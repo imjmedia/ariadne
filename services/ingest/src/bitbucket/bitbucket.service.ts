@@ -84,6 +84,15 @@ export class BitbucketService {
       ...(await this.getAuthHeaders(credentialsRef)),
       ...(rest.headers as Record<string, string>),
     };
+    // Early check: warn if no auth headers were resolved
+    if (!headers['Authorization']) {
+      const hint = credentialsRef
+        ? `La credencial "${credentialsRef}" no existe, no es de tipo bitbucket o no pudo descifrarse`
+        : 'BITBUCKET_TOKEN / BITBUCKET_APP_PASSWORD no definido en entorno';
+      throw new Error(
+        `No hay autenticación para Bitbucket. ${hint}. Ve a Credenciales y verifica que exista y sea válida.`,
+      );
+    }
     let res: Response;
     try {
       res = await fetch(url, { ...rest, headers });
