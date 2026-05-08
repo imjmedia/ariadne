@@ -9,10 +9,16 @@ import { SyncService } from './sync.service';
 /** Nombre de la cola BullMQ para sync. */
 export const SYNC_QUEUE = 'sync';
 
+/** Duración del lock Redis del job: full sync puede tardar minutos (parse + Falkor + embed). Default BullMQ ~30s provoca "could not renew lock" / "Missing lock" al completar. */
+const SYNC_LOCK_MS = parseInt(process.env.BULL_SYNC_LOCK_DURATION_MS ?? '', 10) || 30 * 60 * 1000;
+
 /** Procesa jobs sync encolados (concurrency 1, limiter 2/min). */
 @Processor(SYNC_QUEUE, {
   concurrency: 1,
   limiter: { max: 2, duration: 60_000 },
+  lockDuration: SYNC_LOCK_MS,
+  /** Menos agresivo que el default (~30s) para jobs largos; el lock ya cubre el stall window. */
+  stalledInterval: Math.min(120_000, Math.max(60_000, Math.floor(SYNC_LOCK_MS / 4))),
 })
 export class SyncProcessor extends WorkerHost {
   private readonly logger = new Logger(SyncProcessor.name);
