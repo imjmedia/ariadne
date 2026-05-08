@@ -203,9 +203,15 @@ services:
       - FALKOR_SHARD_BY_PROJECT=${FALKOR_SHARD_BY_PROJECT:-false}
       - FALKOR_SHARD_BY_DOMAIN=${FALKOR_SHARD_BY_DOMAIN:-false}
       - INGEST_URL=http://ingest:3002
+      # Caché de herramientas MCP (get_component_graph, legacy impact, …): misma Redis que api/ingest.
+      # Opcional: MCP_REDIS_URL (prioridad sobre REDIS_URL), MCP_REDIS_DISABLED=1 → solo memoria.
+      - REDIS_URL=redis://redis:6379
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
+      - ARIADNE_API_URL=${ARIADNE_API_URL:-http://api:3000}
     depends_on:
       falkordb:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - falkor-net
