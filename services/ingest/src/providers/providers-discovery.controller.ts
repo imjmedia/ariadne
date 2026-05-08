@@ -2,7 +2,7 @@
  * @fileoverview Endpoints para listar workspaces, repos y branches (Bitbucket/GitHub).
  * Usados por el formulario de alta de repositorio para selects en cascada.
  */
-import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, InternalServerErrorException, Query } from '@nestjs/common';
 import { BitbucketService } from '../bitbucket/bitbucket.service';
 import { GitHubService } from './github.service';
 
@@ -30,7 +30,19 @@ export class ProvidersDiscoveryController {
     if (!workspace?.trim() || !credentialsRef?.trim()) {
       throw new BadRequestException('workspace and credentialsRef are required');
     }
-    return this.bitbucket.listRepositories(workspace, credentialsRef);
+    try {
+      return await this.bitbucket.listRepositories(workspace, credentialsRef);
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      if (msg.startsWith('Bitbucket API')) {
+        throw new InternalServerErrorException(
+          `Error al conectar con Bitbucket: ${msg}. Verifica que el token tenga acceso al workspace "${workspace}".`,
+        );
+      }
+      throw new InternalServerErrorException(
+        `Error inesperado al listar repositorios: ${msg}`,
+      );
+    }
   }
 
   @Get('bitbucket/branches')
