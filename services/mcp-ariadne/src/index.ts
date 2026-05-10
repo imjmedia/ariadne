@@ -951,6 +951,21 @@ function createMcpServer(): Server {
       },
     },
     {
+      name: "generate_navigation_map",
+      description:
+        "Genera el mapa de navegación del proyecto: escanea rutas (React Router, Next.js), componentes, formularios y endpoints. Devuelve un documento Markdown estructurado con la ruta canónica, parámetros, componentes que renderiza, campos de formulario (estáticos y dinámicos), endpoints consumidos y componentes compartidos entre rutas. Ideal para flujo legacy de TheForge.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: { type: "string", description: "ID del proyecto (list_known_projects) — requerido" },
+          scope: { type: "string", description: "full (default) | diff — si es diff, requiere baselineStageId" },
+          baselineStageId: { type: "string", description: "ID de la etapa base para diff (opcional)" },
+        },
+        required: ["projectId"],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "extract_design_tokens",
       description:
         "Busca en el codebase del proyecto archivos de tokens de diseño (Tailwind config, CSS custom properties, theme/token files), extrae y parsea sus valores, y retorna JSON estructurado con los tokens encontrados. No usa LLM — parse directo vía regex + Falkor.",
@@ -3401,6 +3416,42 @@ async function fetchFileFromIngest(
       "```",
     ];
     return { content: [{ type: "text", text: lines.join("\n") }] };
+  }
+
+  // --- generate_navigation_map ---
+  if (name === "generate_navigation_map") {
+    const projectId = (args?.projectId as string) ?? "";
+    if (!projectId) {
+      return {
+        content: [{ type: "text", text: "**Error:** Se requiere `projectId`." }],
+        isError: true,
+      };
+    }
+    const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "";
+    if (!ingestUrl) {
+      return {
+        content: [{ type: "text", text: "**Error:** INGEST_URL no está configurado." }],
+        isError: true,
+      };
+    }
+    try {
+      const { scanNavigationMap } = await import("./navigation-map-scanner.js");
+      const map = await scanNavigationMap(projectId, ingestUrl);
+      return {
+        content: [
+          {
+            type: "text",
+            text: formatNavigationMapMarkdown(map),
+          },
+        ],
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: "text", text: `**Error al generar mapa de navegación:** ${msg}` }],
+        isError: true,
+      };
+    }
   }
 
   // --- extract_design_tokens ---
