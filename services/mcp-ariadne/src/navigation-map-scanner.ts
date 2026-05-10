@@ -9,6 +9,10 @@
  * 4. Para cada componente, resuelve subcomponentes (arbol de imports)
  * 5. Detecta formularios (estaticos y dinamicos)
  * 6. Identifica componentes compartidos (importados desde >=2 rutas)
+ * 7. Resuelve path aliases (tsconfig paths)
+ * 8. Detecta apiClient centralizado para resolver base URL de endpoints
+ * 9. Soporta diff mode (comparacion contra snapshot previo)
+ * 10. Soporta persistencia (guardar/actualizar mapa en archivo)
  *
  * Dependencias: `INGEST_URL` para leer archivos, FalkorDB para consultar el grafo.
  *
@@ -28,6 +32,7 @@ export interface RouteEntry {
   forms: FormEntry[];
   endpoints: EndpointRef[];
   navigation: string[];
+  changed?: "added" | "modified" | "removed" | "unchanged";
 }
 
 export interface SubComponent {
@@ -72,13 +77,29 @@ export interface SharedComponent {
   usedInRoutes: string[];
 }
 
+export interface ApiClientInfo {
+  name: string;
+  baseUrl: string;
+  method: string;
+  filePath: string;
+}
+
 export interface NavigationMap {
   projectId: string;
   framework: string;
   frameworkVersion: string;
   routes: RouteEntry[];
   sharedComponents: SharedComponent[];
+  apiClient?: ApiClientInfo;
+  pathAliases: Record<string, string>;
   errors: string[];
+}
+
+export interface ScannerOptions {
+  ingestBase: string;
+  projectOrRepoId: string;
+  baselineSnapshot?: string;
+  persistPath?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +112,7 @@ interface FrameworkInfo {
   routePattern: "object" | "filesystem" | "both";
 }
 
-function detectFramework(packageJson: Record<string, unknown>): FrameworkInfo {
+export function detectFramework(packageJson: Record<string, unknown>): FrameworkInfo {
   const deps = {
     ...(packageJson.dependencies as Record<string, string> ?? {}),
     ...(packageJson.devDependencies as Record<string, string> ?? {}),
@@ -159,11 +180,154 @@ async function readJsonFromIngest(
   }
 }
 
+/**
+ * Lee el listado de archivos de un directorio via ingest API.
+ * Nueva ruta: GET /repositories/:id/tree?path=... y GET /projects/:id/tree?path=...
+ */
+async function listIngestDirectory(
+  ingestBase: string,
+  projectOrRepoId: string,
+  pathPrefix: string,
+): Promise<string[]> {
+  const base = ingestBase.replace(/\/$/, "");
+  const pathQ = "path=" + encodeURIComponent(pathPrefix);
+  let res = await fetch(base + "/repositories/" + projectOrRepoId + "/tree?" + pathQ);
+  if (res.status === 404) {
+    res = await fetch(base + "/projects/" + projectOrRepoId + "/tree?" + pathQ);
+  }
+  if (!res.ok) return [];
+  const data = (await res.json()) as { files?: string[] };
+  return data.files ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Path alias resolution (from tsconfig.json / jsconfig.json)
+// ---------------------------------------------------------------------------
+
+interface PathAliasMap {
+  [alias: string]: string; // e.g. "@/*" -> "src/*"
+}
+
+export function resolvePathAliases(
+  tsconfig: Record<string, unknown> | null,
+): PathAliasMap {
+  const aliases: PathAliasMap = {};
+  if (!tsconfig) return aliases;
+  const compilerOptions = tsconfig.compilerOptions as Record<string, unknown> | undefined;
+  if (!compilerOptions) return aliases;
+  const paths = compilerOptions.paths as Record<string, string[]> | undefined;
+  if (!paths) return aliases;
+
+  for (const [alias, targets] of Object.entries(paths)) {
+    const target = targets?.[0];
+    if (target) {
+      // Normalize: "@/*" -> ["@/", "src/"]
+      const aliasPrefix = alias.replace(/\*$/, "");
+      const targetPrefix = target.replace(/\*$/, "");
+      aliases[aliasPrefix] = targetPrefix;
+    }
+  }
+  return aliases;
+}
+
+/**
+ * Resuelve un import usando path aliases del tsconfig.
+ * Ej: "@/components/Button" con alias "@/" -> "src/"  -> "src/components/Button"
+ */
+export function resolveAliasedPath(
+  importPath: string,
+  aliases: PathAliasMap,
+): string | null {
+  for (const [aliasPrefix, targetPrefix] of Object.entries(aliases)) {
+    if (importPath.startsWith(aliasPrefix)) {
+      const rest = importPath.slice(aliasPrefix.length);
+      const resolved = targetPrefix + rest;
+      if (!/\.[a-z]+$/i.test(resolved)) {
+        return resolved + ".tsx";
+      }
+      return resolved;
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// apiClient detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Detecta si el proyecto tiene un apiClient centralizado.
+ * Busca patrones como:
+ * - `const apiFetch = ...` con base URL
+ * - `axios.create({ baseURL: "..." })`
+ * - `new ApiClient({ baseUrl: "..." })`
+ */
+async function detectApiClient(
+  ingestBase: string,
+  projectOrRepoId: string,
+): Promise<ApiClientInfo | null> {
+  // Common apiClient file paths
+  const candidates = [
+    "src/lib/api-client.ts",
+    "src/lib/apiClient.ts",
+    "src/lib/api.ts",
+    "src/utils/api-client.ts",
+    "src/utils/apiClient.ts",
+    "src/utils/api.ts",
+    "src/services/api-client.ts",
+    "src/services/apiClient.ts",
+    "src/services/api.ts",
+    "src/api/api-client.ts",
+    "src/api/client.ts",
+    "src/api/index.ts",
+  ];
+
+  for (const path of candidates) {
+    const content = await readIngestFile(ingestBase, projectOrRepoId, path);
+    if (!content) continue;
+
+    // Pattern: baseURL: "..." or baseUrl = "..."
+    const baseUrlMatch = /baseURL\s*[:=]\s*["']([^"']+)["']/.exec(content);
+    // Pattern: const apiFetch = ... / export const apiFetch
+    const exportMatch = /(?:export\s+)?(?:const|let|var)\s+(apiFetch|apiClient|client)\b/.exec(content);
+    // Pattern: axios.create({ ... })
+    const axiosMatch = /axios\.create\s*\(\s*\{/.test(content);
+
+    if (baseUrlMatch || exportMatch || axiosMatch) {
+      const name = exportMatch?.[1] ?? "apiClient";
+      const method = axiosMatch ? "axios" : "fetch";
+      return {
+        name,
+        baseUrl: baseUrlMatch?.[1] ?? "/api",
+        method,
+        filePath: path,
+      };
+    }
+  }
+
+  // Fallback: search in package.json for api client libs
+  const pkg = await readJsonFromIngest(ingestBase, projectOrRepoId, "package.json");
+  if (pkg) {
+    const deps = {
+      ...(pkg.dependencies as Record<string, string> ?? {}),
+      ...(pkg.devDependencies as Record<string, string> ?? {}),
+    };
+    if (deps["axios"]) {
+      return { name: "axios", baseUrl: "/api", method: "axios", filePath: "package.json" };
+    }
+    if (deps["@tanstack/react-query"]) {
+      return { name: "react-query", baseUrl: "/api", method: "fetch", filePath: "package.json" };
+    }
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // React Router object-style route parser
 // ---------------------------------------------------------------------------
 
-function parseReactRouterRoutes(
+export function parseReactRouterRoutes(
   content: string,
   _basePath: string,
 ): Array<{ path: string; componentPath: string }> {
@@ -171,7 +335,7 @@ function parseReactRouterRoutes(
   const seen = new Set<string>();
 
   // Pattern 1: createBrowserRouter([ { path: "...", element: <Component /> } ])
-  const routerPattern = /create(?:Browser)?Router\s*\(\s*\[([\s\S]*?)\]\)/g;
+  const routerPattern = /create(?:Browser)?Router\s*\(\s*\[([\s\S]*?)\]\s*\)/g;
   const routerMatch = routerPattern.exec(content);
   if (routerMatch) {
     const routeDefs = routerMatch[1];
@@ -203,52 +367,109 @@ function parseReactRouterRoutes(
 }
 
 // ---------------------------------------------------------------------------
-// Next.js filesystem router parser
+// Next.js filesystem router parser (dinamico via tree API)
 // ---------------------------------------------------------------------------
 
-async function parseNextJsRoutes(
+interface PageFile {
+  path: string;       // e.g. "pages/dashboard.tsx"
+  routePath: string;  // e.g. "/dashboard"
+  isDynamic: boolean;
+}
+
+/**
+ * Escanea directorios de Next.js (pages/ y app/) usando la API tree.
+ * Soporta:
+ * - pages/index.tsx -> /
+ * - pages/dashboard.tsx -> /dashboard
+ * - pages/blog/[slug].tsx -> /blog/:slug
+ * - app/page.tsx -> /
+ * - app/dashboard/page.tsx -> /dashboard
+ * - app/blog/[slug]/page.tsx -> /blog/:slug
+ */
+async function scanNextJsDirectories(
   ingestBase: string,
   projectOrRepoId: string,
-  _reactVersion: string,
-): Promise<Array<{ path: string; componentPath: string }>> {
-  const routes: Array<{ path: string; componentPath: string }> = [];
-  const found = new Set<string>();
+): Promise<PageFile[]> {
+  const pages: PageFile[] = [];
+  const seen = new Set<string>();
 
-  // Try common page files
-  const pageCandidates = [
-    { file: "pages/index.tsx", route: "/" },
-    { file: "pages/index.ts", route: "/" },
-    { file: "app/page.tsx", route: "/" },
-    { file: "app/page.jsx", route: "/" },
-    { file: "pages/dashboard.tsx", route: "/dashboard" },
-    { file: "app/dashboard/page.tsx", route: "/dashboard" },
-    { file: "pages/login.tsx", route: "/login" },
-    { file: "app/login/page.tsx", route: "/login" },
-    { file: "pages/settings.tsx", route: "/settings" },
-    { file: "app/settings/page.tsx", route: "/settings" },
-    { file: "pages/profile.tsx", route: "/profile" },
-    { file: "app/profile/page.tsx", route: "/profile" },
-  ];
+  // Try pages/ directory first (Pages Router)
+  const pagesFiles = await listIngestDirectory(ingestBase, projectOrRepoId, "pages");
+  if (pagesFiles.length > 0) {
+    for (const file of pagesFiles) {
+      // Only page files (not components/_app/_document etc)
+      if (!file.endsWith(".tsx") && !file.endsWith(".jsx") && !file.endsWith(".ts") && !file.endsWith(".js")) continue;
+      if (file.includes("/_")) continue; // _app, _document, _middleware
 
-  for (const c of pageCandidates) {
-    if (found.has(c.route)) continue;
-    const content = await readIngestFile(ingestBase, projectOrRepoId, c.file);
-    if (content) {
-      found.add(c.route);
-      routes.push({ path: c.route, componentPath: c.file });
+      // Convert filesystem path to route
+      const relPath = file.startsWith("pages/") ? file.slice(6) : file;
+      if (relPath === "index.tsx" || relPath === "index.ts" || relPath === "index.jsx" || relPath === "index.js") {
+        if (!seen.has("/")) { seen.add("/"); pages.push({ path: file, routePath: "/", isDynamic: false }); }
+        continue;
+      }
+
+      const routePath = filesystemPathToRoute(relPath);
+      if (!seen.has(routePath)) {
+        seen.add(routePath);
+        pages.push({ path: file, routePath, isDynamic: routePath.includes(":") });
+      }
     }
   }
 
-  return routes;
+  // Try app/ directory (App Router)
+  const appFiles = await listIngestDirectory(ingestBase, projectOrRepoId, "app");
+  if (appFiles.length > 0) {
+    for (const file of appFiles) {
+      // Only page.tsx/page.jsx files
+      if (!file.endsWith("/page.tsx") && !file.endsWith("/page.jsx")) continue;
+
+      const relPath = file.startsWith("app/") ? file.slice(4) : file;
+      const routeDir = relPath.replace(/\/page\.(tsx|jsx)$/, "");
+
+      if (routeDir === "" || routeDir === "page" || routeDir === "(index)") {
+        if (!seen.has("/")) { seen.add("/"); pages.push({ path: file, routePath: "/", isDynamic: false }); }
+        continue;
+      }
+
+      // Skip route groups: (marketing)/about -> about
+      const cleanRoute = routeDir.replace(/\([^)]+\)\//g, "");
+      const routePath = filesystemPathToRoute(cleanRoute);
+      if (!seen.has(routePath)) {
+        seen.add(routePath);
+        pages.push({ path: file, routePath, isDynamic: routePath.includes(":") });
+      }
+    }
+  }
+
+  return pages;
+}
+
+export function filesystemPathToRoute(relPath: string): string {
+  let route = relPath.replace(/\.(tsx|ts|jsx|js)$/, "");
+  // Strip pages/ or app/ prefix
+    route = route.replace(/^(pages|app)\//, "");
+    // Convert [slug] -> :slug
+    route = route.replace(/\[([^\]]+)\]/g, ":$1");
+    // Convert (group) routes — remove route groups
+    route = route.replace(/\/\([^)]+\)/g, "");
+    // Handle page.tsx in app router: /dashboard/page -> /dashboard
+    route = route.replace(/\/page$/, "");
+    // Handle index files
+    if (route === "" || route === "index") return "/";
+    if (route.endsWith("/index")) {
+      route = route.slice(0, -6) || "/";
+    }
+    return "/" + route;
 }
 
 // ---------------------------------------------------------------------------
 // Component analysis
 // ---------------------------------------------------------------------------
 
-function analyzeComponent(
+export function analyzeComponent(
   source: string,
   filePath: string,
+  pathAliases: PathAliasMap,
 ): {
   subComponents: SubComponent[];
   forms: FormEntry[];
@@ -261,12 +482,27 @@ function analyzeComponent(
   if (!source) return { subComponents, forms, endpoints };
 
   // ---- Subcomponents: local imports ----
-  const importRegex = /import\s+(?:\{[^}]+\}|[^;{]+)\s+from\s+["'](\.[^"']+)["']/g;
+  const importRegex = /import\s+(?:\{[^}]*\}|[^;{]+)\s+from\s+["'](\.[^"']+)["']/g;
   let m: RegExpExecArray | null;
   while ((m = importRegex.exec(source)) !== null) {
     const importPath = m[1]!;
     const dir = filePath.substring(0, filePath.lastIndexOf("/") + 1);
     const resolved = resolveRelativePath(dir, importPath);
+    if (resolved && !resolved.startsWith("node_modules")) {
+      subComponents.push({
+        path: resolved,
+        name: importPath.split("/").pop() ?? resolved,
+        isShared: false,
+      });
+    }
+  }
+
+  // ---- Subcomponents: aliased imports (@/, ~/, etc.) ----
+  const aliasImportRegex = /import\s+(?:\{[^}]*\}|[^;{]+)\s+from\s+["'](@[^"']+|~[^"']+|[a-z][\w-]*\/[^"']+)["']/g;
+  let am: RegExpExecArray | null;
+  while ((am = aliasImportRegex.exec(source)) !== null) {
+    const importPath = am[1]!;
+    const resolved = resolveAliasedPath(importPath, pathAliases);
     if (resolved && !resolved.startsWith("node_modules")) {
       subComponents.push({
         path: resolved,
@@ -317,7 +553,7 @@ function analyzeComponent(
     if (nameMatch && !fieldNames.has(nameMatch[1]!)) {
       fieldNames.add(nameMatch[1]!);
       const options: string[] = [];
-      const optPattern = /<option[^>]*value=["']([^"']+)["']/g;
+      const optPattern = /<option[^>]*value=["']([^"']*)["']/g;
       let om: RegExpExecArray | null;
       while ((om = optPattern.exec(selectMatch[2])) !== null) {
         options.push(om[1]!);
@@ -342,11 +578,10 @@ function analyzeComponent(
 
     if (submitMatch) {
       const handlerName = submitMatch[1]!;
-      // Build regex without template literal to avoid TS parser issues
       const patternParts = [
         handlerName,
-        "[\\s\\S]{0,500}(?:fetch|axios\\.|apiFetch)\\(\\s*[\"'`]([^\"'`]+)[\"'`]",
-        "[\\s\\S]{0,100}(method\\s*:\\s*[\"'](\\w+)[\"'])?"
+        "[\\s\\S]{0,500}(?:fetch|axios\\.|apiFetch)\\(\\s*[\\\"'`]([^\\\"'`]+)[\\\"'`]",
+        "[\\s\\S]{0,100}(method\\s*:\\s*[\\\"'](\\w+)[\\\"'])?"
       ];
       const handlerPattern = new RegExp(patternParts.join(""), "i");
       const handlerMatch = handlerPattern.exec(source);
@@ -376,13 +611,12 @@ function analyzeComponent(
 
     if (schemaMatch) {
       const schemaName = schemaMatch[1]!;
-      // Try to find the schema import (no template literal to avoid TS parser issues)
       const importParts = [
         "import\\s+(?:\\{[^}]*",
         schemaName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
         "[^}]*\\}|",
         schemaName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-        "\\s+from)\\s+from\\s+[\"']([^\"']+)[\"']"
+        "\\s+from)\\s+from\\s+[\\\"']([^\\\"']+)[\\\"']"
       ];
       const schemaImportPattern = new RegExp(importParts.join(""), "i");
       schemaImportPattern.exec(source);
@@ -399,7 +633,7 @@ function analyzeComponent(
   }
 
   // ---- Endpoints: fetch/axios/apiFetch calls ----
-  const fetchPatternStr = "(?:fetch|axios\\.(?:get|post|put|patch|delete)|apiFetch)\\s*\\(\\s*[\"'`]([^\"'`]+)[\"'`][\\s\\S]{0,200}?(method\\s*:\\s*[\"'](\\w+)[\"'])?";
+  const fetchPatternStr = "(?:fetch|axios\\.(?:get|post|put|patch|delete)|apiFetch)\\s*\\(\\s*[\\\"'`]([^\\\"'`]+)[\\\"'`][\\s\\S]{0,200}?(method\\s*:\\s*[\\\"'](\\w+)[\\\"'])?";
   const fetchPattern = new RegExp(fetchPatternStr, "gi");
   let fetchMatch: RegExpExecArray | null;
   const seenEndpoints = new Set<string>();
@@ -441,17 +675,85 @@ function resolveRelativePath(dir: string, importPath: string): string {
   }
 
   const fullPath = [...dirParts, ...resolved].join("/");
-  if (!/\.\w+$/.test(fullPath)) {
+  if (!/\.[a-z]+$/i.test(fullPath)) {
+    // Try common extensions
     return fullPath + ".tsx";
   }
   return fullPath;
 }
 
 // ---------------------------------------------------------------------------
+// Diff computation
+// ---------------------------------------------------------------------------
+
+function parseSnapshotRoutes(snapshotMarkdown: string): Map<string, RouteEntry> {
+  const routes = new Map<string, RouteEntry>();
+  const routeBlocks = snapshotMarkdown.split(/^##\s+/m);
+  for (const block of routeBlocks) {
+    const urlMatch = block.match(/^(\/\S+)/m);
+    if (!urlMatch) continue;
+    const url = urlMatch[1];
+    routes.set(url, {
+      url,
+      params: [],
+      screenName: "",
+      componentPath: "",
+      subComponents: [],
+      forms: [],
+      endpoints: [],
+      navigation: [],
+    });
+  }
+  return routes;
+}
+
+export function computeDiff(
+  currentRoutes: RouteEntry[],
+  baselineMarkdown: string,
+): RouteEntry[] {
+  const baseline = parseSnapshotRoutes(baselineMarkdown);
+  const currentMap = new Map(currentRoutes.map((r) => [r.url, r]));
+  const result: RouteEntry[] = [];
+
+  for (const route of currentRoutes) {
+    if (!baseline.has(route.url)) {
+      route.changed = "added";
+      result.push(route);
+    } else {
+      const base = baseline.get(route.url)!;
+      const changed = route.componentPath !== base.componentPath
+        || JSON.stringify(route.forms) !== JSON.stringify(base.forms)
+        || JSON.stringify(route.endpoints) !== JSON.stringify(base.endpoints);
+      route.changed = changed ? "modified" : "unchanged";
+      result.push(route);
+    }
+  }
+
+  // Detect removed routes
+  for (const [url] of baseline) {
+    if (!currentMap.has(url)) {
+      result.push({
+        url,
+        params: [],
+        screenName: url.split("/").pop() ?? "",
+        componentPath: "REMOVED",
+        subComponents: [],
+        forms: [],
+        endpoints: [],
+        navigation: [],
+        changed: "removed",
+      });
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Navigation map formatting for output
 // ---------------------------------------------------------------------------
 
-export function formatNavigationMapMarkdown(map: NavigationMap): string {
+export function formatNavigationMapMarkdown(map: NavigationMap, showAll?: boolean): string {
   const lines: string[] = [];
   lines.push("# Mapa de Navegacion - Proyecto: " + map.projectId);
   lines.push("");
@@ -459,6 +761,12 @@ export function formatNavigationMapMarkdown(map: NavigationMap): string {
   lines.push("> Framework: " + map.framework + " " + map.frameworkVersion);
   lines.push("> Rutas: " + map.routes.length);
   lines.push("> Componentes compartidos: " + map.sharedComponents.length);
+  if (map.apiClient) {
+    lines.push("> apiClient: " + map.apiClient.name + " (" + map.apiClient.baseUrl + ", " + map.apiClient.method + ")");
+  }
+  if (Object.keys(map.pathAliases).length > 0) {
+    lines.push("> Path aliases: " + Object.keys(map.pathAliases).join(", "));
+  }
   lines.push("");
 
   if (map.errors.length > 0) {
@@ -477,14 +785,22 @@ export function formatNavigationMapMarkdown(map: NavigationMap): string {
   }
 
   for (const route of map.routes) {
+    // In diff mode, skip unchanged routes unless showAll is true
+    if (route.changed === "unchanged" && !showAll) continue;
+
     lines.push("---");
     lines.push("");
-    lines.push("## " + route.url);
+
+    const statusIcon = route.changed === "added" ? " 🟢" : route.changed === "modified" ? " 🟡" : route.changed === "removed" ? " 🔴" : "";
+    lines.push("## " + route.url + statusIcon);
     lines.push("### Pantalla: " + route.screenName);
     lines.push("");
     lines.push("- **URL:** " + route.url);
     if (route.params.length > 0) {
       lines.push("- **Parametros:** " + route.params.join(", "));
+    }
+    if (route.changed) {
+      lines.push("- **Estado:** " + route.changed);
     }
     lines.push("- **Renderiza:** " + route.componentPath);
 
@@ -555,12 +871,36 @@ export function formatNavigationMapMarkdown(map: NavigationMap): string {
 }
 
 // ---------------------------------------------------------------------------
+// Persistence helpers
+// ---------------------------------------------------------------------------
+
+export function serializeNavigationMapJson(map: NavigationMap): string {
+  return JSON.stringify(map, null, 2);
+}
+
+/**
+ * Escribe el mapa de navegacion a un archivo via la API de persistencia.
+ * Como alternativa, guarda el Markdown en la base de datos de TheForge.
+ */
+export function navigationMapToJsonPatch(map: NavigationMap): Record<string, unknown> {
+  return {
+    mddContent: formatNavigationMapMarkdown(map),
+    navigationMapJson: serializeNavigationMapJson(map),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Main scanner function
 // ---------------------------------------------------------------------------
 
 export async function scanNavigationMap(
   projectOrRepoId: string,
   ingestBase: string,
+  options?: {
+    baselineSnapshot?: string;
+    showAll?: boolean;
+  },
 ): Promise<NavigationMap> {
   const errors: string[] = [];
   const routes: RouteEntry[] = [];
@@ -576,15 +916,24 @@ export async function scanNavigationMap(
       frameworkVersion: "0",
       routes: [],
       sharedComponents: [],
+      pathAliases: {},
       errors: ["No se pudo leer package.json"],
     };
   }
 
-  // 2. Detect framework
+  // 2. Read tsconfig.json for path aliases
+  const tsconfig = await readJsonFromIngest(baseUrl, projectOrRepoId, "tsconfig.json")
+    ?? await readJsonFromIngest(baseUrl, projectOrRepoId, "jsconfig.json");
+  const pathAliases = resolvePathAliases(tsconfig);
+
+  // 3. Detect apiClient
+  const apiClient = await detectApiClient(baseUrl, projectOrRepoId);
+
+  // 4. Detect framework
   const framework = detectFramework(pkg);
   let rawRoutes: Array<{ path: string; componentPath: string }> = [];
 
-  // 3. Extract routes based on framework
+  // 5. Extract routes based on framework
   if (framework.name === "react-router-dom") {
     const routerPaths = [
       "src/router.tsx", "src/router.ts", "src/router.jsx",
@@ -601,7 +950,14 @@ export async function scanNavigationMap(
       }
     }
   } else if (framework.name === "next") {
-    rawRoutes = await parseNextJsRoutes(baseUrl, projectOrRepoId, framework.version);
+    // Dynamic Next.js scanner via tree API
+    const pageFiles = await scanNextJsDirectories(baseUrl, projectOrRepoId);
+    for (const pf of pageFiles) {
+      rawRoutes.push({ path: pf.routePath, componentPath: pf.path });
+    }
+    if (rawRoutes.length === 0) {
+      errors.push("No se encontraron rutas en pages/ ni app/ (Next.js). Verifica que existan archivos de pagina.");
+    }
   } else {
     const commonPaths = [
       "src/router.tsx", "src/router.ts", "src/routes.tsx",
@@ -616,19 +972,27 @@ export async function scanNavigationMap(
     }
   }
 
-  // 4. For each route, resolve component and analyze
+  // 6. For each route, resolve component and analyze
   const allSubComponents: Map<string, string[]> = new Map();
 
   for (const rr of rawRoutes) {
     const componentPath = rr.componentPath;
-    const possiblePaths = [
-      "src/pages/" + componentPath + ".tsx",
-      "src/pages/" + componentPath + "/index.tsx",
-      "src/components/" + componentPath + ".tsx",
-      "src/" + componentPath + ".tsx",
-      "pages/" + componentPath + ".tsx",
-      componentPath,
-    ];
+
+    // Build search paths based on whether this is a Next.js page file or a component name
+    let possiblePaths: string[];
+    if (componentPath.startsWith("pages/") || componentPath.startsWith("app/")) {
+      // Next.js: use the file path directly
+      possiblePaths = [componentPath];
+    } else {
+      possiblePaths = [
+        "src/pages/" + componentPath + ".tsx",
+        "src/pages/" + componentPath + "/index.tsx",
+        "src/components/" + componentPath + ".tsx",
+        "src/" + componentPath + ".tsx",
+        "pages/" + componentPath + ".tsx",
+        componentPath,
+      ];
+    }
 
     let source: string | null = null;
     let resolvedPath = componentPath;
@@ -646,7 +1010,7 @@ export async function scanNavigationMap(
       continue;
     }
 
-    const analysis = analyzeComponent(source, resolvedPath);
+    const analysis = analyzeComponent(source, resolvedPath, pathAliases);
 
     // Track sub-components for shared detection
     for (const sc of analysis.subComponents) {
@@ -670,7 +1034,7 @@ export async function scanNavigationMap(
       navigation: [],
     };
 
-    const paramMatches = rr.path.match(/:(\w+)/g);
+    const paramMatches = rr.path.match(/:\w+/g);
     if (paramMatches) {
       entry.params = paramMatches.map((p) => p.replace(":", ""));
     }
@@ -678,14 +1042,14 @@ export async function scanNavigationMap(
     routes.push(entry);
   }
 
-  // 5. Identify shared components (used in >=2 routes)
+  // 7. Identify shared components (used in >=2 routes)
   for (const [path, routeUrls] of allSubComponents) {
     if (routeUrls.length >= 2) {
       const source = await readIngestFile(baseUrl, projectOrRepoId, path);
       let forms: FormEntry[] = [];
       let endpoints: EndpointRef[] = [];
       if (source) {
-        const analysis = analyzeComponent(source, path);
+        const analysis = analyzeComponent(source, path, pathAliases);
         forms = analysis.forms;
         endpoints = analysis.endpoints;
       }
@@ -700,7 +1064,7 @@ export async function scanNavigationMap(
     }
   }
 
-  // 6. Mark subcomponents as shared in each route
+  // 8. Mark subcomponents as shared in each route
   const sharedPaths = new Set(sharedComponents.map((s) => s.path));
   for (const route of routes) {
     for (const sc of route.subComponents) {
@@ -711,21 +1075,30 @@ export async function scanNavigationMap(
     }
   }
 
-  return {
+  const map: NavigationMap = {
     projectId: projectOrRepoId,
     framework: framework.name,
     frameworkVersion: framework.version,
     routes,
     sharedComponents,
+    apiClient: apiClient ?? undefined,
+    pathAliases,
     errors,
   };
+
+  // 9. Diff mode: compute changes against baseline
+  if (options?.baselineSnapshot) {
+    map.routes = computeDiff(routes, options.baselineSnapshot);
+  }
+
+  return map;
 }
 
 // ---------------------------------------------------------------------------
 // Utility: infer screen name from route path
 // ---------------------------------------------------------------------------
 
-function inferScreenName(routePath: string, _componentName: string): string {
+export function inferScreenName(routePath: string, _componentName: string): string {
   const parts = routePath.split("/").filter(Boolean);
   if (parts.length === 0) return "Inicio";
 

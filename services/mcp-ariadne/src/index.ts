@@ -953,13 +953,15 @@ function createMcpServer(): Server {
     {
       name: "generate_navigation_map",
       description:
-        "Genera el mapa de navegación del proyecto: escanea rutas (React Router, Next.js), componentes, formularios y endpoints. Devuelve un documento Markdown estructurado con la ruta canónica, parámetros, componentes que renderiza, campos de formulario (estáticos y dinámicos), endpoints consumidos y componentes compartidos entre rutas. Ideal para flujo legacy de TheForge.",
+        "Genera el mapa de navegacion del proyecto: escanea rutas (React Router, Next.js), componentes, formularios y endpoints. Soporta Next.js dinamico (tree API), path aliases (tsconfig), deteccion de apiClient, diff mode y persistencia. Devuelve Markdown estructurado con ruta, parametros, componentes, formularios, endpoints y compartidos.",
       inputSchema: {
         type: "object" as const,
         properties: {
           projectId: { type: "string", description: "ID del proyecto (list_known_projects) — requerido" },
-          scope: { type: "string", description: "full (default) | diff — si es diff, requiere baselineStageId" },
-          baselineStageId: { type: "string", description: "ID de la etapa base para diff (opcional)" },
+          scope: { type: "string", description: "full (default, muestra todo) | diff (solo cambios) | diff-all (cambios + sin cambios)" },
+          baselineSnapshot: { type: "string", description: "Snapshot Markdown previo para comparacion diff (opcional). Si no se pasa, scope=diff usa baselineStageId." },
+          baselineStageId: { type: "string", description: "ID de la etapa base para recuperar snapshot de BD (opcional, solo si scope=diff y no hay baselineSnapshot)" },
+          showAll: { type: "boolean", description: "En modo diff, incluir rutas sin cambios (default: false)" },
         },
         required: ["projectId"],
         additionalProperties: false,
@@ -3434,14 +3436,20 @@ async function fetchFileFromIngest(
         isError: true,
       };
     }
+    const scope = (args?.scope as string) ?? "full";
+    const baselineSnapshot = (args?.baselineSnapshot as string) ?? undefined;
+    const showAll = (args?.showAll as boolean) ?? false;
     try {
-      const { scanNavigationMap } = await import("./navigation-map-scanner.js");
-      const map = await scanNavigationMap(projectId, ingestUrl);
+      const { scanNavigationMap, formatNavigationMapMarkdown } = await import("./navigation-map-scanner.js");
+      const map = await scanNavigationMap(projectId, ingestUrl, {
+        baselineSnapshot: scope.startsWith("diff") ? baselineSnapshot : undefined,
+        showAll: scope === "diff-all" || showAll,
+      });
       return {
         content: [
           {
             type: "text",
-            text: formatNavigationMapMarkdown(map),
+            text: formatNavigationMapMarkdown(map, scope === "diff-all" || showAll),
           },
         ],
       };

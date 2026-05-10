@@ -74,6 +74,17 @@ export class RepositoriesController {
     return this.embedIndexSvc.runEmbedIndex(id);
   }
 
+  /** Lista archivos del repositorio (GitHub/Bitbucket tree). Filtra por pathPrefix opcional. */
+  @Get(':id/tree')
+  async listTree(
+    @Param('id') id: string,
+    @Query('path') path: string | undefined,
+    @Query('credentialsRef') credentialsRef: string | undefined,
+  ) {
+    const files = await this.fileContent.listFiles(id, path?.trim() || undefined, credentialsRef ?? null);
+    return { files };
+  }
+
   @Get(':id/jobs')
   findJobs(@Param('id') id: string) {
     return this.service.findJobsByRepositoryId(id);

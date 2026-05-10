@@ -121,6 +121,44 @@ export class FileContentService {
     return null;
   }
 
+  /**
+   * Lista archivos del repositorio (Bitbucket/GitHub). Filtra por path opcional.
+   * @param {string} repositoryId - ID del repositorio.
+   * @param {string} [pathPrefix] - Prefijo de directorio (opcional; ej. "src/pages").
+   * @param {string | null} [credentialsRef] - UUID de credencial.
+   * @returns {Promise<string[]>} Lista de rutas de archivos.
+   */
+  async listFiles(
+    repositoryId: string,
+    pathPrefix?: string,
+    credentialsRef?: string | null,
+  ): Promise<string[]> {
+    const repo = await this.repos.findOne(repositoryId);
+    const credRef = credentialsRef ?? repo.credentialsRef;
+    let files: string[];
+    if (repo.provider === 'bitbucket') {
+      files = await this.bitbucket.listFiles(
+        repo.projectKey,
+        repo.repoSlug,
+        credRef,
+      );
+    } else if (repo.provider === 'github') {
+      files = await this.github.listFiles(
+        repo.projectKey,
+        repo.repoSlug,
+        repo.defaultBranch,
+        credRef,
+      );
+    } else {
+      throw new NotFoundException(`Provider ${repo.provider} does not support file listing`);
+    }
+    if (pathPrefix) {
+      const prefix = pathPrefix.replace(/\/+$/, '') + '/';
+      files = files.filter((f) => f.startsWith(prefix));
+    }
+    return files;
+  }
+
   /** Convierte path del grafo (repo-slug/src/foo.ts) a relPath (src/foo.ts) */
   private toRelativePath(path: string, repoSlug: string): string {
     const norm = path.replace(/\\/g, '/').trim();
