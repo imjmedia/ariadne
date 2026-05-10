@@ -140,6 +140,7 @@ export class FileContentService {
       files = await this.bitbucket.listFiles(
         repo.projectKey,
         repo.repoSlug,
+        repo.defaultBranch,
         credRef,
       );
     } else if (repo.provider === 'github') {
