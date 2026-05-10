@@ -953,7 +953,7 @@ function createMcpServer(): Server {
     {
       name: "generate_navigation_map",
       description:
-        "Genera el mapa de navegacion del proyecto: escanea rutas (React Router, Next.js), componentes, formularios y endpoints. Soporta Next.js dinamico (tree API), path aliases (tsconfig), deteccion de apiClient, diff mode y persistencia. Devuelve Markdown estructurado con ruta, parametros, componentes, formularios, endpoints y compartidos.",
+        "Genera un mapa de navegacion detallado del proyecto frontend. INPUT: projectId (obligatorio, de list_known_projects), scope (full|diff|diff-all), baselineSnapshot (Markdown previo para diff), showAll (bool). OUTPUT: Markdown estructurado con: framework detectado, cada ruta (URL, parametros, componente principal, subcomponentes, formularios con campos/tipos/validaciones, endpoints HTTP), y seccion de componentes compartidos entre rutas. Frameworks soportados: react-router-dom, next (pages + app router), tanstack-router, angular, vue-router, sveltekit, expo-router, remix. Detecta path aliases de tsconfig, apiClient centralizado, formularios estaticos y DynamicForm. Para cambios incrementales usa scope=diff con baselineSnapshot del stage previo.",
       inputSchema: {
         type: "object" as const,
         properties: {

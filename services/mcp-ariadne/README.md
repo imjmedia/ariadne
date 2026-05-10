@@ -57,6 +57,9 @@ npm publish
 ### Workflow
 - **get_file_context** — Combina contenido + imports + exports. Paso 2: search → get_file_context → validate/apply.
 
+### Mapa de navegación (legacy flow)
+- **generate_navigation_map** — Escanea el proyecto frontend (React Router, Next.js) y genera un mapa completo: rutas con parámetros, componentes que renderiza, formularios (estáticos y dinámicos), endpoints consumidos, componentes compartidos entre ≥2 rutas, path aliases (tsconfig) y apiClient detectado. Soporta diff mode (`scope=diff` + `baselineSnapshot`) para comparar contra un snapshot previo. Requiere `projectId` (de `list_known_projects`).
+
 **Enrutamiento y whitelist de dominios:** Con `INGEST_URL`, el MCP llama a **`GET /projects/:id/graph-routing`** y usa **`cypherShardContexts`**: lista de `{ graphName, cypherProjectId }`. Cada consulta Cypher debe filtrar con el `projectId` que realmente tienen los nodos en ese grafo (propio proyecto + proyectos en dominios permitidos en **ProjectDomainDependency**). Sin esto, los grafos “hermanos” devolverían 0 filas. `forEachProjectShardGraph` y búsquedas que fusionan filas pasan el `cypherProjectId` correcto por shard.
 
 **`semantic_search`, `find_similar_implementations` y id de proyecto vs repo:** `list_known_projects` devuelve `roots[].id` (**repositorio**). En Falkor, los nodos llevan `projectId` = UUID del **proyecto** Ariadne cuando el repo está enlazado; `roots[].id` coincide con `repoId`. **`resolve-graph-scope.ts`** llama `GET /repositories/:id` en ingest, mapea al `cypherProjectId` correcto y, si aplica, añade `AND n.repoId = $repoId` para no mezclar repos en multi-root. Ambas herramientas enrutan con `runOnProjectGraphs`/`forEachProjectShardGraph` y el mismo filtro. Sin este paso, filtrar por `roots[].id` como si fuera `projectId` devolvía **0 filas** (MDD vacío pese a índice sano).
