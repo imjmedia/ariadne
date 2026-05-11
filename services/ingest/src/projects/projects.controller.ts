@@ -16,6 +16,7 @@ import {
 import { ProjectsService } from './projects.service';
 import { FileContentService } from '../repositories/file-content.service';
 import { JobAnalysisService } from '../repositories/job-analysis.service';
+import { RepositoriesService } from '../repositories/repositories.service';
 import { C4DslGeneratorService } from '../architecture/c4-dsl-generator.service';
 import { KrokiProxyService } from '../architecture/kroki-proxy.service';
 import { DomainsService } from '../domains/domains.service';
@@ -26,6 +27,7 @@ export class ProjectsController {
     private readonly service: ProjectsService,
     private readonly fileContent: FileContentService,
     private readonly jobAnalysis: JobAnalysisService,
+    private readonly reposService: RepositoriesService,
     private readonly c4Dsl: C4DslGeneratorService,
     private readonly kroki: KrokiProxyService,
     private readonly domains: DomainsService,
@@ -92,6 +94,23 @@ export class ProjectsController {
   @Get(':id/graph-routing')
   graphRouting(@Param('id') id: string) {
     return this.service.getGraphRouting(id);
+  }
+
+  /** Lista archivos del proyecto (multi-root). Filtra por pathPrefix opcional. */
+  @Get(':id/tree')
+  async listTree(
+    @Param('id') projectId: string,
+    @Query('path') path: string | undefined,
+    @Query('ref') ref?: string,
+  ) {
+    const repos = await this.reposService.findAll(projectId);
+    const allFiles: string[] = [];
+    const prefix = path?.trim() || undefined;
+    for (const repo of repos) {
+      const files = await this.fileContent.listFiles(repo.id, prefix, ref ?? null);
+      allFiles.push(...files);
+    }
+    return { files: [...new Set(allFiles)].sort() };
   }
 
   @Get(':id/file')

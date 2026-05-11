@@ -951,6 +951,23 @@ function createMcpServer(): Server {
       },
     },
     {
+      name: "generate_navigation_map",
+      description:
+        "Genera un mapa de navegacion detallado del proyecto frontend. INPUT: projectId (obligatorio, de list_known_projects), scope (full|diff|diff-all), baselineSnapshot (Markdown previo para diff), showAll (bool). OUTPUT: Markdown estructurado con: framework detectado, cada ruta (URL, parametros, componente principal, subcomponentes, formularios con campos/tipos/validaciones, endpoints HTTP), y seccion de componentes compartidos entre rutas. Frameworks soportados: react-router-dom, next (pages + app router), tanstack-router, angular, vue-router, sveltekit, expo-router, remix. Detecta path aliases de tsconfig, apiClient centralizado, formularios estaticos y DynamicForm. Para cambios incrementales usa scope=diff con baselineSnapshot del stage previo.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: { type: "string", description: "ID del proyecto (list_known_projects) — requerido" },
+          scope: { type: "string", description: "full (default, muestra todo) | diff (solo cambios) | diff-all (cambios + sin cambios)" },
+          baselineSnapshot: { type: "string", description: "Snapshot Markdown previo para comparacion diff (opcional). Si no se pasa, scope=diff usa baselineStageId." },
+          baselineStageId: { type: "string", description: "ID de la etapa base para recuperar snapshot de BD (opcional, solo si scope=diff y no hay baselineSnapshot)" },
+          showAll: { type: "boolean", description: "En modo diff, incluir rutas sin cambios (default: false)" },
+        },
+        required: ["projectId"],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "extract_design_tokens",
       description:
         "Busca en el codebase del proyecto archivos de tokens de diseño (Tailwind config, CSS custom properties, theme/token files), extrae y parsea sus valores, y retorna JSON estructurado con los tokens encontrados. No usa LLM — parse directo vía regex + Falkor.",
@@ -3413,6 +3430,48 @@ async function fetchFileFromIngest(
       "```",
     ];
     return { content: [{ type: "text", text: lines.join("\n") }] };
+  }
+
+  // --- generate_navigation_map ---
+  if (name === "generate_navigation_map") {
+    const projectId = (args?.projectId as string) ?? "";
+    if (!projectId) {
+      return {
+        content: [{ type: "text", text: "**Error:** Se requiere `projectId`." }],
+        isError: true,
+      };
+    }
+    const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "";
+    if (!ingestUrl) {
+      return {
+        content: [{ type: "text", text: "**Error:** INGEST_URL no está configurado." }],
+        isError: true,
+      };
+    }
+    const scope = (args?.scope as string) ?? "full";
+    const baselineSnapshot = (args?.baselineSnapshot as string) ?? undefined;
+    const showAll = (args?.showAll as boolean) ?? false;
+    try {
+      const { scanNavigationMap, formatNavigationMapMarkdown } = await import("./navigation-map-scanner.js");
+      const map = await scanNavigationMap(projectId, ingestUrl, {
+        baselineSnapshot: scope.startsWith("diff") ? baselineSnapshot : undefined,
+        showAll: scope === "diff-all" || showAll,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: formatNavigationMapMarkdown(map, scope === "diff-all" || showAll),
+          },
+        ],
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: "text", text: `**Error al generar mapa de navegación:** ${msg}` }],
+        isError: true,
+      };
+    }
   }
 
   // --- extract_design_tokens ---
