@@ -162,24 +162,15 @@ function getTokenFromRequest(req: IncomingMessage): string | null {
   return auth?.startsWith("Bearer ") ? auth.slice(7).trim() : null;
 }
 
-/** Valida auth con MCP_AUTH_TOKEN estático o token MCP por usuario contra Ingest. Retorna null si ok. */
+/** Valida token MCP contra usuario en BD vía Ingest directo (fallback API Gateway). Retorna null si ok. */
 async function validateAuth(req: IncomingMessage): Promise<string | null> {
-  const staticToken = process.env.MCP_AUTH_TOKEN?.trim();
   const clientToken = getTokenFromRequest(req);
 
   if (!clientToken) {
-    if (staticToken) return "Token no proporcionado (X-M2M-Token o Authorization: Bearer)";
-    // Sin token y sin auth configurada → permitir
-    return null;
+    return "Token no proporcionado (X-M2M-Token o Authorization: Bearer)";
   }
 
-  // 1. Validar contra MCP_AUTH_TOKEN estático (backward compat)
-  if (staticToken) {
-    if (clientToken === staticToken) return null;
-    // Si hay static token y no coincide, intentar validación por usuario como fallback
-  }
-
-  // 2. Validar contra token MCP de usuario vía Ingest directo (más rápido, sin pasar por API Gateway)
+  // Validar contra token MCP de usuario vía Ingest directo (más rápido, sin pasar por API Gateway)
   try {
     const ingestUrl = process.env.INGEST_URL?.trim() || 'http://ingest:3002';
     const res = await fetch(`${ingestUrl}/internal/users/validate-mcp-token`, {
@@ -221,12 +212,10 @@ async function validateAuth(req: IncomingMessage): Promise<string | null> {
         }
       }
     } catch (err2) {
-      if (staticToken && clientToken === staticToken) return null;
       console.error(`[MCP] validateAuth: per-user fetch failed (both ingest and api): ${err2 instanceof Error ? err2.message : String(err2)}`);
     }
   }
 
-  if (staticToken) return "Token inválido";
   return "Token MCP inválido";
 }
 
