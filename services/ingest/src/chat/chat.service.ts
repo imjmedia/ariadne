@@ -55,6 +55,7 @@ import {
   hasExplicitChatScopeNarrowing,
   matchesChatScope,
 } from './chat-scope.util';
+import { buildEmptyRetrieverAnswerCopy } from './chat-empty-retriever-message';
 import {
   resolveRepositoryIdForModificationPlan,
   type ModificationPlanDiagnostic,
@@ -3823,7 +3824,7 @@ ${retrievalJson}
 
 ${structuredBlock}Contexto reunido (datos del grafo y código — referencia${useTwoPhase ? '; prioriza el JSON de arriba para citas' : ''}):
 
-${rawContextForSynth || '**sin datos en índice para este alcance** (no hay salidas de herramientas con filas ni archivos leídos). Indícalo sin inventar rutas; sugiere sync/resync o ampliar la búsqueda.'}
+${rawContextForSynth || '**sin datos en índice para este alcance** (no hay salidas de herramientas con filas ni archivos leídos). Indícalo sin inventar rutas. Si el índice existe, menciona alcance (repo vs proyecto, scope.repoIds, chat amplio) y graph-summary antes de sugerir solo resync.'}
 
 ---
 Sintetiza una respuesta clara. Si no hay datos útiles, di explícitamente **sin datos en índice para este alcance**.`;
@@ -3838,8 +3839,10 @@ Sintetiza una respuesta clara. Si no hay datos útiles, di explícitamente **sin
         evidenceFirst ? 3072 : 2048,
       );
     } else {
-      answer =
-        '**sin datos en índice para este alcance** — no se obtuvo contexto desde las herramientas (Cypher/archivos/RAG). Verifica sync/resync del repositorio o reformula la pregunta.';
+      answer = buildEmptyRetrieverAnswerCopy({
+        projectScope: Boolean(options?.projectScope),
+        scope,
+      });
     }
 
     const telemetryEnabled = process.env.CHAT_TELEMETRY_LOG === '1' || process.env.CHAT_TELEMETRY_LOG === 'true';

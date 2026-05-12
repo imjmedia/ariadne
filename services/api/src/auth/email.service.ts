@@ -18,12 +18,17 @@ export class EmailService {
     if (!host || !user || !pass) return null;
 
     if (!this.transporter) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-      });
+      try {
+        this.transporter = nodemailer.createTransport({
+          host,
+          port,
+          secure: port === 465,
+          auth: { user, pass },
+        });
+      } catch (e) {
+        console.error('[email] createTransport falló:', (e as Error)?.message ?? e);
+        return null;
+      }
     }
 
     return this.transporter;

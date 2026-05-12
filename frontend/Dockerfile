@@ -4,7 +4,8 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
-ARG VITE_API_URL=http://localhost:3002
+# Debe apuntar al API Nest (3000), no a ingest (3002). En Compose se pasa build-arg desde .env.
+ARG VITE_API_URL=http://localhost:3000
 ENV VITE_API_URL=$VITE_API_URL
 
 # Copiar todo el repo

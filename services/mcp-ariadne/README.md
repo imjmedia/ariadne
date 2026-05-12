@@ -101,6 +101,10 @@ Las herramientas ya no recortan agresivamente listados y snippets; puedes **baja
 
 Variables: `PORT` (8080), `FALKORDB_HOST`, `FALKORDB_PORT`, `INGEST_URL`, **`ARIADNE_API_URL`** (API Nest; default `http://localhost:3000`), **`ARIADNE_API_BEARER`** o **`ARIADNE_API_JWT`** (token OTP para rutas `/api/*`: grafo de componente, impacto, C4), `MCP_AUTH_TOKEN` (opcional; auth del propio endpoint MCP, no del API Nest).
 
+### Cursor (stdio): el `.env` del repo no alimenta el MCP
+
+El servidor MCP es **otro proceso**. Hay que pasar `ARIADNE_API_URL`, `ARIADNE_API_BEARER` (o `ARIADNE_API_JWT`) y el resto en la config del MCP, p. ej. en `~/.cursor/mcp.json` dentro de `env` del servidor, o en las variables del contenedor si usas Docker/SSE. Solo `ARIADNE_API_URL` sin JWT ⇒ la API devuelve **401** y `get_component_graph` / `get_legacy_impact` caen en **fallback Falkor**. `http://api:3000` solo resuelve **dentro** de la red Docker; en el host usa la URL pública del API (p. ej. `https://relicai.obp.mx`).
+
 ### Caché de herramientas MCP (no es la caché de `analyze`)
 
 Las herramientas **get_component_graph**, **get_legacy_impact** y **get_sync_status** pueden cachear respuestas cortas (clave `v2` para grafo/impacto tras alinear con el API):

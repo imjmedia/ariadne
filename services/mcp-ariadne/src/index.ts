@@ -1553,6 +1553,7 @@ async function fetchFileFromIngest(
     if (projectId) qs.set("projectId", projectId);
     const apiUrl = `${base}/api/graph/component/${encodeURIComponent(resolvedComponentName)}?${qs}`;
 
+    let apiAuthHint = "";
     try {
       const res = await fetch(apiUrl, ariadneApiFetchInit({ signal: AbortSignal.timeout(30_000) }));
       if (res.ok) {
@@ -1561,8 +1562,12 @@ async function fetchFileFromIngest(
         await cache.set(cacheKey, markdown, 120);
         return { content: [{ type: "text", text: markdown }] };
       }
+      if (res.status === 401 || res.status === 403) {
+        apiAuthHint =
+          `> **API ${res.status}:** Las rutas \`/api/graph/*\` exigen JWT. En el **proceso del MCP** (p. ej. \`env\` en \`mcp.json\` de Cursor, o variables del contenedor Dokploy), define \`ARIADNE_API_BEARER\` o \`ARIADNE_API_JWT\` con el token OTP (mismo que usarías en \`Authorization: Bearer\` contra el API). El \`.env\` del repo **no** se carga solo en el MCP.\n\n`;
+      }
     } catch {
-      /* fallback Falkor */
+      /* fallback Falkor (red / timeout / DNS); si usas \`http://api:3000\` fuera de Docker, el host \`api\` no resuelve. */
     }
 
     const params: Record<string, string | number> = { componentName: resolvedComponentName };
@@ -1579,6 +1584,7 @@ async function fetchFileFromIngest(
     const data = result.data ?? [];
     const headers = result.headers ?? ["c", "dependency"];
     const fallbackNote =
+      apiAuthHint +
       "> **Nota (fallback Falkor):** Consulta genérica `-[*1..depth]->`; no replica `GraphService.getComponent` (RENDERS/USES_HOOK/IMPORTS, hints multi-shard). Para paridad con el explorador, arranca el API Nest y define `ARIADNE_API_URL` + `ARIADNE_API_BEARER` (JWT OTP).\n\n";
     const markdown = fallbackNote + formatComponentGraph(componentName, data, headers);
 
@@ -1671,6 +1677,7 @@ async function fetchFileFromIngest(
     if (projectId) impactQs.set("projectId", projectId);
     const impactUrl = `${base}/api/graph/impact/${encodeURIComponent(resolvedName)}?${impactQs}`;
 
+    let impactApiAuthHint = "";
     try {
       const res = await fetch(impactUrl, ariadneApiFetchInit({ signal: AbortSignal.timeout(30_000) }));
       if (res.ok) {
@@ -1685,6 +1692,10 @@ async function fetchFileFromIngest(
         const markdown = apiNote + formatLegacyImpact(nodeName, data, headers);
         await cache.set(cacheKey, markdown, 120);
         return { content: [{ type: "text", text: markdown }] };
+      }
+      if (res.status === 401 || res.status === 403) {
+        impactApiAuthHint =
+          `> **API ${res.status}:** Falta o JWT inválido para \`/api/graph/impact\`. Define \`ARIADNE_API_BEARER\` o \`ARIADNE_API_JWT\` en el entorno del **proceso MCP** (no basta el \`.env\` del repo salvo que tu despliegue lo cargue ahí).\n\n`;
       }
     } catch {
       /* fallback Falkor */
@@ -1708,6 +1719,7 @@ async function fetchFileFromIngest(
     const data = result.data ?? [];
     const headers = result.headers ?? ["name", "labels"];
     const fallbackNote =
+      impactApiAuthHint +
       "> **Nota (fallback Falkor):** Solo `CALLS|RENDERS*` en un shard; no incluye la fusión IMPORTS multi-shard de Nest. Configura `ARIADNE_API_URL` + `ARIADNE_API_BEARER`.\n\n";
     const markdown = fallbackNote + formatLegacyImpact(nodeName, data, headers);
 

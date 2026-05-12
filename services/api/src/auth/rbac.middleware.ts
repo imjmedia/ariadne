@@ -25,6 +25,8 @@ const BLOCKED_PATTERNS: Array<{ pattern: RegExp; methods: string[]; reason: stri
  */
 export function createRbacMiddleware() {
   return (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'OPTIONS') return next();
+
     const user = (req as Request & { user?: AuthenticatedUser }).user;
 
     // Si no hay user (path exento), pasar
