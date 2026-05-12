@@ -24,6 +24,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install and build ariadne-common
+        working-directory: packages/ariadne-common
+        run: npm install && npm run build
       - run: npm install
       - run: npm test -- --run
 
@@ -37,5 +40,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      # ariadne-common es file: dep; dist/ no está en el repo — hay que compilar antes del prepare del MCP.
+      - name: Install and build ariadne-common
+        working-directory: packages/ariadne-common
+        run: npm install && npm run build
       - run: npm install
       - run: npm run build
