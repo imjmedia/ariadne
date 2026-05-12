@@ -82,8 +82,10 @@ export const requestOtp = async (
     const text = await res.text();
     let msg = text;
     try {
-      const json = JSON.parse(text) as { message?: string };
-      if (json?.message) msg = json.message;
+      const json = JSON.parse(text) as { message?: string | string[] };
+      if (json?.message != null) {
+        msg = Array.isArray(json.message) ? json.message.join(', ') : String(json.message);
+      }
     } catch {
       /* use text */
     }

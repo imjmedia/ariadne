@@ -17,6 +17,11 @@ services:
   api:
     ports:
       - "3000:3000"
+    # Sin OTP_DEV_MODE en .env el compose base inyecta cadena vacía; aquí default true para OTP local sin SMTP.
+    environment:
+      - OTP_DEV_MODE=${OTP_DEV_MODE:-true}
+      # Si no defines CORS_ORIGIN en .env, permite localhost y 127.0.0.1 (evita "Failed to fetch" por CORS).
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173,http://127.0.0.1:5173}
 
   ingest:
     ports:
@@ -29,3 +34,7 @@ services:
   frontend:
     ports:
       - "5173:80"
+    build:
+      args:
+        # Navegador en el host: el API expuesto es :3000 (no uses http://api:3000 aquí).
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}

@@ -33,6 +33,9 @@ function getToken(req: Request): string | null {
 /** Middleware: valida JWT OTP, asigna req.user y llama next(); si no hay token o es inválido responde 401. */
 export function createOtpAuthMiddleware(authService: AuthService) {
   return (req: Request, res: Response, next: NextFunction) => {
+    // Preflight CORS: sin Authorization; debe pasar aunque el orden de middlewares cambie.
+    if (req.method === 'OPTIONS') return next();
+
     const path = req.path || req.url?.split('?')[0] || '';
     if (SKIP_PATHS.some((p) => path === p)) return next();
 

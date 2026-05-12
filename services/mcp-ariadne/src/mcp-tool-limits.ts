@@ -15,7 +15,7 @@ export const mcpLimits = {
     return intEnv('MCP_SEMANTIC_SEARCH_DEFAULT', 200, 1, 50_000);
   },
   get semanticSearchMax(): number {
-    return intEnv('MCP_SEMANTIC_SEARCH_MAX', 5000, 1, 100_000);
+    return intEnv('MCP_SEMANTIC_SEARCH_MAX', 5000, 1, 100_000);ß
   },
   get semanticVectorKMax(): number {
     return intEnv('MCP_SEMANTIC_VECTOR_K_MAX', 500, 20, 10_000);

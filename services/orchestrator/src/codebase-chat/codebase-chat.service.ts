@@ -99,6 +99,35 @@ const CodebaseChatStateAnnotation = Annotation.Root({
 
 export type CodebaseChatState = typeof CodebaseChatStateAnnotation.State;
 
+/**
+ * Cuando el retrieve no devuelve contexto: no implica que Falkor esté vacío (suele ser alcance,
+ * chat por proyecto vs repo, o ReAct sin herramientas útiles). Guía al usuario más allá de "resync".
+ */
+function emptyRetrieverUserMessage(state: CodebaseChatState): string {
+  const repoIds = (state.scope?.repoIds ?? []).map((x) => String(x).trim()).filter(Boolean);
+  const lines: string[] = [
+    '**sin datos en índice para este alcance** — el retrieve (Cypher / archivos / RAG) no aportó filas ni contenido útil en esta petición.',
+    '',
+    '**Qué revisar** (el sync puede estar correcto y el grafo poblado):',
+  ];
+  if (state.projectScope) {
+    lines.push(
+      '- **Chat por proyecto:** con varios repos, elige el repo en la UI, envía `scope.repoIds`, activa **chat amplio** (`strictChatScope: false`) o abre el chat desde la ruta **/repos/:id/chat** del repositorio deseado.',
+    );
+  }
+  if (repoIds.length > 0) {
+    lines.push(
+      `- **scope.repoIds:** llevas **${repoIds.length}** id(s); confirma que incluyen el repositorio donde indexaste.`,
+    );
+  }
+  lines.push(
+    '- **Verificar grafo:** `GET /api/repositories/:id/graph-summary?full=1` (multi-root: prueba también el query `repoScoped=1`).',
+    '- **RAG:** si esperas `semantic_search` útil, ejecuta **embed-index** en el repo.',
+    '- **Operadores:** `CHAT_TELEMETRY_LOG=true` en orchestrator e ingest para ver `chat_scope_effective` en logs.',
+  );
+  return lines.join('\n');
+}
+
 @Injectable()
 export class CodebaseChatService {
   private readonly logger = new Logger(CodebaseChatService.name);
@@ -489,7 +518,7 @@ ${retrievalJson}
 
 ${structuredBlock}Contexto reunido (datos del grafo y código — referencia${useTwoPhase ? '; prioriza el JSON de arriba para citas' : ''}):
 
-${rawContextForSynth || '**sin datos en índice para este alcance** (no hay salidas de herramientas con filas ni archivos leídos). Indícalo sin inventar rutas; sugiere sync/resync o ampliar la búsqueda.'}
+${rawContextForSynth || '**sin datos en índice para este alcance** (no hay salidas de herramientas con filas ni archivos leídos). Indícalo sin inventar rutas. Si el índice existe, menciona alcance (repo vs proyecto, scope.repoIds, chat amplio) y graph-summary antes de sugerir solo resync.'}
 
 ---
 Sintetiza una respuesta clara. Si no hay datos útiles, di explícitamente **sin datos en índice para este alcance**.`;
@@ -504,8 +533,7 @@ Sintetiza una respuesta clara. Si no hay datos útiles, di explícitamente **sin
         evidenceFirst ? 3072 : 2048,
       );
     } else {
-      answer =
-        '**sin datos en índice para este alcance** — no se obtuvo contexto desde las herramientas (Cypher/archivos/RAG). Verifica sync/resync del repositorio o reformula la pregunta.';
+      answer = emptyRetrieverUserMessage(state);
     }
 
     const telemetryEnabled = process.env.CHAT_TELEMETRY_LOG === '1' || process.env.CHAT_TELEMETRY_LOG === 'true';

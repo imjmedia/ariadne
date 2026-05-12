@@ -22,16 +22,18 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  const authService = app.get(AuthService);
-  app.use(createOtpAuthMiddleware(authService));
-  // RBAC después de auth: bloquea operaciones no permitidas según rol
-  app.use(createRbacMiddleware());
-
+  // CORS debe registrarse **antes** del middleware OTP: el preflight OPTIONS no lleva Bearer;
+  // si OTP corre primero responde 401 sin cabeceras CORS y el navegador bloquea (Failed to fetch).
   const corsOrigin = process.env.CORS_ORIGIN;
   app.enableCors({
     origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
     credentials: true,
   });
+
+  const authService = app.get(AuthService);
+  app.use(createOtpAuthMiddleware(authService));
+  // RBAC después de auth: bloquea operaciones no permitidas según rol
+  app.use(createRbacMiddleware());
 
   // Proxy /api/projects, /api/repositories, /api/credentials, /api/webhooks al ingest (quita /api al reenviar)
   const ingestUrl = process.env.INGEST_URL ?? 'http://localhost:3002';

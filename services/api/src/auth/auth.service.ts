@@ -2,7 +2,7 @@
  * @fileoverview Servicio OTP: generar código, enviar por email (SMTP), emitir JWT con rol.
  * Tras verify OTP, resuelve usuario en Ingest para incluir userId y role en JWT.
  */
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { EmailService } from './email.service';
 
@@ -20,6 +20,12 @@ const INGEST_URL = process.env.INGEST_URL || 'http://localhost:3002';
 
 /** Store en memoria. key = email, value = { code, expiresAt } */
 const memoryStore = new Map<string, { code: string; expiresAt: number }>();
+
+/** true / 1 / yes (trim, sin sensibilidad a mayúsculas). Tolera CRLF en .env. */
+function isOtpDevMode(): boolean {
+  const v = (process.env.OTP_DEV_MODE ?? '').trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes';
+}
 
 export interface OtpRequestResult {
   sent: boolean;
@@ -42,11 +48,11 @@ export class AuthService {
   async requestOtp(email: string): Promise<OtpRequestResult> {
     const normalized = email.trim().toLowerCase();
     if (!normalized) {
-      throw new Error('Email requerido');
+      throw new BadRequestException('Email requerido');
     }
 
     if (EMAIL_OTP_WHITELIST && normalized !== EMAIL_OTP_WHITELIST) {
-      throw new Error('Email no autorizado para solicitar OTP');
+      throw new BadRequestException('Email no autorizado para solicitar OTP');
     }
 
     const code = Array.from({ length: OTP_LENGTH }, () =>
@@ -56,11 +62,14 @@ export class AuthService {
 
     memoryStore.set(normalized, { code, expiresAt });
 
-    const devMode = process.env.OTP_DEV_MODE === 'true';
+    const devMode = isOtpDevMode();
     const emailSent = await this.emailService.sendOtp(normalized, code);
 
     if (!emailSent && !devMode) {
-      throw new Error('No se pudo enviar el email. Comprueba la configuración SMTP.');
+      throw new ServiceUnavailableException(
+        'No se pudo enviar el email (SMTP no configurado o error de envío). ' +
+          'Configura SMTP_HOST, SMTP_USER y SMTP_PASS, o define OTP_DEV_MODE=true para desarrollo (código en devCode).',
+      );
     }
 
     return {
