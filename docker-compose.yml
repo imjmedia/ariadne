@@ -152,9 +152,6 @@ services:
       - MODIFICATION_PLAN_MAX_FILES=${MODIFICATION_PLAN_MAX_FILES:-150}
       - CREDENTIALS_ENCRYPTION_KEY=${CREDENTIALS_ENCRYPTION_KEY}
       - ORCHESTRATOR_URL=http://orchestrator:3001
-      # Allows the MCP server to authenticate to Nest using the same ari_ token Cursor sends it.
-      # Set MCP_AUTH_TOKEN=ari_… in .env — no ARIADNE_API_BEARER needed.
-      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -193,7 +190,7 @@ services:
       - falkor-net
 
   # Servidor MCP (El Oráculo). Streamable HTTP para producción (Dokploy).
-  # Cursor/IA conecta por URL. Auth M2M opcional: MCP_AUTH_TOKEN.
+  # Cursor/IA por URL Streamable MCP. Bearer a `/mcp`: Secret MCP `ari_*` del usuario (validado vía ingest), reenvío al Nest.
   mcp-ariadne:
     build:
       context: .
@@ -209,10 +206,7 @@ services:
       # Caché de herramientas MCP (get_component_graph, legacy impact, …): misma Redis que api/ingest.
       # Opcional: MCP_REDIS_URL (prioridad sobre REDIS_URL), MCP_REDIS_DISABLED=1 → solo memoria.
       - REDIS_URL=redis://redis:6379
-      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - ARIADNE_API_URL=${ARIADNE_API_URL:-http://api:3000}
-      - ARIADNE_API_JWT=${ARIADNE_API_JWT:-}
-      - ARIADNE_API_BEARER=${ARIADNE_API_BEARER:-}
     depends_on:
       falkordb:
         condition: service_healthy

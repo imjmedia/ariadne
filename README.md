@@ -211,8 +211,6 @@ Estas variables controlan cómo se particionan los datos entre grafos FalkorDB.
 | `SMTP_USER` | — | Usuario SMTP |
 | `SMTP_PASS` | — | Contraseña SMTP |
 | `SMTP_FROM` | — | Remitente del correo OTP |
-| `ARIADNE_API_URL` | — | URL de la API (para el explorador de grafo: component graph, impacto, C4) |
-| `ARIADNE_API_BEARER` / `ARIADNE_API_JWT` | — | Token JWT para autenticarse contra la API en rutas protegidas |
 
 ---
 
@@ -231,7 +229,9 @@ Estas variables controlan cómo se particionan los datos entre grafos FalkorDB.
 | Variable | Default | Qué hace |
 |---|---|---|
 | `PORT` | `8080` | Puerto HTTP del servidor MCP |
-| `MCP_AUTH_TOKEN` | — | **Token M2M opcional.** Si se define, exige `Authorization: Bearer <token>` en cada request al MCP |
+| `ARIADNE_API_URL` | `http://api:3000` (Compose) | Base URL Nest para `fetch` interno `/api/graph/*` (solo proceso MCP). **Bearer**: mismo que el cliente envía en cada `POST /mcp` (no `ARIADNE_*` en `.env` para tokens). |
+| `INGEST_URL` | `http://ingest:3002` | Validación Bearer / Secret MCP contra ingest (`validate-mcp-token`) |
+| `MCP_HTTP_ALLOW_UNAUTHENTICATED` | — | **`1`/`true`:** omite Bearer en `/mcp` (**solo desarrollo local**); no usar en prod expuesta |
 | `MCP_ASK_CODEBASE_TIMEOUT_MS` | `300000` (300s) | Timeout del fetch hacia ingest en `ask_codebase`. Con `raw_evidence`: 900s |
 | `MCP_ASK_CODEBASE_PROGRESS_LOG_MS` | `60000` | Intervalo en ms entre logs de progreso de `ask_codebase` (0 = desactivado) |
 | `MCP_TOOL_LOG` | `1` (activo) | **`0`:** desactiva logs detallados de invocación de herramientas |
@@ -273,7 +273,7 @@ Las únicas **obligatorias** en Dokploy son:
 |---|---|
 | **ingest** | `LLM_API_KEY`, `LLM_PROVIDER`, `CREDENTIALS_ENCRYPTION_KEY` |
 | **api** | `JWT_SECRET` |
-| **mcp-ariadne** | _Ninguna obligatoria_ (opcional: `MCP_AUTH_TOKEN`) |
+| **mcp-ariadne** | Valores por defecto en Compose (`ARIADNE_API_URL`, etc.); **Bearer**: cada desarrollador en `~/.cursor/mcp.json` |
 | **orchestrator** | `LLM_API_KEY`, `LLM_PROVIDER` |
 | **frontend** | `VITE_API_URL` (build arg) |
 
