@@ -4,7 +4,7 @@
 
 - **api** (NestJS, puerto 3000): auth OTP (JWT), grafo Falkor, proxy a ingest
 - **ingest** (NestJS, puerto 3002): PostgreSQL (TypeORM), CRUD de todo lo demás
-- **mcp-ariadne** (Hono/Node): herramientas MCP, auth con `MCP_AUTH_TOKEN` estático
+- **mcp-ariadne** (Streamable HTTP): herramientas MCP; validación Bearer per-user vía ingest; reenvío al Nest para `/api/graph/*`. Sin `ARIADNE_API_*` en env para JWT de usuario.
 - **frontend** (React+Vite): login OTP, no hay concepto de roles
 
 ## Cambios
@@ -68,7 +68,7 @@ Si `SSO_URL` está definida:
 
 - `mcp-ariadne` valida tokens contra `POST /internal/users/validate-mcp-token` en ingest
 - El token MCP se usa como Bearer token o X-M2M-Token
-- Se elimina `MCP_AUTH_TOKEN` estático (o se mantiene como fallback)
+- Se elimina cualquier **token estático compartido** (`MCP_AUTH_TOKEN` / env) como sustituto del Secret MCP por usuario; el flujo soportado es **`ari_*` en Perfil** + `headers` en Cursor y reenvío al Nest.
 - El usuario ve su token MCP en `/profile` y puede regenerarlo
 
 ### 6. Frontend – Nuevas páginas
