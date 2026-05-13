@@ -2,7 +2,7 @@
 
 **Protocolo:** Model Context Protocol (MCP)
 
-**Origen de Datos:** FalkorDB (via Oracle/AriadneSpecs Core) y, para paridad con el explorador web, **API Nest** (`GraphService` en `GET /api/graph/*`) cuando el MCP tiene JWT configurado.
+**Origen de Datos:** FalkorDB (via Oracle/AriadneSpecs Core) y, para paridad con el explorador web, **API Nest** (`GraphService` en `GET /api/graph/*`) cuando cada petición al MCP incluye **`Authorization: Bearer`** válido (**JWT de sesión** o **Secret MCP** `ari_…`): el proceso MCP lo reenvía tal cual al Nest.
 
 ## 1. Arquitectura del Servidor MCP
 
@@ -45,8 +45,9 @@ Cuando el ingest/API despliegan **un grafo Redis/Falkor por `projectId`** (`Aria
 
 Varias tools intentan primero el **servicio API Nest** (mismo criterio que el explorador: `GraphService`, fusión multi-shard, aristas `RENDERS` / `USES_HOOK` / `IMPORTS`, `graphHints`, impacto con ramas IMPORTS entre shards, etc.):
 
-- **Variables de entorno (MCP):** `ARIADNE_API_URL` (default `http://localhost:3000`), y **`ARIADNE_API_BEARER`** o **`ARIADNE_API_JWT`** — JWT OTP en `Authorization: Bearer` (el middleware Nest protege casi todo `/api/*`).
-- **Si la API no responde o no hay token válido:** el MCP hace **fallback** a consultas Cypher directas contra Falkor. El Markdown de salida indica la fuente; el fallback **no** replica por completo la lógica de `GraphService`.
+- **`ARIADNE_API_URL`** en el proceso MCP (default `http://localhost:3000`) — solo la base URL del API Nest.
+- **Bearer (`Authorization`):** mismo valor en **cada** `POST …/mcp` que debe aceptar el Nest: **Secret MCP** (`ari_…` desde Perfil, persistido en BD) o **JWT** emitido tras login web (**no** configures `ARIADNE_API_BEARER` ni `ARIADNE_API_JWT` en `.env` para sustituir esto).
+- **Si la API no responde o el Bearer falta/expira:** el MCP puede hacer **fallback** Falkor donde aplique.
 - **Caché:** respuestas cacheadas con clave `v2` para `get_component_graph` y `get_legacy_impact` tras alinear con la API (TTL corto; ver README del paquete).
 
 ### Tool A: `get_component_graph`
@@ -87,7 +88,7 @@ RETURN dependent.name AS name, labels(dependent) AS labels
 
 - **Descripción:** Modelo C4 agregado (sistemas, contenedores, relaciones `COMMUNICATES_WITH`) para un proyecto indexado.
 - **Argumentos:** `projectId: string` (obligatorio con sharding multi-grafo).
-- **Implementación:** `GET /api/graph/c4-model?projectId=` — mismas variables **`ARIADNE_API_URL`** + **`ARIADNE_API_BEARER`** / **`ARIADNE_API_JWT`** que el resto de rutas `/api/graph/*`. Sin JWT la llamada falla (no hay fallback Falkor equivalente en esta tool).
+- **Implementación:** `GET /api/graph/c4-model?projectId=` — requiere **`ARIADNE_API_URL`** y el mismo **Bearer** en la petición MCP (reenviado al Nest). Sin Bearer válido, no hay llamada Nest exitosa equivalente ni fallback Falkor en esta tool.
 
 ### Tool C: `get_contract_specs`
 
@@ -98,7 +99,7 @@ RETURN dependent.name AS name, labels(dependent) AS labels
   MATCH (c:Component {name: $componentName, projectId: $projectId})-[:HAS_PROP]->(p:Prop) RETURN p.name, p.required
   ```
 - **Propósito:** Forzar a la IA a usar los nombres de variables y tipos reales del grafo. La respuesta se formatea en Markdown (lista de props y si son requeridas).
-- **Implementación:** El servidor MCP usa transporte **Streamable HTTP** (puerto 8080, path /mcp); las herramientas se registran en `ListToolsRequestSchema` y se ejecutan en `CallToolRequestSchema` conectando a FalkorDB, al **API Nest** (`/api/graph/*` con JWT opcional en el entorno del MCP) y/o al servicio ingest. Cuando se proporciona `projectId` o `currentFilePath`, las consultas Cypher filtran por `n.projectId` para evitar ambigüedad. Herramientas que llaman al ingest: `get_file_content` (repositories/file o projects/file), `ask_codebase` (projects/chat o repositories/chat; con orchestrator, MDD vía ingest interno **`mdd-evidence`**), `get_file_context`, `get_project_standards`, `get_modification_plan` (projects/modification-plan), `get_project_analysis` (`POST /projects/:id/analyze` o `POST /repositories/:id/analyze` según si el id es proyecto Ariadne o `roots[].id`; ver [Tool: `get_project_analysis`](#tool-get_project_analysis)).
+- **Implementación:** El servidor MCP usa transporte **Streamable HTTP** (puerto 8080, path /mcp); las herramientas se registran en `ListToolsRequestSchema` y se ejecutan en `CallToolRequestSchema` conectando a FalkorDB, al **API Nest** (`/api/graph/*` con Bearer **reenviado** desde cada `POST …/mcp`) y/o al servicio ingest. Cuando se proporciona `projectId` o `currentFilePath`, las consultas Cypher filtran por `n.projectId` para evitar ambigüedad. Herramientas que llaman al ingest: `get_file_content` (repositories/file o projects/file), `ask_codebase` (projects/chat o repositories/chat; con orchestrator, MDD vía ingest interno **`mdd-evidence`**), `get_file_context`, `get_project_standards`, `get_modification_plan` (projects/modification-plan), `get_project_analysis` (`POST /projects/:id/analyze` o `POST /repositories/:id/analyze` según si el id es proyecto Ariadne o `roots[].id`; ver [Tool: `get_project_analysis`](#tool-get_project_analysis)).
 
 ### Tool: `get_file_content`
 
@@ -272,7 +273,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "get_component_graph") {
-    // 1) GET ARIADNE_API_URL/api/graph/component/... con Authorization: Bearer (JWT)
+    // 1) GET ARIADNE_API_URL/api/graph/component/... con Authorization: Bearer (mismo JWT o Secret MCP ari_* que envió el cliente en POST …/mcp)
     // 2) si falla: Cypher contra Falkor en el shard del projectId (ver § Sharding)
     return { content: [{ type: "text", text: "..." }] };
   }
@@ -292,7 +293,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 - **Solo Lectura:** El usuario de FalkorDB vinculado al MCP solo debe tener permisos de `READ`.
 
-- **API Nest (`/api/*`):** El middleware OTP del API exige JWT en `Authorization: Bearer` para la mayoría de rutas. El MCP debe configurar **`ARIADNE_API_BEARER`** o **`ARIADNE_API_JWT`** en su entorno si se desea paridad con el explorador en `get_component_graph`, `get_legacy_impact` y `get_c4_model`. Ese token es **independiente** de `MCP_AUTH_TOKEN` (auth opcional del propio endpoint MCP hacia clientes: `X-M2M-Token` / `Authorization`).
+- **API Nest (`/api/*`):** El middleware exige **`Authorization: Bearer`** con **JWT de sesión web** (OTP/SSO) o **Secret MCP** (`ari_…` validado en Ingest). El cliente MCP (p. ej. Cursor) debe enviar **ese mismo Bearer** en cada petición Streamable (`headers`); el proceso MCP lo reenvía al Nest para `GET /api/graph/*`. **No uses** variables `ARIADNE_API_BEARER` ni `ARIADNE_API_JWT` en `.env` para estos tokens.
 
 - **Llamadas HTTPS desde aplicación:** Para implementar peticiones HTTP/HTTPS al MCP desde una app (fetch, curl, etc.), ver [MCP_HTTPS.md](MCP_HTTPS.md).
 

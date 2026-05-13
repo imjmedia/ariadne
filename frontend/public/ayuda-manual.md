@@ -121,7 +121,7 @@ Tras cada sync (normal o resync), se ejecuta automáticamente el indexado de emb
 
 ### MCP AriadneSpecs
 
-Servidor por **Streamable HTTP** (puerto 8080, path /mcp). Para usarlo en Cursor: arranca `PORT=8080 node dist/index.js` (tras `npm run build`) con `FALKORDB_HOST`, `FALKORDB_PORT`, `INGEST_URL`, y configura `url`: `http://localhost:8080/mcp` en el cliente MCP.
+Servidor por **Streamable HTTP** (puerto 8080 en el contenedor, path `/mcp`). **Compose dev** expone **`127.0.0.1:9888`** → `8080` para no chocar con otros servicios en `:8080`. En Cursor: `url`: `http://127.0.0.1:9888/mcp`. En el host sin Docker: `PORT=8080 node dist/index.js` (tras `npm run build`) y `http://localhost:8080/mcp`.
 
 Herramientas expuestas:
 

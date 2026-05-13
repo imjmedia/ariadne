@@ -7,7 +7,7 @@
 | Doc | Descripción |
 |-----|-------------|
 | **INSTALACION_MCP_CURSOR.md** | Instalación del MCP para Cursor (esta carpeta). |
-| **MCP_HTTPS.md** | Cliente HTTP(S) al MCP (Streamable HTTP, auth `MCP_AUTH_TOKEN`, nota API Nest en el servidor). |
+| **MCP_HTTPS.md** | Cliente HTTP(S) al MCP (Streamable HTTP); Bearer **`ari_*`/JWT por usuario**, reenvío al API Nest (`ARIADNE_API_URL`). |
 | **MCP_AYUDA.md** | Ayuda resumida MCP (esta carpeta); copia al frontend como `ayuda-mcp.md`. |
 | **../manual/README.md** | Manual de uso y validación (carpeta `docs/manual/`). |
 | **../manual/CONFIGURACION_Y_USO.md** | Configuración detallada (`docs/manual/`). |
