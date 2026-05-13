@@ -43,13 +43,19 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embed(text: string): Promise<number[]> {
+    const vecs = await this.embedBatch([text]);
+    return vecs[0];
+  }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
     if (!this.apiKey) {
       throw new Error('LLM_API_KEY required for OpenRouter embeddings');
     }
+    if (texts.length === 0) return [];
     const base = resolveLlmBaseUrl().replace(/\/$/, '');
     const body: Record<string, unknown> = {
       model: this.model,
-      input: text.slice(0, 8191),
+      input: texts.map(t => t.slice(0, 8191)),
     };
     if (this.model.includes('text-embedding-3')) {
       body.dimensions = this.dimension;
@@ -68,12 +74,21 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
       const err = await res.text();
       throw new Error(`OpenRouter embedding failed: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { data: [{ embedding: number[] }] };
-    const vec = data.data?.[0]?.embedding;
-    if (!Array.isArray(vec) || vec.length !== this.dimension) {
-      throw new Error(`Unexpected embedding shape: expected ${this.dimension}, got ${Array.isArray(vec) ? vec.length : 'n/a'}`);
+    const data = (await res.json()) as { data: Array<{ embedding: number[] }> };
+    if (!Array.isArray(data.data) || data.data.length !== texts.length) {
+      throw new Error(
+        `Unexpected batch embedding response: expected ${texts.length} items, got ${data.data?.length ?? 'n/a'}`,
+      );
     }
-    return vec;
+    return data.data.map((item, i) => {
+      const vec = item.embedding;
+      if (!Array.isArray(vec) || vec.length !== this.dimension) {
+        throw new Error(
+          `Unexpected embedding shape at index ${i}: expected ${this.dimension}, got ${Array.isArray(vec) ? vec.length : 'n/a'}`,
+        );
+      }
+      return vec;
+    });
   }
 }
 

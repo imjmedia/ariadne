@@ -123,7 +123,7 @@ flowchart LR
 | **OpenAI** | `OPENAI_API_KEY` — chat (`chat-llm.service`), embeddings opcionales. |
 | **Embeddings** | `EMBEDDING_PROVIDER=openai|google` + `OPENAI_API_KEY` o `GOOGLE_API_KEY`; endpoint ingest `POST /embed`, `POST /repositories/:id/embed-index`. |
 | **Bitbucket / GitHub** | Tokens en BD (`credentials`) o env; webhooks Bitbucket → ingest. |
-| **MCP** | Cursor/IDE: `mcp-ariadne` con `INGEST_URL`, `FALKORDB_*`, opcional `MCP_AUTH_TOKEN`. |
+| **MCP** | Cursor/IDE: `mcp-ariadne` con `INGEST_URL`, `ARIADNE_API_URL`, `FALKORDB_*`; Bearer por usuario (**Secret MCP** `ari_*` o JWT) en `mcp.json`, validado por ingest.
 
 **Google Antigravity:** no aparece en el código ni en dependencias. Si en el futuro un IDE usa Antigravity de forma similar a Cursor, el **contrato** sigue siendo MCP + HTTP hacia ingest/API.
 
@@ -200,7 +200,7 @@ flowchart TB
 4. **Component graph API:** aristas `depends` (árbol de dependencias) + `legacy_impact` (consumidores vía patrones tipo `CALLS`/`RENDERS`); normalización de celdas Falkor evita `String(object)` → `[object Object]` en IDs.
 5. **Chat:** si no hay `OPENAI_API_KEY`, el chat degradará o error explícito; Cypher generado se ejecuta con límites y retries según handlers.
 6. **Búsqueda semántica MCP:** combina vector (si `/embed` + índice) y fallback por **tokens** en labels del grafo (no solo frase literal completa).
-7. **MCP auth:** opcional `MCP_AUTH_TOKEN` en despliegues expuestos.
+7. **MCP auth:** cada petición lleva Bearer (Perfil **`ari_*`** o JWT web); proceso reenvía al Nest. Opción dev solo: `MCP_HTTP_ALLOW_UNAUTHENTICATED`.
 
 ---
 

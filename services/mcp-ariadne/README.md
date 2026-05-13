@@ -2,7 +2,7 @@
 
 Servidor MCP que expone herramientas de contexto sobre el grafo en FalkorDB.
 
-**Transporte:** Streamable HTTP (puerto 8080 o `PORT`). **Modo stateless:** un Server+Transport por request, evita el error "Server already initialized" cuando Cursor reintenta el handshake. Auth M2M opcional: `MCP_AUTH_TOKEN` → exige `Authorization: Bearer <token>`.
+**Transporte:** Streamable HTTP (puerto 8080 o `PORT`). **Modo stateless:** un Server+Transport por request, evita el error "Server already initialized" cuando Cursor reintenta el handshake. Con autenticación activa (`MCP_HTTP_ALLOW_UNAUTHENTICATED` sin definir), cada petición a `/mcp` lleva **`Authorization: Bearer`** con el **Secret MCP** (`ari_…` de Perfil) o un **JWT de sesión** válido — el proceso valida vía ingest y reenvía el mismo Bearer al API Nest cuando hace falta.
 
 **Logs de invocación (Dokploy / The Forge):** por defecto cada `tools/call` escribe en stdout JSON en una línea: `mcp_tool_call_start` (nombre, claves de argumentos, payload redactado/truncado), `mcp_tool_call_end` (ms, `resultSummary`, **`result`** con `content[]` devuelto al cliente — texto por bloque hasta `MCP_TOOL_LOG_RESPONSE_BLOCK_MAX`, cupo total `MCP_TOOL_LOG_RESPONSE_TOTAL_MAX`, flag `responseTruncated`), o `mcp_tool_call_error`. También `mcp_list_tools` al listar herramientas. Desactivar: `MCP_TOOL_LOG=0`. Límite de tamaño de la **línea** de log: `MCP_TOOL_LOG_ARG_MAX` (default 12000; súbelo si trunca el JSON entero antes de ver la respuesta).
 
@@ -25,10 +25,10 @@ npm publish
 
 ### Core
 - **list_known_projects** — Proyectos indexados (`id` = proyecto Ariadne, `roots[]` = repos). El texto de respuesta indica que para **`get_modification_plan`** en multi-root conviene usar `roots[].id` del repo donde está el código (p. ej. frontend).
-- **get_component_graph** — Por defecto intenta **`GET /api/graph/component/:name`** (mismo grafo que el explorador: RENDERS, USES_HOOK, IMPORTS, `graphHints`, fusión multi-shard). Requiere **`ARIADNE_API_URL`** + JWT en **`ARIADNE_API_BEARER`** o **`ARIADNE_API_JWT`** (middleware OTP en `/api/*`). Si la API no responde, **fallback** a consulta Falkor genérica `-[*1..depth]->` (comportamiento distinto; el markdown lo indica).
-- **get_legacy_impact** — Preferencia: **`GET /api/graph/impact/:nodeId`** (`GraphService.getImpact`). Mismas variables que arriba. Fallback: Falkor `CALLS|RENDERS*` en un shard.
+- **get_component_graph** — Por defecto intenta **`GET /api/graph/component/:name`** (mismo grafo que el explorador: RENDERS, USES_HOOK, IMPORTS, `graphHints`, fusión multi-shard). Requiere **`ARIADNE_API_URL`** y **`Authorization: Bearer`** en Cursor (Secret MCP `ari_…` o JWT web); el proceso lo reenvía al Nest **sin variables `ARIADNE_API_*`** en `.env`. Sin Bearer válido, **fallback** Falkor genérico `-[*1..depth]->`.
+- **get_legacy_impact** — Preferencia: **`GET /api/graph/impact/:nodeId`** (`GraphService.getImpact`). Misma regla Bearer reenviable que `get_component_graph`. Fallback: Falkor `CALLS|RENDERS*` en un shard.
 - **get_contract_specs** — Props (con `description` JSDoc si existe); sigue siendo solo Falkor.
-- **get_c4_model** — `GET /api/graph/c4-model`. Mismas variables (**`ARIADNE_API_URL`** + bearer).
+- **get_c4_model** — `GET /api/graph/c4-model`. **`ARIADNE_API_URL`** + Bearer reenviado igual que herramientas grafo arriba.
 - **get_functions_in_file**, **get_import_graph** — Contenido estructural de archivos.
 - **get_file_content** — Contenido crudo del archivo desde Bitbucket/GitHub (requiere INGEST_URL).
 - **validate_before_edit** — OBLIGATORIO antes de editar: impacto + contrato en un llamado.
@@ -97,13 +97,34 @@ Las herramientas ya no recortan agresivamente listados y snippets; puedes **baja
 - Transporte: **Streamable HTTP** en `0.0.0.0:8080` (o `PORT`).
 - Requiere FalkorDB con el grafo `AriadneSpecs` ya poblado.
 - **Conexión Falkor:** el cliente registra `error` (no tumba el proceso ante `Socket closed unexpectedly`), usa `pingInterval` y `reconnectStrategy` vía Redis. Reinicios de Falkor o cortes de red pueden loguearse sin exit de Node; si el servicio MCP sigue unhealthy, revisa red/DNS hasta Falkor.
-- **Auth:** Si `MCP_AUTH_TOKEN` está definido, las peticiones deben incluir `Authorization: Bearer <token>`.
+- **Auth (`/mcp`, producción):** el cliente envía **`Authorization: Bearer`** (Secret MCP `ari_…` de Perfil o JWT de sesión); el proceso valida vía ingest y reenvía el mismo Bearer al Nest en grafos/C4.
 
-Variables: `PORT` (8080), `FALKORDB_HOST`, `FALKORDB_PORT`, `INGEST_URL`, **`ARIADNE_API_URL`** (API Nest; default `http://localhost:3000`), **`ARIADNE_API_BEARER`** o **`ARIADNE_API_JWT`** (token OTP para rutas `/api/*`: grafo de componente, impacto, C4), `MCP_AUTH_TOKEN` (opcional; auth del propio endpoint MCP, no del API Nest).
+Variables: `PORT` (8080), `FALKORDB_HOST`, `FALKORDB_PORT`, `INGEST_URL`, **`ARIADNE_API_URL`** (solo URL base Nest; sin tokens de usuario en `.env`).
 
-### Cursor (stdio): el `.env` del repo no alimenta el MCP
+### Cursor (HTTP): `~/.cursor/mcp.json`
 
-El servidor MCP es **otro proceso**. Hay que pasar `ARIADNE_API_URL`, `ARIADNE_API_BEARER` (o `ARIADNE_API_JWT`) y el resto en la config del MCP, p. ej. en `~/.cursor/mcp.json` dentro de `env` del servidor, o en las variables del contenedor si usas Docker/SSE. Solo `ARIADNE_API_URL` sin JWT ⇒ la API devuelve **401** y `get_component_graph` / `get_legacy_impact` caen en **fallback Falkor**. `http://api:3000` solo resuelve **dentro** de la red Docker; en el host usa la URL pública del API (p. ej. `https://relicai.obp.mx`).
+Servidor **Streamable HTTP** en `http://127.0.0.1:9888/mcp` cuando usas **docker-compose.dev.yml** (mapeo **9888→8080** en el contenedor; evita choque con Apache u otros en `:8080`). Si ejecutas el MCP con `PORT=8080` en el host, usa `http://127.0.0.1:8080/mcp`.
+
+```json
+{
+  "mcpServers": {
+    "ariadne-local": {
+      "url": "http://127.0.0.1:9888/mcp",
+      "headers": {
+        "Authorization": "Bearer <Secret MCP del Perfil (ari_…) o JWT de sesión>"
+      }
+    }
+  }
+}
+```
+
+Con **Docker Compose dev** (`docker-compose.yml` + `docker-compose.dev.yml`): el servicio `mcp-ariadne` publica **`127.0.0.1:9888`** y a menudo tiene **`MCP_HTTP_ALLOW_UNAUTHENTICATED=true`** (omitir Bearer solo en pruebas locales). En producción deja **`MCP_HTTP_ALLOW_UNAUTHENTICATED` sin definir** y configura el Bearer en `mcp.json`.
+
+Para **paridad** con el explorador en grafos Nest, necesitas **`ARIADNE_API_URL`** correcta **y** Bearer vigente (única fuente: Cursor `headers`, mismo token que usa el usuario en web o el Secret MCP persistente).
+
+### Variables MCP ↔ Cursor / Docker
+
+Compose puede inyectar solo **`ARIADNE_API_URL`** (p. ej. `http://api:3000`). Los tokens de sesión / Secret MCP **no** van en variables de entorno del contenedor MCP: van en la config de Cursor como arriba. Sin Bearer en la petición (y sin modo allow-unauth) la API responde **401** y las tools con fallback usan Falkor.
 
 ### Caché de herramientas MCP (no es la caché de `analyze`)
 
@@ -115,4 +136,4 @@ Las herramientas **get_component_graph**, **get_legacy_impact** y **get_sync_sta
 ## Scripts
 
 - `npm run build` — compila TypeScript.
-- `npm start` — inicia el servidor (stdio).
+- `npm start` — inicia el servidor HTTP Streamable (`PORT` / `MCP_HTTP_PORT`, default 8080).

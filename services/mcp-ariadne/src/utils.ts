@@ -25,6 +25,29 @@ export function loadAriadneProjectConfig(currentDir?: string): AriadneProjectCon
         return null;
       }
     }
+    /** Repos Cursor / Relic suelen tener `.relic-project` con `projectId` (proyecto o root repo). */
+    const relicPath = path.join(startDir, ".relic-project");
+    if (fs.existsSync(relicPath)) {
+      try {
+        const content = fs.readFileSync(relicPath, "utf-8");
+        const j = JSON.parse(content) as Record<string, unknown>;
+        const pid = typeof j.projectId === "string" ? j.projectId.trim() : "";
+        if (pid) {
+          const out: AriadneProjectConfig = { projectId: pid };
+          if (typeof j.defaultRepoId === "string") out.defaultRepoId = j.defaultRepoId;
+          if (
+            j.pathPrefixes &&
+            typeof j.pathPrefixes === "object" &&
+            !Array.isArray(j.pathPrefixes)
+          ) {
+            out.pathPrefixes = j.pathPrefixes as Record<string, string>;
+          }
+          return out;
+        }
+      } catch (e) {
+        console.error("Error al leer .relic-project:", e);
+      }
+    }
     startDir = path.dirname(startDir);
   }
   return null;

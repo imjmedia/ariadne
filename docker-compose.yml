@@ -190,7 +190,7 @@ services:
       - falkor-net
 
   # Servidor MCP (El Oráculo). Streamable HTTP para producción (Dokploy).
-  # Cursor/IA conecta por URL. Auth M2M opcional: MCP_AUTH_TOKEN.
+  # Cursor/IA por URL Streamable MCP. Bearer a `/mcp`: Secret MCP `ari_*` del usuario (validado vía ingest), reenvío al Nest.
   mcp-ariadne:
     build:
       context: .
@@ -206,7 +206,6 @@ services:
       # Caché de herramientas MCP (get_component_graph, legacy impact, …): misma Redis que api/ingest.
       # Opcional: MCP_REDIS_URL (prioridad sobre REDIS_URL), MCP_REDIS_DISABLED=1 → solo memoria.
       - REDIS_URL=redis://redis:6379
-      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - ARIADNE_API_URL=${ARIADNE_API_URL:-http://api:3000}
     depends_on:
       falkordb:

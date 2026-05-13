@@ -6,6 +6,14 @@ import { BadRequestException, Injectable, ServiceUnavailableException } from '@n
 import * as jwt from 'jsonwebtoken';
 import { EmailService } from './email.service';
 
+/** Result of verifying an OTP/session JWT issued by verifyOtp / ssoLogin. */
+export type SessionJwtOutcome =
+  | {
+      ok: true;
+      user: { sub: string; email?: string; userId?: string; role?: string; name?: string };
+    }
+  | { ok: false; reason: 'expired' | 'invalid' };
+
 const OTP_TTL_SEC = 300; // 5 min
 const OTP_LENGTH = 6;
 const JWT_SECRET = process.env.JWT_SECRET || 'ariadne-dev-secret-change-in-prod';
@@ -136,8 +144,8 @@ export class AuthService {
     };
   }
 
-  /** Verifica JWT y devuelve payload o null. */
-  verifyToken(token: string): { sub: string; email?: string; userId?: string; role?: string; name?: string } | null {
+  /** Verifica JWT de sesión (web/localStorage): distingue caducidad vs formato inválido. */
+  verifySessionJwtOutcome(token: string): SessionJwtOutcome {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as {
         sub?: string;
@@ -148,17 +156,34 @@ export class AuthService {
       };
       if (decoded?.sub) {
         return {
-          sub: decoded.sub,
-          email: decoded.email,
-          userId: decoded.userId,
-          role: decoded.role,
-          name: decoded.name,
+          ok: true,
+          user: {
+            sub: decoded.sub,
+            email: decoded.email,
+            userId: decoded.userId,
+            role: decoded.role,
+            name: decoded.name,
+          },
         };
       }
-      return null;
-    } catch {
-      return null;
+      return { ok: false, reason: 'invalid' };
+    } catch (e: unknown) {
+      const isExpired =
+        typeof e === 'object' &&
+        e !== null &&
+        'name' in e &&
+        (e as { name: string }).name === 'TokenExpiredError';
+      if (isExpired) {
+        return { ok: false, reason: 'expired' };
+      }
+      return { ok: false, reason: 'invalid' };
     }
+  }
+
+  /** Verifica JWT y devuelve payload o null (compat callers). */
+  verifyToken(token: string): { sub: string; email?: string; userId?: string; role?: string; name?: string } | null {
+    const r = this.verifySessionJwtOutcome(token);
+    return r.ok ? r.user : null;
   }
 
   /** Valida un token MCP contra el servicio Ingest. */

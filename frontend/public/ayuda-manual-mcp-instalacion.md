@@ -57,7 +57,7 @@ Si Ariadne está en Dokploy con MCP en Streamable HTTP (puerto 8080):
 |----------------|------------------------------------|
 | URL            | `https://ariadne.kreoint.mx/mcp`       |
 
-Cursor se conecta directamente por URL. Si el servidor tiene `MCP_AUTH_TOKEN` definido, incluir `Authorization: Bearer <token>` en la config (ver Paso 4).
+Cursor se conecta directamente por URL. En producción añade **`headers.Authorization: Bearer`** con tu **Secret MCP** (`ari_…` desde Perfil) o un **JWT de sesión** válido (ver Paso 4). Solo en desarrollo con `MCP_HTTP_ALLOW_UNAUTHENTICATED=1` puedes omitir el Bearer sobre `/mcp`.
 
 ### Escenario C: Producción con MCP local + túnel SSH
 
@@ -231,14 +231,14 @@ Previo: arrancar el MCP en tu máquina (`PORT=8080 node dist/index.js` con FALKO
 }
 ```
 
-**Producción con auth M2M** (si el servidor define `MCP_AUTH_TOKEN`):
+**Producción con Bearer (recomendado):** mismo token que usarías tras login web o el **Secret MCP** de Perfil (no hay `ARIADNE_API_*` en `.env` para esto):
 ```json
 {
   "mcpServers": {
     "ariadnespecs": {
       "url": "https://ariadne.kreoint.mx/mcp",
       "headers": {
-        "Authorization": "Bearer <tu-token-m2m>"
+        "Authorization": "Bearer <ari_… o JWT vigente>"
       }
     }
   }
@@ -319,7 +319,8 @@ El MCP usa **Streamable HTTP** en todas las configuraciones (puerto 8080, path /
 | FALKORDB_PORT   | Puerto de FalkorDB                         | `6379`         |
 | INGEST_URL      | URL base del Ingest (get_file_content, etc.) | —           |
 | FALKORSPEC_INGEST_URL | Alias de INGEST_URL                    | = INGEST_URL   |
-| MCP_AUTH_TOKEN  | Token estático Bearer: si está definido, exige `Authorization: Bearer <token>` o `X-M2M-Token` | — |
+| `MCP_HTTP_ALLOW_UNAUTHENTICATED` | **`1`** (solo dev local): permite `/mcp` sin Bearer                           | — |
+| `ARIADNE_API_URL`               | URL base del API Nest (default `http://localhost:3000`; en Docker suele ser `http://api:3000`) | Compose lo inyecta |
 
 ---
 

@@ -32,12 +32,13 @@ OPENAI_API_KEY=<tu-key>
 LLM_CHAT_MODEL=gpt-4o-mini
 CREDENTIALS_ENCRYPTION_KEY=<generar con: openssl rand -base64 32>
 
-# MCP — Auth M2M (recomendado en producción)
-# Si se define, Cursor debe enviar Authorization: Bearer <token>. Sin esto, el MCP queda abierto.
-MCP_AUTH_TOKEN=<token-secreto>
+# MCP: cada desarrollador pone Bearer en ~/.cursor/mcp.json (Secret MCP `ari_…` en Perfil o JWT de sesión). No uses `ARIADNE_API_*` en Environment para eso.
+
+# API Nest — firma JWT OTP/SSO (obligatorio en producción para la web)
+JWT_SECRET=<openssl rand -base64 32>
 ```
 
-**Importante:** Las variables definidas en Dokploy Environment se inyectan a Docker al desplegar. El servicio `mcp-ariadne` lee `MCP_AUTH_TOKEN` del entorno; si está definido, todas las peticiones al MCP requieren el header `Authorization: Bearer <valor>` o `X-M2M-Token: <valor>`.
+El contenedor MCP recibe típicamente **`ARIADNE_API_URL=http://api:3000`** vía Compose; los **Bearer personales no van ahí.**
 
 ## 3. Enrutamiento Traefik (docker-compose)
 
@@ -85,20 +86,8 @@ El MCP usa **Streamable HTTP** en el puerto 8080. FalkorDB e Ingest están en la
    - Path **`/mcp`** (o prefix `/mcp`) → servicio **mcp-ariadne**, puerto **8080** — conexión MCP
    - Path **`/.well-known`** (o prefix) → servicio **mcp-ariadne**, puerto **8080** — discovery OAuth (Cursor pide esto antes de conectar)
    - Orden: rutas más específicas primero. Sin esto, `/mcp` devuelve HTML (SPA) → error "Unexpected token '<'"
-2. **Token**: En **Dokploy** → Environment, definir `MCP_AUTH_TOKEN` con un token secreto. Ese valor se inyecta al contenedor `mcp-ariadne` vía `environment` del compose. Si está definido, todas las peticiones requieren `Authorization: Bearer <token>`.
-3. **Cursor** (`~/.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "https://ariadne.kreoint.mx/mcp"
-    }
-  }
-}
-```
-
-Con auth M2M (si `MCP_AUTH_TOKEN` está definido en el servidor):
+2. **Bearer por usuario**: en **Perfil** genera tu **Secret MCP** (`ari_…`). En Cursor (`mcp.json`) añade `headers.Authorization: Bearer <ari_…>` (o el **JWT de sesión** vigente tras login web). El proceso MCP valida vía ingest y reenvía el mismo Bearer al API Nest para grafos/C4 — **no** uses `ARIADNE_API_BEARER`/`ARIADNE_API_JWT` en Environment.
+3. **Cursor** (`~/.cursor/mcp.json`) — ejemplo:
 
 ```json
 {
@@ -106,12 +95,15 @@ Con auth M2M (si `MCP_AUTH_TOKEN` está definido en el servidor):
     "ariadnespecs": {
       "url": "https://ariadne.kreoint.mx/mcp",
       "headers": {
-        "Authorization": "Bearer <tu-token-m2m>"
+        "Authorization": "Bearer <tu Secret MCP `ari_…` o JWT de sesión>"
       }
     }
   }
 }
 ```
+
+En **desarrollo** el compose puede activar `MCP_HTTP_ALLOW_UNAUTHENTICATED` (solo local; **no** en producción expuesta).
+
 
 El MCP tiene `FALKORDB_HOST=falkordb`, `INGEST_URL=http://ingest:3002` y escucha en `0.0.0.0:8080`.
 
@@ -135,4 +127,4 @@ Variables requeridas para Postgres (ingest):
 - [ ] Frontend desplegado en ariadne.kreoint.mx
 - [ ] API accesible en ariadne.kreoint.mx/api/repositories, /api/graph/*, etc.
 - [ ] Certificado SSL en ariadne.kreoint.mx
-- [ ] `MCP_AUTH_TOKEN` en Environment (Dokploy) si quieres auth en el MCP; Cursor configurado con `headers.Authorization`
+- [ ] Cursor con `headers.Authorization` (Secret MCP `ari_…` o JWT vigente); sin `ARIADNE_API_*` en Dokploy para eso

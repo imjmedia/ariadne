@@ -4,8 +4,8 @@ Guía para **implementar llamadas HTTP/HTTPS** desde una aplicación al servidor
 
 **Importante (dos redes distintas):**
 
-1. **Tu app → MCP** (`POST https://<host>/mcp`): autenticación opcional con **`MCP_AUTH_TOKEN`** en el servidor MCP (`Authorization: Bearer` o `X-M2M-Token`). Eso solo protege el endpoint MCP.
-2. **MCP → API Nest** (`ARIADNE_API_URL`, típ. `https://<host-api>` con prefijo `/api`): el **proceso** del servidor MCP, si tiene configurado **`ARIADNE_API_BEARER`** / **`ARIADNE_API_JWT`**, llama a `GET /api/graph/component`, `/api/graph/impact`, `/api/graph/c4-model`, etc. Ese JWT es **OTP del API Nest**; no lo envía el cliente HTTP del MCP salvo que operes el mismo binario con otra app. Si el MCP no tiene token válido hacia Nest, herramientas como `get_component_graph` / `get_legacy_impact` hacen **fallback Falkor** (resultado puede no coincidir con el explorador). Ver [mcp_server_specs.md](mcp_server_specs.md) § API Nest vs Falkor.
+1. **Tu app → MCP** (`POST https://<host>/mcp`): en producción suele exigirse **`Authorization: Bearer`** (o `X-M2M-Token`) con el **Secret MCP** del usuario (`ari_…` desde Perfil) o un **JWT de sesión** válido; el proceso valida contra Ingest. En desarrollo, `MCP_HTTP_ALLOW_UNAUTHENTICATED=1` puede permitir peticiones sin Bearer (solo local).
+2. **MCP → API Nest** (`ARIADNE_API_URL`, típ. `https://<host-api>` con prefijo `/api`): el proceso MCP **reenvía el mismo Bearer** de la petición (1) en `fetch` interno a `GET /api/graph/*`. **No** se usan `ARIADNE_API_BEARER` ni `ARIADNE_API_JWT` en el entorno para esto. Sin Bearer válido, herramientas como `get_component_graph` / `get_legacy_impact` pueden usar **fallback Falkor** (resultado puede no coincidir con el explorador). Ver [mcp_server_specs.md](mcp_server_specs.md) § API Nest vs Falkor.
 
 ---
 
@@ -50,19 +50,11 @@ MCP-Protocol-Version: 2025-03-26
 
 ### 3.1 Auth del endpoint MCP (cliente → servidor)
 
-Si el despliegue define **`MCP_AUTH_TOKEN`**, cada petición al **path `/mcp`** debe incluir ese token (no confundir con el JWT del API Nest):
+En **producción** (sin `MCP_HTTP_ALLOW_UNAUTHENTICATED`), cada `POST …/mcp` debe llevar **`Authorization: Bearer`** con el **Secret MCP** (`ari_…`) del usuario desde Perfil, o el **JWT** de sesión web (alternativa equivalente: `X-M2M-Token`). El proceso valida ese valor vía ingest. En **desarrollo local**, algunos compose habilitan `MCP_HTTP_ALLOW_UNAUTHENTICATED` y permiten omitir el Bearer sobre `/mcp` (no expongas así en Internet).
 
-```
-Authorization: Bearer <MCP_AUTH_TOKEN>
-```
+### 3.2 API Nest (reenvío automático desde el proceso MCP)
 
-Alternativa equivalente: `X-M2M-Token: <MCP_AUTH_TOKEN>`.
-
-Sin `MCP_AUTH_TOKEN` en el servidor, el MCP acepta peticiones sin `Authorization`.
-
-### 3.2 API Nest (solo entorno del proceso MCP)
-
-Variables típicas en el **mismo** host/contenedor que ejecuta el MCP: **`ARIADNE_API_URL`** (default `http://localhost:3000`), **`ARIADNE_API_BEARER`** o **`ARIADNE_API_JWT`**. El cliente HTTPS que documenta este archivo **no** las envía: las lee solo el servidor MCP al hacer `fetch` interno a `/api/graph/*`. Para paridad con el explorador, el operador debe configurarlas en el despliegue.
+El proceso MCP debe tener **`ARIADNE_API_URL`** (base URL Nest). Para `GET /api/graph/*` **no uses** variables **`ARIADNE_API_BEARER`** ni **`ARIADNE_API_JWT`**: el mismo Bearer del §3.1 se reenvía en `fetch`. El cliente HTTPS que documenta este archivo **solo** debe enviar esa cabecera en el POST a `/mcp`.
 
 ---
 
@@ -258,7 +250,7 @@ Si el servidor MCP corre con **partición por proyecto** en FalkorDB (un grafo l
 - Con sharding activo no hay búsqueda multi-shard genérica: **`find_similar_implementations`** exige **`projectId`** o **`currentFilePath`** (inferencia con ingest/shards).
 - Detalle técnico: el MCP abre el grafo con `graphNameForProject(projectId)`; si hace falta inferir el proyecto desde path con sharding, puede barrer candidatos obtenidos del ingest (`/projects`, `/repositories`).
 
-La API REST Nest (`GET /api/graph/*`) acepta query **`projectId`** (y en algunos endpoints **`scopePath`**) para caché y selección de shard; el middleware OTP exige **`Authorization: Bearer`** salvo rutas públicas (`/api/health`, OpenAPI, OTP). El MCP reenvía el JWT configurado en **`ARIADNE_API_BEARER`** / **`ARIADNE_API_JWT`**.
+La API REST Nest (`GET /api/graph/*`) acepta query **`projectId`** (y en algunos endpoints **`scopePath`**) para caché y selección de shard; el middleware exige **`Authorization: Bearer`** salvo rutas públicas (`/api/health`, OpenAPI, OTP). El MCP **reenvía** el Bearer que el cliente envió a `/mcp`.
 
 ---
 
@@ -268,8 +260,9 @@ La API REST Nest (`GET /api/graph/*`) acepta query **`projectId`** (y en algunos
 
 ```typescript
 const MCP_URL = "https://ariadne.kreoint.mx/mcp";
-/** Token para el endpoint `/mcp` (MCP_AUTH_TOKEN en el servidor). No es el JWT del API Nest. */
-const MCP_CLIENT_TOKEN = process.env.MCP_AUTH_TOKEN;
+/** Mismo Bearer que en Cursor: Secret MCP (`ari_…`) o JWT tras login web. El MCP lo reenvía al Nest. */
+const AUTHORIZATION_BEARER =
+  process.env.USER_MCP_OR_SESSION_BEARER ?? "<paste-from-profile-or-session>";
 
 async function callMcpTool(name: string, args: Record<string, unknown>) {
   const res = await fetch(MCP_URL, {
@@ -278,7 +271,9 @@ async function callMcpTool(name: string, args: Record<string, unknown>) {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       "MCP-Protocol-Version": "2025-03-26",
-      ...(MCP_CLIENT_TOKEN && { Authorization: `Bearer ${MCP_CLIENT_TOKEN}` }),
+      ...(AUTHORIZATION_BEARER && AUTHORIZATION_BEARER !== "<paste-from-profile-or-session>"
+        ? { Authorization: `Bearer ${AUTHORIZATION_BEARER}` }
+        : {}),
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -352,7 +347,7 @@ function extractToolResult(response: {
 | 200    | OK — Respuesta JSON-RPC en body                                           |
 | 202    | Accepted — Notificación aceptada (sin body)                               |
 | 400    | Bad Request — JSON malformado o método inválido                           |
-| 401    | Unauthorized — Falta o token incorrecto hacia **`/mcp`** (si `MCP_AUTH_TOKEN` está definido en el servidor). Los fallos de JWT hacia el API Nest suelen devolver **200** con Markdown de error o fallback en el `result` de la tool, no necesariamente HTTP 401 al cliente MCP. |
+| 401    | Unauthorized — Falta Bearer o token inválido en **`/mcp`** (validación ingest) salvo desarrollo con `MCP_HTTP_ALLOW_UNAUTHENTICATED`. Fallos contra el API Nest en tools suelen llegar como **200** con Markdown/aviso u otro contenido en `result`. |
 | 404    | Not Found — Ruta incorrecta (verificar que sea `/mcp`)                    |
 | 500    | Internal Server Error — Error del servidor                                |
 

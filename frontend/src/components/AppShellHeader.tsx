@@ -4,6 +4,7 @@
 import { useLocation } from 'react-router-dom';
 import { AppBreadcrumbs } from '@/components/AppBreadcrumbs';
 import { HeaderSearch } from '@/components/HeaderSearch';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export function AppShellHeader() {
   const { pathname } = useLocation();
@@ -13,8 +14,12 @@ export function AppShellHeader() {
       <div className="min-w-0 flex-1">
         <AppBreadcrumbs pathname={pathname} />
       </div>
-      <div className="flex shrink-0 items-center justify-end">
+      <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
         <HeaderSearch />
+        <ThemeToggle
+          variant="outline"
+          className="shrink-0 bg-[var(--background)] text-[var(--foreground-muted)]"
+        />
       </div>
     </div>
   );

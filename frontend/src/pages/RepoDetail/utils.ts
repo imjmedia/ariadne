@@ -4,25 +4,19 @@
  * @param status - Estado del job (queued, running, etc.) para mensajes contextuales.
  * @returns Texto legible para la celda de estado.
  */
+import { formatRunningSyncHeadline, SYNC_FULL_PIPELINE_STEPS } from './syncPipeline';
+
 export function formatJobPayload(
   payload: Record<string, unknown> | null | undefined,
   status?: string,
 ): string {
   if (!payload) return '—';
   const parts: string[] = [];
-  if (status === 'queued' || payload.phase === 'queued') {
-    parts.push('En cola…');
+  if (status === 'queued') {
+    parts.push(formatRunningSyncHeadline(payload, 'queued') ?? `Paso 1/${SYNC_FULL_PIPELINE_STEPS}: Encolado…`);
   }
   if (status === 'running') {
-    if (payload.phase === 'mapping') parts.push('Listando archivos…');
-    else if (payload.phase === 'mapping_done' && typeof payload.filesFound === 'number')
-      parts.push(`${payload.filesFound} archivos encontrados`);
-    else if (
-      payload.phase === 'indexing' &&
-      typeof payload.current === 'number' &&
-      typeof payload.total === 'number'
-    )
-      parts.push(`Indexando ${payload.current}/${payload.total}`);
+    parts.push(formatRunningSyncHeadline(payload, 'running') ?? 'En proceso…');
   }
   if (typeof payload.indexed === 'number') {
     const total = typeof payload.total === 'number' ? payload.total : payload.indexed;

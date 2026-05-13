@@ -84,7 +84,7 @@ GOOGLE_API_KEY=xxx
 | `FALKORDB_HOST`  | Sí          | localhost             | FalkorDB host                                       |
 | `FALKORDB_PORT`  | Sí          | 6379                  | FalkorDB puerto                                     |
 | `INGEST_URL`     | No          | http://localhost:3002 | **Obligatorio** para routing completo: `get_file_content`, listados, **`GET /projects/:id/graph-routing`** (`cypherShardContexts`, whitelist de dominios). Sin esto, el MCP cae a heurísticas locales. |
-| `MCP_AUTH_TOKEN` | No          | —                     | Si está definido: exige Bearer token en peticiones  |
+| `MCP_HTTP_ALLOW_UNAUTHENTICATED` | No          | **`1`** (solo dev local) | Omite validación Bearer en `/mcp` — no usar expuesto                                          |
 
 #### Frontend (puerto 5173)
 

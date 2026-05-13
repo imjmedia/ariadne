@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -153,7 +154,8 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--background)] p-4 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+    <div className="relative flex min-h-[100dvh] items-center justify-center bg-[var(--background)] p-4 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+      <ThemeToggle className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top,0px))] z-50 sm:right-4" />
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">ARIADNE</CardTitle>

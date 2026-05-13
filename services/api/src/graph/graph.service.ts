@@ -180,10 +180,16 @@ function normalizeComponentGraphFocal(
   const n = nodes.get(focalId)!;
   const replaceName =
     !n.name || n.name === 'unknown' || n.name === 'Node' || n.kind === 'Node';
+  const kindNorm =
+    n.kind === 'Node'
+      ? componentName.startsWith('use')
+        ? 'Hook'
+        : 'Component'
+      : n.kind;
   nodes.set(focalId, {
     ...n,
     name: replaceName ? componentName : n.name,
-    kind: n.kind === 'Node' ? 'Component' : n.kind,
+    kind: kindNorm,
   });
 }
 
@@ -303,6 +309,55 @@ export class GraphService {
     const params: Record<string, string> = { componentName: name };
     if (pid) params.projectId = pid;
 
+    const compMatch = pid ? ', projectId: $projectId' : '';
+    /** Foco es un custom hook (:Hook): aristas Component -[:USES_HOOK]-> Hook (invertidas respecto al grafo “componente centrado”). */
+    const hookFanIn = (await graph.query(
+      pid
+        ? `MATCH (h:Hook {name: $componentName, projectId: $projectId}) ` +
+            `MATCH (consumer:Component {projectId: $projectId})-[:USES_HOOK]->(h) ` +
+            `RETURN consumer, h`
+        : `MATCH (h:Hook {name: $componentName}) ` +
+            `MATCH (consumer:Component)-[:USES_HOOK]->(h) ` +
+            `RETURN consumer, h`,
+      { params },
+    )) as FalkorResult;
+    const hookFanHeaders =
+      hookFanIn.headers && hookFanIn.headers.length ? hookFanIn.headers : ['consumer', 'h'];
+    if ((hookFanIn.data ?? []).length > 0) {
+      for (const row of hookFanIn.data ?? []) {
+        const [consumerCell, hookCell] = extractFalkorTwoColumnRow(
+          row,
+          'consumer',
+          'h',
+          hookFanHeaders,
+        );
+        const hookNode = parseGraphNodeCell(hookCell);
+        const consumerNode = parseGraphNodeCell(consumerCell);
+        if (hookNode && consumerNode) {
+          accum.nodes.set(hookNode.id, hookNode);
+          accum.nodes.set(consumerNode.id, consumerNode);
+          if (!accum.centerId) accum.centerId = hookNode.id;
+          addGraphEdge(accum.edges, accum.edgeKey, consumerNode.id, hookNode.id, 'depends');
+        }
+      }
+      return;
+    }
+    const hookOnly = (await graph.query(
+      `MATCH (h:Hook {name: $componentName${compMatch}}) RETURN h`,
+      { params },
+    )) as FalkorResult;
+    if ((hookOnly.data ?? []).length > 0) {
+      const oh = hookOnly.headers && hookOnly.headers.length ? hookOnly.headers : ['h'];
+      const row0 = hookOnly.data![0];
+      const [, hookCell] = extractFalkorTwoColumnRow(row0 as unknown, 'h', 'h', oh);
+      const hookNode = parseGraphNodeCell(hookCell ?? row0);
+      if (hookNode) {
+        accum.nodes.set(hookNode.id, hookNode);
+        accum.centerId = hookNode.id;
+      }
+      return;
+    }
+
     const dRel = Math.min(Math.max(depth, 1), 10);
     const importHop = Math.min(dRel, 5);
     const rendersRows = (await graph.query(
@@ -405,6 +460,24 @@ export class GraphService {
         { params },
       )) as FalkorResult;
       const rows = this.mapImpactQueryRows(result);
+      const seen = new Set(rows.map((r) => `${String(r.name)}\0${JSON.stringify(r.labels)}`));
+      const mergeImpactRows = (extra: { name: unknown; labels: unknown }[]) => {
+        for (const r of extra) {
+          const k = `${String(r.name)}\0${JSON.stringify(r.labels)}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          rows.push(r);
+        }
+      };
+      /** React custom hooks (:Hook): consumidores son componentes con arista USES_HOOK (no siempre hay CALLS al hook). */
+      const hookConsumersQ = projectId
+        ? `MATCH (h:Hook {name: $nodeName, projectId: $projectId})<-[:USES_HOOK]-(consumer:Component {projectId: $projectId}) ` +
+          `RETURN consumer.name AS name, labels(consumer) AS labels`
+        : `MATCH (h:Hook {name: $nodeName})<-[:USES_HOOK]-(consumer:Component) ` +
+          `RETURN consumer.name AS name, labels(consumer) AS labels`;
+      mergeImpactRows(
+        this.mapImpactQueryRows((await graph.query(hookConsumersQ, { params })) as FalkorResult),
+      );
       if (!projectId) return rows;
       /** Consumidores vía IMPORTS entre archivos (módulos API / utils sin aristas RENDERS hacia otros Component). */
       const importCons = (await graph.query(
@@ -414,14 +487,7 @@ export class GraphService {
           `RETURN consumer.name AS name, labels(consumer) AS labels`,
         { params },
       )) as FalkorResult;
-      const extra = this.mapImpactQueryRows(importCons);
-      const seen = new Set(rows.map((r) => `${String(r.name)}\0${JSON.stringify(r.labels)}`));
-      for (const r of extra) {
-        const k = `${String(r.name)}\0${JSON.stringify(r.labels)}`;
-        if (seen.has(k)) continue;
-        seen.add(k);
-        rows.push(r);
-      }
+      mergeImpactRows(this.mapImpactQueryRows(importCons));
       return rows;
     };
 
@@ -510,7 +576,7 @@ export class GraphService {
     if (!pid || scopePath) {
       const graph = await this.pickShardGraph(pid, scopePath, async (g) => {
         const r = (await g.query(
-          `MATCH (c:Component {name: $componentName${compMatch}}) RETURN count(c) AS c`,
+          `MATCH (n) WHERE (n:Component OR n:Hook) AND n.name = $componentName${compMatch} RETURN count(n) AS c`,
           { params },
         )) as FalkorResult;
         const row = r.data?.[0] as unknown;
@@ -545,7 +611,12 @@ export class GraphService {
 
     if (!centerId) {
       centerId = graphNodeKey({ kind: 'Component', projectId: pid ?? '', name });
-      nodes.set(centerId, { id: centerId, kind: 'Component', name, ...(pid ? { projectId: pid } : {}) });
+      nodes.set(centerId, {
+        id: centerId,
+        kind: 'Component',
+        name,
+        ...(pid ? { projectId: pid } : {}),
+      });
     }
 
     const impact = await this.getImpact(name, pid, scopePath);
@@ -563,7 +634,10 @@ export class GraphService {
       centerId && nodes.has(centerId) ? centerId : null;
     if (!focalIdForHints) {
       for (const [id, n] of nodes) {
-        if (n.name === name && (n.kind === 'Component' || n.kind === 'Node')) {
+        if (
+          n.name === name &&
+          (n.kind === 'Component' || n.kind === 'Node' || n.kind === 'Hook')
+        ) {
           focalIdForHints = id;
           break;
         }
@@ -573,11 +647,18 @@ export class GraphService {
     const dependsOut = focalIdForHints
       ? edges.filter((e) => e.kind === 'depends' && e.source === focalIdForHints).length
       : 0;
+    /** Para hooks el grafo usa consumer → hook (`depends` entrante al foco). */
+    const dependsIntoFocal = focalIdForHints
+      ? edges.filter((e) => e.kind === 'depends' && e.target === focalIdForHints).length
+      : 0;
     const legacyInForHints = focalIdForHints
       ? edges.filter((e) => e.kind === 'legacy_impact' && e.target === focalIdForHints).length
       : 0;
     const graphHints: GraphComponentHintsDto | undefined =
-      dependsOut === 0 && legacyInForHints === 0 && pid
+      dependsOut === 0 &&
+      dependsIntoFocal === 0 &&
+      legacyInForHints === 0 &&
+      pid
         ? {
             suggestResync: true,
             messageEs:

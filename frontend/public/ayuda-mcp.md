@@ -12,7 +12,9 @@ Si Ariadne está desplegado (ariadne.kreoint.mx), Cursor se conecta por URL. **N
 
 En Cursor: **Settings** → **MCP** → editar `~/.cursor/mcp.json`:
 
-**Sin autenticación** (MCP sin token):
+<a id="mcp-http-allow-unauth"></a>
+
+**Sin cabecera `Authorization`** — solo si el proceso MCP tiene **`MCP_HTTP_ALLOW_UNAUTHENTICATED=1`** (típico en **desarrollo local**, p. ej. `docker-compose.dev.yml`). **No** hagas esto en producción ni en un host expuesto: sin esa variable, `/mcp` devolverá **401** hasta que Cursor envíe Bearer (Secret MCP o JWT).
 
 ```json
 {
@@ -24,7 +26,7 @@ En Cursor: **Settings** → **MCP** → editar `~/.cursor/mcp.json`:
 }
 ```
 
-**Con token** (cuando MCP_AUTH_TOKEN está definido en el servidor):
+**Con Bearer (producción recomendada)** — cada usuario usa su **Secret MCP** (`ari_*` en Perfil) o un **JWT de sesión** válido; el proceso MCP lo valida (ingest) y lo reenvía al API Nest:
 
 ```json
 {
@@ -32,14 +34,14 @@ En Cursor: **Settings** → **MCP** → editar `~/.cursor/mcp.json`:
     "ariadnespecs": {
       "url": "https://ariadne.kreoint.mx/mcp",
       "headers": {
-        "Authorization": "Bearer m2m_xxx"
+        "Authorization": "Bearer <Secret MCP `ari_…` de Perfil o JWT de sesión>"
       }
     }
   }
 }
 ```
 
-Sustituye el valor por el token que el admin te proporcione (MCP_AUTH_TOKEN). Alternativa: `"X-M2M-Token": "<token>"`.
+El valor es el **Secret MCP** de tu cuenta (Perfil) o el mismo **JWT** que obtienes tras iniciar sesión en la web — no uses variables `ARIADNE_API_BEARER` / `ARIADNE_API_JWT` en `.env` para esto. Alternativa de cabecera: `"X-M2M-Token": "<mismo valor>"`.
 
 Reiniciar Cursor. Listo.
 
@@ -51,7 +53,7 @@ Reiniciar Cursor. Listo.
 
 | Caso | Config |
 |------|--------|
-| **Desarrollo local** (Ariadne en tu máquina) | Arrancar MCP: `PORT=8080 node services/mcp-ariadne/dist/index.js` con env FALKORDB_HOST, INGEST_URL. Luego `url`: `http://localhost:8080/mcp` |
+| **Desarrollo local** (Ariadne en tu máquina) | Arrancar MCP: `PORT=8080 node services/mcp-ariadne/dist/index.js` con env FALKORDB_HOST, INGEST_URL. Luego `url`: `http://localhost:8080/mcp`. Omitir `headers`/`Authorization` en `mcp.json` solo si el proceso MCP tiene **`MCP_HTTP_ALLOW_UNAUTHENTICATED=1`** (típico compose dev): [motivo y riesgos §1](#mcp-http-allow-unauth). |
 | **Producción + túnel SSH** | Igual que local, pero `INGEST_URL=https://ariadne.kreoint.mx` y crear túnel: `ssh -L 6379:127.0.0.1:6379 user@servidor` |
 
 ---
@@ -237,7 +239,7 @@ Ejemplos de qué pedirle a la IA en el chat para que use las herramientas del MC
 |---------|----------|
 | `Unexpected token '<', "<!doctype "... is not valid JSON` | **Rutas no enrutadas al MCP.** Cursor pide `/mcp` y `/.well-known/oauth-*`; si van al frontend, recibe HTML. En Dokploy: añadir rutas path **`/mcp`** y **`/.well-known`** → servicio `mcp-ariadne` puerto `8080`. Verificar: `curl -s https://ariadne.kreoint.mx/.well-known/oauth-authorization-server` → JSON, no HTML. |
 | "Connection refused" | Verificar que ariadne.kreoint.mx/mcp responda; revisar ruta en Dokploy |
-| 401 Unauthorized / "Token no proporcionado" | El MCP exige token. Añadir en mcp.json: `"headers": { "Authorization": "Bearer <token>" }` (el admin te da MCP_AUTH_TOKEN) |
+| 401 Unauthorized / "Token no proporcionado" | En producción falta `Authorization: Bearer` válido (Secret MCP `ari_…` de Perfil o JWT de sesión) en `mcp.json` → `headers`. En dev, el compose puede tener `MCP_HTTP_ALLOW_UNAUTHENTICATED`; no lo uses expuesto a Internet. |
 | "Nodo X no encontrado" | Reindexar: resync del repo desde la UI |
 | Herramientas no aparecen | Reiniciar Cursor tras cambiar mcp.json |
 | `projectId` desconocido | Ejecutar `list_known_projects` al inicio (o pedir *"Lista los proyectos indexados"*) |
