@@ -26,10 +26,22 @@ services:
   ingest:
     ports:
       - "3002:3002"
+    # Libera la cola si un sync queda colgado (p. ej. Falkor ECONNRESET). 0 = sin timeout (comportamiento prod base).
+    environment:
+      - BULL_SYNC_JOB_TIMEOUT_MS=${BULL_SYNC_JOB_TIMEOUT_MS:-3600000}
 
   orchestrator:
     ports:
       - "3001:3001"
+
+  # MCP Streamable HTTP: host 9888 → contenedor 8080 (8080 suele estar ocupado por Apache/u otros).
+  # Cursor: http://127.0.0.1:9888/mcp
+  mcp-ariadne:
+    ports:
+      - "127.0.0.1:9888:8080"
+    environment:
+      # Pruebas locales sin token MCP en Cursor (no usar en exposición pública).
+      - MCP_HTTP_ALLOW_UNAUTHENTICATED=${MCP_HTTP_ALLOW_UNAUTHENTICATED:-true}
 
   frontend:
     ports:
