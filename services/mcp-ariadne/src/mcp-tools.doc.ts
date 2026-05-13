@@ -12,7 +12,7 @@
  * ## Entorno y autenticación
  *
  * - **INGEST_URL** (o `ARIADNESPEC_INGEST_URL`): chat, análisis, archivos, `list_known_projects` vía REST.
- * - **ARIADNE_API_URL** + **ARIADNE_API_BEARER** / **ARIADNE_API_JWT**: rutas `GET /api/graph/*` (paridad UI).
+ * - **ARIADNE_API_URL** + el mismo Bearer que el cliente MCP envía a `/mcp` (**Secret MCP** `ari_…` desde Perfil o JWT de sesión): rutas `GET /api/graph/*` (paridad UI). Sin variables de Bearer en `.env` para estos tokens.
  * - **FalkorDB**: fallback cuando no hay API/ingest; sharding vía `ariadne-common`.
  * - **`.ariadne-project`**: el IDE debe leer `projectId` y pasarlo donde aplique (ver `MCP_INSTRUCTIONS` en `index.ts`).
  *

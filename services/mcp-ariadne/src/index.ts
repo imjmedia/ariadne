@@ -4,8 +4,8 @@
  *
  * Expone herramientas para IDEs y agentes: grafo de componentes, impacto legacy, validación pre-edición,
  * búsqueda semántica, contenido de archivos, análisis de proyecto, planes de modificación, etc.
- * Variables de entorno clave: `PORT`, `MCP_AUTH_TOKEN`, `MCP_HTTP_ALLOW_UNAUTHENTICATED` (solo dev local), `FALKORDB_HOST`, `INGEST_URL`, `ARIADNE_API_URL`,
- * `ARIADNE_API_BEARER` / `ARIADNE_API_JWT` como fallback si el cliente no envía Bearer; si Cursor envía el Secret MCP (`ari_…`), se reenvía al Nest. Límites de logging:
+ * Variables de entorno clave: `PORT`, `MCP_HTTP_ALLOW_UNAUTHENTICATED` (solo dev local), `FALKORDB_HOST`, `INGEST_URL`, `ARIADNE_API_URL`,
+ * Bearer del cliente (Secret MCP `ari_…` o JWT web) solo por la petición HTTP a `/mcp` — se reenvía al Nest. Límites de logging:
  * `MCP_TOOL_LOG`, `MCP_TOOL_LOG_ARG_MAX`, `MCP_TOOL_LOG_RESPONSE_BLOCK_MAX`, `MCP_TOOL_LOG_RESPONSE_TOTAL_MAX`.
  *
  * @copyright 2026 Jorge Correa
@@ -86,40 +86,10 @@ function ariadneApiBase(): string {
 
 /**
  * Headers para `fetch` al API Nest (`Authorization: Bearer`).
- * Prioridad: Bearer de esta petición MCP (Cursor → mismo secret Perfil) · si no, `ARIADNE_API_BEARER` / `ARIADNE_API_JWT`.
- */
-/** Tokens válidos para Nest: JWT de sesión (tres segmentos) o Secret MCP (`ari_…`). No OTP de 6 dígitos ni placeholders cortos. */
-function isLikelyNestAuthToken(token: string): boolean {
-  const t = token.trim();
-  if (!t) return false;
-  if (t.startsWith("ari_")) return true;
-  const parts = t.split(".");
-  if (parts.length === 3 && parts.every((p) => p.length > 0)) return true;
-  if (/^\d+$/.test(t)) return false;
-  return t.length >= 20;
-}
-
-/**
- * Bearer para `fetch` al API Nest.
- * 1) El mismo token que el cliente envió al MCP (`Authorization` / `X-M2M-Token`) — Secret MCP `ari_…` o JWT desde Cursor.
- * 2) Solo si no hay (1): `ARIADNE_API_BEARER` / `ARIADNE_API_JWT` si parecen JWT o `ari_…` (evita OTP guardado por error en .env).
+ * Usa únicamente el mismo Bearer que el cliente envió a esta petición MCP (Cursor `mcp.json`: Secret MCP o JWT de sesión).
  */
 function pickNestAuthToken(): string | undefined {
-  const store = mcpNestAuthAls.getStore();
-  const client = store?.clientBearerForNest?.trim();
-  if (client) return client;
-
-  const envBearer =
-    process.env.ARIADNE_API_BEARER?.trim() ||
-    process.env.ARIADNE_API_JWT?.trim();
-  if (!envBearer) return undefined;
-  if (isLikelyNestAuthToken(envBearer)) return envBearer;
-
-  console.warn(
-    "[MCP] ARIADNE_API_BEARER / ARIADNE_API_JWT ignorado (no parece JWT ni secret MCP `ari_…`). " +
-      "Deja vacío y usa el Secret MCP en Cursor (Bearer hacia el MCP), o pega el JWT completo de POST /api/auth/otp/verify.",
-  );
-  return undefined;
+  return mcpNestAuthAls.getStore()?.clientBearerForNest?.trim() || undefined;
 }
 
 function ariadneApiFetchInit(extra: RequestInit = {}): RequestInit {
@@ -462,7 +432,7 @@ const MCP_INSTRUCTIONS = `AriadneSpecs Oracle: herramientas de análisis de cód
 
 ## API Nest (paridad con el explorador)
 
-Las herramientas **get_component_graph**, **get_legacy_impact** y **get_c4_model** pueden llamar a \`ARIADNE_API_URL\` (default http://localhost:3000). El API acepta JWT de sesión o el **Secret MCP** (\`ari_…\`) en \`Authorization: Bearer\`. Si Cursor envía ese Bearer al MCP, el servidor lo reenvía al Nest; si no, usa \`ARIADNE_API_BEARER\` / \`ARIADNE_API_JWT\` del entorno. Sin ningún token válido, esas llamadas fallan y el MCP usa fallback Falkor (resultados pueden diferir del UI).
+Las herramientas **get_component_graph**, **get_legacy_impact** y **get_c4_model** pueden llamar a \`ARIADNE_API_URL\` (default http://localhost:3000). El API Nest acepta JWT de sesión web o **Secret MCP** (\`ari_…\`) en \`Authorization: Bearer\`. Configura Cursor con el mismo Bearer (Perfil → Secret MCP, o JWT) en los headers HTTP del servidor MCP — el proceso lo reenvía al Nest sin variables de sesión extra. Sin Bearer válido, esas llamadas fallan y el MCP usa fallback Falkor (resultados pueden diferir del UI).
 
 ## projectId (OBLIGATORIO)
 
@@ -511,7 +481,7 @@ function createMcpServer(): Server {
     {
       name: "get_component_graph",
       description:
-        "Árbol de dependencias de un componente. Preferencia: API Nest GET /api/graph/component (mismo grafo que el explorador: RENDERS, USES_HOOK, IMPORTS, graphHints). Auth: Secret MCP (`ari_…`) en Authorization desde Cursor (reenviado al Nest) o JWT en `ARIADNE_API_BEARER`/`ARIADNE_API_JWT`. Si la API no está disponible o falla, fallback Falkor genérico (puede diferir).",
+        "Árbol de dependencias de un componente. Preferencia: API Nest GET /api/graph/component (mismo grafo que el explorador: RENDERS, USES_HOOK, IMPORTS, graphHints). Auth: mismo \`Authorization: Bearer\` que envías al MCP desde Cursor (**Secret MCP** \`ari_…\` o JWT de sesión web); el servidor lo reenvía al Nest. Si la API no está disponible o falla, fallback Falkor genérico (puede diferir).",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -527,7 +497,7 @@ function createMcpServer(): Server {
     {
       name: "get_c4_model",
       description:
-        "Modelo C4 (sistemas, contenedores, COMMUNICATES_WITH) vía GET /api/graph/c4-model. Auth: Secret MCP reenviado o env JWT (`ARIADNE_API_*`). Usar tras sync.",
+        "Modelo C4 (sistemas, contenedores, COMMUNICATES_WITH) vía GET /api/graph/c4-model. Auth: mismo \`Authorization: Bearer\` hacia MCP (Secret MCP \`ari_…\` o JWT web), reenviado al Nest. Usar tras sync.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -540,7 +510,7 @@ function createMcpServer(): Server {
     {
       name: "get_legacy_impact",
       description:
-        "Dependientes de un nodo (quién lo llama o lo renderiza). Preferencia: API Nest GET /api/graph/impact (CALLS/RENDERS e IMPORTS entre shards). Auth: Secret MCP reenviado o env JWT. Fallback Falkor: solo CALLS|RENDERS*.",
+        "Dependientes de un nodo (quién lo llama o lo renderiza). Preferencia: API Nest GET /api/graph/impact (CALLS/RENDERS e IMPORTS entre shards). Auth: mismo `Authorization: Bearer` hacia MCP (Secret MCP `ari_…` de Perfil o JWT web), reenviado al Nest. Fallback Falkor: solo CALLS|RENDERS*.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -1606,7 +1576,7 @@ async function fetchFileFromIngest(
       }
       if (res.status === 401 || res.status === 403) {
         apiAuthHint =
-          `> **API ${res.status}:** Rutas \`/api/graph/*\` requieren auth. Usa el **Secret MCP** (\`ari_…\`) en \`Authorization\` hacia el MCP (como en Perfil), o define \`ARIADNE_API_BEARER\` / \`ARIADNE_API_JWT\` en el entorno del proceso MCP como fallback (JWT de sesión OTP).\n\n`;
+          `> **API ${res.status}:** Rutas \`/api/graph/*\` requieren auth. Configura Cursor con \`Authorization: Bearer\` igual al **Secret MCP** (\`ari_…\`) de Perfil o al **JWT de sesión** tras login web; el proceso MCP lo reenvía al Nest.\n\n`;
       }
     } catch {
       /* fallback Falkor (red / timeout / DNS); si usas \`http://api:3000\` fuera de Docker, el host \`api\` no resuelve. */
@@ -1638,7 +1608,7 @@ async function fetchFileFromIngest(
     const headers = result.headers && result.headers.length ? result.headers : ["c", "dependency"];
     const fallbackNote =
       apiAuthHint +
-      "> **Nota (fallback Falkor):** Si el foco es **Hook**, se listan consumidores vía `USES_HOOK`; si es **Component**, consulta genérica `-[*1..depth]->`. Sin API Nest no hay fusión IMPORTS multi-shard ni `graphHints`. Para paridad con el explorador: Secret MCP (`ari_…`) o `ARIADNE_API_BEARER` + `ARIADNE_API_URL`.\n\n";
+      "> **Nota (fallback Falkor):** Si el foco es **Hook**, se listan consumidores vía `USES_HOOK`; si es **Component**, consulta genérica `-[*1..depth]->`. Sin API Nest no hay fusión IMPORTS multi-shard ni `graphHints`. Para paridad con el explorador: Bearer en Cursor (`Secret MCP` o JWT de sesión) + `ARIADNE_API_URL`.\n\n";
     const markdown = fallbackNote + formatComponentGraph(componentName, data, headers);
 
     await cache.set(cacheKey, markdown, 120);
@@ -1689,7 +1659,7 @@ async function fetchFileFromIngest(
           {
             type: "text",
             text:
-              `**Error:** No se pudo obtener el modelo C4. ¿API en **ARIADNE_API_URL** y auth (**Secret MCP** desde Cursor o **ARIADNE_API_BEARER**)? ${msg}`,
+              `**Error:** No se pudo obtener el modelo C4. Comprueba **ARIADNE_API_URL** y que Cursor envía \`Authorization: Bearer\` (Secret MCP \`ari_…\` o JWT de sesión): ${msg}`,
           },
         ],
         isError: true,
@@ -1748,7 +1718,7 @@ async function fetchFileFromIngest(
       }
       if (res.status === 401 || res.status === 403) {
         impactApiAuthHint =
-          `> **API ${res.status}:** Falta o token inválido para \`/api/graph/impact\`. Envía \`Authorization: Bearer <Secret MCP ari_…>\` desde Cursor, o \`ARIADNE_API_BEARER\` / \`ARIADNE_API_JWT\` en el entorno del MCP.\n\n`;
+          `> **API ${res.status}:** Falta o token inválido para \`/api/graph/impact\`. Envía desde Cursor \`Authorization: Bearer\` con el **Secret MCP** (\`ari_…\`) o el **JWT** de sesión web (cuando están vigentes).\n\n`;
       }
     } catch {
       /* fallback Falkor */
@@ -1789,7 +1759,7 @@ async function fetchFileFromIngest(
     const headers = result.headers ?? ["name", "labels"];
     const fallbackNote =
       impactApiAuthHint +
-      "> **Nota (fallback Falkor):** `CALLS|RENDERS*` más consumidores **`USES_HOOK`** si el foco es Hook; sin API Nest no hay fusión IMPORTS multi-shard. Configura Secret MCP (`ari_…`) o `ARIADNE_API_BEARER`.\n\n";
+      "> **Nota (fallback Falkor):** `CALLS|RENDERS*` más consumidores **`USES_HOOK`** si el foco es Hook; sin API Nest no hay fusión IMPORTS multi-shard. Envía Bearer (Secret MCP o JWT web) desde Cursor al MCP para reenvío al Nest.\n\n";
     const markdown = fallbackNote + formatLegacyImpact(nodeName, data, headers);
 
     await cache.set(cacheKey, markdown, 120);
@@ -4084,18 +4054,16 @@ async function requestHandler(req: IncomingMessage, res: ServerResponse): Promis
 
 async function main() {
   const port = parseInt(process.env.PORT ?? process.env.MCP_HTTP_PORT ?? "8080", 10);
-  const rawToken = process.env.MCP_AUTH_TOKEN;
-  const authEnabled = !!rawToken?.trim();
-  const authMode = authEnabled ? "static (Bearer)" : "disabled";
   console.log("[AriadneSpecs MCP] Starting Streamable HTTP server (stateless)...");
   const allowUnauth =
     process.env.MCP_HTTP_ALLOW_UNAUTHENTICATED?.trim() === "1" ||
     process.env.MCP_HTTP_ALLOW_UNAUTHENTICATED?.trim().toLowerCase() === "true";
-  console.log(`[MCP] Port: ${port}, Path: ${MCP_PATH}, Auth: ${authMode}`);
-  if (allowUnauth) {
-    console.warn("[MCP] MCP_HTTP_ALLOW_UNAUTHENTICATED=1 — sin validación Bearer/X-M2M (solo para pruebas locales)");
-  }
-  console.log(`[MCP] MCP_AUTH_TOKEN: ${authEnabled ? "configured" : "empty or not set"}`);
+  console.log(`[MCP] Port: ${port}, Path: ${MCP_PATH}`);
+  console.log(
+    allowUnauth
+      ? "[MCP] MCP_HTTP_ALLOW_UNAUTHENTICATED=1 — /mcp sin validar Bearer (solo pruebas locales)"
+      : "[MCP] /mcp: validación Bearer vía ingest `validate-mcp-token` (Secret MCP `ari_*` del usuario)",
+  );
 
   const httpServer = createServer((req, res) => {
     requestHandler(req, res).catch((err) => {
