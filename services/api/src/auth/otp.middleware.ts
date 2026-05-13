@@ -1,5 +1,5 @@
 /**
- * @fileoverview Middleware OTP: valida JWT emitido por verify o Secret MCP (`ari_…`). Protege /api/* excepto health, openapi y auth.
+ * @fileoverview Middleware: valida (1) Secret MCP (`ari_*`) contra Ingest/BD y (2) JWT de sesión web (OTP/SSO). Protege /api/* excepto health, openapi y auth.
  * Adjunta req.user con { sub, email, userId, role } para uso en controladores y proxy.
  */
 import { Request, Response, NextFunction } from 'express';
@@ -31,8 +31,8 @@ function getToken(req: Request): string | null {
 }
 
 /**
- * Middleware: valida JWT OTP o secret MCP (`ari_…`), asigna req.user y llama next().
- * El MCP puede reenviar el mismo Bearer que Cursor envía al endpoint MCP (Perfil → Secret MCP).
+ * Middleware: valida Secret MCP (`ari_*`) contra Ingest **o** JWT de sesión; asigna req.user y llama next().
+ * El Bearer que envía Cursor al MCP (`mcp.json`) es el mismo `ari_*` de Perfil; el servidor MCP lo reenvía al Nest.
  */
 export function createOtpAuthMiddleware(authService: AuthService) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -48,9 +48,9 @@ export function createOtpAuthMiddleware(authService: AuthService) {
       return;
     }
 
-    let user = authService.verifyToken(token);
+    let user: AuthenticatedUser | undefined;
 
-    if (!user && token.startsWith('ari_')) {
+    if (token.startsWith('ari_')) {
       const mcp = await authService.validateMcpToken(token);
       if (mcp.valid && mcp.user) {
         user = {
@@ -61,10 +61,32 @@ export function createOtpAuthMiddleware(authService: AuthService) {
           name: mcp.user.name ?? undefined,
         };
       }
+    } else {
+      const jwtOutcome = authService.verifySessionJwtOutcome(token);
+      if (jwtOutcome.ok) {
+        const u = jwtOutcome.user;
+        user = {
+          sub: u.sub,
+          email: u.email,
+          userId: u.userId,
+          role: u.role,
+          name: u.name,
+        };
+      } else if (jwtOutcome.reason === 'expired') {
+        res.status(401).json({
+          statusCode: 401,
+          message: 'Sesión JWT expirada; inicia sesión de nuevo desde la aplicación web',
+          code: 'JWT_EXPIRED',
+        });
+        return;
+      }
     }
 
     if (!user) {
-      res.status(401).json({ statusCode: 401, message: 'Token inválido o expirado' });
+      res.status(401).json({
+        statusCode: 401,
+        message: 'Token inválido, revocado o Secret MCP no reconocido',
+      });
       return;
     }
 
