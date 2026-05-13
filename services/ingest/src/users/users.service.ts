@@ -182,6 +182,14 @@ export class UsersService {
         }
       }
     }
+
+    // Static env token: MCP_AUTH_TOKEN passed to ingest container lets the MCP server
+    // authenticate to Nest using the same ari_ token Cursor sends it, without DB registration.
+    const staticToken = process.env.MCP_AUTH_TOKEN?.trim();
+    if (staticToken && staticToken.startsWith('ari_') && token === staticToken) {
+      return { id: 'mcp-static', email: 'mcp@system.local', role: 'admin', name: 'MCP Static' };
+    }
+
     return null;
   }
 

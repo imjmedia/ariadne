@@ -130,6 +130,24 @@ export class SyncService {
     return job;
   }
 
+  /**
+   * Si `syncQueue.add` falla tras crear la fila `queued`, evita dejar la UI en “En cola” sin job en Redis.
+   */
+  async markSyncJobEnqueueFailed(
+    repositoryId: string,
+    syncJobId: string,
+    message: string,
+  ): Promise<void> {
+    await this.syncJobRepo.update(
+      { id: syncJobId, repositoryId },
+      {
+        status: 'failed',
+        finishedAt: new Date(),
+        errorMessage: `No se pudo encolar en Redis (BullMQ): ${message}`,
+      },
+    );
+  }
+
   private async purgeMonolithicProjectGraph(
     client: Awaited<ReturnType<typeof FalkorDB.connect>>,
     projectId: string,
@@ -445,6 +463,15 @@ export class SyncService {
         }
       }
 
+      const openApiPathCount = paths.filter(
+        (p) => /swagger\.json$/i.test(p) || /openapi\.(yaml|yml|json)$/i.test(p),
+      ).length;
+      /** En cuanto termina el barrido de rutas: si no, la UI se queda en "Indexando N/N" durante deps/tsconfig (puede tardar mucho). */
+      await this.updateJobProgress(job.id, {
+        phase: 'writing_graph',
+        graphBatchTotal: parsedByPath.size + prismaFiles.length + openApiPathCount,
+      });
+
       if (isFirstSync && withAst.length > 0) {
         const inferred = inferDomainConfig(withAst);
         await this.repoRepo.update(repositoryId, { domainConfig: inferred });
@@ -720,6 +747,7 @@ export class SyncService {
           },
         };
       } else {
+        await this.updateJobProgress(job.id, { phase: 'embeddings' });
         try {
           const embedRes = await this.embedIndex.runEmbedIndex(repositoryId);
           console.log(`Embed-index post-sync: ${embedRes.indexed} indexed, ${embedRes.errors} errors`);
