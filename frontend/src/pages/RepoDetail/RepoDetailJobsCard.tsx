@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { JobAnalysisModal } from './JobAnalysisModal';
 import { SkippedFilesModal } from './SkippedFilesModal';
 import { IndexedFilesModal } from './IndexedFilesModal';
+import { SyncPipelineModal } from './SyncPipelineModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -53,6 +54,7 @@ export function RepoDetailJobsCard({
 }: RepoDetailJobsCardProps) {
   const [skippedModalJobId, setSkippedModalJobId] = useState<string | null>(null);
   const [indexedModalJobId, setIndexedModalJobId] = useState<string | null>(null);
+  const [pipelineModalJobId, setPipelineModalJobId] = useState<string | null>(null);
   const hasSelection = selectedJobIds.size > 0;
   const allSelected = jobs.length > 0 && selectedJobIds.size === jobs.length;
 
@@ -93,6 +95,7 @@ export function RepoDetailJobsCard({
           onAnalyzeJob={onAnalyzeJob}
           onShowSkipped={(jobId) => setSkippedModalJobId(jobId)}
           onShowIndexed={(jobId) => setIndexedModalJobId(jobId)}
+          onShowPipeline={(jobId) => setPipelineModalJobId(jobId)}
         />
         <JobAnalysisModal
           repoId={repoId ?? null}
@@ -111,6 +114,11 @@ export function RepoDetailJobsCard({
           onOpenChange={(open) => !open && setIndexedModalJobId(null)}
           payload={jobs.find((j) => j.id === indexedModalJobId)?.payload}
         />
+        <SyncPipelineModal
+          open={pipelineModalJobId !== null}
+          onOpenChange={(open) => !open && setPipelineModalJobId(null)}
+          job={jobs.find((j) => j.id === pipelineModalJobId) ?? null}
+        />
       </CardContent>
     </Card>
   );
@@ -127,6 +135,7 @@ interface JobsTableProps {
   onAnalyzeJob: (jobId: string) => void;
   onShowSkipped: (jobId: string) => void;
   onShowIndexed: (jobId: string) => void;
+  onShowPipeline: (jobId: string) => void;
 }
 
 /** Tabla de jobs con checkbox global, columnas estado/resultado y acciones por fila. */
@@ -141,6 +150,7 @@ function JobsTable({
   onAnalyzeJob,
   onShowSkipped,
   onShowIndexed,
+  onShowPipeline,
 }: JobsTableProps) {
   if (jobs.length === 0) {
     return <p className="text-muted-foreground py-8 text-center">No hay jobs aún.</p>;
@@ -179,6 +189,7 @@ function JobsTable({
             onAnalyze={() => onAnalyzeJob(j.id)}
             onShowSkipped={() => onShowSkipped(j.id)}
             onShowIndexed={() => onShowIndexed(j.id)}
+            onShowPipeline={() => onShowPipeline(j.id)}
           />
         ))}
       </TableBody>
@@ -195,6 +206,7 @@ interface JobRowProps {
   onAnalyze: () => void;
   onShowSkipped: () => void;
   onShowIndexed: () => void;
+  onShowPipeline: () => void;
 }
 
 /** Fila de job: checkbox, tipo, estado, fechas, resultado, error, botones analizar/omitidos/borrar. */
@@ -207,6 +219,7 @@ function JobRow({
   onAnalyze,
   onShowSkipped,
   onShowIndexed,
+  onShowPipeline,
 }: JobRowProps) {
   const skipped = (job.payload?.skipped as number) ?? 0;
   const indexed = (job.payload?.indexed as number) ?? 0;
@@ -241,6 +254,18 @@ function JobRow({
                 onClick={onShowIndexed}
               >
                 Ver indexados
+              </Button>
+            )}
+            {job.type === 'full' && (
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-muted-foreground underline"
+                type="button"
+                title="Ver fases del pipeline (cola, parseo, Falkor, embeddings)"
+                onClick={onShowPipeline}
+              >
+                Pasos del sync
               </Button>
             )}
             {hasSkipped && (

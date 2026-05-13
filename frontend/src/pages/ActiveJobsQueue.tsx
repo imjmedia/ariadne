@@ -18,6 +18,8 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/StatusBadge';
+import { SyncPipelineModal } from '@/pages/RepoDetail/SyncPipelineModal';
+import { formatRunningSyncHeadline } from '@/pages/RepoDetail/syncPipeline';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 const POLL_MS = 5000;
@@ -32,16 +34,13 @@ function canSelectJobForDelete(j: ActiveSyncJob): boolean {
 }
 
 /** Resume progreso en vivo (payload mezclado durante el sync). */
-function progressHint(payload: Record<string, unknown> | null | undefined): string | null {
-  if (!payload) return null;
-  const phase = typeof payload.phase === 'string' ? payload.phase : null;
-  const current = typeof payload.current === 'number' ? payload.current : null;
-  const total = typeof payload.total === 'number' ? payload.total : null;
-  const lastFile = typeof payload.lastFile === 'string' ? payload.lastFile : null;
-  if (current != null && total != null) {
-    return [phase, `${current}/${total}`, lastFile ? lastFile.slice(-40) : null].filter(Boolean).join(' · ');
+function progressHint(
+  payload: Record<string, unknown> | null | undefined,
+  status: string,
+): string | null {
+  if (status === 'queued' || status === 'running') {
+    return formatRunningSyncHeadline(payload, status === 'queued' ? 'queued' : 'running');
   }
-  if (phase) return phase;
   return null;
 }
 
@@ -110,6 +109,7 @@ export function ActiveJobsQueue() {
   const [syncingRepoId, setSyncingRepoId] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
   const [cancellingJobKey, setCancellingJobKey] = useState<string | null>(null);
+  const [pipelineModalJob, setPipelineModalJob] = useState<ActiveSyncJob | null>(null);
 
   const load = useCallback(() => {
     return api
@@ -392,7 +392,7 @@ export function ActiveJobsQueue() {
                     const scope =
                       typeof j.payload?.onlyProjectId === 'string' ? j.payload.onlyProjectId : null;
                     const active = isActiveStatus(j.status);
-                    const prog = active ? progressHint(j.payload) : null;
+                    const prog = active ? progressHint(j.payload, j.status) : null;
                     const audit = auditFromPayload(j);
                     const showOmitted = audit.omitted.length > 0;
                     const showIndexed = audit.indexedPaths.length > 0;
@@ -415,10 +415,15 @@ export function ActiveJobsQueue() {
                         <TableCell>
                           <StatusBadge status={j.status} />
                         </TableCell>
-                        <TableCell className="font-mono text-sm min-w-[10rem]">
-                          <div>
+                        <TableCell className="min-w-[10rem]">
+                          <div className="font-mono text-sm">
                             {j.repository.projectKey}/{j.repository.repoSlug}
                           </div>
+                          {j.repository.defaultBranch?.trim() ? (
+                            <div className="mt-0.5 text-xs text-[var(--foreground-muted)]">
+                              {j.repository.defaultBranch}
+                            </div>
+                          ) : null}
                           {scope && (
                             <div className="text-xs text-[var(--foreground-muted)] mt-0.5">
                               Solo proyecto: {scope}
@@ -478,6 +483,20 @@ export function ActiveJobsQueue() {
                           )}
                           {!active && j.status === 'failed' && audit.errorLine && (
                             <span className="text-destructive text-xs break-words">{audit.errorLine}</span>
+                          )}
+                          {j.type === 'full' && (
+                            <div className="mt-1">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto p-0 text-xs text-[var(--foreground-muted)] underline"
+                                type="button"
+                                title="Ver fases del pipeline (parseo, Falkor, embeddings)"
+                                onClick={() => setPipelineModalJob(j)}
+                              >
+                                Pasos del sync
+                              </Button>
+                            </div>
                           )}
                         </TableCell>
                         <TableCell className="text-right whitespace-nowrap">
@@ -551,6 +570,12 @@ export function ActiveJobsQueue() {
           )}
         </CardContent>
       </Card>
+
+      <SyncPipelineModal
+        open={pipelineModalJob !== null}
+        onOpenChange={(open) => !open && setPipelineModalJob(null)}
+        job={pipelineModalJob}
+      />
     </div>
   );
 }
