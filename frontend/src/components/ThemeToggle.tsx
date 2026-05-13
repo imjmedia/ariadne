@@ -13,9 +13,14 @@ import {
 
 type ThemeToggleProps = {
   className?: string;
+  /** `outline` marca mejor el borde sobre la cabecera; `ghost` es más discreto (p. ej. login). */
+  variant?: 'ghost' | 'outline';
 };
 
-export function ThemeToggle({ className }: ThemeToggleProps) {
+export function ThemeToggle({
+  className,
+  variant = 'ghost',
+}: ThemeToggleProps) {
   const [mode, setMode] = useState<ThemeMode>(() => getResolvedTheme());
 
   useEffect(() => {
@@ -39,7 +44,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant={variant}
       size="icon"
       className={className}
       onClick={handleClick}

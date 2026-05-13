@@ -15,8 +15,11 @@ export function AppShellHeader() {
         <AppBreadcrumbs pathname={pathname} />
       </div>
       <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
-        <ThemeToggle className="shrink-0 text-[var(--foreground-muted)]" />
         <HeaderSearch />
+        <ThemeToggle
+          variant="outline"
+          className="shrink-0 bg-[var(--background)] text-[var(--foreground-muted)]"
+        />
       </div>
     </div>
   );
