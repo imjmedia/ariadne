@@ -1,5 +1,5 @@
 /**
- * @fileoverview Middleware OTP: valida JWT emitido por verify. Protege /api/* excepto health, openapi y auth.
+ * @fileoverview Middleware OTP: valida JWT emitido por verify o Secret MCP (`ari_…`). Protege /api/* excepto health, openapi y auth.
  * Adjunta req.user con { sub, email, userId, role } para uso en controladores y proxy.
  */
 import { Request, Response, NextFunction } from 'express';
@@ -30,9 +30,12 @@ function getToken(req: Request): string | null {
   return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
 }
 
-/** Middleware: valida JWT OTP, asigna req.user y llama next(); si no hay token o es inválido responde 401. */
+/**
+ * Middleware: valida JWT OTP o secret MCP (`ari_…`), asigna req.user y llama next().
+ * El MCP puede reenviar el mismo Bearer que Cursor envía al endpoint MCP (Perfil → Secret MCP).
+ */
 export function createOtpAuthMiddleware(authService: AuthService) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     // Preflight CORS: sin Authorization; debe pasar aunque el orden de middlewares cambie.
     if (req.method === 'OPTIONS') return next();
 
@@ -45,7 +48,21 @@ export function createOtpAuthMiddleware(authService: AuthService) {
       return;
     }
 
-    const user = authService.verifyToken(token);
+    let user = authService.verifyToken(token);
+
+    if (!user && token.startsWith('ari_')) {
+      const mcp = await authService.validateMcpToken(token);
+      if (mcp.valid && mcp.user) {
+        user = {
+          sub: mcp.user.email,
+          email: mcp.user.email,
+          userId: mcp.user.id,
+          role: mcp.user.role,
+          name: mcp.user.name ?? undefined,
+        };
+      }
+    }
+
     if (!user) {
       res.status(401).json({ statusCode: 401, message: 'Token inválido o expirado' });
       return;
