@@ -7,4 +7,6 @@ export interface EmbeddingProvider {
   isAvailable(): boolean;
   getDimension(): number;
   embed(text: string): Promise<number[]>;
+  /** Embed multiple texts in one API call. Items are returned in the same order as input. */
+  embedBatch?(texts: string[]): Promise<number[][]>;
 }
