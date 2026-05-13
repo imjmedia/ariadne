@@ -101,9 +101,27 @@ Las herramientas ya no recortan agresivamente listados y snippets; puedes **baja
 
 Variables: `PORT` (8080), `FALKORDB_HOST`, `FALKORDB_PORT`, `INGEST_URL`, **`ARIADNE_API_URL`** (API Nest; default `http://localhost:3000`), **`ARIADNE_API_BEARER`** o **`ARIADNE_API_JWT`** (token OTP para rutas `/api/*`: grafo de componente, impacto, C4), `MCP_AUTH_TOKEN` (opcional; auth del propio endpoint MCP, no del API Nest).
 
-### Cursor (stdio): el `.env` del repo no alimenta el MCP
+### Cursor (HTTP): `~/.cursor/mcp.json`
 
-El servidor MCP es **otro proceso**. Hay que pasar `ARIADNE_API_URL`, `ARIADNE_API_BEARER` (o `ARIADNE_API_JWT`) y el resto en la config del MCP, p. ej. en `~/.cursor/mcp.json` dentro de `env` del servidor, o en las variables del contenedor si usas Docker/SSE. Solo `ARIADNE_API_URL` sin JWT ⇒ la API devuelve **401** y `get_component_graph` / `get_legacy_impact` caen en **fallback Falkor**. `http://api:3000` solo resuelve **dentro** de la red Docker; en el host usa la URL pública del API (p. ej. `https://relicai.obp.mx`).
+Servidor **Streamable HTTP** en `http://127.0.0.1:9888/mcp` cuando usas **docker-compose.dev.yml** (mapeo **9888→8080** en el contenedor; evita choque con Apache u otros en `:8080`). Si ejecutas el MCP con `PORT=8080` en el host, usa `http://127.0.0.1:8080/mcp`.
+
+```json
+{
+  "mcpServers": {
+    "ariadne-local": {
+      "url": "http://127.0.0.1:9888/mcp"
+    }
+  }
+}
+```
+
+Con **Docker Compose dev** (`docker-compose.yml` + `docker-compose.dev.yml`): el servicio `mcp-ariadne` publica **`127.0.0.1:9888`** y por defecto activa **`MCP_HTTP_ALLOW_UNAUTHENTICATED=true`** para que Cursor no necesite Bearer en la URL del MCP (solo para pruebas locales). En producción deja esta variable **sin definir** y usa el token MCP de **Perfil** en `Authorization: Bearer …` (validación vía ingest).
+
+Para **paridad** con el explorador en `get_component_graph` / `get_legacy_impact` / `get_c4_model`, define **`ARIADNE_API_JWT`** o **`ARIADNE_API_BEARER`** en el entorno del contenedor MCP (JWT OTP del login), no en `mcp.json` salvo que ejecutes el MCP fuera de Docker.
+
+### Variables MCP ↔ Cursor / Docker
+
+El proceso MCP es independiente del `.env` del monorepo salvo que Compose los inyecte. **`ARIADNE_API_URL`** + **`ARIADNE_API_BEARER`** / **`ARIADNE_API_JWT`** van en el entorno del contenedor MCP (Compose ya interpola `ARIADNE_API_*` desde tu `.env` raíz). Sin JWT OTP ⇒ la API responde **401** y `get_component_graph` / `get_legacy_impact` usan **fallback Falkor**. `http://api:3000` solo dentro de Docker; MCP en el host usa `http://localhost:3000`.
 
 ### Caché de herramientas MCP (no es la caché de `analyze`)
 
@@ -115,4 +133,4 @@ Las herramientas **get_component_graph**, **get_legacy_impact** y **get_sync_sta
 ## Scripts
 
 - `npm run build` — compila TypeScript.
-- `npm start` — inicia el servidor (stdio).
+- `npm start` — inicia el servidor HTTP Streamable (`PORT` / `MCP_HTTP_PORT`, default 8080).
