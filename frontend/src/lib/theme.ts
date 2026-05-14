@@ -1,55 +1,79 @@
 /**
- * @fileoverview Theme persistence (light/dark) on `document.documentElement` via `.light` class.
- * @see `src/styles/vars.css` for token definitions.
+ * @fileoverview Theme preference (light / dark / system) on `document.documentElement` via `.dark`.
+ * Light mode uses cosmic-night `:root` tokens; dark mode uses `.dark` from `src/index.css`.
  */
 
 export const ARIADNE_THEME_STORAGE_KEY = 'ariadne-theme';
 
-export type ThemeMode = 'light' | 'dark';
+export type ThemePreference = 'light' | 'dark' | 'system';
 
-export function readStoredTheme(): ThemeMode | null {
+export type EffectiveTheme = 'light' | 'dark';
+
+function getSystemScheme(): EffectiveTheme {
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+export function readStoredTheme(): ThemePreference | null {
   if (typeof window === 'undefined') return null;
   try {
     const value = localStorage.getItem(ARIADNE_THEME_STORAGE_KEY);
-    if (value === 'light' || value === 'dark') return value;
+    if (value === 'light' || value === 'dark' || value === 'system') return value;
   } catch {
     /* ignore */
   }
   return null;
 }
 
-/** Resolved theme when the app loads: stored value or default dark (legacy single-mode default). */
-export function getResolvedTheme(): ThemeMode {
+/** Stored preference, or default dark (cosmic-night default surface). */
+export function getThemePreference(): ThemePreference {
   return readStoredTheme() ?? 'dark';
 }
 
-export function applyTheme(mode: ThemeMode): void {
+/** Resolved light/dark for UI and `color-scheme` (follows OS when preference is system). */
+export function getEffectiveTheme(): EffectiveTheme {
+  const pref = getThemePreference();
+  if (pref === 'system') return getSystemScheme();
+  return pref;
+}
+
+export function applyTheme(preference: ThemePreference): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
-  if (mode === 'light') {
-    root.classList.add('light');
-    root.classList.remove('dark');
-  } else {
+  const effective = preference === 'system' ? getSystemScheme() : preference;
+
+  if (effective === 'dark') {
     root.classList.add('dark');
     root.classList.remove('light');
+  } else {
+    root.classList.remove('dark');
+    root.classList.remove('light');
   }
-  root.style.colorScheme = mode === 'light' ? 'light' : 'dark';
+
+  root.style.colorScheme = effective === 'light' ? 'light' : 'dark';
 
   try {
-    localStorage.setItem(ARIADNE_THEME_STORAGE_KEY, mode);
+    localStorage.setItem(ARIADNE_THEME_STORAGE_KEY, preference);
   } catch {
     /* ignore */
   }
 
-  const themeColor = mode === 'light' ? '#f8fafc' : '#020617';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor);
+  const themeColorMeta = effective === 'light' ? '#f8f7fc' : '#1a1824';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColorMeta);
   document
     .querySelector('meta[name="color-scheme"]')
-    ?.setAttribute('content', mode === 'light' ? 'light dark' : 'dark light');
+    ?.setAttribute('content', effective === 'light' ? 'light dark' : 'dark light');
 }
 
-export function toggleTheme(): ThemeMode {
-  const next: ThemeMode = getResolvedTheme() === 'dark' ? 'light' : 'dark';
+/** @deprecated Use getThemePreference / getEffectiveTheme */
+export function getResolvedTheme(): EffectiveTheme {
+  return getEffectiveTheme();
+}
+
+export function toggleTheme(): ThemePreference {
+  const next: ThemePreference = getEffectiveTheme() === 'dark' ? 'light' : 'dark';
   applyTheme(next);
   return next;
 }
