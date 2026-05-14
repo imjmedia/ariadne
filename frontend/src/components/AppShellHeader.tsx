@@ -1,25 +1,55 @@
 /**
- * Barra superior: breadcrumbs y búsqueda global.
+ * Top bar: compact search left; theme, notifications (placeholder), profile avatar right — reference-style circles.
  */
-import { useLocation } from 'react-router-dom';
-import { AppBreadcrumbs } from '@/components/AppBreadcrumbs';
+import { Link } from 'react-router-dom';
+import { Bell } from 'lucide-react';
 import { HeaderSearch } from '@/components/HeaderSearch';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { Avatar } from '@/components/atoms/Avatar';
+import { cn } from '@/lib/utils';
+import type { UserInfo } from '@/utils/auth';
 
-export function AppShellHeader() {
-  const { pathname } = useLocation();
+const headerIconButtonClass =
+  'flex size-9 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--background)] text-[var(--foreground-muted)] shadow-none transition-colors hover:bg-[var(--muted)]/60 hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]';
+
+export type AppShellHeaderProps = {
+  user: UserInfo | null;
+};
+
+export function AppShellHeader({ user }: AppShellHeaderProps) {
+  const displayName = user?.name?.trim() || user?.email || 'Usuario';
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-3 border-b border-[var(--border)]/80 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4 lg:px-6 lg:py-3">
-      <div className="min-w-0 flex-1">
-        <AppBreadcrumbs pathname={pathname} />
-      </div>
-      <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
-        <HeaderSearch />
+    <div className="flex h-full min-h-0 w-full min-w-0 items-center justify-between gap-2 sm:gap-3">
+      <HeaderSearch />
+      <div className="flex shrink-0 items-center justify-end gap-2">
         <ThemeToggle
-          variant="outline"
-          className="shrink-0 bg-[var(--background)] text-[var(--foreground-muted)]"
+          variant="ghost"
+          layout="icon"
+          className={headerIconButtonClass}
         />
+        <button
+          type="button"
+          className={cn(headerIconButtonClass, 'touch-manipulation')}
+          aria-label="Notificaciones"
+          title="Notificaciones — próximamente"
+        >
+          <Bell className="size-[1.15rem] shrink-0" strokeWidth={1.75} aria-hidden />
+        </button>
+        {user ? (
+          <Link
+            to="/profile"
+            className={cn(
+              headerIconButtonClass,
+              'overflow-hidden p-0 hover:opacity-95',
+              'border-[var(--border)] bg-[var(--secondary)]',
+            )}
+            title={displayName}
+            aria-label={`Perfil: ${displayName}`}
+          >
+            <Avatar name={displayName} size="sm" className="!size-9 border-0 ring-0" />
+          </Link>
+        ) : null}
       </div>
     </div>
   );

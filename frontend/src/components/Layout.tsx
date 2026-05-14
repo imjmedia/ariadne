@@ -1,26 +1,25 @@
 /**
- * Shell SaaS: sidenav colapsable, header con breadcrumbs / búsqueda / workspace, contenido principal.
+ * Shell SaaS: sidenav colapsable, header compacto (búsqueda + usuario + tema), contenido principal.
  * Muestra/oculta elementos del sidebar según el rol del usuario.
  */
 import { useEffect, useState } from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
+import { Menu as MenuIcon } from 'lucide-react';
 import {
-  Menu as MenuIcon,
-  LayoutDashboard,
-  FolderKanban,
-  Layers,
-  FolderGit2,
-  ListOrdered,
+  SquaresFour,
+  Stack,
+  Kanban,
+  ShieldCheck,
+  GitBranch,
+  ListNumbers,
   FolderPlus,
-  Boxes,
-  Share2,
   Key,
-  HelpCircle,
-  User,
-  Shield,
-} from 'lucide-react';
+  Package,
+  ShareNetwork,
+  Question,
+} from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
-import { SidebarModern, type SidebarGroup } from './layout/SidebarModern';
+import { SidebarModern, type SidebarGroup, type SidebarLink } from './layout/SidebarModern';
 import { Button } from '@/components/ui/button';
 import { AppShellHeader } from '@/components/AppShellHeader';
 import { getActiveNavHref } from '@/lib/nav';
@@ -35,32 +34,34 @@ function buildNavigationGroups(user: UserInfo | null): SidebarGroup[] {
     {
       title: 'Gobierno',
       items: [
-        { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { label: 'Dominios', href: '/domains', icon: Layers },
-        { label: 'Proyectos', href: '/projects', icon: FolderKanban },
-        ...(isAdmin ? [{ label: 'Usuarios', href: '/users', icon: Shield }] : []),
+        { label: 'Dashboard', href: '/dashboard', icon: SquaresFour },
+        { label: 'Dominios', href: '/domains', icon: Stack },
+        { label: 'Proyectos', href: '/projects', icon: Kanban },
+        ...(isAdmin ? [{ label: 'Usuarios', href: '/users', icon: ShieldCheck }] : []),
       ],
     },
     {
       title: 'Ingeniería',
       items: [
-        { label: 'Repositorios', href: '/repos', icon: FolderGit2 },
-        { label: 'Cola de Sync', href: '/jobs', icon: ListOrdered },
+        { label: 'Repositorios', href: '/repos', icon: GitBranch },
+        { label: 'Cola de Sync', href: '/jobs', icon: ListNumbers },
         ...(isAdmin ? [{ label: 'Nuevo Repo', href: '/repos/new', icon: FolderPlus }] : []),
-        ...(isAdmin ? [{ label: 'Credenciales', href: '/credentials', icon: Key }] : []),
-        { label: 'C4 Viewer', href: '/c4', icon: Boxes },
+        { label: 'C4 Viewer', href: '/c4', icon: Package },
       ],
     },
     {
       title: 'Plataforma',
       items: [
-        { label: 'Grafo', href: '/graph-explorer', icon: Share2 },
+        { label: 'Grafo', href: '/graph-explorer', icon: ShareNetwork },
         ...(isAdmin ? [{ label: 'Credenciales', href: '/credentials', icon: Key }] : []),
-        { label: 'Perfil', href: '/profile', icon: User },
-        { label: 'Ayuda', href: '/ayuda', icon: HelpCircle },
       ],
     },
   ];
+}
+
+/** Footer del sidebar: documentación. */
+function buildSidebarFooterNav(): SidebarLink[] {
+  return [{ label: 'Ayuda', href: '/ayuda', icon: Question }];
 }
 
 export function Layout() {
@@ -78,15 +79,14 @@ export function Layout() {
 
   const activeHref = getActiveNavHref(location.pathname);
   const navigationGroups = buildNavigationGroups(user);
+  const sidebarFooterNav = buildSidebarFooterNav();
 
   return (
     <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-[var(--background)]">
       <SidebarModern
         groups={navigationGroups}
+        footerItems={sidebarFooterNav}
         activeHref={activeHref}
-        brand={<span className="text-xl font-black tracking-tighter text-[var(--foreground)]">ARIADNE</span>}
-        brandHref="/dashboard"
-        user={user ? { name: user.email, email: `Rol: ${user.role}` } : undefined}
         className="hidden lg:flex shrink-0"
       />
 
@@ -99,8 +99,8 @@ export function Layout() {
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
         <SidebarModern
           groups={navigationGroups}
+          footerItems={sidebarFooterNav}
           activeHref={activeHref}
-          brandHref="/dashboard"
           collapsible={false}
           className={cn(
             'relative h-full max-w-[18rem] w-[min(18rem,88vw)] max-lg:pt-[env(safe-area-inset-top,0px)] shadow-xl transition-transform duration-300',
@@ -110,19 +110,19 @@ export function Layout() {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="z-20 shrink-0 bg-[var(--card)]/90 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
-          <div className="flex min-h-14 items-start gap-2 px-2 sm:min-h-16 sm:items-center sm:px-3 lg:px-4">
+        <header className="z-20 shrink-0 border-b border-[var(--border)] bg-[var(--card)]/90 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
+          <div className="flex h-16 w-full min-w-0 items-center gap-2 px-2 sm:px-3 lg:px-4">
             <Button
               variant="ghost"
               size="icon"
-              className="mt-2 shrink-0 touch-manipulation text-[var(--foreground-muted)] lg:hidden"
+              className="shrink-0 touch-manipulation text-[var(--foreground-muted)] lg:hidden"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Abrir menú"
             >
               <MenuIcon className="size-5" />
             </Button>
-            <div className="min-w-0 flex-1 py-2 sm:py-0">
-              <AppShellHeader />
+            <div className="flex h-full min-h-0 min-w-0 flex-1">
+              <AppShellHeader user={user} />
             </div>
           </div>
         </header>

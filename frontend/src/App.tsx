@@ -32,6 +32,7 @@ import { Dashboard } from './pages/Dashboard';
 import { C4ViewerPage } from './pages/C4ViewerPage';
 import { UsersManagement } from './pages/UsersManagement';
 import { ProfilePage } from './pages/ProfilePage';
+import { SettingsPage } from './pages/SettingsPage';
 
 /** Componente raíz con enrutamiento. */
 function App() {
@@ -65,6 +66,7 @@ function App() {
             <Route path="domains" element={<DomainsList />} />
             <Route path="users" element={<UsersManagement />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="settings" element={<SettingsPage />} />
             <Route path="ayuda/*" element={<Ayuda />} />
           </Route>
         </Route>

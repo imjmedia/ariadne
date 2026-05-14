@@ -128,9 +128,9 @@ export function ThemeToggle({
       aria-pressed={effectiveIcon === 'light'}
     >
       {effectiveIcon === 'dark' ? (
-        <Sun className="size-5 shrink-0 text-[var(--foreground-muted)]" />
+        <Sun className="size-[1.15rem] shrink-0 text-[var(--foreground-muted)]" strokeWidth={1.75} aria-hidden />
       ) : (
-        <Moon className="size-5 shrink-0 text-[var(--foreground-muted)]" />
+        <Moon className="size-[1.15rem] shrink-0 text-[var(--foreground-muted)]" strokeWidth={1.75} aria-hidden />
       )}
     </Button>
   );

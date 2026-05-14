@@ -4,13 +4,16 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Mail, Shield } from 'lucide-react';
+import { Mail, Shield, CircleCheck } from 'lucide-react';
+import { AriadneLogo } from '@/components/brand/AriadneLogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LoginPageFooter } from '@/components/login/LoginPageFooter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+import { isValidEmailFormat } from '@/utils/emailFormat';
 import {
   Card,
   CardContent,
@@ -104,13 +107,18 @@ export function Login() {
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!email.trim()) {
+    const trimmed = email.trim();
+    if (!trimmed) {
       setError('Email requerido');
+      return;
+    }
+    if (!isValidEmailFormat(trimmed)) {
+      setError('Introduce un correo válido (incluye dominio, ej. empresa.com)');
       return;
     }
     setLoading(true);
     try {
-      const result = await requestOtp(email.trim());
+      const result = await requestOtp(trimmed);
       if (result.devCode) setDevCode(result.devCode);
       setStep('code');
     } catch (err) {
@@ -156,6 +164,9 @@ export function Login() {
   };
 
   const token = getToken();
+  const emailTrimmed = email.trim();
+  const emailValid = isValidEmailFormat(emailTrimmed);
+
   if (token && !isTokenExpired(token)) {
     navigate('/dashboard', { replace: true });
     return null;
@@ -168,108 +179,127 @@ export function Login() {
           <ThemeToggle layout="pill" />
         </div>
 
-        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-8 pt-16 sm:px-8 lg:pt-12">
-          <div className="flex w-full max-w-md flex-col gap-6">
-            <div className="flex flex-col items-center gap-4 text-center lg:items-stretch lg:text-left">
-              <div className="flex items-center gap-3 lg:justify-start">
-                <div
-                  className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-[var(--primary)]/50 bg-[var(--primary)]/10 shadow-sm"
-                  aria-hidden
-                >
-                  <span className="text-lg font-bold text-[var(--primary)]">A</span>
-                </div>
-                <div className="min-w-0 text-left">
-                  <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)] sm:text-3xl">
-                    Ariadne
-                  </h1>
-                  <p className="text-sm text-[var(--foreground-muted)]">
-                    Mapa de arquitectura y conocimiento del código
-                  </p>
-                </div>
-              </div>
+        <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 pb-8 pt-16 sm:px-8 lg:pt-12">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-[min(55vh,28rem)] bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_65%)]"
+            aria-hidden
+          />
+          <div className="relative flex w-full max-w-lg flex-col items-center gap-8">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <h1 className="sr-only">Ariadne</h1>
+              <AriadneLogo
+                variant="full"
+                className="shrink-0 justify-center"
+                imageClassName="h-6 w-auto max-h-6 object-contain object-center sm:h-[1.875rem] sm:max-h-[1.875rem] max-w-[min(18rem,90vw)]"
+              />
+              <p className="max-w-md text-sm leading-relaxed text-[var(--foreground-muted)]">
+                Mapa de arquitectura y conocimiento del código
+              </p>
             </div>
 
             {step === 'email' ? (
               <>
-                <Card className="border-[var(--primary)]/20 shadow-lg shadow-[var(--shadow-glow)]/30">
-                  <CardHeader className="gap-3">
-                    <CardTitle className="text-xl sm:text-2xl">
-                      Acceso seguro
-                    </CardTitle>
-                    <CardDescription className="text-base leading-relaxed">
-                      Ingresa tu correo registrado para recibir el código de acceso.
-                    </CardDescription>
-                    <Badge
-                      variant="outline"
-                      className="w-fit gap-1.5 border-[var(--primary)]/40 px-2 py-1 text-[var(--foreground)]"
-                    >
-                      <Shield className="size-3.5 shrink-0" aria-hidden />
-                      Acceso sin contraseña
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-4">
-                    <div className="h-px w-full bg-[var(--border)]" aria-hidden />
-                    <form
-                      id="login-email-form"
-                      onSubmit={handleRequestOtp}
-                      className="flex flex-col gap-4"
-                    >
-                      <div className="flex flex-col gap-2">
-                        <Label
-                          htmlFor="email"
-                          className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]"
-                        >
-                          Correo corporativo
-                        </Label>
-                        <div className="relative">
-                          <Mail
-                            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--foreground-muted)]"
-                            aria-hidden
-                          />
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="tu@empresa.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={loading}
-                            autoFocus
-                            className="h-11 pl-10"
-                            autoComplete="email"
-                          />
+                <div className="relative w-full max-w-md">
+                  <div
+                    className="pointer-events-none absolute -inset-px rounded-[1.35rem] bg-gradient-to-b from-[var(--primary)]/35 via-[var(--primary)]/8 to-transparent opacity-70 blur-md"
+                    aria-hidden
+                  />
+                  <Card className="relative overflow-hidden rounded-3xl border-[var(--primary)]/25 bg-[var(--card)]/85 shadow-[0_0_0_1px_color-mix(in_oklch,var(--primary)_12%,transparent),0_25px_50px_-12px_rgba(0,0,0,0.45)] backdrop-blur-md">
+                    <CardHeader className="flex flex-col items-center gap-3 border-0 px-6 pb-2 pt-8 text-center">
+                      <CardTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                        Acceso seguro
+                      </CardTitle>
+                      <CardDescription className="max-w-[22rem] text-balance text-base leading-relaxed">
+                        Ingresa tu correo registrado para recibir el código de acceso.
+                      </CardDescription>
+                      <Badge
+                        variant="outline"
+                        className="mx-auto w-fit gap-1.5 rounded-full border-[var(--primary)]/35 px-3 py-1 text-[var(--foreground)]"
+                      >
+                        <Shield className="size-3.5 shrink-0" aria-hidden />
+                        Acceso sin contraseña
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center gap-5 px-6 pb-8 pt-4">
+                      <div
+                        className="h-px w-16 max-w-full bg-gradient-to-r from-transparent via-[var(--primary)]/40 to-transparent"
+                        aria-hidden
+                      />
+                      <form
+                        id="login-email-form"
+                        onSubmit={handleRequestOtp}
+                        className="flex w-full max-w-sm flex-col items-center gap-5"
+                      >
+                        <div className="flex w-full flex-col items-center gap-2">
+                          <Label
+                            htmlFor="email"
+                            className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--foreground-muted)]"
+                          >
+                            Correo corporativo
+                          </Label>
+                          <div className="relative w-full">
+                            <Mail
+                              strokeWidth={2.5}
+                              className="pointer-events-none absolute left-3.5 top-1/2 z-[1] size-5 -translate-y-1/2 text-[var(--foreground)] dark:text-[var(--primary)]"
+                              aria-hidden
+                            />
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="tu@empresa.com"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              disabled={loading}
+                              autoFocus
+                              className={cn(
+                                'h-12 border-[var(--border)]/80 bg-[var(--background)]/40 pl-11 text-left text-base backdrop-blur-sm placeholder:text-[var(--foreground-muted)]',
+                                emailValid ? 'pr-11' : 'pr-3.5',
+                              )}
+                              autoComplete="email"
+                              aria-invalid={emailTrimmed.length > 0 && !emailValid}
+                            />
+                            {emailValid ? (
+                              <CircleCheck
+                                className="pointer-events-none absolute right-3.5 top-1/2 size-[1.125rem] -translate-y-1/2 text-[var(--success)]"
+                                aria-hidden
+                              />
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                      <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-3 text-sm text-[var(--foreground-muted)]">
-                        Solo cuentas autorizadas reciben un código. Revisa spam si
-                        no ves el correo en unos minutos.
-                      </div>
-                      {error && (
-                        <p className="text-sm text-[var(--destructive)]">{error}</p>
-                      )}
-                    </form>
-                  </CardContent>
-                </Card>
+                        <p className="w-full max-w-sm rounded-2xl border border-[var(--border)]/50 bg-[var(--muted)]/30 px-4 py-3 text-center text-xs leading-relaxed text-[var(--foreground-muted)] text-balance">
+                          Solo cuentas autorizadas reciben un código. Revisa spam si
+                          no ves el correo en unos minutos.
+                        </p>
+                        {error && (
+                          <p className="text-center text-sm text-[var(--destructive)]">
+                            {error}
+                          </p>
+                        )}
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
                 <Button
                   type="submit"
                   form="login-email-form"
-                  className="h-11 w-full max-w-md text-base font-semibold"
-                  disabled={loading}
+                  className="h-12 w-full max-w-sm rounded-xl text-base font-semibold shadow-lg shadow-[var(--primary)]/15"
+                  disabled={loading || !emailValid}
                 >
                   {loading ? 'Enviando…' : 'Enviar código'}
                 </Button>
                 {ssoEnabled && (
-                  <div className="flex flex-col gap-3">
+                  <div className="flex w-full max-w-sm flex-col gap-3">
                     <div className="relative flex items-center gap-4">
-                      <div className="h-px flex-1 bg-[var(--border)]" />
-                      <span className="text-xs uppercase text-[var(--foreground-muted)]">
-                        o
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[var(--border)]" />
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-widest text-[var(--foreground-muted)]">
+                        o continúa con
                       </span>
-                      <div className="h-px flex-1 bg-[var(--border)]" />
+                      <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[var(--border)]" />
                     </div>
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-11 w-full"
+                      className="h-11 w-full rounded-xl border-[var(--border)]/80"
                       onClick={handleSsoRedirect}
                       disabled={loading}
                     >
@@ -280,67 +310,78 @@ export function Login() {
               </>
             ) : (
               <>
-                <Card className="border-[var(--primary)]/20 shadow-lg shadow-[var(--shadow-glow)]/30">
-                  <CardHeader className="gap-2">
-                    <CardTitle className="text-xl">Verificar código</CardTitle>
-                    <CardDescription>
-                      Ingresa el código de 6 dígitos enviado a tu correo.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form
-                      id="login-code-form"
-                      onSubmit={handleVerifyOtp}
-                      className="flex flex-col gap-4"
-                    >
-                      <p className="text-sm text-[var(--foreground-muted)]">
-                        Código enviado a <strong className="text-[var(--foreground)]">{email}</strong>
-                      </p>
-                      {devCode && (
-                        <p className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/15 px-3 py-2 text-sm text-[var(--foreground)]">
-                          Modo dev: código{' '}
-                          <code className="font-mono font-bold">{devCode}</code>
+                <div className="relative w-full max-w-md">
+                  <div
+                    className="pointer-events-none absolute -inset-px rounded-[1.35rem] bg-gradient-to-b from-[var(--primary)]/35 via-[var(--primary)]/8 to-transparent opacity-70 blur-md"
+                    aria-hidden
+                  />
+                  <Card className="relative overflow-hidden rounded-3xl border-[var(--primary)]/25 bg-[var(--card)]/85 shadow-[0_0_0_1px_color-mix(in_oklch,var(--primary)_12%,transparent),0_25px_50px_-12px_rgba(0,0,0,0.45)] backdrop-blur-md">
+                    <CardHeader className="flex flex-col items-center gap-2 border-0 px-6 pb-2 pt-8 text-center">
+                      <CardTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                        Verificar código
+                      </CardTitle>
+                      <CardDescription className="max-w-[22rem] text-balance">
+                        Ingresa el código de 6 dígitos enviado a tu correo.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center px-6 pb-8 pt-4">
+                      <form
+                        id="login-code-form"
+                        onSubmit={handleVerifyOtp}
+                        className="flex w-full max-w-sm flex-col items-center gap-5"
+                      >
+                        <p className="text-center text-sm text-[var(--foreground-muted)]">
+                          Código enviado a{' '}
+                          <strong className="text-[var(--foreground)]">{email}</strong>
                         </p>
-                      )}
-                      <div className="flex flex-col gap-2">
-                        <Label
-                          htmlFor="code"
-                          className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]"
-                        >
-                          Código de acceso
-                        </Label>
-                        <Input
-                          id="code"
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          autoCapitalize="off"
-                          autoCorrect="off"
-                          spellCheck={false}
-                          enterKeyHint="done"
-                          placeholder="000000"
-                          maxLength={6}
-                          pattern="\d{6}"
-                          value={code}
-                          onChange={(e) =>
-                            setCode(e.target.value.replace(/\D/g, ''))
-                          }
-                          disabled={loading}
-                          autoFocus
-                          className="h-11 font-mono text-lg tracking-[0.35em]"
-                        />
-                      </div>
-                      {error && (
-                        <p className="text-sm text-[var(--destructive)]">{error}</p>
-                      )}
-                    </form>
-                  </CardContent>
-                </Card>
-                <div className="flex w-full max-w-md flex-col gap-3">
+                        {devCode && (
+                          <p className="w-full rounded-2xl border border-[var(--warning)]/30 bg-[var(--warning)]/15 px-4 py-2 text-center text-sm text-[var(--foreground)]">
+                            Modo dev: código{' '}
+                            <code className="font-mono font-bold">{devCode}</code>
+                          </p>
+                        )}
+                        <div className="flex w-full flex-col items-center gap-2">
+                          <Label
+                            htmlFor="code"
+                            className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--foreground-muted)]"
+                          >
+                            Código de acceso
+                          </Label>
+                          <Input
+                            id="code"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            enterKeyHint="done"
+                            placeholder="000000"
+                            maxLength={6}
+                            pattern="\d{6}"
+                            value={code}
+                            onChange={(e) =>
+                              setCode(e.target.value.replace(/\D/g, ''))
+                            }
+                            disabled={loading}
+                            autoFocus
+                            className="h-12 max-w-[13rem] border-[var(--border)]/80 bg-[var(--background)]/40 text-center font-mono text-xl tracking-[0.4em] backdrop-blur-sm"
+                          />
+                        </div>
+                        {error && (
+                          <p className="text-center text-sm text-[var(--destructive)]">
+                            {error}
+                          </p>
+                        )}
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="flex w-full max-w-sm flex-col gap-3">
                   <Button
                     type="submit"
                     form="login-code-form"
-                    className="h-11 w-full text-base font-semibold"
+                    className="h-12 w-full rounded-xl text-base font-semibold shadow-lg shadow-[var(--primary)]/15"
                     disabled={loading || code.length !== 6}
                   >
                     {loading ? 'Verificando…' : 'Verificar'}
@@ -348,7 +389,7 @@ export function Login() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 w-full"
+                    className="h-11 w-full rounded-xl border-[var(--border)]/80"
                     onClick={handleBack}
                     disabled={loading}
                   >

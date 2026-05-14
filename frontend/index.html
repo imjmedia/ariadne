@@ -2,7 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link
+      rel="icon"
+      type="image/png"
+      data-ariadne-brand
+      href="/brand/favicon.png"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,22 +23,34 @@
         try {
           var K = 'ariadne-theme';
           var stored = localStorage.getItem(K);
-          var mode = stored === 'light' || stored === 'dark' ? stored : 'dark';
+          var pref =
+            stored === 'light' || stored === 'dark' || stored === 'system'
+              ? stored
+              : 'dark';
+          var effective =
+            pref === 'system'
+              ? window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+              : pref;
           var root = document.documentElement;
-          if (mode === 'light') {
+          if (effective === 'light') {
             root.classList.add('light');
             root.classList.remove('dark');
           } else {
             root.classList.add('dark');
             root.classList.remove('light');
           }
-          root.style.colorScheme = mode === 'light' ? 'light' : 'dark';
-          var themeColor = mode === 'light' ? '#f8fafc' : '#020617';
+          root.style.colorScheme = effective === 'light' ? 'light' : 'dark';
+          var themeColor = effective === 'light' ? '#f8f7fc' : '#1a1824';
           var metaTheme = document.querySelector('meta[name="theme-color"]');
           if (metaTheme) metaTheme.setAttribute('content', themeColor);
           var metaScheme = document.querySelector('meta[name="color-scheme"]');
           if (metaScheme)
-            metaScheme.setAttribute('content', mode === 'light' ? 'light dark' : 'dark light');
+            metaScheme.setAttribute(
+              'content',
+              effective === 'light' ? 'light dark' : 'dark light',
+            );
         } catch (e) {}
       })();
     </script>

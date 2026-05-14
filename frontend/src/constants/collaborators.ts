@@ -71,3 +71,13 @@ export const APACHE_LICENSE_URL = 'https://www.apache.org/licenses/LICENSE-2.0';
 export function getGithubAvatarUrl(username: string, size = 64): string {
   return `https://github.com/${username}.png?size=${String(size)}`;
 }
+
+export function getGithubProfileUrl(username: string): string {
+  return `https://github.com/${username}`;
+}
+
+/** Spanish label for hover card / UI. */
+export function getCollaboratorRoleLabel(role: CollaboratorRole): string {
+  if (role === 'primary') return 'Autor principal';
+  return 'Colaborador especial';
+}

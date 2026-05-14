@@ -3,6 +3,8 @@
  * Light mode uses cosmic-night `:root` tokens; dark mode uses `.dark` from `src/index.css`.
  */
 
+import { getBrandedFaviconHref } from '@/constants/brand';
+
 export const ARIADNE_THEME_STORAGE_KEY = 'ariadne-theme';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -65,6 +67,21 @@ export function applyTheme(preference: ThemePreference): void {
   document
     .querySelector('meta[name="color-scheme"]')
     ?.setAttribute('content', effective === 'light' ? 'light dark' : 'dark light');
+
+  syncBrandedFavicon(effective);
+}
+
+function syncBrandedFavicon(effective: EffectiveTheme): void {
+  if (typeof document === 'undefined') return;
+  const href = getBrandedFaviconHref(effective);
+  const link =
+    (document.querySelector(
+      'link[rel="icon"][data-ariadne-brand]',
+    ) as HTMLLinkElement | null) ??
+    (document.querySelector('link[rel="icon"]') as HTMLLinkElement | null);
+  if (!link) return;
+  link.href = href;
+  link.type = href.endsWith('.svg') ? 'image/svg+xml' : 'image/png';
 }
 
 /** @deprecated Use getThemePreference / getEffectiveTheme */
