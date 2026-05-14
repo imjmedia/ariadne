@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   GitBranch,
   ListNumbers,
-  FolderPlus,
   Key,
   Package,
   ShareNetwork,
@@ -45,7 +44,6 @@ function buildNavigationGroups(user: UserInfo | null): SidebarGroup[] {
       items: [
         { label: 'Repositorios', href: '/repos', icon: GitBranch },
         { label: 'Cola de Sync', href: '/jobs', icon: ListNumbers },
-        ...(isAdmin ? [{ label: 'Nuevo Repo', href: '/repos/new', icon: FolderPlus }] : []),
         { label: 'C4 Viewer', href: '/c4', icon: Package },
       ],
     },

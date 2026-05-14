@@ -211,9 +211,9 @@ export function Dashboard() {
           trend={{ direction: "neutral", label: "Tiempo real" }}
           footer={
             <>
-              <span className="block text-[var(--foreground-subtle)]">Índice The Forge.</span>
+              <span className="block text-[var(--foreground-subtle)]">Ingesta, webhooks y jobs por repositorio.</span>
               <Link to="/repos" className="mt-1 inline-block font-medium text-[var(--primary)] hover:underline">
-                Abrir The Forge
+                Ver listado
               </Link>
             </>
           }

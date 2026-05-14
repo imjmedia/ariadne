@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DataSet } from 'vis-data';
 import { Network, type Options } from 'vis-network';
 import 'vis-network/styles/vis-network.css';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   type GraphEdge,
@@ -72,6 +73,44 @@ const FOCAL_NODE_COLOR = {
   hover: { border: '#60a5fa', background: '#1e3a5f' },
 };
 
+const visShellClass = cn(
+  'component-graph-vis flex min-h-[560px] w-full flex-col overflow-hidden rounded-2xl border border-[var(--border)]',
+  'bg-[var(--card)] shadow-sm transition-shadow duration-[var(--transition-base)] hover:shadow-md',
+);
+
+const visHeaderBarClass = cn(
+  'border-b border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_32%,var(--card))] px-4 py-3',
+);
+
+/** Leyenda de aristas (misma semántica que el módulo; vive dentro del panel del grafo). */
+function GraphEdgeLegend() {
+  return (
+    <div
+      className={cn(
+        'flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[var(--border)]',
+        'bg-[color-mix(in_oklch,var(--muted)_22%,var(--card))] px-4 py-2.5 text-xs text-[var(--foreground-muted)]',
+      )}
+      role="note"
+      aria-label="Leyenda de tipos de arista"
+    >
+      <span className="inline-flex items-center gap-2">
+        <span className="inline-block h-0.5 w-8 shrink-0 rounded-full bg-blue-500" aria-hidden />
+        <span>
+          <span className="font-medium text-[var(--foreground)]">depends</span>{' '}
+          <span className="text-[var(--foreground-subtle)]">(animada)</span>
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-2">
+        <span
+          className="inline-block h-0.5 w-8 shrink-0 rounded-full border border-dashed border-amber-500/80 bg-amber-500"
+          aria-hidden
+        />
+        <span className="font-medium text-[var(--foreground)]">legacy_impact</span>
+      </span>
+    </div>
+  );
+}
+
 type Props = {
   graphNodes: GraphNode[];
   graphEdges: GraphEdge[];
@@ -113,9 +152,7 @@ export function ComponentGraphVisView({
           label: `${labelFor(n)} (${n.kind})`,
           shape: 'box' as const,
           font: NODE_FONT,
-          color: isFocal
-            ? FOCAL_NODE_COLOR
-            : PERIPHERAL_NODE_COLOR,
+          color: isFocal ? FOCAL_NODE_COLOR : PERIPHERAL_NODE_COLOR,
           borderWidth: isFocal ? 3 : 2,
         };
       }),
@@ -151,8 +188,7 @@ export function ComponentGraphVisView({
       if (id == null || focalId == null || id === focalId) return;
       const gn = graphNodes.find((n) => n.id === id);
       if (!gn) return;
-      const cn =
-        typeof gn.name === 'string' && gn.name.trim() ? gn.name.trim() : labelFor(gn);
+      const cn = typeof gn.name === 'string' && gn.name.trim() ? gn.name.trim() : labelFor(gn);
       if (!cn) return;
       void onExpandNode(cn);
     };
@@ -180,27 +216,45 @@ export function ComponentGraphVisView({
 
   if (graphNodes.length === 0) {
     return (
-      <div
-        className="flex items-center justify-center text-sm text-[var(--foreground-muted)] border border-dashed border-[var(--border)] rounded-lg bg-[var(--muted)]/30"
-        style={{ height: 560 }}
-      >
-        Carga un componente para ver el vecindario en el grafo Falkor (depends + legacy_impact).
+      <div className={visShellClass}>
+        <div className={visHeaderBarClass}>
+          <h3 className="text-sm font-semibold tracking-tight text-[var(--foreground)]">Subgrafo (vis-network)</h3>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)]">
+            Vecindario Falkor del componente seleccionado (mismo <span className="font-mono">projectId</span> que la
+            API).
+          </p>
+        </div>
+        <GraphEdgeLegend />
+        <div
+          className={cn(
+            'flex flex-1 flex-col items-center justify-center px-6 py-12 text-center',
+            'bg-[color-mix(in_oklch,var(--muted)_45%,transparent)]',
+          )}
+        >
+          <div
+            className={cn(
+              'max-w-md rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)] px-6 py-8 shadow-sm',
+            )}
+          >
+            <p className="m-0 text-sm font-medium text-[var(--foreground)]">Aún no hay grafo cargado</p>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--foreground-muted)]">
+              Elige alcance y componente arriba, luego pulsa <span className="font-medium text-[var(--foreground)]">Cargar grafo</span> para
+              ver depends y legacy_impact en el lienzo.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div
-      className="component-graph-vis w-full rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--background)] flex flex-col"
-      style={{ height: 560 }}
-    >
-      <div className="flex flex-wrap items-start gap-3 border-b border-[var(--border)] bg-[var(--card)]/50 px-3 py-2">
-        <div className="flex flex-wrap gap-2 shrink-0">
+    <div className={cn(visShellClass, 'h-[560px] min-h-0')}>
+      <div className={cn(visHeaderBarClass, 'flex flex-wrap items-start gap-3')}>
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="h-8 text-xs"
+            className="h-9 rounded-xl border-[var(--border)] bg-[var(--card)] text-xs"
             onClick={() => {
               visNetworkRef.current?.fit({
                 animation: { duration: 380, easingFunction: 'easeInOutQuad' },
@@ -212,29 +266,25 @@ export function ComponentGraphVisView({
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="h-8 text-xs"
+            className="h-9 rounded-xl border-[var(--border)] bg-[var(--card)] text-xs"
             onClick={() => setVisLayoutGeneration((n) => n + 1)}
           >
             Autolayout (re-física)
           </Button>
         </div>
-        <div className="min-w-0 flex-1 text-xs text-[var(--foreground-muted)] leading-relaxed max-w-[min(100%,520px)]">
-          <p className="font-semibold text-[var(--foreground)] mb-0.5">Subgrafo indexado</p>
+        <div className="min-w-0 max-w-[min(100%,520px)] flex-1 text-xs leading-relaxed text-[var(--foreground-muted)]">
+          <p className="mb-0.5 font-semibold text-[var(--foreground)]">Subgrafo indexado</p>
           {expanding ? (
-            <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 mb-1">Fusionando vecindario…</p>
+            <p className="mb-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">Fusionando vecindario…</p>
           ) : null}
           <p>
-            Mismo <span className="font-mono">projectId</span> que la API: aristas{' '}
-            <span className="font-mono">depends</span> y <span className="font-mono">legacy_impact</span>. Clic en un
-            nodo periférico para ampliar (depth 1).
+            Mismo <span className="font-mono">projectId</span> que la API. Clic en un nodo periférico para ampliar (depth
+            1).
           </p>
         </div>
       </div>
-      <div
-        ref={containerRef}
-        className="min-h-0 flex-1 w-full touch-none bg-[var(--background)]"
-      />
+      <GraphEdgeLegend />
+      <div ref={containerRef} className="min-h-0 w-full flex-1 touch-none bg-[var(--background)]" />
     </div>
   );
 }

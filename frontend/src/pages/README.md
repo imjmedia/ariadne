@@ -28,6 +28,6 @@ Vistas principales de la aplicación Ariadne (shell SaaS: sidebar + header con b
 ## Otros
 
 - **Login.tsx** — Autenticación OTP: email → código de 6 dígitos.
-- **CredentialsList.tsx**, **CreateCredential.tsx**, **EditCredential.tsx** — CRUD de credenciales.
+- **CredentialsList.tsx**, **CreateCredentialForm.tsx**, **EditCredential.tsx** — CRUD de credenciales (alta en modal con `?create=1`).
 - **Ayuda.tsx** — Manual y ayuda (docs).
 - **ErrorPage.tsx** — Página de error genérica.

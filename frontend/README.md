@@ -8,7 +8,7 @@ Proyecto en la raíz del repo (`frontend/`), independiente de `services/`. UI pa
 - `src/api.ts` — cliente API para Ingest.
 - `src/types.ts` — tipos e interfaces.
 - `src/components/` — **Layout** (sidenav colapsable, **AppShellHeader**: breadcrumbs + búsqueda + selector de workspace), `SidebarModern`, **DataTable** (TanStack Table), StatusBadge, UI Shadcn (Button, Card, Input, Select, Badge, Alert, Skeleton, Table, Dialog).
-- `src/pages/` — **Dashboard** (`/dashboard`), listado de **proyectos** (`/`), **C4ViewerPage** (`/c4`), **ProjectDetail** (General + **Arquitectura** con `C4Previewer`), **DomainsList**, **RepoList** (The Forge, tabla filtrable), RepoDetail, RepoChat, RepoIndex, CreateRepo, EditRepo, CredentialsList, CreateCredential, EditCredential, **Ayuda**.
+- `src/pages/` — **Dashboard** (`/dashboard`), listado de **proyectos** (`/`), **C4ViewerPage** (`/c4`), **ProjectDetail** (General + **Arquitectura** con `C4Previewer`), **DomainsList**, **RepoList** (The Forge, tabla filtrable), RepoDetail, RepoChat, RepoIndex, CreateRepo, EditRepo, CredentialsList, **CreateCredentialForm** (modal desde `/credentials?create=1`), EditCredential, **Ayuda**.
 - **Tests:** `pnpm run test:unit` (Vitest), `pnpm run test:e2e` (Playwright; instalar Chromium con `pnpm exec playwright install chromium`). Ver `docs/notebooklm/TESTING.md` y `e2e/smoke.spec.ts`.
 
 ## Stack
@@ -46,7 +46,7 @@ Proyecto en la raíz del repo (`frontend/`), independiente de `services/`. UI pa
 - Lista `/repos`: **Resync** por fila (`POST /repositories/:id/resync`), sin abrir el detalle.
 - Eliminar repo: botón en lista y detalle (`DELETE /repositories/:id`), con confirmación.
 - `/credentials` — Lista de credenciales (tokens, app passwords, webhook secrets) cifradas en BD.
-- `/credentials/new` — Alta de credencial.
+- `/credentials?create=1` — Alta de credencial (modal); `/credentials/new` redirige aquí.
 - `/credentials/:id/edit` — Editar credencial: nombre, valor (token/password) y usuario para app_password (`PATCH /credentials/:id`).
 - `/error` — Página de error genérica.
 - `/ayuda` — Ayuda in-app: **MCP** (`docs/notebooklm/MCP_AYUDA.md` → `public/ayuda-mcp.md` vía `scripts/copy-docs.sh`), **Skills**, **Manual** (`docs/manual/README.md`).

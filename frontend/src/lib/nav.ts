@@ -12,7 +12,6 @@ export function getActiveNavHref(pathname: string): string {
   if (pathname.startsWith('/users')) return '/users';
   if (pathname.startsWith('/profile')) return '/profile';
   if (pathname.startsWith('/jobs')) return '/jobs';
-  if (pathname.startsWith('/repos/new')) return '/repos/new';
   if (pathname.startsWith('/repos')) return '/repos';
   if (pathname.startsWith('/projects')) return '/projects';
   return '/dashboard';
@@ -25,7 +24,7 @@ export function breadcrumbsForPath(pathname: string): { to: string; label: strin
   if (pathname === '/dashboard') return [home, { to: '/dashboard', label: 'Dashboard' }];
   if (pathname === '/') return [home];
   if (pathname === '/projects') return [home, { to: '/projects', label: 'Proyectos' }];
-  if (pathname.startsWith('/projects/new')) return [home, { to: '/projects', label: 'Proyectos' }, { to: '/projects/new', label: 'Nuevo' }];
+  if (pathname.startsWith('/projects/new')) return [home, { to: '/projects', label: 'Proyectos' }, { to: '/projects/new', label: 'Crear proyecto' }];
   if (pathname.startsWith('/projects/')) {
     const rest = pathname.replace(/^\/projects\//, '');
     const [id, sub] = rest.split('/');
@@ -36,7 +35,6 @@ export function breadcrumbsForPath(pathname: string): { to: string; label: strin
   }
   if (pathname.startsWith('/domains')) return [home, { to: '/domains', label: 'Dominios' }];
   if (pathname.startsWith('/c4')) return [home, { to: '/c4', label: 'C4 Viewer' }];
-  if (pathname.startsWith('/repos/new')) return [home, { to: '/repos', label: 'Repositorios' }, { to: '/repos/new', label: 'Nuevo Repo' }];
   if (pathname.startsWith('/jobs')) return [home, { to: '/jobs', label: 'Cola de Sync' }];
   if (pathname.startsWith('/repos/')) {
     const id = pathname.replace(/^\/repos\//, '').split('/')[0];

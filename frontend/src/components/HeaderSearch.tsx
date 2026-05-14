@@ -39,7 +39,7 @@ const SHORTCUTS: Omit<SearchResult, "id">[] = [
   { kind: "shortcut", label: "Explorador de grafo", detail: "Componentes y dependencias", to: "/graph-explorer", icon: Share2 },
   { kind: "shortcut", label: "Credenciales", detail: "GitHub / Bitbucket", to: "/credentials", icon: Key },
   { kind: "shortcut", label: "Ayuda", detail: "Documentación", to: "/ayuda", icon: HelpCircle },
-  { kind: "shortcut", label: "Nuevo repositorio", detail: "Alta y webhook", to: "/repos/new", icon: Plus },
+  { kind: "shortcut", label: "Nuevo repositorio", detail: "Abre el modal en Repositorios", to: "/repos?openCreate=1", icon: Plus },
 ]
 
 function norm(s: string): string {

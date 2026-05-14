@@ -47,7 +47,7 @@ export function DataTable<T>({ columns, data, filterPlaceholder = 'Filtrar…', 
         value={globalFilter ?? ''}
         onChange={(e) => setGlobalFilter(e.target.value)}
         placeholder={filterPlaceholder}
-        className="max-w-sm border-[var(--border)] bg-[var(--input)]/30"
+        className="h-11 max-w-sm rounded-xl border-[var(--border)] bg-[var(--card)] text-sm shadow-sm placeholder:text-[var(--foreground-muted)]"
       />
       <div className={cn('rounded-xl border border-[var(--border)] bg-[var(--card)]/50', tableClassName)}>
         <Table>

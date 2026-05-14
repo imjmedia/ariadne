@@ -1,15 +1,49 @@
 /**
- * Perfil de usuario: datos personales y gestión de secret MCP.
- * Patrón UI idéntico a McpSecretCard de The Forge: toggle ojo, copia, regenerar con confirmación.
+ * Perfil de usuario: datos de cuenta, secret MCP (ver/copiar/regenerar) y cierre de sesión.
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Shield,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
+  RefreshCw,
+  User,
+  Mail,
+  LogOut,
+  Loader2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Shield, Eye, EyeOff, Copy, Check, RefreshCw, User, Mail } from 'lucide-react';
-import { getUser, removeToken } from '../utils/auth';
-import type { UserInfo } from '../utils/auth';
-import { api } from '../api';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getUser, removeToken } from '@/utils/auth';
+import type { UserInfo } from '@/utils/auth';
+import { api } from '@/api';
+import { cn } from '@/lib/utils';
+
+const panelIntroClass = cn(
+  'rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm',
+  'transition-shadow duration-[var(--transition-base)] hover:shadow-md',
+);
+
+const sectionShellClass = cn(
+  'overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm',
+  'transition-shadow duration-[var(--transition-base)] hover:shadow-md',
+);
+
+const sectionHeaderClass = cn(
+  'border-b border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_26%,var(--card))]',
+  'px-5 py-4 sm:px-6',
+);
+
+const monoFieldClass = cn(
+  'flex min-h-11 w-full items-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_35%,var(--card))]',
+  'px-3 py-2 font-mono text-sm text-[var(--foreground)] shadow-none',
+);
+
+const labelMuted = 'text-xs font-medium text-[var(--foreground-muted)]';
 
 export function ProfilePage() {
   const navigate = useNavigate();
@@ -30,14 +64,11 @@ export function ProfilePage() {
     setUser(u);
   }, [navigate]);
 
-  // Cargar secret al montar el componente (cuando tengamos user)
   useEffect(() => {
-    if (user) {
-      fetchSecret();
-    }
+    if (user) void fetchSecret();
   }, [user]);
 
-  const fetchSecret = async () => {
+  async function fetchSecret() {
     if (!user) return;
     setLoading(true);
     setError('');
@@ -45,17 +76,16 @@ export function ProfilePage() {
       const data = await api.getMcpSecret(user.id);
       setMcpSecret(data.mcpSecret ?? '');
       setMessage(data.mcpSecret ? '' : '');
-    } catch (err) {
-      setError('Error al obtener el secret MCP');
-      console.error(err);
+    } catch {
+      setError('No se pudo cargar el secret MCP. Reintenta con «Recargar».');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleRegenerate = async () => {
+  async function handleRegenerate() {
     if (!user) return;
-    if (!confirm('¿Regenerar el secret MCP? El secret anterior dejará de funcionar inmediatamente.')) return;
+    if (!confirm('¿Regenerar el secret MCP? El valor anterior dejará de funcionar de inmediato.')) return;
 
     setLoading(true);
     setError('');
@@ -63,22 +93,22 @@ export function ProfilePage() {
     try {
       const data = await api.regenerateMcpToken(user.id);
       setMcpSecret(data.token);
-      setMessage('Secret regenerado exitosamente. Guárdalo de inmediato.');
-    } catch (err) {
-      setError('Error al regenerar el secret MCP');
-      console.error(err);
+      setVisible(true);
+      setMessage('Secret regenerado. Cópialo y guárdalo en un lugar seguro; no volverá a mostrarse igual si lo ocultas.');
+    } catch {
+      setError('No se pudo regenerar el secret MCP.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleCopy = async () => {
+  async function handleCopy() {
+    if (!mcpSecret) return;
     try {
       await navigator.clipboard.writeText(mcpSecret);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback para entornos sin clipboard API
       const ta = document.createElement('textarea');
       ta.value = mcpSecret;
       document.body.appendChild(ta);
@@ -88,147 +118,182 @@ export function ProfilePage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
-  };
+  }
 
-  const handleLogout = () => {
+  function handleLogout() {
+    if (!confirm('¿Cerrar sesión en este dispositivo?')) return;
     removeToken();
     navigate('/login', { replace: true });
-  };
+  }
 
   if (!user) return null;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Perfil</h1>
-        <p className="text-muted-foreground mt-1">Configuración de tu cuenta</p>
+    <div className="mx-auto max-w-3xl space-y-6 pb-10">
+      <div className={panelIntroClass}>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Perfil</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
+          Datos de tu cuenta y token MCP para que el servidor de herramientas actúe con tu identidad. Regenera el secret
+          si sospechas que se filtró.
+        </p>
       </div>
 
-      {/* Datos del usuario */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
+      <section className={sectionShellClass} aria-labelledby="profile-account-heading">
+        <div className={sectionHeaderClass}>
+          <h2 id="profile-account-heading" className="flex items-center gap-2 text-base font-semibold text-[var(--foreground)]">
+            <User className="size-5 shrink-0 text-[var(--foreground-muted)]" aria-hidden />
             Información de la cuenta
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Email</p>
-              <p className="font-medium">{user.email}</p>
+          </h2>
+          <p className="mt-1 text-xs text-[var(--foreground-muted)]">Solo lectura; el rol lo define un administrador.</p>
+        </div>
+        <div className="grid gap-6 px-5 py-6 sm:grid-cols-2 sm:px-6">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Mail className="size-4 text-[var(--foreground-muted)]" aria-hidden />
+              <p className={labelMuted}>Email</p>
             </div>
+            <p className="break-all text-sm font-medium text-[var(--foreground)]">{user.email}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Shield className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Rol</p>
-              <p className="font-medium capitalize">{user.role}</p>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Shield className="size-4 text-[var(--foreground-muted)]" aria-hidden />
+              <p className={labelMuted}>Rol</p>
             </div>
+            <p className="text-sm font-medium capitalize text-[var(--foreground)]">{user.role}</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {/* Secret MCP */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--primary)]/10">
-              <Shield className="h-5 w-5 text-[var(--primary)]" />
+      <section className={sectionShellClass} aria-labelledby="profile-mcp-heading">
+        <div className={sectionHeaderClass}>
+          <div className="flex items-start gap-3">
+            <div
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--primary)_12%,var(--card))]"
+              aria-hidden
+            >
+              <Shield className="size-5 text-[var(--primary)]" />
             </div>
-            <div>
-              <CardTitle>Secret MCP</CardTitle>
-              <CardDescription>
-                Token para autenticar el MCP server como tu usuario. Se genera automáticamente y es rotable.
-              </CardDescription>
+            <div className="min-w-0">
+              <h2 id="profile-mcp-heading" className="text-base font-semibold text-[var(--foreground)]">
+                Secret MCP
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)] sm:text-sm">
+                Autenticación del servidor MCP como tu usuario. No lo compartas en chats ni repositorios públicos.
+              </p>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Mensajes */}
-            {message && (
-              <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-3 text-sm text-[var(--accent)]">
-                {message}
-              </div>
-            )}
-            {error && (
-              <div className="rounded-lg border border-[var(--destructive)]/30 bg-[var(--destructive)]/10 px-4 py-3 text-sm text-[var(--destructive)]">
-                {error}
-              </div>
-            )}
+        </div>
+        <div className="space-y-5 px-5 py-6 sm:px-6">
+          {message ? (
+            <Alert className="rounded-xl border-emerald-500/35 bg-emerald-500/10 text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-50">
+              <AlertTitle className="text-sm">Listo</AlertTitle>
+              <AlertDescription className="text-sm leading-relaxed">{message}</AlertDescription>
+            </Alert>
+          ) : null}
+          {error ? (
+            <Alert variant="destructive" className="rounded-xl">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription className="text-sm">{error}</AlertDescription>
+            </Alert>
+          ) : null}
 
-            {/* Secret display */}
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)]/50 p-3">
-              <div className="flex items-center gap-2">
-                <code className="flex-1 break-all font-mono text-sm text-[var(--foreground)]">
+          <div className="space-y-2">
+            <p className={labelMuted}>Valor del secret</p>
+            {loading && !mcpSecret ? (
+              <Skeleton className="h-11 w-full rounded-xl" />
+            ) : (
+              <div className={cn(monoFieldClass, 'pr-1')}>
+                <code className="min-w-0 flex-1 break-all">
                   {mcpSecret
                     ? visible
                       ? mcpSecret
-                      : mcpSecret.replace(/./g, '•')
-                    : loading
-                    ? 'Cargando...'
-                    : 'Sin secret disponible'}
+                      : '•••••••••••••••••••••••••••••••••'
+                    : 'Sin secret — usa «Regenerar» si acabas de crear la cuenta.'}
                 </code>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setVisible(!visible)}
-                  disabled={!mcpSecret}
-                >
-                  {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={handleCopy}
-                  disabled={!mcpSecret}
-                >
-                  {copied ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 rounded-lg text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                    onClick={() => setVisible((v) => !v)}
+                    disabled={!mcpSecret}
+                    aria-label={visible ? 'Ocultar secret' : 'Mostrar secret'}
+                  >
+                    {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 rounded-lg text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                    onClick={() => void handleCopy()}
+                    disabled={!mcpSecret}
+                    aria-label="Copiar secret"
+                  >
+                    {copied ? <Check className="size-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="size-4" />}
+                  </Button>
+                </div>
               </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Regenerar secret
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={fetchSecret}
-                disabled={loading}
-              >
-                Recargar
-              </Button>
-            </div>
-
-            <p className="text-xs text-[var(--foreground-muted)]">
-              Este secret permite que el MCP server actúe en tu nombre. Si lo comprometes,
-              regéneralo para invalidar el anterior.
-            </p>
+            )}
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Cerrar sesión */}
-      <div className="pt-4">
-        <Button variant="destructive" onClick={handleLogout} className="w-full">
-          Cerrar sesión
-        </Button>
-      </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 gap-2 rounded-xl border-[var(--border)]"
+              onClick={() => void handleRegenerate()}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              Regenerar secret
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 rounded-xl text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+              onClick={() => void fetchSecret()}
+              disabled={loading}
+            >
+              Recargar
+            </Button>
+          </div>
+
+          <p className="m-0 text-xs leading-relaxed text-[var(--foreground-muted)]">
+            Si el secret se filtra, regenera en cuanto puedas: el anterior deja de ser válido al instante.
+          </p>
+        </div>
+      </section>
+
+      <section
+        className={cn(sectionShellClass, 'border-destructive/25 bg-[color-mix(in_oklch,var(--destructive)_6%,var(--card))]')}
+        aria-labelledby="profile-session-heading"
+      >
+        <div className={cn(sectionHeaderClass, 'border-destructive/20 bg-[color-mix(in_oklch,var(--destructive)_8%,var(--card))]')}>
+          <h2 id="profile-session-heading" className="flex items-center gap-2 text-base font-semibold text-[var(--foreground)]">
+            <LogOut className="size-5 shrink-0 text-[var(--destructive)]" aria-hidden />
+            Sesión
+          </h2>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)] sm:text-sm">
+            Cierra la sesión en este navegador. Necesitarás OTP de nuevo para entrar.
+          </p>
+        </div>
+        <div className="flex flex-col gap-4 px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <p className="m-0 max-w-md text-sm text-[var(--foreground-muted)]">
+            Usa esta acción en equipos compartidos o si terminas tu jornada.
+          </p>
+          <Button
+            type="button"
+            variant="destructive"
+            className="h-11 shrink-0 rounded-xl px-6 sm:min-w-[11rem]"
+            onClick={handleLogout}
+          >
+            <LogOut className="size-4" />
+            Cerrar sesión
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

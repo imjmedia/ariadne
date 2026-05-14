@@ -530,7 +530,7 @@ export function ProjectDetail() {
             <Link to={`/projects/${id}/chat`}>Chat (proyecto)</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to={`/repos/new?projectId=${id}`}>Repositorio nuevo</Link>
+            <Link to={`/repos?openCreate=1&projectId=${id}`}>Repositorio nuevo</Link>
           </Button>
           <Button variant="outline" onClick={() => setAssociateDialogOpen(true)}>
             Asociar repo existente
@@ -623,7 +623,7 @@ export function ProjectDetail() {
               <p className="text-muted-foreground">Sin repositorios. Añade uno nuevo o asocia uno ya registrado.</p>
               <div className="flex gap-2">
                 <Button asChild>
-                  <Link to={`/repos/new?projectId=${id}`}>Repositorio nuevo</Link>
+                  <Link to={`/repos?openCreate=1&projectId=${id}`}>Repositorio nuevo</Link>
                 </Button>
                 <Button variant="outline" onClick={() => setAssociateDialogOpen(true)}>
                   Asociar repo existente
