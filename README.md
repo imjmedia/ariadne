@@ -3,7 +3,6 @@
 <p align="center">
   <a href="https://github.com/kreodevs/ariadne">
     <img src="frontend/public/brand/wordmark-light.png#gh-light-mode-only" alt="Ariadne" width="320" />
-    <img src="frontend/public/brand/wordmark-dark.png#gh-dark-mode-only" alt="Ariadne" width="320" />
   </a>
 </p>
 
