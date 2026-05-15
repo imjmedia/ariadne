@@ -155,7 +155,7 @@ export function C4Previewer({
     loading ? (
       <p className="text-sm text-[var(--foreground-muted)]">Generando diagrama…</p>
     ) : krokiError ? (
-      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-50">
         No se pudo generar el diagrama ({krokiError}). Comprueba que ingest pueda salir a Kroki
         (KROKI_URL si usas instancia propia). El DSL sigue disponible; puedes pegarlo en{' '}
         <a href="https://kroki.io" className="underline" target="_blank" rel="noreferrer">
@@ -172,19 +172,19 @@ export function C4Previewer({
   const dslPanel = (
     <div
       className={cn(
-        'flex min-h-0 flex-col rounded-lg border border-[var(--border)] bg-[#0c1222]',
+        'flex min-h-0 flex-col rounded-lg border border-[var(--border)] bg-[var(--card)] shadow-sm',
         layout === 'split' ? 'min-h-[320px] lg:min-h-[480px]' : '',
       )}
     >
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_18%,var(--card))] px-3 py-2">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
           DSL PlantUML
         </span>
-        <Badge variant="outline" className="font-mono text-[10px]">
+        <Badge variant="outline" className="border-[var(--border)] font-mono text-[10px] text-[var(--foreground)]">
           .puml
         </Badge>
       </div>
-      <pre className="flex-1 overflow-auto p-4 text-left text-xs leading-relaxed font-mono text-sky-100/95 whitespace-pre-wrap">
+      <pre className="flex-1 overflow-auto bg-[color-mix(in_oklch,var(--muted)_12%,var(--card))] p-4 text-left font-mono text-xs leading-relaxed text-[var(--foreground)] whitespace-pre-wrap">
         {dsl || '…'}
       </pre>
     </div>
@@ -214,7 +214,7 @@ export function C4Previewer({
       {diagramBlock}
       <details className="text-xs">
         <summary className="cursor-pointer text-[var(--foreground-muted)]">DSL PlantUML</summary>
-        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-[var(--muted)] p-3 font-mono whitespace-pre-wrap">
+        <pre className="mt-2 max-h-64 overflow-auto rounded-md border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_18%,var(--card))] p-3 font-mono text-xs text-[var(--foreground)] whitespace-pre-wrap">
           {dsl}
         </pre>
       </details>

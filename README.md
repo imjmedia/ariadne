@@ -1,6 +1,82 @@
 # Ariadne / AriadneSpecs
 
+<p align="center">
+  <a href="https://github.com/kreodevs/ariadne">
+    <img src="frontend/public/brand/wordmark-light.png#gh-light-mode-only" alt="Ariadne" width="320" />
+    <img src="frontend/public/brand/wordmark-dark.png#gh-dark-mode-only" alt="Ariadne" width="320" />
+  </a>
+</p>
+
+<p align="center">
+  Monorepo <strong>NestJS</strong> (ingest, API, orquestador, MCP) + <strong>React</strong> (Vite) + <strong>FalkorDB</strong>, <strong>PostgreSQL</strong> y <strong>Redis</strong>.<br />
+  Despliegue listo para <strong>Dokploy</strong> / Docker.
+</p>
+
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat&colorA=1a1425&colorB=6d58a6" alt="License" /></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%E2%89%A520-1a1425.svg?style=flat&colorA=1a1425&colorB=6d58a6" alt="Node" /></a>
+  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=fff&style=flat&colorA=1a1425" alt="TypeScript" /></a>
+  <a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-6d58a6.svg?style=flat&colorA=1a1425" alt="PRs Welcome" /></a>
+</p>
+
+> **Ariadne** es el mapa de arquitectura y el conocimiento vivo del código: sincroniza repositorios, indexa dependencias y reglas de dominio, y ofrece chat NL→Cypher, API, MCP y vistas C4 para gobierno de arquitectura.
+
 Arquitectura: **Ingest** (repos remotos + sync) + **PostgreSQL** (metadatos: repos, proyectos, **dominios de arquitectura**, whitelist proyecto→dominio) + **FalkorDB** (grafo particionado por proyecto/dominio; shadow SDD) + **Chat/Analysis** (NL→Cypher + diagnósticos) + **MCP** (herramientas para la IA) + **gobierno C4** (DSL PlantUML, preview en frontend).
+
+**[Arquitectura (doc)](docs/notebooklm/architecture.md)** · **[Contribuir](CONTRIBUTING.md)** · **[CHANGELOG](CHANGELOG.md)** · **[AUTHORS](AUTHORS.md)**
+
+---
+
+## Estructura del monorepo
+
+```
+ariadne/
+├── frontend/             — React (Vite): gobierno, proyectos/repos, dominios, chat, C4, explorador de grafo
+├── packages/
+│   └── ariadne-common/   — Tipos y utilidades FalkorDB/Cypher compartidas (ingest + MCP)
+├── services/
+│   ├── api/              — REST NestJS: impacto, contratos, grafo, auth OTP
+│   ├── ingest/           — Sync Bitbucket/GitHub, webhooks, índice, chat NL→Cypher, análisis
+│   ├── orchestrstrator/  — NestJS + LangGraph (validación SDD)
+│   └── mcp-ariadne/      — Servidor MCP (herramientas para agentes / IDE)
+├── docs/                 — Arquitectura, manual, diagramas, capturas README
+├── docker-compose.yml    — Stack producción
+└── docker-compose.dev.yml — Overrides locales (puertos expuestos, etc.)
+```
+
+---
+
+## Capturas de la aplicación
+
+Vista del producto en producción: gobierno (dashboard, proyectos), explorador de grafo y acceso sin contraseña (OTP).
+
+### Acceso seguro (OTP)
+
+<p align="center">
+  <img src="docs/readme/screenshot-login.png" alt="Pantalla de acceso con OTP y selector de tema" width="92%" />
+</p>
+
+### Dashboard — resumen en tiempo real
+
+<p align="center">
+  <img src="docs/readme/screenshot-dashboard-light.png" alt="Dashboard en tema claro" width="46%" />
+  &nbsp;
+  <img src="docs/readme/screenshot-dashboard-dark.png" alt="Dashboard en tema oscuro" width="46%" />
+</p>
+
+### Proyectos — catálogo multi-repo e ingesta
+
+<p align="center">
+  <img src="docs/readme/screenshot-projects.png" alt="Listado de proyectos con métricas de ingesta y dominio" width="92%" />
+</p>
+
+### Explorador de grafo (Falkor / vis-network)
+
+<p align="center">
+  <img src="docs/readme/screenshot-graph-explorer.png" alt="Explorador de grafo con alcance y profundidad" width="92%" />
+</p>
+
+---
 
 ## Deployment
 
@@ -128,19 +204,19 @@ A continuación se listan todas las variables de entorno organizadas por servici
 
 ### 🔷 Core — Compartidas entre servicios
 
-|| Variable | Default | Servicios | Qué hace |
-|---|---|---|---|---|
-|| `FALKORDB_HOST` | `falkordb` | ingest, api, mcp-ariadne | Host de FalkorDB |
-|| `FALKORDB_PORT` | `6379` | ingest, api, mcp-ariadne | Puerto de FalkorDB |
-|| `REDIS_URL` | `redis://redis:6379` | ingest, api, orchestrator | Redis para cola BullMQ (ingest), caché (api, orchestrator) |
-|| `CORS_ORIGIN` | — | ingest, api | Origen permitido para CORS (ej. `https://ariadne.kreoint.mx`) |
-|| `LLM_API_KEY` | — | ingest, orchestrator | **Clave única para LLM** (OpenRouter, LemonData, etc.). Unifica OPENROUTER_API_KEY, AI_API_KEY, OPENAI_API_KEY. |
-|| `LLM_PROVIDER` | `openrouter` | ingest, orchestrator | **Proveedor LLM.** Default: `openrouter`. Para migrar a LemonData: cambiar aquí. |
-|| `LLM_MODEL_INGEST` | — | ingest | **Modelo específico para ingest.** Prioridad sobre `LLM_CHAT_MODEL`. |
-|| `ORCHESTRATOR_LLM_MODEL` | — | orchestrator | **Modelo específico para orquestador.** Prioridad sobre `LLM_CHAT_MODEL`. |
-|| `LLM_TEMPERATURE` | `0.1` | ingest, orchestrator | Temperatura del LLM |
-|| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | ingest, orchestrator | URL base de OpenRouter (válido mientras `LLM_PROVIDER=openrouter`) |
-|| `LLM_CHAT_MODEL` | `google/gemini-2.0-flash-001` | ingest, orchestrator | Modelo de chat (fallback global) |
+| Variable | Default | Servicios | Qué hace |
+|---|---|---|---|
+| `FALKORDB_HOST` | `falkordb` | ingest, api, mcp-ariadne | Host de FalkorDB |
+| `FALKORDB_PORT` | `6379` | ingest, api, mcp-ariadne | Puerto de FalkorDB |
+| `REDIS_URL` | `redis://redis:6379` | ingest, api, orchestrator | Redis para cola BullMQ (ingest), caché (api, orchestrator) |
+| `CORS_ORIGIN` | — | ingest, api | Origen permitido para CORS (ej. `https://ariadne.kreoint.mx`) |
+| `LLM_API_KEY` | — | ingest, orchestrator | **Clave única para LLM** (OpenRouter, LemonData, etc.). Unifica OPENROUTER_API_KEY, AI_API_KEY, OPENAI_API_KEY. |
+| `LLM_PROVIDER` | `openrouter` | ingest, orchestrator | **Proveedor LLM.** Default: `openrouter`. Para migrar a LemonData: cambiar aquí. |
+| `LLM_MODEL_INGEST` | — | ingest | **Modelo específico para ingest.** Prioridad sobre `LLM_CHAT_MODEL`. |
+| `ORCHESTRATOR_LLM_MODEL` | — | orchestrator | **Modelo específico para orquestador.** Prioridad sobre `LLM_CHAT_MODEL`. |
+| `LLM_TEMPERATURE` | `0.1` | ingest, orchestrator | Temperatura del LLM |
+| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | ingest, orchestrator | URL base de OpenRouter (válido mientras `LLM_PROVIDER=openrouter`) |
+| `LLM_CHAT_MODEL` | `google/gemini-2.0-flash-001` | ingest, orchestrator | Modelo de chat (fallback global) |
 | `LLM_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | ingest | Modelo de embeddings |
 | `LLM_EMBEDDING_DIM` | `1536` | ingest | Dimensión de vectores de embedding |
 | `LLM_HTTP_REFERER` | — | ingest, orchestrator | HTTP Referer para OpenRouter |
@@ -289,3 +365,17 @@ Todo lo demás tiene defaults funcionales en `docker-compose.yml`.
 - **Licencia:** [Apache License 2.0](LICENSE). Aviso de terceros y copyright del proyecto: [NOTICE](NOTICE).
 - **Autores y colaboradores:** [AUTHORS.md](AUTHORS.md) (autor principal: Jorge Correa; sección *Contributors* para quien sume al repo).
 - **Cómo contribuir y JSDoc:** [CONTRIBUTING.md](CONTRIBUTING.md) y [docs/JSDOC.md](docs/JSDOC.md).
+
+## Contribución
+
+- Reporta bugs o propone mejoras en [Issues](https://github.com/kreodevs/ariadne/issues).
+- Abre un PR siguiendo la guía en [CONTRIBUTING.md](CONTRIBUTING.md).
+- Comparte el proyecto si te ha sido útil.
+
+## Gracias a todos los colaboradores ❤
+
+[![Contributors](https://contrib.rocks/image?repo=kreodevs/ariadne)](https://github.com/kreodevs/ariadne/graphs/contributors)
+
+---
+
+**Licencia:** [Apache License 2.0](./LICENSE) · **Aviso:** [NOTICE](./NOTICE) · **Autores:** [AUTHORS.md](./AUTHORS.md)

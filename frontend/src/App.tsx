@@ -5,7 +5,7 @@
  * @copyright 2026 Jorge Correa
  * @license Apache-2.0
  */
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
@@ -18,10 +18,8 @@ import { RepoList } from './pages/RepoList';
 import { RepoDetail } from './pages/RepoDetail';
 import { RepoChat } from './pages/RepoChat';
 import { RepoIndex } from './pages/RepoIndex';
-import { CreateRepo } from './pages/CreateRepo';
 import { EditRepo } from './pages/EditRepo';
 import { CredentialsList } from './pages/CredentialsList';
-import { CreateCredential } from './pages/CreateCredential';
 import { EditCredential } from './pages/EditCredential';
 import { Ayuda } from './pages/Ayuda';
 import { ErrorPage } from './pages/ErrorPage';
@@ -32,6 +30,18 @@ import { Dashboard } from './pages/Dashboard';
 import { C4ViewerPage } from './pages/C4ViewerPage';
 import { UsersManagement } from './pages/UsersManagement';
 import { ProfilePage } from './pages/ProfilePage';
+import { SettingsPage } from './pages/SettingsPage';
+
+/** Marcadores antiguos `/repos/new` y `/repos/new?projectId=` → lista con modal de alta. */
+function LegacyReposNewRedirect() {
+  const { search } = useLocation();
+  const qs = new URLSearchParams(search);
+  const next = new URLSearchParams();
+  next.set('openCreate', '1');
+  const projectId = qs.get('projectId');
+  if (projectId) next.set('projectId', projectId);
+  return <Navigate to={`/repos?${next.toString()}`} replace />;
+}
 
 /** Componente raíz con enrutamiento. */
 function App() {
@@ -52,19 +62,20 @@ function App() {
             <Route path="projects/:id" element={<ProjectDetail />} />
             <Route path="projects" element={<ProjectList />} />
             <Route path="repos" element={<RepoList />} />
-            <Route path="jobs" element={<ActiveJobsQueue />} />
-            <Route path="repos/new" element={<CreateRepo />} />
+            <Route path="repos/new" element={<LegacyReposNewRedirect />} />
             <Route path="repos/:id/edit" element={<EditRepo />} />
             <Route path="repos/:id/chat" element={<RepoChat />} />
             <Route path="repos/:id/index" element={<RepoIndex />} />
             <Route path="repos/:id" element={<RepoDetail />} />
+            <Route path="jobs" element={<ActiveJobsQueue />} />
             <Route path="credentials" element={<CredentialsList />} />
-            <Route path="credentials/new" element={<CreateCredential />} />
+            <Route path="credentials/new" element={<Navigate to="/credentials?create=1" replace />} />
             <Route path="credentials/:id/edit" element={<EditCredential />} />
             <Route path="graph-explorer" element={<ComponentGraphExplorer />} />
             <Route path="domains" element={<DomainsList />} />
             <Route path="users" element={<UsersManagement />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="settings" element={<SettingsPage />} />
             <Route path="ayuda/*" element={<Ayuda />} />
           </Route>
         </Route>

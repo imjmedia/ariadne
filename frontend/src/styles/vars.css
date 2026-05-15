@@ -1,47 +1,28 @@
-/* Ariadne SaaS — Slate / Neutral oscuro + acento azul eléctrico (Linear / Vercel vibe) */
-
-:root {
-  --primary: #3b82f6;
-  --primary-foreground: #f8fafc;
-  --primary-hover: #2563eb;
-  --background: #020617;
-  --background-secondary: #0f172a;
-  --background-tertiary: #1e293b;
-  --foreground: #f1f5f9;
-  --foreground-muted: #94a3b8;
-  --foreground-subtle: #64748b;
-  --accent: #38bdf8;
-  --accent-foreground: #0c1222;
-  --accent-muted: #0ea5e9;
-  --card: #0f172a;
-  --card-foreground: #f1f5f9;
-  --card-border: #1e293b;
-  --popover: #1e293b;
-  --popover-foreground: #f1f5f9;
-  --secondary: #1e293b;
-  --secondary-foreground: #f1f5f9;
-  --muted: #334155;
-  --muted-foreground: #94a3b8;
-  --destructive: #ef4444;
-  --destructive-foreground: #fef2f2;
-  --success: #22c55e;
-  --success-foreground: #f0fdf4;
-  --warning: #eab308;
-  --warning-foreground: #0f172a;
-  --info: #38bdf8;
-  --info-foreground: #0c1222;
-  --border: #1e293b;
-  --border-hover: #334155;
-  --input: #1e293b;
-  --input-border: #334155;
-  --input-focus: #3b82f6;
-  --ring: #3b82f6;
-  --ring-offset: #020617;
-  --radius: 0.5rem;
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+/**
+ * Ariadne — semantic tokens layered on cosmic-night (`index.css` :root / `.dark`).
+ * Keep extensions here so shadcn theme updates stay in `index.css`.
+ */
+html {
+  --foreground-muted: var(--muted-foreground);
+  --foreground-subtle: color-mix(
+    in oklch,
+    var(--muted-foreground) 80%,
+    var(--foreground) 20%
+  );
+  --card-border: var(--border);
+  --input-border: var(--border);
+  --input-focus: var(--ring);
+  --primary-hover: color-mix(in oklch, var(--primary) 88%, var(--foreground));
+  --background-secondary: var(--card);
+  --background-tertiary: var(--muted);
+  --accent-muted: color-mix(in oklch, var(--accent) 75%, var(--foreground));
+  --ring-offset: var(--background);
+  --success: oklch(0.65 0.17 145);
+  --success-foreground: oklch(0.98 0.02 145);
+  --warning: oklch(0.75 0.15 85);
+  --warning-foreground: oklch(0.25 0.04 85);
+  --info: var(--chart-3);
+  --info-foreground: var(--foreground);
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -52,72 +33,5 @@
   --z-modal: 1050;
   --z-popover: 1060;
   --z-tooltip: 1070;
-  --shadow-glow: 0 0 24px rgba(59, 130, 246, 0.12);
-  --chart-1: #3b82f6;
-  --chart-2: #64748b;
-  --chart-3: #22c55e;
-  --chart-4: #a855f7;
-  --chart-5: #f43f5e;
-  --sidebar: #020617;
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #3b82f6;
-  --sidebar-primary-foreground: #f8fafc;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: #f1f5f9;
-  --sidebar-border: #1e293b;
-  --sidebar-ring: #3b82f6;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-}
-
-.light {
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
-  --primary-hover: #1d4ed8;
-  --background: #f8fafc;
-  --background-secondary: #f1f5f9;
-  --background-tertiary: #e2e8f0;
-  --foreground: #0f172a;
-  --foreground-muted: #475569;
-  --foreground-subtle: #64748b;
-  --accent: #0ea5e9;
-  --accent-foreground: #ffffff;
-  --accent-muted: #0284c7;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --card-border: #e2e8f0;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --destructive: #dc2626;
-  --destructive-foreground: #fef2f2;
-  --success: #16a34a;
-  --success-foreground: #f0fdf4;
-  --warning: #ca8a04;
-  --warning-foreground: #0f172a;
-  --info: #0ea5e9;
-  --info-foreground: #ffffff;
-  --border: #e2e8f0;
-  --border-hover: #cbd5e1;
-  --input: #ffffff;
-  --input-border: #cbd5e1;
-  --input-focus: #2563eb;
-  --ring: #2563eb;
-  --ring-offset: #f8fafc;
-  --shadow-glow: 0 0 24px rgba(37, 99, 235, 0.08);
-  --chart-1: #2563eb;
-  --chart-2: #64748b;
-  --chart-3: #16a34a;
-  --chart-4: #9333ea;
-  --chart-5: #e11d48;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #2563eb;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f5f9;
-  --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #2563eb;
+  --shadow-glow: 0 0 28px color-mix(in oklch, var(--primary) 22%, transparent);
 }

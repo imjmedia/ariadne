@@ -3,7 +3,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { FolderGit2, LayoutDashboard, Search, Share2, Key, HelpCircle, Plus } from "lucide-react"
+import { FolderGit2, LayoutDashboard, Search, Share2, Key, HelpCircle, Plus, Command } from "lucide-react"
 import { api } from "@/api"
 import type { Project, Repository } from "@/types"
 import { cn } from "@/lib/utils"
@@ -16,6 +16,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+
+function isAppleLikePlatform(): boolean {
+  if (typeof navigator === "undefined") return false
+  return /Mac|iPhone|iPod|iPad/i.test(navigator.userAgent)
+}
 
 type ResultKind = "shortcut" | "project" | "repo" | "component"
 
@@ -34,7 +39,7 @@ const SHORTCUTS: Omit<SearchResult, "id">[] = [
   { kind: "shortcut", label: "Explorador de grafo", detail: "Componentes y dependencias", to: "/graph-explorer", icon: Share2 },
   { kind: "shortcut", label: "Credenciales", detail: "GitHub / Bitbucket", to: "/credentials", icon: Key },
   { kind: "shortcut", label: "Ayuda", detail: "Documentación", to: "/ayuda", icon: HelpCircle },
-  { kind: "shortcut", label: "Nuevo repositorio", detail: "Alta y webhook", to: "/repos/new", icon: Plus },
+  { kind: "shortcut", label: "Nuevo repositorio", detail: "Abre el modal en Repositorios", to: "/repos?openCreate=1", icon: Plus },
 ]
 
 function norm(s: string): string {
@@ -63,6 +68,7 @@ type GraphComponentRow = {
 
 export function HeaderSearch({ className }: { className?: string }) {
   const [open, setOpen] = useState(false)
+  const showCommandGlyph = useMemo(() => isAppleLikePlatform(), [])
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const [graphLoading, setGraphLoading] = useState(false)
@@ -283,17 +289,34 @@ export function HeaderSearch({ className }: { className?: string }) {
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "flex items-center gap-2 px-3 py-2 bg-[var(--background)] border border-[var(--border)] rounded-[var(--radius-lg)] text-[var(--foreground-subtle)] text-sm text-left transition-colors hover:border-[var(--border-hover)] hover:text-[var(--foreground-muted)] touch-manipulation",
-          "hidden md:flex w-48 lg:w-72 shrink-0",
+          "flex h-9 min-h-9 w-[min(100%,17.5rem)] max-w-[17.5rem] shrink-0 items-center gap-2.5 rounded-full border border-[var(--border)] bg-[var(--muted)]/45 px-3 py-0 text-left text-sm text-[var(--foreground-subtle)] transition-colors hover:border-[var(--border-hover)] hover:bg-[var(--muted)]/70 hover:text-[var(--foreground-muted)] touch-manipulation",
+          "hidden md:flex",
           className,
         )}
         aria-haspopup="dialog"
         aria-label="Abrir búsqueda (Cmd o Ctrl + K)"
       >
-        <Search className="w-4 h-4 shrink-0" />
-        <span className="truncate">Buscar…</span>
-        <kbd className="ml-auto hidden lg:inline pointer-events-none rounded border border-[var(--border)] bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--foreground-muted)]">
-          ⌘K
+        <Search className="size-4 shrink-0 text-[var(--foreground-muted)]" strokeWidth={2} aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-[var(--foreground-muted)]">Buscar…</span>
+        <kbd
+          className={cn(
+            "ml-1 hidden shrink-0 select-none items-center gap-1 rounded-full md:inline-flex",
+            "border border-[var(--border)] bg-[var(--background)] px-2 py-1",
+            "text-[11px] font-medium leading-none text-[var(--foreground-muted)]",
+            "shadow-[inset_0_1px_0_0_color-mix(in_oklch,var(--foreground)_6%,transparent)]",
+            "pointer-events-none dark:bg-[var(--card)] dark:shadow-none",
+          )}
+        >
+          {showCommandGlyph ? (
+            <Command className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+          ) : (
+            <span className="text-[10px] font-semibold tabular-nums" aria-hidden>
+              Ctrl
+            </span>
+          )}
+          <span className="font-semibold leading-none" aria-hidden>
+            K
+          </span>
         </kbd>
       </button>
 
@@ -301,14 +324,14 @@ export function HeaderSearch({ className }: { className?: string }) {
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "flex md:hidden flex-1 min-w-0 items-center gap-2 px-3 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-[var(--radius-lg)] text-[var(--foreground-subtle)] text-sm touch-manipulation text-left",
+          "flex md:hidden h-9 min-h-9 w-[min(100%,15rem)] max-w-[15rem] shrink-0 items-center gap-2.5 rounded-full border border-[var(--border)] bg-[var(--muted)]/45 px-3 py-0 text-left text-sm text-[var(--foreground-subtle)] touch-manipulation transition-colors hover:bg-[var(--muted)]/70",
           className,
         )}
         aria-haspopup="dialog"
         aria-label="Abrir búsqueda"
       >
-        <Search className="w-4 h-4 shrink-0 opacity-70" />
-        <span className="truncate">Buscar…</span>
+        <Search className="size-4 shrink-0 text-[var(--foreground-muted)]" strokeWidth={2} aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-[var(--foreground-muted)]">Buscar…</span>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

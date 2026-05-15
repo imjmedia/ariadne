@@ -3,6 +3,7 @@
  * Refactorizado con compound components y useRepoDetail para reducir complejidad.
  */
 import { useRepoDetail } from './useRepoDetail';
+import { repoDetailPageClass } from './layoutClasses';
 import { RepoDetailLoading } from './RepoDetailLoading';
 import { RepoDetailError } from './RepoDetailError';
 import { RepoDetailNotFound } from './RepoDetailNotFound';
@@ -29,7 +30,7 @@ export function RepoDetail() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={repoDetailPageClass}>
       <RepoDetail.Header />
       <RepoDetail.RepoCard {...getRepoCardProps(state)} />
       <RepoDetail.JobsCard {...getJobsCardProps(state)} />

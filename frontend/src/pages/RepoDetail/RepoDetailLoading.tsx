@@ -1,21 +1,29 @@
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RepoDetailBackNav } from './RepoDetailBackNav';
+import { repoDetailPageClass, sectionHeaderClass, sectionShellClass } from './layoutClasses';
 
-/** Estado de carga del detalle de repo: esqueleto y enlace a lista. */
+/** Loading skeleton for repository detail. */
 export function RepoDetailLoading() {
   return (
-    <div className="space-y-6">
-      <Button variant="ghost" size="sm" asChild>
-        <Link to="/repos">← Repos</Link>
-      </Button>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-7 w-64" />
-          <Skeleton className="h-4 w-48 mt-2" />
-        </CardHeader>
-      </Card>
+    <div className={repoDetailPageClass}>
+      <RepoDetailBackNav />
+      <section className={sectionShellClass}>
+        <div className={sectionHeaderClass}>
+          <Skeleton className="h-8 w-full max-w-2xl rounded-lg" />
+        </div>
+        <div className="space-y-4 px-5 py-6 sm:px-6">
+          <div className="flex flex-wrap gap-3">
+            <Skeleton className="h-5 w-24 rounded-lg" />
+            <Skeleton className="h-7 w-24 rounded-full" />
+            <Skeleton className="h-5 w-48 rounded-lg" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      </section>
     </div>
   );
 }

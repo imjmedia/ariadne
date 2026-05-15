@@ -2,13 +2,25 @@
  * Página de login con OTP: email → código.
  * Si no hay usuarios registrados, redirige a /setup.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Mail, Shield, CircleCheck } from 'lucide-react';
+import { AriadneLogo } from '@/components/brand/AriadneLogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LoginPageFooter } from '@/components/login/LoginPageFooter';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { isValidEmailFormat } from '@/utils/emailFormat';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import {
   requestOtp,
   verifyOtp,
@@ -36,34 +48,19 @@ export function Login() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [ssoEnabled, setSsoEnabled] = useState(false);
 
-  // Check for SSO config, SSO redirect token, and if setup is needed
-  useEffect(() => {
-    const ssoUrl = import.meta.env.VITE_SSO_URL as string;
-    if (ssoUrl?.trim()) {
-      setSsoEnabled(true);
-    }
-
-    const ssoToken = searchParams.get('sso_token');
-    if (ssoToken) {
-      handleSsoLogin(ssoToken);
-    }
-
-    checkNeedsSetup();
-  }, [searchParams]);
-
-  const checkNeedsSetup = async () => {
+  const checkNeedsSetup = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/auth/has-users`);
-      const data = await res.json() as { hasUsers?: boolean };
+      const data = (await res.json()) as { hasUsers?: boolean };
       if (data.hasUsers === false) {
         navigate('/setup', { replace: true });
       }
     } catch {
       // Si falla la consulta, continuar con login normal
     }
-  };
+  }, [navigate]);
 
-  const handleSsoLogin = async (token: string) => {
+  const handleSsoLogin = useCallback(async (token: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -84,7 +81,21 @@ export function Login() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    const ssoUrl = import.meta.env.VITE_SSO_URL as string;
+    if (ssoUrl?.trim()) {
+      setSsoEnabled(true);
+    }
+
+    const ssoToken = searchParams.get('sso_token');
+    if (ssoToken) {
+      void handleSsoLogin(ssoToken);
+    }
+
+    void checkNeedsSetup();
+  }, [searchParams, handleSsoLogin, checkNeedsSetup]);
 
   const handleSsoRedirect = () => {
     const ssoUrl = import.meta.env.VITE_SSO_URL as string;
@@ -96,13 +107,18 @@ export function Login() {
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!email.trim()) {
+    const trimmed = email.trim();
+    if (!trimmed) {
       setError('Email requerido');
+      return;
+    }
+    if (!isValidEmailFormat(trimmed)) {
+      setError('Introduce un correo válido (incluye dominio, ej. empresa.com)');
       return;
     }
     setLoading(true);
     try {
-      const result = await requestOtp(email.trim());
+      const result = await requestOtp(trimmed);
       if (result.devCode) setDevCode(result.devCode);
       setStep('code');
     } catch (err) {
@@ -148,115 +164,257 @@ export function Login() {
   };
 
   const token = getToken();
+  const emailTrimmed = email.trim();
+  const emailValid = isValidEmailFormat(emailTrimmed);
+
   if (token && !isTokenExpired(token)) {
     navigate('/dashboard', { replace: true });
     return null;
   }
 
   return (
-    <div className="relative flex min-h-[100dvh] items-center justify-center bg-[var(--background)] p-4 pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
-      <ThemeToggle className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top,0px))] z-50 sm:right-4" />
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">ARIADNE</CardTitle>
-          <CardDescription>
-            {step === 'email'
-              ? 'Ingresa tu email para recibir un código'
-              : 'Ingresa el código de 6 dígitos'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {step === 'email' ? (
-            <>
-            <form onSubmit={handleRequestOtp} className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
-                  autoFocus
-                  className="mt-2"
-                />
-              </div>
-              {error && (
-                <p className="text-destructive text-sm">{error}</p>
-              )}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Enviando...' : 'Enviar código'}
-              </Button>
-            </form>
-            {ssoEnabled && (
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-[var(--card)] px-2 text-muted-foreground">o</span>
-                </div>
-              </div>
-            )}
-            {ssoEnabled && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleSsoRedirect}
-                disabled={loading}
-              >
-                Iniciar sesión con SSO
-              </Button>
-            )}
-            </>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <p className="text-muted-foreground text-sm">
-                Código enviado a <strong>{email}</strong>
+    <div className="grid min-h-[100dvh] w-full bg-[var(--background)] lg:min-h-0 lg:grid-cols-2">
+      <div className="relative flex min-h-[100dvh] flex-col lg:min-h-[100dvh]">
+        <div className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top,0px))] z-20 sm:right-6">
+          <ThemeToggle layout="pill" />
+        </div>
+
+        <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 pb-8 pt-16 sm:px-8 lg:pt-12">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-[min(55vh,28rem)] bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_65%)]"
+            aria-hidden
+          />
+          <div className="relative flex w-full max-w-lg flex-col items-center gap-8">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <h1 className="sr-only">Ariadne</h1>
+              <AriadneLogo
+                variant="full"
+                className="shrink-0 justify-center"
+                imageClassName="h-6 w-auto max-h-6 object-contain object-center sm:h-[1.875rem] sm:max-h-[1.875rem] max-w-[min(18rem,90vw)]"
+              />
+              <p className="max-w-md text-sm leading-relaxed text-[var(--foreground-muted)]">
+                Mapa de arquitectura y conocimiento del código
               </p>
-              {devCode && (
-                <p className="rounded-md bg-amber-500/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-                  Modo dev: código <code className="font-mono font-bold">{devCode}</code>
-                </p>
-              )}
-              <div>
-                <Label htmlFor="code">Código</Label>
-                <Input
-                  id="code"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  enterKeyHint="done"
-                  placeholder="000000"
-                  maxLength={6}
-                  pattern="\d{6}"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                  disabled={loading}
-                  autoFocus
-                  className="mt-2 font-mono text-lg tracking-widest"
-                />
-              </div>
-              {error && (
-                <p className="text-destructive text-sm">{error}</p>
-              )}
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={handleBack} disabled={loading}>
-                  Atrás
+            </div>
+
+            {step === 'email' ? (
+              <>
+                <div className="relative w-full max-w-md">
+                  <div
+                    className="pointer-events-none absolute -inset-px rounded-[1.35rem] bg-gradient-to-b from-[var(--primary)]/35 via-[var(--primary)]/8 to-transparent opacity-70 blur-md"
+                    aria-hidden
+                  />
+                  <Card className="relative overflow-hidden rounded-3xl border-[var(--primary)]/25 bg-[var(--card)]/85 shadow-[0_0_0_1px_color-mix(in_oklch,var(--primary)_12%,transparent),0_25px_50px_-12px_rgba(0,0,0,0.45)] backdrop-blur-md">
+                    <CardHeader className="flex flex-col items-center gap-3 border-0 px-6 pb-2 pt-8 text-center">
+                      <CardTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                        Acceso seguro
+                      </CardTitle>
+                      <CardDescription className="max-w-[22rem] text-balance text-base leading-relaxed">
+                        Ingresa tu correo registrado para recibir el código de acceso.
+                      </CardDescription>
+                      <Badge
+                        variant="outline"
+                        className="mx-auto w-fit gap-1.5 rounded-full border-[var(--primary)]/35 px-3 py-1 text-[var(--foreground)]"
+                      >
+                        <Shield className="size-3.5 shrink-0" aria-hidden />
+                        Acceso sin contraseña
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center gap-5 px-6 pb-8 pt-4">
+                      <div
+                        className="h-px w-16 max-w-full bg-gradient-to-r from-transparent via-[var(--primary)]/40 to-transparent"
+                        aria-hidden
+                      />
+                      <form
+                        id="login-email-form"
+                        onSubmit={handleRequestOtp}
+                        className="flex w-full max-w-sm flex-col items-center gap-5"
+                      >
+                        <div className="flex w-full flex-col items-center gap-2">
+                          <Label
+                            htmlFor="email"
+                            className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--foreground-muted)]"
+                          >
+                            Correo corporativo
+                          </Label>
+                          <div className="relative w-full">
+                            <Mail
+                              strokeWidth={2.5}
+                              className="pointer-events-none absolute left-3.5 top-1/2 z-[1] size-5 -translate-y-1/2 text-[var(--foreground)] dark:text-[var(--primary)]"
+                              aria-hidden
+                            />
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="tu@empresa.com"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              disabled={loading}
+                              autoFocus
+                              className={cn(
+                                'h-12 border-[var(--border)]/80 bg-[var(--background)]/40 pl-11 text-left text-base backdrop-blur-sm placeholder:text-[var(--foreground-muted)]',
+                                emailValid ? 'pr-11' : 'pr-3.5',
+                              )}
+                              autoComplete="email"
+                              aria-invalid={emailTrimmed.length > 0 && !emailValid}
+                            />
+                            {emailValid ? (
+                              <CircleCheck
+                                className="pointer-events-none absolute right-3.5 top-1/2 size-[1.125rem] -translate-y-1/2 text-[var(--success)]"
+                                aria-hidden
+                              />
+                            ) : null}
+                          </div>
+                        </div>
+                        <p className="w-full max-w-sm rounded-2xl border border-[var(--border)]/50 bg-[var(--muted)]/30 px-4 py-3 text-center text-xs leading-relaxed text-[var(--foreground-muted)] text-balance">
+                          Solo cuentas autorizadas reciben un código. Revisa spam si
+                          no ves el correo en unos minutos.
+                        </p>
+                        {error && (
+                          <p className="text-center text-sm text-[var(--destructive)]">
+                            {error}
+                          </p>
+                        )}
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Button
+                  type="submit"
+                  form="login-email-form"
+                  className="h-12 w-full max-w-sm rounded-xl text-base font-semibold shadow-lg shadow-[var(--primary)]/15"
+                  disabled={loading || !emailValid}
+                >
+                  {loading ? 'Enviando…' : 'Enviar código'}
                 </Button>
-                <Button type="submit" className="flex-1" disabled={loading || code.length !== 6}>
-                  {loading ? 'Verificando...' : 'Verificar'}
-                </Button>
-              </div>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+                {ssoEnabled && (
+                  <div className="flex w-full max-w-sm flex-col gap-3">
+                    <div className="relative flex items-center gap-4">
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[var(--border)]" />
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-widest text-[var(--foreground-muted)]">
+                        o continúa con
+                      </span>
+                      <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[var(--border)]" />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 w-full rounded-xl border-[var(--border)]/80"
+                      onClick={handleSsoRedirect}
+                      disabled={loading}
+                    >
+                      Iniciar sesión con SSO
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="relative w-full max-w-md">
+                  <div
+                    className="pointer-events-none absolute -inset-px rounded-[1.35rem] bg-gradient-to-b from-[var(--primary)]/35 via-[var(--primary)]/8 to-transparent opacity-70 blur-md"
+                    aria-hidden
+                  />
+                  <Card className="relative overflow-hidden rounded-3xl border-[var(--primary)]/25 bg-[var(--card)]/85 shadow-[0_0_0_1px_color-mix(in_oklch,var(--primary)_12%,transparent),0_25px_50px_-12px_rgba(0,0,0,0.45)] backdrop-blur-md">
+                    <CardHeader className="flex flex-col items-center gap-2 border-0 px-6 pb-2 pt-8 text-center">
+                      <CardTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                        Verificar código
+                      </CardTitle>
+                      <CardDescription className="max-w-[22rem] text-balance">
+                        Ingresa el código de 6 dígitos enviado a tu correo.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center px-6 pb-8 pt-4">
+                      <form
+                        id="login-code-form"
+                        onSubmit={handleVerifyOtp}
+                        className="flex w-full max-w-sm flex-col items-center gap-5"
+                      >
+                        <p className="text-center text-sm text-[var(--foreground-muted)]">
+                          Código enviado a{' '}
+                          <strong className="text-[var(--foreground)]">{email}</strong>
+                        </p>
+                        {devCode && (
+                          <p className="w-full rounded-2xl border border-[var(--warning)]/30 bg-[var(--warning)]/15 px-4 py-2 text-center text-sm text-[var(--foreground)]">
+                            Modo dev: código{' '}
+                            <code className="font-mono font-bold">{devCode}</code>
+                          </p>
+                        )}
+                        <div className="flex w-full flex-col items-center gap-2">
+                          <Label
+                            htmlFor="code"
+                            className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--foreground-muted)]"
+                          >
+                            Código de acceso
+                          </Label>
+                          <Input
+                            id="code"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            enterKeyHint="done"
+                            placeholder="000000"
+                            maxLength={6}
+                            pattern="\d{6}"
+                            value={code}
+                            onChange={(e) =>
+                              setCode(e.target.value.replace(/\D/g, ''))
+                            }
+                            disabled={loading}
+                            autoFocus
+                            className="h-12 max-w-[13rem] border-[var(--border)]/80 bg-[var(--background)]/40 text-center font-mono text-xl tracking-[0.4em] backdrop-blur-sm"
+                          />
+                        </div>
+                        {error && (
+                          <p className="text-center text-sm text-[var(--destructive)]">
+                            {error}
+                          </p>
+                        )}
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="flex w-full max-w-sm flex-col gap-3">
+                  <Button
+                    type="submit"
+                    form="login-code-form"
+                    className="h-12 w-full rounded-xl text-base font-semibold shadow-lg shadow-[var(--primary)]/15"
+                    disabled={loading || code.length !== 6}
+                  >
+                    {loading ? 'Verificando…' : 'Verificar'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full rounded-xl border-[var(--border)]/80"
+                    onClick={handleBack}
+                    disabled={loading}
+                  >
+                    Volver al correo
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <LoginPageFooter />
+      </div>
+
+      <div
+        className="relative hidden min-h-0 overflow-hidden lg:block"
+        aria-hidden
+      >
+        <img
+          src="/images/login-side-panel.png"
+          alt=""
+          className="absolute inset-0 size-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--background)]/90 via-transparent to-[var(--background)]/20" />
+      </div>
     </div>
   );
 }

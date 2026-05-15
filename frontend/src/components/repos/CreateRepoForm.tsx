@@ -1,23 +1,31 @@
 /**
- * @fileoverview Formulario para crear un repositorio. Flujo: Provider → Credencial → Workspace/Owner → Proyecto/Repo → Branch.
- * Workspace, proyecto y branch son selects poblados desde la API con la credencial.
+ * @fileoverview Create repository form: Provider → Credential → workspace/repo/branch. Used in CreateRepoDialog (modal).
  */
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '../api';
-import type { CreateRepositoryDto, Credential } from '../types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useEffect, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { KeyRound, Plus } from "lucide-react"
+import { api } from "@/api"
+import type { CreateRepositoryDto, Credential, Repository } from "@/types"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+} from "@/components/ui/select"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { cn } from "@/lib/utils"
+
+const inputFieldClass = "h-11 rounded-xl border-[var(--border)] bg-[var(--card)]"
+const selectTriggerFull = cn(
+  "h-11 w-full min-w-0 justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 shadow-sm",
+  "text-left text-sm font-normal text-[var(--foreground)] hover:bg-[var(--card)]",
+  "focus-visible:ring-1 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-0",
+)
 
 /** Etiqueta del primer selector según provider (Bitbucket: Workspace, GitHub: Owner). */
 const workspaceLabel = (provider: string) => (provider === 'github' ? 'Owner' : 'Workspace');
@@ -51,7 +59,7 @@ function CredentialsFormFields({
   return (
     <>
       <div className="space-y-2">
-        <Label>{wLabel}</Label>
+        <Label className="text-xs font-medium text-[var(--foreground-muted)]">{wLabel}</Label>
         <Select
           value={dto.projectKey}
           onValueChange={(v) =>
@@ -59,7 +67,7 @@ function CredentialsFormFields({
           }
           disabled={loadingDiscovery}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className={selectTriggerFull}>
             <SelectValue placeholder={loadingDiscovery ? 'Cargando…' : 'Seleccionar'} />
           </SelectTrigger>
           <SelectContent>
@@ -79,12 +87,12 @@ function CredentialsFormFields({
       </div>
       {dto.projectKey && (
         <div className="space-y-2">
-          <Label>{pLabel}</Label>
+          <Label className="text-xs font-medium text-[var(--foreground-muted)]">{pLabel}</Label>
           <Select
             value={dto.repoSlug}
             onValueChange={(v) => setDto((x) => ({ ...x, repoSlug: v }))}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className={selectTriggerFull}>
               <SelectValue placeholder="Seleccionar" />
             </SelectTrigger>
             <SelectContent>
@@ -101,22 +109,23 @@ function CredentialsFormFields({
         </div>
       )}
       <div className="space-y-2">
-        <Label>Repo slug (editable)</Label>
+        <Label className="text-xs font-medium text-[var(--foreground-muted)]">Repo slug (editable)</Label>
         <Input
           required
           value={dto.repoSlug}
           onChange={(e) => setDto((x) => ({ ...x, repoSlug: e.target.value }))}
           placeholder="my-repo"
+          className={inputFieldClass}
         />
       </div>
       <div className="space-y-2">
-        <Label>Branch por defecto</Label>
+        <Label className="text-xs font-medium text-[var(--foreground-muted)]">Branch por defecto</Label>
         <Select
           value={dto.defaultBranch ?? 'main'}
           onValueChange={(v) => setDto((x) => ({ ...x, defaultBranch: v }))}
           disabled={branches.length === 0}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className={selectTriggerFull}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -130,8 +139,8 @@ function CredentialsFormFields({
       </div>
       {provider === 'bitbucket' && (
         <div className="space-y-2">
-          <Label>Webhook secret (opcional)</Label>
-          <p className="text-xs text-muted-foreground">
+          <Label className="text-xs font-medium text-[var(--foreground-muted)]">Webhook secret (opcional)</Label>
+          <p className="text-xs text-[var(--foreground-muted)]">
             Si configuras un webhook en Bitbucket, usa el mismo secret aquí para validar las
             peticiones.
           </p>
@@ -142,6 +151,7 @@ function CredentialsFormFields({
               setDto((x) => ({ ...x, webhookSecret: e.target.value || null }))
             }
             placeholder="Opcional. El mismo valor que en Bitbucket → Webhooks"
+            className={inputFieldClass}
           />
         </div>
       )}
@@ -274,9 +284,9 @@ function CreateRepoProviderSelect({
   };
   return (
     <div className="space-y-2">
-      <Label>Provider</Label>
+      <Label className="text-xs font-medium text-[var(--foreground-muted)]">Provider</Label>
       <Select value={provider} onValueChange={handleChange}>
-        <SelectTrigger className="w-full">
+        <SelectTrigger className={selectTriggerFull}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -304,17 +314,20 @@ function CreateRepoCredentialSelect({
     onDtoReset();
   };
   return (
-    <div className="space-y-2">
-      <Label>Credencial (requerida)</Label>
-      <p className="text-xs text-muted-foreground">
-        Crea una en{' '}
-        <Link to="/credentials/new" className="underline hover:text-foreground">
+    <div className="space-y-3">
+      <Label className="text-xs font-medium text-[var(--foreground-muted)]">Credencial (requerida)</Label>
+      <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">
+        Crea una en{" "}
+        <Link
+          to="/credentials?create=1"
+          className="font-medium text-[var(--primary)] underline underline-offset-4 hover:underline"
+        >
           Credenciales → Nueva
-        </Link>{' '}
+        </Link>{" "}
         si no tienes ninguna. Sin credencial no se pueden listar workspaces ni repos.
       </p>
-      <Select value={credentialsRef ?? '__none__'} onValueChange={handleChange}>
-        <SelectTrigger className="w-full">
+      <Select value={credentialsRef ?? "__none__"} onValueChange={handleChange}>
+        <SelectTrigger className={selectTriggerFull}>
           <SelectValue placeholder="Selecciona una credencial" />
         </SelectTrigger>
         <SelectContent>
@@ -326,50 +339,94 @@ function CreateRepoCredentialSelect({
           ))}
         </SelectContent>
       </Select>
-      {credentials.length === 0 && (
-        <Button type="button" variant="outline" size="sm" className="mt-1" asChild>
-          <Link to="/credentials/new">+ Añadir credencial (token/PAT)</Link>
-        </Button>
-      )}
+      {credentials.length === 0 ? (
+        <div
+          className={cn(
+            "rounded-xl border border-dashed border-[var(--border)] p-4",
+            "bg-[color-mix(in_oklch,var(--muted)_45%,transparent)]",
+          )}
+        >
+          <p className="m-0 text-xs font-medium text-[var(--foreground)]">No hay credenciales para este provider</p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)]">
+            Registra un token o PAT; luego vuelve aquí y el desplegable se llenará solo.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(
+              "mt-4 h-11 w-full gap-2 rounded-xl border-[var(--border)] bg-[var(--card)] text-sm font-medium shadow-sm",
+              "text-[var(--foreground)] transition-colors",
+              "hover:border-[color-mix(in_oklch,var(--primary)_40%,var(--border))]",
+              "hover:bg-[color-mix(in_oklch,var(--primary)_10%,var(--card))] hover:text-[var(--primary)]",
+            )}
+            asChild
+          >
+            <Link to="/credentials?create=1" className="inline-flex items-center justify-center">
+              <Plus className="size-4 shrink-0" strokeWidth={2} aria-hidden />
+              <KeyRound className="size-4 shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
+              <span>Añadir credencial</span>
+              <span className="text-xs font-normal text-[var(--foreground-muted)]">· token / PAT</span>
+            </Link>
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
 
+export type CreateRepoFormProps = {
+  /** When set, repository is linked to this project after create (multi-root). */
+  projectIdFromUrl?: string | null
+  variant: "page" | "dialog"
+  /** If set, called after successful create instead of internal navigation. */
+  onSuccess?: (repo: Repository) => void
+  /** If set, Cancel uses this callback; otherwise navigates back to repos or project. */
+  onCancel?: () => void
+  /** Emitted when async submit starts or ends (e.g. disable dialog dismiss). */
+  onBusyChange?: (busy: boolean) => void
+}
+
 /**
- * Página de alta de repositorio. Flujo: Provider → Credencial → Workspace/Owner → Proyecto/Repo → Branch.
- * POST /repositories con selects en cascada. Query ?projectId= para añadir a proyecto existente (multi-root).
- * Refactor: useCreateRepoDiscovery + CreateRepoProviderSelect + CreateRepoCredentialSelect reducen nesting.
+ * Form: Provider → Credential → workspace/repo/branch. POST /repositories.
  */
-export function CreateRepo() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const projectIdFromUrl = searchParams.get('projectId') || undefined;
+export function CreateRepoForm({
+  projectIdFromUrl = null,
+  variant,
+  onSuccess,
+  onCancel,
+  onBusyChange,
+}: CreateRepoFormProps) {
+  const navigate = useNavigate()
   const [dto, setDto] = useState<CreateRepositoryDto>({
-    provider: 'bitbucket',
-    projectKey: '',
-    repoSlug: '',
-    defaultBranch: 'main',
+    provider: "bitbucket",
+    projectKey: "",
+    repoSlug: "",
+    defaultBranch: "main",
     webhookSecret: null,
-  });
-  const [credentialsRef, setCredentialsRef] = useState<string | null>(null);
-  const [credentials, setCredentials] = useState<Credential[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  })
+  const [credentialsRef, setCredentialsRef] = useState<string | null>(null)
+  const [credentials, setCredentials] = useState<Credential[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    api.getCredentials(dto.provider).then(setCredentials).catch(() => setCredentials([]));
-  }, [dto.provider]);
+    onBusyChange?.(submitting)
+  }, [submitting, onBusyChange])
 
-  const discovery = useCreateRepoDiscovery(dto, setDto, credentialsRef, setError);
+  useEffect(() => {
+    api.getCredentials(dto.provider).then(setCredentials).catch(() => setCredentials([]))
+  }, [dto.provider])
+
+  const discovery = useCreateRepoDiscovery(dto, setDto, credentialsRef, setError)
 
   const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+    e.preventDefault()
+    setError(null)
     if (!credentialsRef) {
-      setError('Selecciona una credencial para continuar.');
-      return;
+      setError("Selecciona una credencial para continuar.")
+      return
     }
-    setSubmitting(true);
+    setSubmitting(true)
     api
       .createRepository({
         ...dto,
@@ -377,79 +434,91 @@ export function CreateRepo() {
         webhookSecret: dto.webhookSecret?.trim() || null,
         projectId: projectIdFromUrl ?? null,
       })
-      .then((r) => navigate(projectIdFromUrl ? `/projects/${projectIdFromUrl}` : `/repos/${r.id}`))
+      .then((r) => {
+        setSubmitting(false)
+        if (onSuccess) onSuccess(r)
+        else navigate(projectIdFromUrl ? `/projects/${projectIdFromUrl}` : `/repos/${r.id}`)
+      })
       .catch((e) => {
-        setError(e.message);
-        setSubmitting(false);
-      });
-  };
+        setError(e instanceof Error ? e.message : String(e))
+        setSubmitting(false)
+      })
+  }
 
-  const resetDtoKeys = () =>
-    setDto((x) => ({ ...x, projectKey: '', repoSlug: '', defaultBranch: 'main' }));
+  const resetDtoKeys = () => setDto((x) => ({ ...x, projectKey: "", repoSlug: "", defaultBranch: "main" }))
+
+  const cancelHref = projectIdFromUrl ? `/projects/${projectIdFromUrl}` : "/repos"
+
+  const formInner = (
+    <>
+      {error ? (
+        <Alert variant="destructive" className={cn(variant === "page" && "mb-4")}>
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      <form onSubmit={submit} className="space-y-5">
+        <CreateRepoProviderSelect
+          provider={dto.provider}
+          onProviderChange={(v) =>
+            setDto((x) => ({ ...x, provider: v, projectKey: "", repoSlug: "", defaultBranch: "main" }))
+          }
+          onCredentialReset={() => setCredentialsRef(null)}
+        />
+        <CreateRepoCredentialSelect
+          credentialsRef={credentialsRef}
+          credentials={credentials}
+          onCredentialChange={setCredentialsRef}
+          onDtoReset={resetDtoKeys}
+        />
+        {credentialsRef ? (
+          <CredentialsFormFields
+            dto={dto}
+            setDto={setDto}
+            provider={dto.provider}
+            workspaces={discovery.workspaces}
+            owners={discovery.owners}
+            repositories={discovery.repositories}
+            branches={discovery.branches}
+            loadingDiscovery={discovery.loadingDiscovery}
+          />
+        ) : null}
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button
+            type="submit"
+            className="h-11 rounded-xl"
+            disabled={submitting || !credentialsRef || !dto.projectKey || !dto.repoSlug}
+          >
+            {submitting ? "Creando…" : "Crear repositorio"}
+          </Button>
+          {onCancel ? (
+            <Button type="button" variant="outline" className="h-11 rounded-xl border-[var(--border)]" onClick={onCancel}>
+              Cancelar
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" className="h-11 rounded-xl border-[var(--border)]" asChild>
+              <Link to={cancelHref}>Cancelar</Link>
+            </Button>
+          )}
+        </div>
+      </form>
+    </>
+  )
+
+  if (variant === "dialog") {
+    return <div className="space-y-5">{formInner}</div>
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/repos">← Repos</Link>
-        </Button>
-      </div>
-
-      <Card className="max-w-md">
-        <CardHeader>
-          <CardTitle>Alta de repositorio</CardTitle>
-          <CardDescription>
-            Configura un nuevo repositorio para sincronizar con el grafo. Selecciona la credencial y
-            luego elige workspace, proyecto y branch.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <form onSubmit={submit} className="space-y-4">
-            <CreateRepoProviderSelect
-              provider={dto.provider}
-              onProviderChange={(v) =>
-                setDto((x) => ({ ...x, provider: v, projectKey: '', repoSlug: '', defaultBranch: 'main' }))
-              }
-              onCredentialReset={() => setCredentialsRef(null)}
-            />
-            <CreateRepoCredentialSelect
-              credentialsRef={credentialsRef}
-              credentials={credentials}
-              onCredentialChange={setCredentialsRef}
-              onDtoReset={resetDtoKeys}
-            />
-            {credentialsRef && (
-              <CredentialsFormFields
-                dto={dto}
-                setDto={setDto}
-                provider={dto.provider}
-                workspaces={discovery.workspaces}
-                owners={discovery.owners}
-                repositories={discovery.repositories}
-                branches={discovery.branches}
-                loadingDiscovery={discovery.loadingDiscovery}
-              />
-            )}
-            <div className="flex gap-2 pt-2">
-              <Button
-                type="submit"
-                disabled={submitting || !credentialsRef || !dto.projectKey || !dto.repoSlug}
-              >
-                {submitting ? 'Creando...' : 'Crear'}
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to="/projects">Cancelar</Link>
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
+    <Card className="max-w-lg border-[var(--border)] bg-[var(--card)] shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-[var(--foreground)]">Alta de repositorio</CardTitle>
+        <CardDescription className="text-[var(--foreground-muted)]">
+          Configura un nuevo repositorio para sincronizar con el grafo. Selecciona la credencial y luego elige
+          workspace, proyecto y branch.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>{formInner}</CardContent>
+    </Card>
+  )
 }

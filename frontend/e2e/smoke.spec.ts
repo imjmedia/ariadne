@@ -48,8 +48,8 @@ test.describe('smoke (auth bypass + API mock)', () => {
     await expect(page.getByRole('heading', { name: 'Proyectos' })).toBeVisible();
   });
 
-  test('muestra The Forge en /repos', async ({ page }) => {
+  test('muestra Repositorios en /repos', async ({ page }) => {
     await page.goto('/repos');
-    await expect(page.getByRole('heading', { name: 'The Forge' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Repositorios' })).toBeVisible();
   });
 });
