@@ -2,12 +2,13 @@
  * Sidebar lateral — estilo tipo panel SaaS: cabecera con colapsar, divisores,
  * activo con barra + tinte, duotone en iconos, submenús con guía vertical.
  */
-import { useState, forwardRef } from "react"
+import { useState, forwardRef, type ReactElement } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import type { Icon } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { AriadneLogo } from "@/components/brand/AriadneLogo"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 export interface SidebarLink {
   label: string
@@ -63,11 +64,32 @@ const RAIL_COLLAPSED_ACTIVE = cn(
   "bg-[var(--primary)] text-white",
 )
 
+/**
+ * Tooltip solo en rail colapsado; evita anidar providers y mantiene un solo disparador (asChild).
+ */
+function CollapsedNavTooltip(props: {
+  collapsed: boolean
+  label: string
+  children: ReactElement
+}) {
+  if (!props.collapsed) return props.children
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{props.children}</TooltipTrigger>
+      <TooltipContent side="right" align="center">
+        {props.label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 type SidebarLeafLinkRowProps = {
   item: SidebarLink
   collapsed: boolean
   pathname: string
   activeHref?: string
+  /** Texto del tooltip en rail colapsado (p. ej. "Gobierno · Dashboard"). Por defecto `item.label`. */
+  collapsedTooltip?: string
 }
 
 /** Single leaf nav row (no submenu) — shared by main list and footer. */
@@ -76,6 +98,7 @@ function SidebarLeafLinkRow({
   collapsed,
   pathname,
   activeHref,
+  collapsedTooltip,
 }: SidebarLeafLinkRowProps) {
   const active = activeHref ? activeHref === item.href : isRouteActive(pathname, item.href)
   const Icon = item.icon
@@ -146,10 +169,14 @@ function SidebarLeafLinkRow({
     </div>
   )
 
+  const tip = collapsedTooltip ?? item.label
+
   return collapsed ? (
-    <Link to={item.href} title={item.label} className="flex justify-center">
-      {NavItemContent}
-    </Link>
+    <CollapsedNavTooltip collapsed={collapsed} label={tip}>
+      <Link to={item.href} className="flex justify-center">
+        {NavItemContent}
+      </Link>
+    </CollapsedNavTooltip>
   ) : (
     <Link to={item.href}>{NavItemContent}</Link>
   )
@@ -227,18 +254,25 @@ export const SidebarModern = forwardRef<HTMLElement, SidebarModernProps>(
               )}
             </div>
             {collapsible && !collapsed ? (
-              <button
-                type="button"
-                onClick={toggleCollapse}
-                className={cn(
-                  "flex size-9 shrink-0 touch-manipulation items-center justify-center rounded-md",
-                  "text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)]",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]",
-                )}
-                aria-label="Colapsar barra lateral"
-              >
-                <PanelLeftClose className="size-5" strokeWidth={1.75} aria-hidden />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={toggleCollapse}
+                    className={cn(
+                      "flex size-9 shrink-0 touch-manipulation items-center justify-center rounded-md",
+                      "text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)]",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]",
+                    )}
+                    aria-label="Colapsar barra lateral"
+                  >
+                    <PanelLeftClose className="size-5" strokeWidth={1.75} aria-hidden />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end">
+                  Colapsar menú
+                </TooltipContent>
+              </Tooltip>
             ) : null}
           </div>
         </div>
@@ -247,14 +281,21 @@ export const SidebarModern = forwardRef<HTMLElement, SidebarModernProps>(
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto py-3">
           {collapsible && collapsed ? (
             <div className="flex justify-center px-2 pb-2">
-              <button
-                type="button"
-                onClick={toggleCollapse}
-                className={RAIL_COLLAPSED_IDLE}
-                aria-label="Expandir barra lateral"
-              >
-                <PanelLeftOpen className="size-5" strokeWidth={1.75} aria-hidden />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={toggleCollapse}
+                    className={RAIL_COLLAPSED_IDLE}
+                    aria-label="Expandir barra lateral"
+                  >
+                    <PanelLeftOpen className="size-5" strokeWidth={1.75} aria-hidden />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" align="center">
+                  Expandir menú
+                </TooltipContent>
+              </Tooltip>
             </div>
           ) : null}
           {groups.map((group, idx) => (
@@ -281,6 +322,10 @@ export const SidebarModern = forwardRef<HTMLElement, SidebarModernProps>(
                   const childActive = Boolean(
                     item.children?.some((c) => isRouteActive(location.pathname, c.href)),
                   )
+
+                  const navTooltipLabel = group.title
+                    ? `${group.title} · ${item.label}`
+                    : item.label
 
                   const leafHighlighted = !hasChildren && active
                   const parentHighlighted =
@@ -391,13 +436,20 @@ export const SidebarModern = forwardRef<HTMLElement, SidebarModernProps>(
                   return (
                     <div key={i}>
                       {hasChildren ? (
-                        <div className={collapsed ? "flex justify-center" : undefined}>{NavItemContent}</div>
-                      ) : collapsed ? (
-                        <Link to={item.href} title={item.label} className="flex justify-center">
-                          {NavItemContent}
-                        </Link>
+                        <CollapsedNavTooltip collapsed={collapsed} label={navTooltipLabel}>
+                          <div className={collapsed ? "flex justify-center" : undefined}>
+                            {NavItemContent}
+                          </div>
+                        </CollapsedNavTooltip>
                       ) : (
-                        <Link to={item.href}>{NavItemContent}</Link>
+                        <CollapsedNavTooltip collapsed={collapsed} label={navTooltipLabel}>
+                          <Link
+                            to={item.href}
+                            className={collapsed ? "flex justify-center" : undefined}
+                          >
+                            {NavItemContent}
+                          </Link>
+                        </CollapsedNavTooltip>
                       )}
 
                       {!collapsed && hasChildren && isMenuOpen && item.children ? (
@@ -444,6 +496,7 @@ export const SidebarModern = forwardRef<HTMLElement, SidebarModernProps>(
                   collapsed={collapsed}
                   pathname={location.pathname}
                   activeHref={activeHref}
+                  collapsedTooltip={item.label}
                 />
               ))}
             </div>

@@ -1,13 +1,6 @@
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { RepoDetailBackNav } from './RepoDetailBackNav';
 
-/** Cabecera del detalle de repo: enlace "← Repos". */
+/** Top navigation: back to repository list. */
 export function RepoDetailHeader() {
-  return (
-    <div className="flex items-center gap-2">
-      <Button variant="ghost" size="sm" asChild>
-        <Link to="/repos">← Repos</Link>
-      </Button>
-    </div>
-  );
+  return <RepoDetailBackNav />;
 }

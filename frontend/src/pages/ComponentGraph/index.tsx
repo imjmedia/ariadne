@@ -551,7 +551,7 @@ export function ComponentGraphExplorer() {
             <Skeleton className="h-7 w-56 rounded-lg" />
             <Skeleton className="h-4 w-full max-w-2xl rounded-lg" />
           </div>
-          <div className="mt-6 flex flex-wrap gap-4">
+          <div className="mt-6 flex flex-wrap items-end gap-4">
             <Skeleton className="h-11 w-full min-w-[200px] max-w-md flex-1 rounded-xl" />
             <Skeleton className="h-11 w-full min-w-[200px] max-w-md flex-1 rounded-xl" />
             <Skeleton className="h-11 w-20 rounded-xl" />
@@ -599,8 +599,8 @@ export function ComponentGraphExplorer() {
 
           {scopeOptions.length > 0 ? (
             <section className={panelClass}>
-              <div className="flex flex-wrap items-end gap-4">
-                <div className="min-w-[220px] flex-1 space-y-2">
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="min-w-0 flex-1 basis-[min(100%,20rem)] space-y-2">
                   <Label className="text-xs font-medium text-[var(--foreground-muted)]">Proyecto o repositorio</Label>
                   <Select
                     value={scopeKey || undefined}
@@ -657,21 +657,9 @@ export function ComponentGraphExplorer() {
                       )}
                     </SelectContent>
                   </Select>
-                  {selectedScope ? (
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      <span className="font-medium text-[var(--foreground)]">projectId</span>{' '}
-                      <span className="font-mono">{selectedScope.graphProjectId}</span>
-                    </p>
-                  ) : null}
-                  {graphProjectId && !selectedScope ? (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      El projectId de la URL no coincide con ningún proyecto o repo aislado en esta cuenta. Revisa el
-                      UUID o sincroniza el índice.
-                    </p>
-                  ) : null}
                 </div>
 
-                <div className="min-w-[200px] flex-1 space-y-2">
+                <div className="min-w-0 flex-1 basis-[min(100%,18rem)] space-y-2">
                   <Label htmlFor="comp-select" className="text-xs font-medium text-[var(--foreground-muted)]">
                     Componente
                   </Label>
@@ -710,7 +698,7 @@ export function ComponentGraphExplorer() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[5.5rem]">
                   <Label htmlFor="depth" className="text-xs font-medium text-[var(--foreground-muted)]">
                     Profundidad
                   </Label>
@@ -724,19 +712,40 @@ export function ComponentGraphExplorer() {
                       setDepth(e.target.value);
                       setErr(null);
                     }}
-                    className="h-11 w-20 rounded-xl border-[var(--border)] bg-[var(--card)]"
+                    className="h-11 w-full rounded-xl border-[var(--border)] bg-[var(--card)] sm:w-20"
                   />
                 </div>
 
-                <Button
-                  type="button"
-                  className="h-11 shrink-0 rounded-xl"
-                  onClick={() => void load()}
-                  disabled={loading || !selectedScope || viewMode === 'c4'}
-                >
-                  {loading ? 'Cargando…' : 'Cargar grafo'}
-                </Button>
+                <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:shrink-0">
+                  <Label className="pointer-events-none select-none opacity-0" aria-hidden="true">
+                    Profundidad
+                  </Label>
+                  <Button
+                    type="button"
+                    className="h-11 w-full shrink-0 rounded-xl sm:w-auto sm:min-w-[10.5rem]"
+                    onClick={() => void load()}
+                    disabled={loading || !selectedScope || viewMode === 'c4'}
+                  >
+                    {loading ? 'Cargando…' : 'Cargar grafo'}
+                  </Button>
+                </div>
               </div>
+
+              {selectedScope ? (
+                <p
+                  className="mt-3 truncate rounded-lg border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_14%,var(--card))] px-3 py-2 font-mono text-xs text-[var(--foreground-muted)]"
+                  title={selectedScope.graphProjectId}
+                >
+                  <span className="font-sans font-medium text-[var(--foreground)]">projectId</span>{' '}
+                  {selectedScope.graphProjectId}
+                </p>
+              ) : null}
+              {graphProjectId && !selectedScope ? (
+                <p className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-50">
+                  El projectId de la URL no coincide con ningún proyecto o repo aislado en esta cuenta. Revisa el UUID
+                  o sincroniza el índice.
+                </p>
+              ) : null}
             </section>
           ) : null}
 

@@ -6,7 +6,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Domain, Project, Repository } from '../types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +35,44 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Pencil, RefreshCw } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { ArchitecturePanel } from './ProjectDetail/ArchitecturePanel';
+
+const panelIntroClass = cn(
+  'rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm',
+  'transition-shadow duration-[var(--transition-base)] hover:shadow-md',
+);
+
+const sectionShellClass = cn(
+  'overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm',
+  'transition-shadow duration-[var(--transition-base)] hover:shadow-md',
+);
+
+const sectionHeaderClass = cn(
+  'border-b border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_26%,var(--card))]',
+  'px-5 py-4 sm:px-6',
+);
+
+const selectTriggerClass = cn(
+  'h-11 w-full min-w-[220px] max-w-md justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 shadow-none',
+  'text-left text-sm font-normal text-[var(--foreground)]',
+  'focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/18 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]',
+);
+
+const tabListClass = cn(
+  'inline-flex w-full max-w-md gap-1 rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_22%,var(--card))] p-1 sm:w-auto',
+);
+
+const monoFieldClass = cn(
+  'inline-flex min-h-9 max-w-full cursor-pointer items-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_35%,var(--card))]',
+  'px-3 py-1.5 font-mono text-xs text-[var(--foreground)] shadow-none transition-colors hover:bg-[color-mix(in_oklch,var(--muted)_45%,var(--card))]',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/18 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]',
+);
+
+const tabPillActiveClass =
+  'bg-[var(--card)] text-[var(--foreground)] shadow-sm ring-1 ring-[var(--border)]/80';
+const tabPillInactiveClass = 'text-[var(--foreground-muted)] hover:bg-[var(--card)]/40 hover:text-[var(--foreground)]';
 
 /** Modal para asociar un repo existente al proyecto. Extraído para reducir anidamiento en ProjectDetail. */
 function AssociateRepoDialog({
@@ -60,55 +96,72 @@ function AssociateRepoDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Asociar repositorio existente</DialogTitle>
-          <DialogDescription>
-            Elige un repo ya dado de alta en Ariadne. Se asociará a este proyecto sin crear otro webhook; seguirá sincronizándose con el mismo.
-          </DialogDescription>
-        </DialogHeader>
-        {associateError && (
-          <Alert variant="destructive">
-            <AlertDescription>{associateError}</AlertDescription>
-          </Alert>
+      <DialogContent
+        className={cn(
+          'max-h-[min(90vh,640px)] w-[calc(100%-1.5rem)] max-w-md gap-0 overflow-hidden p-0 sm:max-w-md',
+          'border-[var(--border)] bg-[var(--card)]',
         )}
-        {associateSuccess && (
-          <Alert className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
-            <AlertDescription>{associateSuccess}</AlertDescription>
-          </Alert>
-        )}
-        {loadingRepos ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Cargando repositorios…</div>
-        ) : availableRepos.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">
-            No hay repositorios disponibles para asociar (todos están ya en este proyecto o no hay otros registrados).
-          </p>
-        ) : (
-          <ul className="max-h-60 overflow-y-auto space-y-2 rounded-md border p-2">
-            {availableRepos.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-3 py-2">
-                <span className="font-medium text-sm truncate">
-                  {r.projectKey}/{r.repoSlug}
-                </span>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => onAssociate(r.id)}
-                  disabled={associatingId !== null}
+      >
+        <div className="border-b border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_22%,var(--card))] px-6 py-4 pr-12">
+          <DialogHeader className="space-y-2 text-left">
+            <DialogTitle className="text-lg font-semibold">Asociar repositorio existente</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed text-[var(--foreground-muted)]">
+              Elige un repo ya dado de alta en Ariadne. Se asociará a este proyecto sin crear otro webhook; seguirá
+              sincronizándose con el mismo.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className="space-y-4 overflow-y-auto px-6 py-5">
+          {associateError ? (
+            <Alert variant="destructive" className="rounded-xl">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{associateError}</AlertDescription>
+            </Alert>
+          ) : null}
+          {associateSuccess ? (
+            <Alert className="rounded-xl border-emerald-500/35 bg-emerald-500/10 text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-50">
+              <AlertTitle className="text-sm">Hecho</AlertTitle>
+              <AlertDescription>{associateSuccess}</AlertDescription>
+            </Alert>
+          ) : null}
+          {loadingRepos ? (
+            <div className="py-8 text-center text-sm text-[var(--foreground-muted)]">Cargando repositorios…</div>
+          ) : availableRepos.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_30%,transparent)] px-4 py-6 text-sm text-[var(--foreground-muted)]">
+              No hay repositorios disponibles para asociar (todos están ya en este proyecto o no hay otros
+              registrados).
+            </p>
+          ) : (
+            <ul className="max-h-60 space-y-2 overflow-y-auto rounded-xl border border-[var(--border)] p-2">
+              {availableRepos.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_20%,var(--card))] px-3 py-2.5"
                 >
-                  {associatingId === r.id ? 'Asociando…' : 'Asociar'}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <DialogFooter showCloseButton />
+                  <span className="truncate text-sm font-medium text-[var(--foreground)]">
+                    {r.projectKey}/{r.repoSlug}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-9 shrink-0 rounded-lg"
+                    onClick={() => onAssociate(r.id)}
+                    disabled={associatingId !== null}
+                  >
+                    {associatingId === r.id ? 'Asociando…' : 'Asociar'}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <DialogFooter showCloseButton className="border-t border-[var(--border)] px-6 py-3" />
       </DialogContent>
     </Dialog>
   );
 }
 
-/** Card de descripción editable. Extraído para reducir anidamiento en ProjectDetail. */
+/** Card de descripción editable. */
 function ProjectDetailDescriptionCard({
   description,
   editingDescription,
@@ -129,42 +182,53 @@ function ProjectDetailDescriptionCard({
   onSave: () => void;
 }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Descripción</CardTitle>
-        <CardDescription>Ej: solo ramas main, mixto (varias ramas), etc.</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
+    <section className={sectionShellClass} aria-labelledby="project-desc-heading">
+      <div className={sectionHeaderClass}>
+        <h2 id="project-desc-heading" className="text-base font-semibold text-[var(--foreground)]">
+          Descripción
+        </h2>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)] sm:text-sm">
+          Ej.: solo ramas main, mixto (varias ramas), convenciones del equipo, etc.
+        </p>
+      </div>
+      <div className="px-5 py-5 sm:px-6 sm:py-6">
         {editingDescription ? (
-          <div className="space-y-2">
-            <textarea
+          <div className="space-y-4">
+            <Textarea
               value={descriptionDraft}
               onChange={(e) => onDraftChange(e.target.value)}
-              placeholder="Ej: Repositorios en rama main. / Proyecto mixto: front en main, back en develop."
-              rows={3}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Ej.: Repositorios en rama main. / Proyecto mixto: front en main, back en develop."
+              rows={4}
+              className={cn(
+                'min-h-[6.5rem] w-full resize-y rounded-xl border-[var(--border)] bg-[var(--card)] text-sm',
+                'focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/18 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]',
+              )}
             />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={onSave} disabled={savingDescription}>
+            <div className="flex flex-wrap gap-2">
+              <Button className="h-11 rounded-xl" onClick={onSave} disabled={savingDescription}>
                 {savingDescription ? 'Guardando…' : 'Guardar'}
               </Button>
-              <Button size="sm" variant="outline" onClick={onCancelEdit} disabled={savingDescription}>
+              <Button variant="outline" className="h-11 rounded-xl" onClick={onCancelEdit} disabled={savingDescription}>
                 Cancelar
               </Button>
             </div>
           </div>
         ) : (
-          <div className="flex items-start justify-between gap-4">
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap min-h-[1.5rem]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <p className="min-h-[1.5rem] flex-1 whitespace-pre-wrap text-sm leading-relaxed text-[var(--foreground-muted)]">
               {description || 'Sin descripción.'}
             </p>
-            <Button variant="ghost" size="sm" onClick={onStartEdit} className="shrink-0">
+            <Button
+              variant="outline"
+              className="h-10 shrink-0 self-start rounded-xl border-[var(--border)] px-4 sm:self-auto"
+              onClick={onStartEdit}
+            >
               {description ? 'Editar' : 'Añadir descripción'}
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -197,21 +261,30 @@ export function ProjectDetail() {
   const [detailTab, setDetailTab] = useState<'general' | 'architecture'>('general');
   const [domains, setDomains] = useState<Domain[]>([]);
   const [savingDomain, setSavingDomain] = useState(false);
+  const [refreshingProject, setRefreshingProject] = useState(false);
 
-  const fetchProject = useCallback(() => {
-    if (!id) return;
-    api.getProject(id).then(setProject).catch((e) => setError(e.message));
+  const fetchProject = useCallback((): Promise<void> => {
+    if (!id) return Promise.resolve();
+    return api
+      .getProject(id)
+      .then((projectData) => {
+        setProject(projectData);
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [id]);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    api
-      .getProject(id)
-      .then(setProject)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [id]);
+    void fetchProject().finally(() => setLoading(false));
+  }, [id, fetchProject]);
+
+  const handleRefreshProject = useCallback(() => {
+    if (!id) return;
+    setRefreshingProject(true);
+    void fetchProject().finally(() => setRefreshingProject(false));
+  }, [id, fetchProject]);
 
   useEffect(() => {
     api
@@ -389,8 +462,7 @@ export function ProjectDetail() {
     setError(null);
     try {
       await api.updateProject(id, { domainId });
-      const updated = await api.getProject(id);
-      setProject(updated);
+      await fetchProject();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al asignar dominio');
     } finally {
@@ -416,17 +488,37 @@ export function ProjectDetail() {
   if (!id) return null;
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40 w-full" />
+      <div className="mx-auto max-w-5xl space-y-6 pb-10">
+        <div className={tabListClass} aria-hidden>
+          <Skeleton className="h-10 flex-1 rounded-xl sm:flex-none sm:w-28" />
+          <Skeleton className="h-10 flex-1 rounded-xl sm:flex-none sm:w-36" />
+        </div>
+        <div className={panelIntroClass}>
+          <Skeleton className="h-9 w-2/3 max-w-md" />
+          <Skeleton className="mt-4 h-4 w-48" />
+          <Skeleton className="mt-6 h-11 w-full max-w-lg" />
+        </div>
+        <div className={sectionShellClass}>
+          <div className={sectionHeaderClass}>
+            <Skeleton className="h-5 w-40" />
+          </div>
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-24 w-full" />
+          </div>
+        </div>
       </div>
     );
   }
-  if (error || !project) {
+  if (!project) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Proyecto</h1>
-        <Alert variant="destructive">
+      <div className="mx-auto max-w-5xl space-y-6 pb-10">
+        <div className={panelIntroClass}>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Proyecto</h1>
+          <p className="mt-2 text-sm leading-relaxed text-[var(--foreground-muted)]">
+            No se pudo cargar el proyecto o no existe.
+          </p>
+        </div>
+        <Alert variant="destructive" className="rounded-2xl">
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error || 'Proyecto no encontrado'}</AlertDescription>
         </Alert>
@@ -434,117 +526,36 @@ export function ProjectDetail() {
     );
   }
 
-  const displayName = project.name || project.repositories[0]?.projectKey + '/' + project.repositories[0]?.repoSlug || id.slice(0, 8);
+  const firstRepo = project.repositories[0];
+  const displayName =
+    (project.name && project.name.trim()) ||
+    (firstRepo ? `${firstRepo.projectKey}/${firstRepo.repoSlug}` : '') ||
+    id.slice(0, 8);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-2">
-        <Button
+    <div className="mx-auto max-w-5xl space-y-6 pb-10">
+      <nav className={tabListClass} aria-label="Secciones del proyecto">
+        <button
           type="button"
-          variant={detailTab === 'general' ? 'default' : 'outline'}
-          size="sm"
           onClick={() => setDetailTab('general')}
+          className={cn(
+            'flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:min-w-[8rem]',
+            detailTab === 'general' ? tabPillActiveClass : tabPillInactiveClass,
+          )}
         >
           General
-        </Button>
-        <Button
+        </button>
+        <button
           type="button"
-          variant={detailTab === 'architecture' ? 'default' : 'outline'}
-          size="sm"
           onClick={() => setDetailTab('architecture')}
+          className={cn(
+            'flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:min-w-[9rem]',
+            detailTab === 'architecture' ? tabPillActiveClass : tabPillInactiveClass,
+          )}
         >
           Arquitectura
-        </Button>
-      </div>
-
-      {detailTab === 'architecture' && id ? (
-        <ArchitecturePanel project={project} projectId={id} onProjectUpdated={fetchProject} />
-      ) : null}
-
-      {detailTab === 'general' ? (
-    <div className="space-y-6">
-      <div className="flex flex-row items-end justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            {editingName ? (
-              <input
-                type="text"
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveName();
-                  if (e.key === 'Escape') {
-                    setEditingName(false);
-                    setNameDraft('');
-                  }
-                }}
-                onBlur={() => saveName()}
-                disabled={savingName}
-                className="text-2xl font-bold tracking-tight border rounded px-2 py-1 w-full max-w-md focus:outline-none focus:ring-2 focus:ring-ring"
-                autoFocus
-              />
-            ) : (
-              <>
-                <h1 className="text-2xl font-bold tracking-tight">{displayName}</h1>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 size-8 text-muted-foreground hover:text-foreground"
-                  onClick={startEditName}
-                  title="Editar nombre del proyecto"
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              </>
-            )}
-          </div>
-          <p className="text-muted-foreground mt-1">
-            {project.repositories.length} repositorio{project.repositories.length !== 1 ? 's' : ''} en este proyecto
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground text-xs">ID (MCP):</span>
-            <code
-              role="button"
-              tabIndex={0}
-              onClick={() => id && navigator.clipboard.writeText(id)}
-              onKeyDown={(e) => e.key === 'Enter' && id && navigator.clipboard.writeText(id)}
-              title="Clic para copiar"
-              className="select-text cursor-pointer rounded bg-muted px-1.5 py-0.5 text-xs font-mono hover:bg-muted/80"
-            >
-              {id}
-            </code>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0"
-              onClick={regenerateProjectId}
-              disabled={regeneratingProjectId}
-              title="Regenerar ID del proyecto (sin perder datos)"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${regeneratingProjectId ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild>
-            <Link to={`/projects/${id}/chat`}>Chat (proyecto)</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to={`/repos?openCreate=1&projectId=${id}`}>Repositorio nuevo</Link>
-          </Button>
-          <Button variant="outline" onClick={() => setAssociateDialogOpen(true)}>
-            Asociar repo existente
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={deleteProject}
-            disabled={deletingProject}
-            title="Eliminar proyecto; los repos quedarán sin proyecto"
-          >
-            {deletingProject ? 'Eliminando…' : 'Eliminar proyecto'}
-          </Button>
-        </div>
-      </div>
+        </button>
+      </nav>
 
       <AssociateRepoDialog
         open={associateDialogOpen}
@@ -557,147 +568,301 @@ export function ProjectDetail() {
         onAssociate={associateRepo}
       />
 
-      <ProjectDetailDescriptionCard
-        description={project.description}
-        editingDescription={editingDescription}
-        descriptionDraft={descriptionDraft}
-        savingDescription={savingDescription}
-        onStartEdit={startEditDescription}
-        onCancelEdit={cancelEditDescription}
-        onDraftChange={setDescriptionDraft}
-        onSave={saveDescription}
-      />
+      {error ? (
+        <Alert variant="destructive" className="rounded-2xl">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Dominio (gobierno C4)</CardTitle>
-          <CardDescription>
-            FK estructural en BD: el proyecto pertenece a un dominio. Afecta coloración, whitelist de grafos y visibilidad
-            entre dominios.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-4 items-end pt-0">
-          <div className="space-y-1 min-w-[220px]">
-            <Label htmlFor="proj-domain">Dominio</Label>
-            <Select
-              value={project.domainId ?? '__none__'}
-              onValueChange={(v) => void saveProjectDomain(v === '__none__' ? null : v)}
-              disabled={savingDomain || domains.length === 0}
-            >
-              <SelectTrigger id="proj-domain">
-                <SelectValue placeholder={domains.length === 0 ? 'Crea dominios primero' : 'Sin dominio'} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">(ninguno)</SelectItem>
-                {domains.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="inline-block size-3 rounded border"
-                        style={{ backgroundColor: d.color }}
-                      />
-                      {d.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button variant="link" className="text-xs h-auto p-0" asChild>
-            <Link to="/domains">Gestionar dominios</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      {detailTab === 'architecture' && id ? (
+        <ArchitecturePanel
+          project={project}
+          projectId={id}
+          onProjectUpdated={() => {
+            void fetchProject();
+          }}
+        />
+      ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Repositorios</CardTitle>
-          <CardDescription>
-            Chat, índice y análisis por repo; grafo común al proyecto. Rol (p. ej. frontend, backend): inferencia
-            de alcance en chat multi-root.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {project.repositories.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
-              <p className="text-muted-foreground">Sin repositorios. Añade uno nuevo o asocia uno ya registrado.</p>
-              <div className="flex gap-2">
-                <Button asChild>
-                  <Link to={`/repos?openCreate=1&projectId=${id}`}>Repositorio nuevo</Link>
-                </Button>
-                <Button variant="outline" onClick={() => setAssociateDialogOpen(true)}>
-                  Asociar repo existente
+      {detailTab === 'general' ? (
+        <div className="space-y-6">
+          <div className={panelIntroClass}>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {editingName ? (
+                  <Input
+                    type="text"
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void saveName();
+                      if (e.key === 'Escape') {
+                        setEditingName(false);
+                        setNameDraft('');
+                      }
+                    }}
+                    onBlur={() => void saveName()}
+                    disabled={savingName}
+                    className="h-11 max-w-xl rounded-xl border-[var(--border)] bg-[var(--card)] text-xl font-bold tracking-tight text-[var(--foreground)]"
+                    autoFocus
+                  />
+                ) : (
+                  <>
+                    <h1 className="min-w-0 break-words text-2xl font-bold tracking-tight text-[var(--foreground)] sm:text-3xl">
+                      {displayName}
+                    </h1>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="size-10 shrink-0 rounded-xl border-[var(--border)]"
+                      onClick={startEditName}
+                      title="Editar nombre del proyecto"
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              <p className="text-sm text-[var(--foreground-muted)]">
+                {project.repositories.length} repositorio{project.repositories.length !== 1 ? 's' : ''} en este
+                proyecto
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-medium text-[var(--foreground-muted)]">ID (MCP)</span>
+                <code
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void navigator.clipboard.writeText(id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void navigator.clipboard.writeText(id);
+                  }}
+                  title="Clic para copiar"
+                  className={cn(monoFieldClass, 'select-text')}
+                >
+                  {id}
+                </code>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="size-9 shrink-0 rounded-xl border-[var(--border)]"
+                  onClick={regenerateProjectId}
+                  disabled={regeneratingProjectId}
+                  title="Regenerar ID del proyecto (sin perder datos)"
+                >
+                  <RefreshCw className={`size-4 ${regeneratingProjectId ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Repo</TableHead>
-                  <TableHead className="min-w-[8rem]">Rol (chat)</TableHead>
-                  <TableHead>Rama</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Último sync</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {project.repositories.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>
-                      <Link to={`/repos/${r.id}`} className="font-medium hover:underline">
-                        {r.projectKey}/{r.repoSlug}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        key={`${r.id}-${r.role ?? ''}`}
-                        className="h-8 max-w-[10rem] text-xs font-mono"
-                        placeholder="p. ej. frontend"
-                        defaultValue={r.role ?? ''}
-                        disabled={roleSavingRepoId === r.id}
-                        onBlur={(e) => {
-                          const v = e.target.value;
-                          if ((v.trim() || '') === (r.role ?? '')) return;
-                          void saveRepoRole(r.id, v);
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {r.defaultBranch || '—'}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={r.status as 'pending' | 'syncing' | 'ready' | 'error'} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {r.lastSyncAt ? new Date(r.lastSyncAt).toLocaleString() : '—'}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void resyncEntireProject()}
-                        disabled={resyncProjectBusy}
-                        title="Reindexar todos los repositorios de este proyecto en Falkor (desde cualquier fila)"
-                      >
-                        {resyncProjectBusy ? 'Encolando…' : 'Resync (proyecto)'}
-                      </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/repos/${r.id}/chat`}>Chat (repo)</Link>
-                      </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/repos/${r.id}`}>Detalle</Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-5">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-11 shrink-0 rounded-xl border-[var(--border)]"
+                onClick={handleRefreshProject}
+                disabled={refreshingProject}
+                title="Recargar datos del proyecto"
+              >
+                <RefreshCw className={`size-4 ${refreshingProject ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button className="h-11 rounded-xl" asChild>
+                <Link to={`/projects/${id}/chat`}>Chat (proyecto)</Link>
+              </Button>
+              <Button className="h-11 rounded-xl" variant="outline" asChild>
+                <Link to={`/repos?openCreate=1&projectId=${id}`}>Repositorio nuevo</Link>
+              </Button>
+              <Button
+                type="button"
+                className="h-11 rounded-xl"
+                variant="outline"
+                onClick={() => setAssociateDialogOpen(true)}
+              >
+                Asociar repo existente
+              </Button>
+              <Button
+                type="button"
+                className="h-11 rounded-xl"
+                variant="destructive"
+                onClick={deleteProject}
+                disabled={deletingProject}
+                title="Eliminar proyecto; los repos quedarán sin proyecto"
+              >
+                {deletingProject ? 'Eliminando…' : 'Eliminar proyecto'}
+              </Button>
+            </div>
+          </div>
+
+          <ProjectDetailDescriptionCard
+            description={project.description}
+            editingDescription={editingDescription}
+            descriptionDraft={descriptionDraft}
+            savingDescription={savingDescription}
+            onStartEdit={startEditDescription}
+            onCancelEdit={cancelEditDescription}
+            onDraftChange={setDescriptionDraft}
+            onSave={saveDescription}
+          />
+
+          <section className={sectionShellClass} aria-labelledby="project-domain-heading">
+            <div className={sectionHeaderClass}>
+              <h2 id="project-domain-heading" className="text-base font-semibold text-[var(--foreground)]">
+                Dominio (gobierno C4)
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)] sm:text-sm">
+                FK estructural en BD: el proyecto pertenece a un dominio. Afecta coloración, whitelist de grafos y
+                visibilidad entre dominios.
+              </p>
+            </div>
+            <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:px-6 sm:py-6">
+              <div className="min-w-0 space-y-2 sm:min-w-[220px]">
+                <Label htmlFor="proj-domain" className="text-xs font-medium text-[var(--foreground-muted)]">
+                  Dominio
+                </Label>
+                <Select
+                  value={project.domainId ?? '__none__'}
+                  onValueChange={(v) => void saveProjectDomain(v === '__none__' ? null : v)}
+                  disabled={savingDomain || domains.length === 0}
+                >
+                  <SelectTrigger id="proj-domain" className={selectTriggerClass}>
+                    <SelectValue placeholder={domains.length === 0 ? 'Crea dominios primero' : 'Sin dominio'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">(ninguno)</SelectItem>
+                    {domains.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="inline-block size-3 rounded border"
+                            style={{ backgroundColor: d.color }}
+                          />
+                          {d.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="link"
+                className="h-auto self-center px-0 text-sm font-medium text-[var(--foreground)] underline-offset-4 hover:underline sm:self-auto"
+                asChild
+              >
+                <Link to="/domains">Gestionar dominios</Link>
+              </Button>
+            </div>
+          </section>
+
+          <section className={sectionShellClass} aria-labelledby="project-repos-heading">
+            <div className={sectionHeaderClass}>
+              <h2 id="project-repos-heading" className="text-base font-semibold text-[var(--foreground)]">
+                Repositorios
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)] sm:text-sm">
+                Chat, índice y análisis por repo; grafo común al proyecto. Rol (p. ej. frontend, backend): inferencia
+                de alcance en chat multi-root.
+              </p>
+            </div>
+            <div className="px-5 py-5 sm:px-6 sm:py-6">
+              {project.repositories.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_18%,var(--card))] px-4 py-10 text-center">
+                  <p className="max-w-md text-sm text-[var(--foreground-muted)]">
+                    Sin repositorios. Añade uno nuevo o asocia uno ya registrado.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button className="h-11 rounded-xl" asChild>
+                      <Link to={`/repos?openCreate=1&projectId=${id}`}>Repositorio nuevo</Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-11 rounded-xl"
+                      variant="outline"
+                      onClick={() => setAssociateDialogOpen(true)}
+                    >
+                      Asociar repo existente
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-[var(--border)] hover:bg-transparent">
+                        <TableHead className="text-[var(--foreground-muted)]">Repo</TableHead>
+                        <TableHead className="min-w-[8rem] text-[var(--foreground-muted)]">Rol (chat)</TableHead>
+                        <TableHead className="text-[var(--foreground-muted)]">Rama</TableHead>
+                        <TableHead className="text-[var(--foreground-muted)]">Estado</TableHead>
+                        <TableHead className="text-[var(--foreground-muted)]">Último sync</TableHead>
+                        <TableHead className="text-right text-[var(--foreground-muted)]">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {project.repositories.map((r) => (
+                        <TableRow key={r.id} className="border-[var(--border)]">
+                          <TableCell>
+                            <Link
+                              to={`/repos/${r.id}`}
+                              className="font-medium text-[var(--foreground)] hover:underline"
+                            >
+                              {r.projectKey}/{r.repoSlug}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              key={`${r.id}-${r.role ?? ''}`}
+                              className="h-10 max-w-[10rem] rounded-xl border-[var(--border)] bg-[var(--card)] text-xs font-mono"
+                              placeholder="p. ej. frontend"
+                              defaultValue={r.role ?? ''}
+                              disabled={roleSavingRepoId === r.id}
+                              onBlur={(e) => {
+                                const v = e.target.value;
+                                if ((v.trim() || '') === (r.role ?? '')) return;
+                                void saveRepoRole(r.id, v);
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell className="font-mono text-sm text-[var(--foreground-muted)]">
+                            {r.defaultBranch || '—'}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={r.status as 'pending' | 'syncing' | 'ready' | 'error'} />
+                          </TableCell>
+                          <TableCell className="text-[var(--foreground-muted)]">
+                            {r.lastSyncAt ? new Date(r.lastSyncAt).toLocaleString() : '—'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg"
+                                onClick={() => void resyncEntireProject()}
+                                disabled={resyncProjectBusy}
+                                title="Reindexar todos los repositorios de este proyecto en Falkor (desde cualquier fila)"
+                              >
+                                {resyncProjectBusy ? 'Encolando…' : 'Resync (proyecto)'}
+                              </Button>
+                              <Button variant="outline" size="sm" className="rounded-lg" asChild>
+                                <Link to={`/repos/${r.id}/chat`}>Chat (repo)</Link>
+                              </Button>
+                              <Button variant="outline" size="sm" className="rounded-lg" asChild>
+                                <Link to={`/repos/${r.id}`}>Detalle</Link>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       ) : null}
     </div>
   );

@@ -113,38 +113,71 @@ export function RepoList() {
 
   const columns = useMemo<ColumnDef<Repository>[]>(
     () => [
-      { accessorKey: "provider", header: "Provider", cell: (info) => info.getValue<string>() },
-      { accessorKey: "projectKey", header: "Project", cell: (info) => info.getValue<string>() },
-      { accessorKey: "repoSlug", header: "Repo", cell: (info) => info.getValue<string>() },
-      { accessorKey: "defaultBranch", header: "Branch" },
+      {
+        accessorKey: "provider",
+        header: "Provider",
+        cell: (info) => (
+          <span className="font-mono text-xs capitalize text-[var(--foreground)]">{info.getValue<string>()}</span>
+        ),
+      },
+      {
+        accessorKey: "projectKey",
+        header: "Project",
+        cell: (info) => {
+          const value = info.getValue<string>();
+          return <span className="font-mono text-sm text-[var(--foreground)]">{value}</span>;
+        },
+      },
+      {
+        accessorKey: "repoSlug",
+        header: "Repo",
+        cell: (info) => {
+          const value = info.getValue<string>();
+          return <span className="font-mono text-sm text-[var(--foreground)]">{value}</span>;
+        },
+      },
+      {
+        accessorKey: "defaultBranch",
+        header: "Branch",
+        cell: (info) => (
+          <span className="font-mono text-sm text-[var(--foreground-muted)]">{info.getValue<string>() || "—"}</span>
+        ),
+      },
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+        cell: ({ row }) => (
+          <div className="flex items-center">
+            <StatusBadge status={row.original.status} />
+          </div>
+        ),
       },
       {
         accessorKey: "id",
-        header: "Project ID (MCP)",
-        cell: ({ row }) => (
-          <code
-            role="button"
-            tabIndex={0}
-            onClick={() => void navigator.clipboard.writeText(row.original.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void navigator.clipboard.writeText(row.original.id)
-            }}
-            title="Clic para copiar"
-            className="block max-w-[min(100%,320px)] cursor-pointer select-text truncate rounded-lg bg-[var(--muted)] px-1.5 py-0.5 font-mono text-xs hover:bg-[color-mix(in_oklch,var(--muted)_85%,var(--foreground))]"
-          >
-            {row.original.id}
-          </code>
-        ),
+        header: "ID (MCP)",
+        cell: ({ row }) => {
+          const repoId = row.original.id;
+          return (
+            <code
+              role="button"
+              tabIndex={0}
+              onClick={() => void navigator.clipboard.writeText(repoId)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void navigator.clipboard.writeText(repoId);
+              }}
+              title={`${repoId} — clic para copiar`}
+              className="cursor-pointer rounded-md border border-transparent bg-[color-mix(in_oklch,var(--muted)_38%,var(--card))] px-1.5 py-0.5 font-mono text-xs text-[var(--foreground)] transition-colors hover:border-[var(--border)] hover:bg-[color-mix(in_oklch,var(--muted)_55%,var(--card))]"
+            >
+              {repoId}
+            </code>
+          );
+        },
       },
       {
         accessorKey: "lastSyncAt",
         header: "Último sync",
         cell: ({ row }) => (
-          <span className="text-[var(--foreground-muted)]">
+          <span className="font-mono text-xs text-[var(--foreground-muted)]">
             {row.original.lastSyncAt ? new Date(row.original.lastSyncAt).toLocaleString() : "—"}
           </span>
         ),
@@ -152,41 +185,49 @@ export function RepoList() {
       {
         id: "actions",
         header: "",
+        meta: {
+          cellClassName: "text-right",
+        },
         cell: ({ row }) => {
-          const r = row.original
+          const r = row.original;
+          const compactBtn =
+            "h-7 shrink-0 rounded-md px-1.5 text-[11px] font-medium leading-none";
           return (
-            <div className="flex flex-wrap justify-end gap-1.5">
-              <Button variant="outline" size="sm" className="h-9 rounded-xl border-[var(--border)]" asChild>
+            <div className="flex flex-nowrap items-center justify-end gap-0.5">
+              <Button variant="outline" size="sm" className={cn(compactBtn, "border-[var(--border)]")} asChild>
                 <Link to={`/repos/${r.id}`}>Ver</Link>
               </Button>
-              <Button variant="ghost" size="sm" className="h-9 rounded-xl" asChild>
+              <Button variant="outline" size="sm" className={cn(compactBtn, "border-[var(--border)]")} asChild>
                 <Link to={`/repos/${r.id}/edit`}>Editar</Link>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 rounded-xl border-[var(--border)]"
+                className={cn(compactBtn, "border-[var(--border)]")}
                 disabled={resyncingId === r.id || deletingId === r.id}
                 onClick={() => setResyncTarget(r)}
               >
                 {resyncingId === r.id ? "Resync…" : "Resync"}
               </Button>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="h-9 rounded-xl text-[var(--destructive)] hover:text-[var(--destructive)]"
+                className={cn(
+                  compactBtn,
+                  "border-[color-mix(in_oklch,var(--destructive)_45%,var(--border))] text-[var(--destructive)] hover:bg-[color-mix(in_oklch,var(--destructive)_10%,transparent)]",
+                )}
                 disabled={deletingId === r.id || resyncingId === r.id}
                 onClick={() => setDeleteTarget(r)}
               >
                 {deletingId === r.id ? "…" : "Eliminar"}
               </Button>
             </div>
-          )
+          );
         },
       },
     ],
     [deletingId, resyncingId],
-  )
+  );
 
   return (
     <div className="space-y-10">
@@ -257,7 +298,7 @@ export function RepoList() {
             <div className="min-w-0">
               <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">Repositorios</h2>
               <p className="mt-1 text-sm text-[var(--foreground-muted)]">
-                {repos.length} repositorio{repos.length !== 1 ? "s" : ""} registrados
+                {repos.length === 1 ? "1 repositorio registrado" : `${repos.length} repositorios registrados`}
               </p>
             </div>
             <Button
@@ -304,7 +345,7 @@ export function RepoList() {
                 columns={columns}
                 data={repos}
                 filterPlaceholder="Filtrar por provider, proyecto, repo, branch, estado o ID…"
-                tableClassName="overflow-x-auto"
+                tableClassName="min-w-0"
               />
             )}
           </div>

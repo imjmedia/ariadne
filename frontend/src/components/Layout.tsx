@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { SidebarModern, type SidebarGroup, type SidebarLink } from './layout/SidebarModern';
 import { Button } from '@/components/ui/button';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppShellHeader } from '@/components/AppShellHeader';
 import { getActiveNavHref } from '@/lib/nav';
 import { getUser } from '@/utils/auth';
@@ -80,6 +81,7 @@ export function Layout() {
   const sidebarFooterNav = buildSidebarFooterNav();
 
   return (
+    <TooltipProvider>
     <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-[var(--background)]">
       <SidebarModern
         groups={navigationGroups}
@@ -132,5 +134,6 @@ export function Layout() {
         </main>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

@@ -41,6 +41,19 @@ const panelClass = cn(
   "transition-shadow duration-[var(--transition-base)] hover:shadow-md",
 )
 
+/** Tabla de jobs: ancho según contenido + scroll (misma idea que lista de repos). */
+const jobsTableWrapClass =
+  "min-w-0 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--card)]/50"
+
+const jobsTh = cn(
+  "whitespace-nowrap px-2 py-2 text-left align-middle text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]",
+)
+
+const jobsTd = "align-middle px-2 py-1.5 text-sm"
+
+const jobActionBtn =
+  "inline-flex h-7 shrink-0 items-center justify-center gap-0.5 rounded-md border px-2 text-[11px] font-medium leading-none"
+
 function isActiveStatus(s: string): boolean {
   return s === "queued" || s === "running"
 }
@@ -439,11 +452,11 @@ export function ActiveJobsQueue() {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
-                <Table>
+              <div className={jobsTableWrapClass}>
+                <Table className="w-max max-w-none">
                   <TableHeader>
                     <TableRow className="border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_55%,transparent)] hover:bg-[color-mix(in_oklch,var(--muted)_55%,transparent)]">
-                      <TableHead className="w-10">
+                      <TableHead className="w-10 px-2 py-2 align-middle">
                         <input
                           type="checkbox"
                           checked={allSelectableSelected}
@@ -457,27 +470,13 @@ export function ActiveJobsQueue() {
                           className="rounded border-[var(--border)]"
                         />
                       </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Estado
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Repositorio
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Tipo
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Inicio
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Fin
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Auditoría / progreso
-                      </TableHead>
-                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
-                        Acciones
-                      </TableHead>
+                      <TableHead className={jobsTh}>Estado</TableHead>
+                      <TableHead className={jobsTh}>Repositorio</TableHead>
+                      <TableHead className={jobsTh}>Tipo</TableHead>
+                      <TableHead className={jobsTh}>Inicio</TableHead>
+                      <TableHead className={jobsTh}>Fin</TableHead>
+                      <TableHead className={cn(jobsTh, "min-w-[12rem]")}>Auditoría / progreso</TableHead>
+                      <TableHead className={cn(jobsTh, "min-w-[11rem] text-right")}>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -493,7 +492,7 @@ export function ActiveJobsQueue() {
                       const repoLabel = `${j.repository.projectKey}/${j.repository.repoSlug}`
                       return (
                         <TableRow key={j.id} className="border-[var(--border)]">
-                          <TableCell>
+                          <TableCell className={cn(jobsTd, "w-10")}>
                             <input
                               type="checkbox"
                               checked={selectedJobIds.has(j.id)}
@@ -507,30 +506,33 @@ export function ActiveJobsQueue() {
                               className="rounded border-[var(--border)]"
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className={jobsTd}>
                             <StatusBadge status={j.status} />
                           </TableCell>
-                          <TableCell className="min-w-[10rem]">
-                            <div className="font-mono text-sm text-[var(--foreground)]">{repoLabel}</div>
-                            {j.repository.defaultBranch?.trim() ? (
-                              <div className="mt-0.5 text-xs text-[var(--foreground-muted)]">
-                                {j.repository.defaultBranch}
-                              </div>
-                            ) : null}
+                          <TableCell className={jobsTd}>
+                            <div className="whitespace-nowrap font-mono text-sm text-[var(--foreground)]">
+                              <span>{repoLabel}</span>
+                              {j.repository.defaultBranch?.trim() ? (
+                                <span className="text-[var(--foreground-muted)]">
+                                  {" "}
+                                  · {j.repository.defaultBranch}
+                                </span>
+                              ) : null}
+                            </div>
                             {scope ? (
-                              <div className="mt-0.5 text-xs text-[var(--foreground-muted)]">
+                              <div className="mt-0.5 whitespace-nowrap font-mono text-[10px] text-[var(--foreground-muted)]">
                                 Solo proyecto: {scope}
                               </div>
                             ) : null}
                           </TableCell>
-                          <TableCell className="capitalize text-[var(--foreground)]">{j.type}</TableCell>
-                          <TableCell className="whitespace-nowrap text-sm text-[var(--foreground-muted)]">
+                          <TableCell className={cn(jobsTd, "whitespace-nowrap capitalize")}>{j.type}</TableCell>
+                          <TableCell className={cn(jobsTd, "whitespace-nowrap font-mono text-xs text-[var(--foreground-muted)]")}>
                             {new Date(j.startedAt).toLocaleString()}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap text-sm text-[var(--foreground-muted)]">
+                          <TableCell className={cn(jobsTd, "whitespace-nowrap font-mono text-xs text-[var(--foreground-muted)]")}>
                             {j.finishedAt ? new Date(j.finishedAt).toLocaleString() : "—"}
                           </TableCell>
-                          <TableCell className="max-w-[28rem] text-sm">
+                          <TableCell className={cn(jobsTd, "min-w-[14rem] align-top text-[var(--foreground)]")}>
                             {active && prog && (
                               <span className="text-[var(--foreground-muted)]">{prog}</span>
                             )}
@@ -538,8 +540,8 @@ export function ActiveJobsQueue() {
                               <span className="text-[var(--foreground-muted)]">En proceso…</span>
                             )}
                             {!active && j.status === "completed" && (
-                              <div className="space-y-1">
-                                <div className="text-[var(--foreground)]">{audit.summary}</div>
+                              <div className="space-y-1.5">
+                                <div className="whitespace-nowrap text-sm text-[var(--foreground)]">{audit.summary}</div>
                                 {showIndexed && (
                                   <details className="text-xs text-[var(--foreground-muted)]">
                                     <summary className="cursor-pointer select-none hover:underline">
@@ -578,7 +580,7 @@ export function ActiveJobsQueue() {
                               <span className="break-words text-xs text-[var(--destructive)]">{audit.errorLine}</span>
                             )}
                             {j.type === "full" && (
-                              <div className="mt-1">
+                              <div className="mt-1.5">
                                 <Button
                                   variant="link"
                                   size="sm"
@@ -592,13 +594,16 @@ export function ActiveJobsQueue() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap text-right">
-                            <div className="flex flex-wrap justify-end gap-1.5">
+                          <TableCell className={cn(jobsTd, "text-right align-middle")}>
+                            <div className="flex flex-nowrap items-center justify-end gap-1">
                               {active && (j.status === "queued" || j.status === "running") && (
                                 <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  className="h-9 rounded-xl"
+                                  type="button"
+                                  variant="outline"
+                                  className={cn(
+                                    jobActionBtn,
+                                    "border-[color-mix(in_oklch,var(--destructive)_50%,var(--border))] text-[var(--destructive)]",
+                                  )}
                                   title="Quita el job de Redis y lo marca como cancelado en la base de datos"
                                   disabled={deletingJobs || cancellingJobKey === `${j.repositoryId}:${j.id}`}
                                   onClick={() =>
@@ -612,8 +617,8 @@ export function ActiveJobsQueue() {
                                 >
                                   {cancellingJobKey === `${j.repositoryId}:${j.id}` ? (
                                     <>
-                                      <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />
-                                      Cancelando…
+                                      <Loader2 className="size-3 animate-spin" aria-hidden />
+                                      …
                                     </>
                                   ) : (
                                     "Cancelar"
@@ -621,26 +626,29 @@ export function ActiveJobsQueue() {
                                 </Button>
                               )}
                               <Button
-                                variant="secondary"
-                                size="sm"
-                                className="h-9 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_40%,var(--card))]"
+                                type="button"
+                                variant="outline"
+                                className={cn(jobActionBtn, "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]")}
                                 title="Encola un sync completo (misma acción que en la ficha del repo)"
                                 disabled={deletingJobs || syncingRepoId === j.repositoryId}
                                 onClick={() => void onTriggerSync(j.repositoryId)}
                               >
                                 {syncingRepoId === j.repositoryId ? (
                                   <>
-                                    <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />
-                                    Encolar…
+                                    <Loader2 className="size-3 animate-spin" aria-hidden />
+                                    …
                                   </>
                                 ) : (
                                   "Encolar sync"
                                 )}
                               </Button>
                               <Button
+                                type="button"
                                 variant="outline"
-                                size="sm"
-                                className="h-9 rounded-xl border-orange-500/50 text-orange-600 dark:text-orange-400"
+                                className={cn(
+                                  jobActionBtn,
+                                  "border-orange-500/45 text-orange-600 dark:text-orange-400",
+                                )}
                                 title="Borra nodos del grafo para este repo y encola reindexación completa"
                                 disabled={deletingJobs || syncingRepoId === j.repositoryId}
                                 onClick={() =>
@@ -649,14 +657,22 @@ export function ActiveJobsQueue() {
                               >
                                 Resync
                               </Button>
-                              <Button variant="ghost" size="sm" className="h-9 rounded-xl" asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className={cn(jobActionBtn, "border-[var(--border)] bg-[var(--card)]")}
+                                asChild
+                              >
                                 <Link to={`/repos/${j.repositoryId}`}>Ver repo</Link>
                               </Button>
                               {selectable && (
                                 <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-9 rounded-xl text-[var(--destructive)] hover:text-[var(--destructive)]"
+                                  type="button"
+                                  variant="outline"
+                                  className={cn(
+                                    jobActionBtn,
+                                    "border-[color-mix(in_oklch,var(--destructive)_45%,var(--border))] text-[var(--destructive)]",
+                                  )}
                                   disabled={deletingJobs}
                                   onClick={() =>
                                     setDeleteOneTarget({ repositoryId: j.repositoryId, jobId: j.id })
