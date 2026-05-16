@@ -11,10 +11,13 @@
  */
 import { NestFactory } from '@nestjs/core';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { register, collectDefaultMetrics } from 'prom-client';
+import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { AuthService } from './auth/auth.service';
 import { createOtpAuthMiddleware } from './auth/otp.middleware';
 import { createRbacMiddleware } from './auth/rbac.middleware';
+import { createLogger, extractRequestId } from 'ariadne-common';
 
 /** Inicia el servidor, configura CORS, prefijo /api, auth OTP, RBAC y proxy a ingest. */
 async function bootstrap() {
@@ -31,6 +34,19 @@ async function bootstrap() {
   });
 
   const authService = app.get(AuthService);
+
+  // Correlation ID middleware (must run BEFORE OTP so all logs carry requestId)
+  const logger = createLogger('api');
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const requestId = extractRequestId(req.headers);
+    (req as any).requestId = requestId;
+    res.locals.requestId = requestId;
+    logger.info({ requestId, method: req.method, url: req.originalUrl ?? req.url }, 'incoming request');
+    next();
+  });
+
+  collectDefaultMetrics();
+
   app.use(createOtpAuthMiddleware(authService));
   // RBAC después de auth: bloquea operaciones no permitidas según rol
   app.use(createRbacMiddleware());
@@ -50,15 +66,29 @@ async function bootstrap() {
     target: ingestUrl,
     changeOrigin: true,
     pathRewrite: { '^/api': '' },
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        const response = res as Response;
+        const requestId = response.locals.requestId || extractRequestId(req.headers);
+        if (requestId) proxyReq.setHeader('X-Request-Id', requestId);
+      },
+    },
   });
   app.use(ingestProxy);
 
+  // Endpoint Prometheus /metrics
+  app.use('/metrics', async (_req: Request, res: Response) => {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  });
+
   const port = parseInt(process.env.PORT ?? '3000', 10);
   await app.listen(port);
-  console.log(`AriadneSpecs API (NestJS + OpenAPI 3.1) listening on port ${port}`);
+  logger.info({ port }, 'AriadneSpecs API (NestJS + OpenAPI 3.1) listening');
 }
 
 bootstrap().catch((err) => {
-  console.error(err);
+  const logger = createLogger('api');
+  logger.error(err, 'Failed to bootstrap API');
   process.exit(1);
 });

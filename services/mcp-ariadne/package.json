@@ -7,7 +7,9 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": "./dist/index.js",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
@@ -16,10 +18,11 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "ariadne-common": "file:../../packages/ariadne-common",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "ariadne-common": "file:../../packages/ariadne-common",
     "falkordb": "^6.0.0",
-    "ioredis": "^5.4.2"
+    "ioredis": "^5.4.2",
+    "pino": "^9.14.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -28,5 +31,10 @@
   "engines": {
     "node": ">=20"
   },
-  "keywords": ["mcp", "falkordb", "ariadne", "cursor"]
+  "keywords": [
+    "mcp",
+    "falkordb",
+    "ariadne",
+    "cursor"
+  ]
 }

@@ -15,5 +15,10 @@
     "@types/node": "^22.10.0",
     "typescript": "^5.7.2"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pino": "^9.14.0"
+  }
 }
