@@ -16,6 +16,7 @@
     "chokidar": "^4.0.1",
     "express": "^4.21.0",
     "falkordb": "^6.0.0",
+    "pino": "^9.14.0",
     "tree-sitter": "^0.21.0",
     "tree-sitter-javascript": "^0.23.0",
     "tree-sitter-typescript": "^0.23.0"

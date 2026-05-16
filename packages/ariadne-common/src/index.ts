@@ -46,3 +46,5 @@ export {
   type FalkorEmbeddableLabel,
   type FalkorDocumentationDocLabel,
 } from './graph-labels.js';
+export { createLogger, extractRequestId } from './logger.js';
+export type { Logger } from 'pino';

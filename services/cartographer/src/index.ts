@@ -19,6 +19,9 @@ import type { ParsedFile } from "./parser/parser.js";
 import { getFalkorConfig, graphNameForProject, isProjectShardingEnabled } from "./graph/falkor.js";
 import { getProjectInfo, buildProjectMergeCypher } from "./graph/project.js";
 import { createShadowServer, SHADOW_GRAPH_NAME } from "./shadow-server.js";
+import { createLogger } from 'ariadne-common';
+
+const logger = createLogger('cartographer');
 
 const SCAN_PATH = process.env.SCAN_PATH ?? "/app/src-to-analyze";
 const WATCH = process.env.WATCH !== "false";
@@ -109,9 +112,7 @@ async function main(): Promise<void> {
 
   await graph.query(buildProjectMergeCypher(projectInfo));
   await runFullScan(graphClient, pathSet, projectInfo.projectId);
-  console.log(
-    `Cartographer: full scan indexed ${pathSet.size} files into ${graphNameForProject(isProjectShardingEnabled() ? projectInfo.projectId : undefined)} (project ${projectInfo.projectName})`,
-  );
+  logger.info(`Cartographer: full scan indexed ${pathSet.size} files into ${graphNameForProject(isProjectShardingEnabled() ? projectInfo.projectId : undefined)} (project ${projectInfo.projectName})`);
 
   if (!WATCH) {
     await client.close();
@@ -128,9 +129,9 @@ async function main(): Promise<void> {
     for (const abs of paths) {
       try {
         await indexFile(abs, pathSet, graphClient, projectInfo.projectId);
-        console.log(`Cartographer: re-indexed ${toRelativePath(abs, SCAN_PATH)}`);
+        logger.info(`Cartographer: re-indexed ${toRelativePath(abs, SCAN_PATH)}`);
       } catch (err) {
-        console.error(`Cartographer: error indexing ${abs}`, err);
+        logger.error(err, `Cartographer: error indexing ${abs}`);
       }
     }
   };
@@ -161,9 +162,9 @@ async function main(): Promise<void> {
     pending.delete(absPath);
   });
 
-  watcher.on("error", (err) => console.error("Cartographer watcher error:", err));
+  watcher.on("error", (err) => logger.error(err, "Cartographer watcher error:"));
 
-  console.log("Cartographer: watching for changes (WATCH=true)");
+  logger.info("Cartographer: watching for changes (WATCH=true)");
 
   const shadowPort = process.env.SHADOW_SERVER_PORT;
   if (shadowPort) {
@@ -171,7 +172,7 @@ async function main(): Promise<void> {
     const shadowClient: GraphClient = { query: (cypher: string) => shadowGraph.query(cypher) };
     const shadowApp = createShadowServer(() => Promise.resolve(shadowClient));
     shadowApp.listen(Number(shadowPort), () => {
-      console.log(`Cartographer: shadow server on port ${shadowPort}`);
+      logger.info(`Cartographer: shadow server on port ${shadowPort}`);
     });
   }
 
@@ -183,6 +184,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error(err);
+  logger.error(err as Error);
   process.exit(1);
 });

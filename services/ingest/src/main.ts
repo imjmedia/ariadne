@@ -17,6 +17,13 @@ import { AppModule } from './app.module';
 import { getFalkorConfig, GRAPH_NAME, isProjectShardingEnabled } from './pipeline/falkor';
 import { runFalkorRepoIdBackfill } from './pipeline/producer';
 import * as express from 'express';
+import { createLogger, extractRequestId } from 'ariadne-common';
+import client from 'prom-client';
+
+const logger = createLogger('ingest');
+
+/** Collect default Prometheus metrics. */
+client.collectDefaultMetrics();
 
 /** Clave en `ingest_runtime_flags`: evita repetir FLUSHALL en reinicios si el env sigue puesto. */
 const FALKOR_FLUSH_FLAG_KEY = 'falkor_flushall_once';
@@ -49,9 +56,7 @@ async function runFalkorFlushAllOnceIfRequested(): Promise<void> {
       [FALKOR_FLUSH_FLAG_KEY],
     );
     if (Array.isArray(existing) && existing.length > 0) {
-      console.log(
-        `[ingest] FALKOR_FLUSH_ALL_ONCE omitido: ya aplicado (flag ${FALKOR_FLUSH_FLAG_KEY}). Quita el env si no lo necesitas.`,
-      );
+      logger.info(`FALKOR_FLUSH_ALL_ONCE omitido: ya aplicado (flag ${FALKOR_FLUSH_FLAG_KEY}). Quita el env si no lo necesitas.`);
       return;
     }
   } finally {
@@ -68,9 +73,9 @@ async function runFalkorFlushAllOnceIfRequested(): Promise<void> {
       throw new Error('Cliente Redis sin método flushAll');
     }
     await flush.call(redis);
-    console.warn('[ingest] FalkorDB: FLUSHALL ejecutado (FALKOR_FLUSH_ALL_ONCE). Re-sincroniza los repos.');
+    logger.warn('FalkorDB: FLUSHALL ejecutado (FALKOR_FLUSH_ALL_ONCE). Re-sincroniza los repos.');
   } catch (err) {
-    console.error('[ingest] FALKOR_FLUSH_ALL_ONCE falló:', (err as Error)?.message ?? err);
+    logger.error({ err }, 'FALKOR_FLUSH_ALL_ONCE falló');
     throw err;
   } finally {
     if (falkor) await falkor.close();
@@ -99,7 +104,7 @@ async function runFalkorFlushAllOnceIfRequested(): Promise<void> {
  */
 async function runMigrations(): Promise<void> {
   if (isTruthyEnv(process.env.INGEST_SKIP_MIGRATIONS)) {
-    console.warn('[ingest] INGEST_SKIP_MIGRATIONS activo: no se ejecutan migraciones al arrancar.');
+    logger.warn('INGEST_SKIP_MIGRATIONS activo: no se ejecutan migraciones al arrancar.');
     return;
   }
   const ds = new DataSource({
@@ -116,9 +121,9 @@ async function runMigrations(): Promise<void> {
   try {
     const executed = await ds.runMigrations();
     if (executed.length > 0) {
-      console.log(`[ingest] Migraciones ejecutadas: ${executed.map((m) => m.name).join(', ')}`);
+      logger.info(`Migraciones ejecutadas: ${executed.map((m) => m.name).join(', ')}`);
     } else {
-      console.log('[ingest] Migraciones PostgreSQL: ninguna pendiente (tabla migrations al día).');
+      logger.info('Migraciones PostgreSQL: ninguna pendiente (tabla migrations al día).');
     }
   } finally {
     await ds.destroy();
@@ -131,28 +136,26 @@ async function runMigrations(): Promise<void> {
  */
 async function runFalkorRepoIdMigration(): Promise<void> {
   if (isProjectShardingEnabled()) {
-    console.warn(
-      '[ingest] Falkor repoId backfill omitido: FALKOR_SHARD_BY_PROJECT activo (migrar por shard si aplica).',
-    );
+    logger.warn('Falkor repoId backfill omitido: FALKOR_SHARD_BY_PROJECT activo (migrar por shard si aplica).');
     return;
   }
   const config = getFalkorConfig();
-  let client: Awaited<ReturnType<typeof FalkorDB.connect>> | null = null;
+  let falkorClient: Awaited<ReturnType<typeof FalkorDB.connect>> | null = null;
   try {
-    client = await FalkorDB.connect({ socket: { host: config.host, port: config.port } });
-    const graph = client.selectGraph(GRAPH_NAME);
+    falkorClient = await FalkorDB.connect({ socket: { host: config.host, port: config.port } });
+    const graph = falkorClient.selectGraph(GRAPH_NAME);
     const graphClient = { query: (cypher: string) => graph.query(cypher) };
     await runFalkorRepoIdBackfill(graphClient);
   } catch (err) {
-    console.warn('[ingest] Falkor repoId backfill omitido (Falkor no disponible o error):', (err as Error)?.message ?? err);
+    logger.warn({ err }, 'Falkor repoId backfill omitido (Falkor no disponible o error)');
   } finally {
-    if (client) await client.close();
+    if (falkorClient) await falkorClient.close();
   }
 }
 
-/** Arranca NestJS con body parser (rawBody para webhooks) y CORS. */
+/** Arranca NestJS con body parser (rawBody para webhooks), CORS, healthcheck, metrics y correlation ID. */
 async function bootstrap() {
-  console.log('[ingest] Starting bootstrap (23b6f50)');
+  logger.info('Starting bootstrap (23b6f50)');
   await runMigrations();
   await runFalkorFlushAllOnceIfRequested();
   await runFalkorRepoIdMigration();
@@ -160,6 +163,16 @@ async function bootstrap() {
     bodyParser: false,
     abortOnError: false,
   });
+
+  // Correlation ID middleware (runs BEFORE body parser so all logs carry requestId)
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const requestId = extractRequestId(req.headers);
+    (req as any).requestId = requestId;
+    res.locals.requestId = requestId;
+    logger.info({ requestId, method: req.method, url: req.originalUrl ?? req.url }, 'incoming request');
+    next();
+  });
+
   const bodyLimit = process.env.BODY_LIMIT ?? '10mb';
   app.use(
     express.json({
@@ -178,16 +191,17 @@ async function bootstrap() {
   app.use('/health', (_req: express.Request, res: express.Response) => {
     res.json({ status: 'ok', service: 'ingest' });
   });
+  // Prometheus /metrics endpoint
+  app.use('/metrics', async (_req: express.Request, res: express.Response) => {
+    res.set('Content-Type', client.register.contentType);
+    res.end(await client.register.metrics());
+  });
   const port = process.env.PORT ?? 3002;
   await app.listen(port);
-  console.log(`Ingest service (NestJS) listening on port ${port}`);
+  logger.info({ port }, 'Ingest service (NestJS) listening');
 }
 
 bootstrap().catch((err) => {
-  console.error('[ingest] FATAL bootstrap error:');
-  console.error(err);
-  if (err?.stack) {
-    console.error('[ingest] Stack trace:', err.stack);
-  }
+  logger.fatal({ err }, 'FATAL bootstrap error');
   process.exit(1);
 });

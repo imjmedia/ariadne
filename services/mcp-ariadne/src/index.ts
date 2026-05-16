@@ -19,7 +19,7 @@ import { execSync } from "node:child_process";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { isProjectShardingEnabled } from "ariadne-common";
+import { createLogger, isProjectShardingEnabled } from "ariadne-common";
 import { getGraph, closeFalkor, forEachProjectShardGraph } from "./falkor.js";
 import { getMcpToolCache, closeRedis } from "./redis.js";
 import { loadAriadneProjectConfig, loadAriadneProjectConfigNearFile, resolveAbsolutePath } from "./utils.js";
@@ -34,6 +34,8 @@ import { mcpLimits } from "./mcp-tool-limits.js";
 import { resolveGraphScopeFromProjectOrRepoId, whereProjectRepo } from "./resolve-graph-scope.js";
 
 const MCP_PATH = "/mcp";
+
+const logger = createLogger('mcp-ariadne');
 
 /** Bearer del cliente HTTP en esta petición (p. ej. Secret MCP `ari_…` en mcp.json) para reenviar al API Nest. */
 type McpNestAuthStore = { clientBearerForNest?: string };
@@ -199,14 +201,14 @@ async function validateAuth(req: IncomingMessage): Promise<string | null> {
         }
         return null;
       }
-      console.warn(`[MCP] validateAuth: per-user validation returned valid=false (email=${data.user?.email ?? '?'})`);
+      logger.warn(`[MCP] validateAuth: per-user validation returned valid=false (email=${data.user?.email ?? '?'})`);
     } else {
       const body = await res.text().catch(() => '<no body>');
-      console.warn(`[MCP] validateAuth: per-user fetch returned ${res.status} ${res.statusText}: ${body.slice(0, 500)}`);
+      logger.warn(`[MCP] validateAuth: per-user fetch returned ${res.status} ${res.statusText}: ${body.slice(0, 500)}`);
     }
   } catch (err) {
     // Si falla, intentar por API Gateway como fallback (mantener backward compat)
-    console.warn(`[MCP] validateAuth: per-user fetch via ingest failed, trying API Gateway: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(`[MCP] validateAuth: per-user fetch via ingest failed, trying API Gateway: ${err instanceof Error ? err.message : String(err)}`);
     try {
       const apiUrl = ariadneApiBase();
       const res = await fetch(`${apiUrl}/api/internal/users/validate-mcp-token`, {
@@ -224,7 +226,7 @@ async function validateAuth(req: IncomingMessage): Promise<string | null> {
         }
       }
     } catch (err2) {
-      console.error(`[MCP] validateAuth: per-user fetch failed (both ingest and api): ${err2 instanceof Error ? err2.message : String(err2)}`);
+      logger.error(`[MCP] validateAuth: per-user fetch failed (both ingest and api): ${err2 instanceof Error ? err2.message : String(err2)}`);
     }
   }
 
@@ -390,7 +392,7 @@ function mcpLogToolInvocationStart(toolName: string, args: unknown): void {
     argumentKeys: Object.keys(argObj),
     arguments: redactToolArgumentsForLog(args ?? {}),
   });
-  console.log(`[mcp-ariadne] ${line}`);
+  logger.info(`[mcp-ariadne] ${line}`);
 }
 
 function mcpLogToolInvocationEnd(toolName: string, startedMs: number, result: McpCallToolResultShape): void {
@@ -403,7 +405,7 @@ function mcpLogToolInvocationEnd(toolName: string, startedMs: number, result: Mc
     resultSummary: summarizeMcpToolResultForLog(result),
     result: buildMcpToolResponseBodyForLog(result),
   });
-  console.log(`[mcp-ariadne] ${line}`);
+  logger.info(`[mcp-ariadne] ${line}`);
 }
 
 function mcpLogToolInvocationFailure(toolName: string, args: unknown, startedMs: number, err: unknown): void {
