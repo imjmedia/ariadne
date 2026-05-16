@@ -9,12 +9,6 @@ import { MagnifyingGlass, CaretDown, CaretRight, Warning, ShieldCheck, FileText 
 
 // ── Tipos ──────────────────────────────────────────
 
-interface DependentNode {
-  name: string;
-  labels: string;
-  children?: DependentNode[];
-}
-
 interface LegacyImpactData {
   nodeName: string;
   dependents: number;
@@ -58,7 +52,7 @@ function TreeItem({ name, label, depth = 0, hasTests, children }: {
         )}
         <span className="font-mono text-sm">{name}</span>
         <span className="text-xs text-[var(--foreground-muted)]">{label}</span>
-        {hasTests === false && <Warning weight="fill" className="size-3.5 text-amber-500" title="Sin tests" />}
+        {hasTests === false && <span title="Sin tests"><Warning weight="fill" className="size-3.5 text-amber-500" /></span>}
       </button>
       {open && children && <div className="ml-4 border-l border-[var(--border)] pl-2">{children}</div>}
     </div>
