@@ -11,8 +11,8 @@ ENV VITE_API_URL=$VITE_API_URL
 # Copiar todo el repo (incluye docs/ para ayuda-mcp.md)
 COPY . .
 
-# Forzar fresh build cada deploy: timestamp nanosegundo siempre único
-RUN head -c 16 /dev/urandom > /tmp/buildstamp
+# Forzar fresh build cada deploy: escribe fecha + nano siempre único
+RUN echo $(date +%s%N) > /tmp/buildstamp.$(uname -n) && head -c 16 /dev/urandom | base64 > /tmp/buildstamp
 
 # 1. Build frontend
 RUN cd frontend && pnpm install --frozen-lockfile && pnpm run build
