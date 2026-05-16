@@ -38,7 +38,8 @@
  * | `get_implementation_details` | Firma, props, endpoints asociados al símbolo. |
  * | `trace_reachability` | Alcance desde entrypoints (código muerto heurístico). |
  * | `check_export_usage` | Exports sin importadores. |
- * | `get_affected_scopes` | Radio de explosión ante cambio en nodo + tests opcionales. |
+ * | `extract_design_tokens` | Parsing de tokens de diseño (Tailwind, CSS vars, theme). |
+ * | `review_diff` | **Review Engine**: análisis multi-lente de cambios legacy (diff/PR → reporte con confianza). |
  * | `check_breaking_changes` | Heurística de ruptura si se quitan parámetros. |
  * | `find_similar_implementations` | Búsqueda semántica de implementaciones parecidas. |
  * | `get_project_standards` | Fragmentos de config (ESLint, Prettier, tsconfig). |
