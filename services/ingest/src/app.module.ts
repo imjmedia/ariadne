@@ -29,7 +29,6 @@ import { ShadowModule } from './shadow/shadow.module';
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
-import { ReviewModule } from './review/review.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { SharedBullModule } from './shared-bull/shared-bull.module';
 
@@ -71,7 +70,6 @@ import { SharedBullModule } from './shared-bull/shared-bull.module';
     SyncModule,
     UsersModule,
     WebhooksModule,
-    ReviewModule,
   ],
 })
 /** Módulo principal del microservicio Ingest. */

@@ -981,23 +981,6 @@ function createMcpServer(): Server {
         additionalProperties: false,
       },
     },
-    {
-      name: "review_diff",
-      description:
-        "Revisa cambios en código legacy y emite un reporte con hallazgos categorizados y puntuación de confianza. Acepta un diff en formato unificado (git diff) o URL de PR. Proyecto Ariadne para enriquecer con contexto legacy (dependencias, impacto, referencias). Ideal para revisar cambios hechos por agentes IA en sistemas sin tests.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          diff: { type: "string", description: "Texto del diff en formato unificado (git diff). Opcional si se proporciona prUrl." },
-          prUrl: { type: "string", description: "URL del PR en GitHub/Bitbucket. Alternativa a diff." },
-          projectId: { type: "string", description: "ID del proyecto Ariadne (opcional, para contexto del grafo)." },
-          branch: { type: "string", description: "Rama base para comparación (default: main)." },
-          repoPath: { type: "string", description: "Ruta absoluta del repo local (opcional)." },
-        },
-        required: [],
-        additionalProperties: false,
-      },
-    },
   ],
 };
   });
@@ -3864,45 +3847,6 @@ async function fetchFileFromIngest(
     ].join("\n");
 
     return { content: [{ type: "text", text: summary }] };
-  }
-
-  // --- review_diff ---
-  if (name === "review_diff") {
-    const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002";
-    const body: Record<string, unknown> = {};
-    if (args?.diff) body.diff = args.diff as string;
-    if (args?.prUrl) body.prUrl = args.prUrl as string;
-    if (args?.projectId) body.projectId = args.projectId as string;
-    if (args?.branch) body.branch = args.branch as string;
-    if (args?.repoPath) body.repoPath = args.repoPath as string;
-
-    try {
-      const res = await fetch(`${ingestUrl}/review/diff`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(120_000),
-      });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        return {
-          content: [{ type: "text", text: `Error del review engine (HTTP ${res.status}): ${errText}` }],
-          isError: true,
-        };
-      }
-      const result = await res.json() as Record<string, unknown>;
-      // Si tiene reportMarkdown, devolverlo como texto formateado
-      if (result.reportMarkdown && typeof result.reportMarkdown === 'string') {
-        return { content: [{ type: "text", text: result.reportMarkdown as string }] };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return {
-        content: [{ type: "text", text: `Error conectando con review engine: ${msg}` }],
-        isError: true,
-      };
-    }
   }
 
   return {
