@@ -64,13 +64,6 @@ services:
       - dokploy-network
     expose:
       - "80"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.ariadne-frontend.rule=Host(`ariadne.kreoint.mx`)
-      - traefik.http.routers.ariadne-frontend.entrypoints=websecure
-      - traefik.http.routers.ariadne-frontend.tls=true
-      - traefik.http.routers.ariadne-frontend.tls.certresolver=letsencrypt
-      - traefik.http.services.ariadne-frontend.loadbalancer.server.port=80
 
   # API REST — proxy a ingest, /graph, /openapi, /health
   # Dokploy Domains UI: ariadne.kreoint.mx path /api → 3000
