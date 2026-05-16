@@ -9,7 +9,7 @@ ARG VITE_API_URL=http://localhost:3000
 ENV VITE_API_URL=$VITE_API_URL
 
 # Build cache bust: incrementar en 1 en cada deploy para forzar rebuild completo
-ARG BUILD_CACHE_BUST=1
+ARG BUILD_CACHE_BUST=2
 
 # Copiar todo el repo
 COPY . .
