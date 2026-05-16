@@ -6,7 +6,6 @@ export function getActiveNavHref(pathname: string): string {
   if (pathname.startsWith('/settings')) return '/settings';
   if (pathname.startsWith('/domains')) return '/domains';
   if (pathname.startsWith('/dashboard')) return '/dashboard';
-  if (pathname.startsWith('/c4')) return '/c4';
   if (pathname.startsWith('/graph-explorer')) return '/graph-explorer';
   if (pathname.startsWith('/credentials')) return '/credentials';
   if (pathname.startsWith('/users')) return '/users';
@@ -34,7 +33,6 @@ export function breadcrumbsForPath(pathname: string): { to: string; label: strin
     return [home, { to: '/projects', label: 'Proyectos' }, { to: `/projects/${id}`, label: 'Detalle' }];
   }
   if (pathname.startsWith('/domains')) return [home, { to: '/domains', label: 'Dominios' }];
-  if (pathname.startsWith('/c4')) return [home, { to: '/c4', label: 'C4 Viewer' }];
   if (pathname.startsWith('/jobs')) return [home, { to: '/jobs', label: 'Cola de Sync' }];
   if (pathname.startsWith('/repos/')) {
     const id = pathname.replace(/^\/repos\//, '').split('/')[0];
