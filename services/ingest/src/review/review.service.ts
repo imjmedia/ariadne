@@ -15,7 +15,7 @@
  *   Fase 5: Cross-cutting legacy
  *   Fase 6: Render de reporte
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import {
   resolveLlmApiKey,
@@ -24,6 +24,7 @@ import {
   llmDefaultHeaders,
 } from '../llm/llm-config';
 import { queryBatchLegacyImpact } from './falkor-review.helper';
+import { GitHubService } from '../providers/github.service';
 import {
   ChangedFile,
   DiffHunk,
@@ -53,6 +54,10 @@ export class ReviewService {
 
   /** Almacén en memoria de artifacts (producción: BD o Redis). */
   private artifacts = new Map<string, ReviewArtifact>();
+
+  constructor(
+    @Inject(GitHubService) private readonly github: GitHubService,
+  ) {}
 
   // ──────────────────────────────────────────────
   //  LLM helper — mismo patrón que orchestrator/llm/llm.adapter.ts
@@ -269,12 +274,77 @@ export class ReviewService {
 
   private async resolveDiff(req: ReviewRequest): Promise<string | null> {
     if (req.diff) return req.diff;
+
     if (req.prUrl) {
-      // TODO: descargar diff de PR via API
-      this.logger.warn(`resolveDiff from PR URL no implementado: ${req.prUrl}`);
+      // Soporte para URLs de GitHub: https://github.com/owner/repo/pull/123
+      const ghMatch = req.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+      if (ghMatch) {
+        const [, owner, repo, prNumber] = ghMatch;
+        try {
+          this.logger.log(`Descargando diff de PR: ${owner}/${repo}#${prNumber}`);
+          const res = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`,
+            {
+              headers: {
+                Accept: 'application/vnd.github.v3.diff',
+                ...(await this.getGitHubAuthHeaders()),
+              },
+            },
+          );
+          if (res.ok) {
+            const text = await res.text();
+            if (text.length > 0) return text;
+          }
+          this.logger.warn(`GitHub PR API respondió ${res.status}, intentando /files`);
+          // Fallback: obtener lista de archivos + contenido
+          const filesRes = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/files`,
+            {
+              headers: {
+                Accept: 'application/vnd.github.v3+json',
+                ...(await this.getGitHubAuthHeaders()),
+              },
+            },
+          );
+          if (filesRes.ok) {
+            const files = await filesRes.json() as Array<{
+              filename: string;
+              status: string;
+              patch?: string;
+              additions: number;
+              deletions: number;
+            }>;
+            if (Array.isArray(files) && files.length > 0) {
+              // Reconstruir diff desde patches individuales
+              const parts: string[] = [];
+              for (const f of files) {
+                if (f.patch) {
+                  parts.push(`diff --git a/${f.filename} b/${f.filename}`);
+                  parts.push(`--- a/${f.filename}`);
+                  parts.push(`+++ b/${f.filename}`);
+                  parts.push(f.patch);
+                }
+              }
+              if (parts.length > 0) return parts.join('\n');
+            }
+          }
+        } catch (err) {
+          this.logger.warn(`Error descargando PR ${req.prUrl}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      this.logger.warn(`No se pudo resolver PR URL: ${req.prUrl}`);
       return null;
     }
+
     return null;
+  }
+
+  /** Obtiene headers de autenticación para GitHub API. */
+  private async getGitHubAuthHeaders(): Promise<Record<string, string>> {
+    const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? '';
+    if (token) return { Authorization: `Bearer ${token}` };
+    return {};
   }
 
   private parseDiff(rawDiff: string): ParsedDiff {
