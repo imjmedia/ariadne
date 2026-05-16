@@ -174,6 +174,10 @@ async function bootstrap() {
     origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
     credentials: true,
   });
+  // Healthcheck endpoint
+  app.use('/health', (_req: express.Request, res: express.Response) => {
+    res.json({ status: 'ok', service: 'ingest' });
+  });
   const port = process.env.PORT ?? 3002;
   await app.listen(port);
   console.log(`Ingest service (NestJS) listening on port ${port}`);
