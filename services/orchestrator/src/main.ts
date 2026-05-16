@@ -10,10 +10,15 @@
  */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import * as express from 'express';
 
 /** Inicia el servidor del Orchestrator. */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Healthcheck endpoint (antes de cualquier middleware NestJS)
+  app.use('/health', (_req: express.Request, res: express.Response) => {
+    res.json({ status: 'ok', service: 'orchestrator' });
+  });
   const port = parseInt(process.env.PORT ?? '3001', 10);
   await app.listen(port);
   console.log(`Orchestrator (NestJS + LangGraph) listening on port ${port}`);

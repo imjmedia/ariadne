@@ -4074,6 +4074,13 @@ async function requestHandler(req: IncomingMessage, res: ServerResponse): Promis
   const pathNorm = path.startsWith("/") ? path : `/${path}`;
   const isMcpPath = pathNorm === MCP_PATH || pathNorm === `${MCP_PATH}/` || pathNorm === "/";
 
+  // Healthcheck endpoint
+  if (pathNorm === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok", service: "mcp-ariadne" }));
+    return;
+  }
+
   if (serveWellKnown(pathNorm, req, res)) return;
 
   if (!isMcpPath) {
