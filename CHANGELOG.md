@@ -5,6 +5,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Review Engine — Legacy Change Review via MCP:** Nuevo módulo `review` en ingest con pipeline completo de revisión de cambios legacy. Incluye 5 lentes de detección via LLM, consulta al grafo FalkorDB para impacto legacy, scoring con penalizaciones, validación profunda, cross-cutting review, y render de reporte Markdown con confianza porcentual. MCP tool `review_diff` registrada. Usa la misma infraestructura LLM existente (LLM_API_KEY, LLM_MODEL_INGEST, etc.) — no introduce nuevas APIs. (`docs/review-engine/README.md`)
+- **Review Engine — PR URL support:** `review_diff` acepta `prUrl` de GitHub (`https://github.com/owner/repo/pull/123`). Descarga el diff via GitHub API con autenticación opcional (`GITHUB_TOKEN`/`GH_TOKEN`). Fallback a `/pulls/:id/files` si el diff directo no está disponible.
+
 ### Changed
 
 - **Orchestrator — Kimi/Moonshot 429 TPM:** reintentos con espera larga cuando el JSON de error indica TPM / `rate_limit_reached` (default `MOONSHOT_TPM_RETRY_COOLDOWN_MS=58000`), hasta **8** intentos; backoff corto para otros 429/503. Ver `services/orchestrator/src/llm/README.md`.
