@@ -13,7 +13,6 @@ import {
   GitBranch,
   ListNumbers,
   Key,
-  Package,
   ShareNetwork,
   Question,
 } from '@phosphor-icons/react';
@@ -45,7 +44,6 @@ function buildNavigationGroups(user: UserInfo | null): SidebarGroup[] {
       items: [
         { label: 'Repositorios', href: '/repos', icon: GitBranch },
         { label: 'Cola de Sync', href: '/jobs', icon: ListNumbers },
-        { label: 'C4 Viewer', href: '/c4', icon: Package },
       ],
     },
     {

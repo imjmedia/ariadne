@@ -27,7 +27,6 @@ import { ComponentGraphExplorer } from './pages/ComponentGraph';
 import { DomainsList } from './pages/DomainsList';
 import { ActiveJobsQueue } from './pages/ActiveJobsQueue';
 import { Dashboard } from './pages/Dashboard';
-import { C4ViewerPage } from './pages/C4ViewerPage';
 import { UsersManagement } from './pages/UsersManagement';
 import { ProfilePage } from './pages/ProfilePage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -56,7 +55,6 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route element={<ProtectedRoute />}>
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="c4" element={<C4ViewerPage />} />
             <Route path="projects/new" element={<CreateProject />} />
             <Route path="projects/:id/chat" element={<ProjectChat />} />
             <Route path="projects/:id" element={<ProjectDetail />} />
