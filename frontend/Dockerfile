@@ -12,7 +12,7 @@ ENV VITE_API_URL=$VITE_API_URL
 COPY . .
 
 # Forzar fresh build cada deploy: timestamp nanosegundo siempre único
-RUN echo $(date +%s%N) > /tmp/buildstamp
+RUN head -c 16 /dev/urandom > /tmp/buildstamp
 
 # 1. Build frontend
 RUN cd frontend && pnpm install --frozen-lockfile && pnpm run build
