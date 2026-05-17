@@ -34,8 +34,8 @@ COPY --from=builder /app/dist ./dist
 ENV NODE_ENV=production
 ENV PORT=8080
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
+# HEALTHCHECK desactivado: Dokploy v2.x no resuelve localhost correctamente
+# HEALTHCHECK NONE
 
 # Obligatorio para Docker: bind 0.0.0.0 para recibir tráfico externo
 EXPOSE 8080

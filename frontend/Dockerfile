@@ -31,6 +31,6 @@ FROM nginx:alpine
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
+# HEALTHCHECK desactivado: Dokploy v2.x no resuelve localhost correctamente
+# HEALTHCHECK NONE
 CMD ["nginx", "-g", "daemon off;"]
