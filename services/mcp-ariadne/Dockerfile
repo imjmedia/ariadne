@@ -34,8 +34,9 @@ COPY --from=builder /app/dist ./dist
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# HEALTHCHECK desactivado: Dokploy v2.x no resuelve localhost correctamente
-# HEALTHCHECK NONE
+# HEALTHCHECK estilo TheForge (wget -qO- con puerto explícito)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:8080/health || exit 1
 
 # Obligatorio para Docker: bind 0.0.0.0 para recibir tráfico externo
 EXPOSE 8080
