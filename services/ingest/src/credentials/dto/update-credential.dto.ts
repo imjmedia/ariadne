@@ -7,4 +7,6 @@ export class UpdateCredentialDto {
   name?: string | null;
   /** Para app_password: { username } */
   extra?: Record<string, unknown> | null;
+  /** Reasignar propietario (admin: cualquier usuario; resto: solo reclamar legado con tu userId). */
+  userId?: string | null;
 }

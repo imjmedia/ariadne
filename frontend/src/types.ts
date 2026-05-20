@@ -181,6 +181,9 @@ export interface Credential {
   kind: string;
   name: string | null;
   extra?: Record<string, unknown> | null;
+  userId?: string | null;
+  ownerEmail?: string | null;
+  ownerName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -199,6 +202,8 @@ export interface UpdateCredentialDto {
   value?: string;
   name?: string | null;
   extra?: Record<string, unknown> | null;
+  /** Reasignar propietario (admin: cualquier user id; resto: solo tu id para reclamar legado). */
+  userId?: string | null;
 }
 
 /** Hallazgo crítico de Full Audit. */

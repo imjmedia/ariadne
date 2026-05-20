@@ -58,11 +58,45 @@ export class CredentialsService {
   }
 
   private async assertCanAccess(id: string, actor: CredentialActor): Promise<CredentialEntity> {
-    const c = await this.repo.findOne({ where: { id } });
+    const c = await this.repo.findOne({ where: { id }, relations: { user: true } });
     if (!c) throw new NotFoundException(`Credential ${id} not found`);
     if (isAdmin(actor)) return c;
     if (c.userId && actor.userId && c.userId === actor.userId) return c;
     throw new ForbiddenException('No tienes acceso a esta credencial');
+  }
+
+  private toPublicView(
+    c: CredentialEntity & { user?: { email: string; name: string | null } | null },
+  ): Omit<CredentialEntity, 'encryptedValue'> & {
+    ownerEmail: string | null;
+    ownerName: string | null;
+  } {
+    const { encryptedValue: _enc, user, ...rest } = c;
+    return {
+      ...rest,
+      ownerEmail: user?.email ?? null,
+      ownerName: user?.name ?? null,
+    };
+  }
+
+  private resolveUserIdReassignment(
+    existing: CredentialEntity,
+    nextUserId: string | null | undefined,
+    actor: CredentialActor,
+  ): string | null | undefined {
+    if (nextUserId === undefined) return undefined;
+    const target = nextUserId === '' ? null : nextUserId;
+    if (isAdmin(actor)) return target;
+    if (!actor.userId) {
+      throw new BadRequestException('Usuario no identificado');
+    }
+    if (target !== actor.userId) {
+      throw new ForbiddenException('Solo un admin puede reasignar a otro usuario');
+    }
+    if (existing.userId != null && existing.userId !== actor.userId) {
+      throw new ForbiddenException('Esta credencial ya pertenece a otro usuario');
+    }
+    return actor.userId;
   }
 
   /**
@@ -119,38 +153,52 @@ export class CredentialsService {
     if (!isAdmin(actor)) {
       if (!actor.userId) return [];
       qb.andWhere('c.user_id = :userId', { userId: actor.userId });
-    } else if (actor.userId) {
-      // Admin con sesión: por defecto solo las propias en UI de perfil; sin filtro extra = todas
     }
-    qb.orderBy('c.createdAt', 'DESC');
-    return qb.getMany();
+    qb.leftJoinAndSelect('c.user', 'u').orderBy('c.createdAt', 'DESC');
+    const rows = await qb.getMany();
+    return rows.map((c) => this.toPublicView(c));
   }
 
   async findOne(
     id: string,
     actor: CredentialActor,
-  ): Promise<Omit<CredentialEntity, 'encryptedValue'>> {
-    await this.assertCanAccess(id, actor);
-    const c = await this.repo.findOne({
-      where: { id },
-      select: ['id', 'provider', 'kind', 'name', 'extra', 'userId', 'createdAt', 'updatedAt'],
-    });
-    if (!c) throw new NotFoundException(`Credential ${id} not found`);
-    return c;
+  ): Promise<Omit<CredentialEntity, 'encryptedValue'> & { ownerEmail: string | null; ownerName: string | null }> {
+    const c = await this.assertCanAccess(id, actor);
+    return this.toPublicView(c);
   }
 
   async update(
     id: string,
-    dto: { value?: string; name?: string | null; extra?: Record<string, unknown> | null },
+    dto: {
+      value?: string;
+      name?: string | null;
+      extra?: Record<string, unknown> | null;
+      userId?: string | null;
+    },
     actor: CredentialActor,
-  ): Promise<Omit<CredentialEntity, 'encryptedValue'>> {
-    const existing = await this.assertCanAccess(id, actor);
+  ): Promise<Omit<CredentialEntity, 'encryptedValue'> & { ownerEmail: string | null; ownerName: string | null }> {
+    let existing = await this.repo.findOne({ where: { id }, relations: { user: true } });
+    if (!existing) throw new NotFoundException(`Credential ${id} not found`);
+
+    const claimOnly =
+      dto.userId !== undefined &&
+      actor.userId &&
+      dto.userId === actor.userId &&
+      existing.userId == null;
+    if (!claimOnly) {
+      existing = await this.assertCanAccess(id, actor);
+    } else if (!isAdmin(actor) && existing.kind === 'webhook_secret') {
+      throw new ForbiddenException('No puedes reclamar un webhook secret global');
+    }
 
     const updates: {
       name?: string | null;
       encryptedValue?: string;
       extra?: Record<string, unknown> | null;
+      userId?: string | null;
     } = {};
+    const nextOwner = this.resolveUserIdReassignment(existing, dto.userId, actor);
+    if (nextOwner !== undefined) updates.userId = nextOwner;
     if (dto.name !== undefined) updates.name = dto.name ?? null;
     if (dto.extra !== undefined) updates.extra = dto.extra ?? null;
     if (dto.value != null && dto.value.trim() !== '') {
@@ -170,6 +218,14 @@ export class CredentialsService {
     this.bbCache.delete(id);
     this.ghCache.delete(id);
     return this.findOne(id, actor);
+  }
+
+  /** Reclama credencial legado (user_id null) para el usuario actual. */
+  async claimForActor(
+    id: string,
+    actor: CredentialActor,
+  ): Promise<Omit<CredentialEntity, 'encryptedValue'> & { ownerEmail: string | null; ownerName: string | null }> {
+    return this.update(id, { userId: actor.userId ?? null }, actor);
   }
 
   async delete(id: string, actor: CredentialActor): Promise<void> {

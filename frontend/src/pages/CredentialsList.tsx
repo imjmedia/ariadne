@@ -206,6 +206,7 @@ export function CredentialsList() {
                     <TableHead className="text-xs font-medium text-[var(--foreground-muted)]">Provider</TableHead>
                     <TableHead className="text-xs font-medium text-[var(--foreground-muted)]">Tipo</TableHead>
                     <TableHead className="text-xs font-medium text-[var(--foreground-muted)]">Nombre</TableHead>
+                    <TableHead className="text-xs font-medium text-[var(--foreground-muted)]">Propietario</TableHead>
                     <TableHead className="text-xs font-medium text-[var(--foreground-muted)]">Creado</TableHead>
                     <TableHead className="w-[200px] text-right text-xs font-medium text-[var(--foreground-muted)]">
                       Acciones
@@ -218,6 +219,11 @@ export function CredentialsList() {
                       <TableCell className="font-medium">{c.provider}</TableCell>
                       <TableCell>{c.kind}</TableCell>
                       <TableCell className="text-[var(--foreground-muted)]">{c.name ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-[var(--foreground-muted)]">
+                        {!c.userId
+                          ? 'Legado'
+                          : c.ownerEmail ?? c.userId.slice(0, 8)}
+                      </TableCell>
                       <TableCell className="text-xs text-[var(--foreground-muted)]">
                         {new Date(c.createdAt).toLocaleString()}
                       </TableCell>
