@@ -156,9 +156,9 @@ export function CredentialsList() {
       <div className={panelIntroClass}>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Credenciales</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
-          Tokens y secrets cifrados en base de datos. Se asignan a repositorios con{' '}
-          <span className="font-mono text-xs text-[var(--foreground)]">credentialsRef</span> para descubrir
-          workspaces, repos y ramas sin exponer el valor en el cliente.
+          Tu token personal de Bitbucket o GitHub (cifrado en base de datos). Al sincronizar un repositorio se usa
+          automáticamente tu credencial; solo tú ves y editas las tuyas. Opcionalmente puedes asignar una credencial
+          concreta al dar de alta un repo.
         </p>
       </div>
 
@@ -190,8 +190,8 @@ export function CredentialsList() {
               </div>
               <p className="m-0 text-sm font-medium text-[var(--foreground)]">Aún no hay credenciales</p>
               <p className="mt-2 max-w-sm text-xs leading-relaxed text-[var(--foreground-muted)]">
-                Crea una para conectar Bitbucket o GitHub al indexar repos. El secreto se guarda cifrado; aquí solo verás
-                proveedor, tipo y nombre opcional.
+                Registra tu App Password o API token de Atlassian/GitHub. El sync usará esta credencial con tu cuenta;
+                el valor nunca se muestra en la UI.
               </p>
               <Button type="button" className="mt-6 h-11 gap-2 rounded-xl px-5" onClick={handleOpenCreate}>
                 <Plus className="size-4" aria-hidden />

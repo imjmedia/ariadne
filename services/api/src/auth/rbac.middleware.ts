@@ -7,8 +7,6 @@ import type { AuthenticatedUser } from './otp.middleware';
 
 /** Path pattern + method → blocked for non-admin. */
 const BLOCKED_PATTERNS: Array<{ pattern: RegExp; methods: string[]; reason: string }> = [
-  // Credenciales: crear, editar, eliminar
-  { pattern: /^\/api\/credentials\/?\w*/ , methods: ['POST', 'PATCH', 'DELETE'], reason: 'Gestión de credenciales requiere admin' },
   // Repositorios: crear y eliminar
   { pattern: /^\/api\/repositories\/?$/, methods: ['POST'], reason: 'Crear repositorios requiere admin' },
   { pattern: /^\/api\/repositories\/[\w-]+\/?$/, methods: ['DELETE'], reason: 'Eliminar repositorios requiere admin' },

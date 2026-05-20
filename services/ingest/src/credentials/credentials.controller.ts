@@ -1,29 +1,39 @@
 /**
  * @fileoverview CRUD de credenciales (Bitbucket/GitHub): list, get, create, update, delete. Filtro opcional por provider.
  */
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query } from '@nestjs/common';
 import { CredentialsService } from './credentials.service';
+import { actorFromHeaders } from './credential-actor';
 
 @Controller('credentials')
 export class CredentialsController {
   constructor(private readonly service: CredentialsService) {}
 
-  /** GET /credentials?provider= — Lista credenciales (opcional: filtrar por provider). */
+  /** GET /credentials?provider= — Lista credenciales del usuario (admin: todas). */
   @Get()
-  findAll(@Query('provider') provider?: string) {
-    return this.service.findAll(provider);
+  findAll(
+    @Query('provider') provider: string | undefined,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.service.findAll(provider, actorFromHeaders(headers));
   }
 
   /** GET /credentials/:id — Una credencial por ID (sin value en respuesta). */
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.service.findOne(id, actorFromHeaders(headers));
   }
 
   /** POST /credentials — Crear credencial (provider, kind, value, name?, extra?). */
   @Post()
-  create(@Body() dto: import('./dto/create-credential.dto').CreateCredentialDto) {
-    return this.service.create(dto);
+  create(
+    @Body() dto: import('./dto/create-credential.dto').CreateCredentialDto,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.service.create(dto, actorFromHeaders(headers));
   }
 
   /** PATCH /credentials/:id — Actualizar value, name o extra. */
@@ -31,13 +41,17 @@ export class CredentialsController {
   update(
     @Param('id') id: string,
     @Body() dto: import('./dto/update-credential.dto').UpdateCredentialDto,
+    @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    return this.service.update(id, dto);
+    return this.service.update(id, dto, actorFromHeaders(headers));
   }
 
   /** DELETE /credentials/:id — Elimina credencial. */
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    await this.service.delete(id);
+  async delete(
+    @Param('id') id: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    await this.service.delete(id, actorFromHeaders(headers));
   }
 }

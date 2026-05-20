@@ -7,7 +7,10 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { UserEntity } from '../../users/entities/user.entity';
 
 export type CredentialProvider = 'bitbucket' | 'github';
 export type CredentialKind =
@@ -37,6 +40,14 @@ export class CredentialEntity {
   /** Extra JSON: { username } for app_password */
   @Column({ type: 'jsonb', nullable: true })
   extra!: Record<string, unknown> | null;
+
+  /** Propietario (token personal). Null = legado / webhook global. */
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId!: string | null;
+
+  @ManyToOne(() => UserEntity, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user?: UserEntity | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

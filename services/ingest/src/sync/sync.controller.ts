@@ -1,11 +1,12 @@
 /**
  * @fileoverview Controlador para encolar sync (full), resync (borrar grafo + sync) y resync solo por proyecto.
  */
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Headers, Param, Post } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { JobsOptions, Queue } from 'bullmq';
 import { SYNC_QUEUE } from './sync.processor';
 import { SyncService } from './sync.service';
+import { actorFromHeaders } from '../credentials/credential-actor';
 
 /** Timeout BullMQ (ms) para full-sync; `0` o vacío = sin límite. Ver `BULL_SYNC_JOB_TIMEOUT_MS` en compose/.env. */
 function resolveSyncJobTimeoutMs(): number | undefined {
@@ -31,10 +32,17 @@ export class SyncController {
     private readonly syncService: SyncService,
   ) {}
 
+  private triggeredByUserId(
+    headers: Record<string, string | string[] | undefined>,
+  ): string | undefined {
+    return actorFromHeaders(headers).userId;
+  }
+
   private async enqueueFullSync(data: {
     repositoryId: string;
     syncJobId: string;
     onlyProjectId?: string;
+    triggeredByUserId?: string;
   }): Promise<void> {
     try {
       await this.syncQueue.add('full-sync', data, fullSyncAddOptions());
@@ -49,9 +57,13 @@ export class SyncController {
    * Encola un job de sync completo para el repositorio (todos los proyectos del repo).
    */
   @Post(':id/sync')
-  async triggerSync(@Param('id') id: string) {
+  async triggerSync(
+    @Param('id') id: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
     const syncJob = await this.syncService.createQueuedJob(id);
-    await this.enqueueFullSync({ repositoryId: id, syncJobId: syncJob.id });
+    const triggeredByUserId = this.triggeredByUserId(headers);
+    await this.enqueueFullSync({ repositoryId: id, syncJobId: syncJob.id, triggeredByUserId });
     return { jobId: syncJob.id, queued: true };
   }
 
@@ -59,10 +71,14 @@ export class SyncController {
    * Borra solo los nodos Falkor de este repo (por participación projectId+repoId) y encola sync completo.
    */
   @Post(':id/resync')
-  async resync(@Param('id') id: string) {
+  async resync(
+    @Param('id') id: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
     const { deletedNodes } = await this.syncService.clearRepositoryForResync(id);
     const syncJob = await this.syncService.createQueuedJob(id);
-    await this.enqueueFullSync({ repositoryId: id, syncJobId: syncJob.id });
+    const triggeredByUserId = this.triggeredByUserId(headers);
+    await this.enqueueFullSync({ repositoryId: id, syncJobId: syncJob.id, triggeredByUserId });
     return { jobId: syncJob.id, queued: true, deletedNodes };
   }
 
@@ -74,16 +90,19 @@ export class SyncController {
   async resyncForProject(
     @Param('id') id: string,
     @Body() body: { projectId: string },
+    @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
     const projectId = body?.projectId?.trim();
     if (!projectId) {
       return { jobId: null, queued: false, error: 'projectId required' };
     }
     const syncJob = await this.syncService.createQueuedJob(id);
+    const triggeredByUserId = this.triggeredByUserId(headers);
     await this.enqueueFullSync({
       repositoryId: id,
       syncJobId: syncJob.id,
       onlyProjectId: projectId,
+      triggeredByUserId,
     });
     return { jobId: syncJob.id, queued: true };
   }
