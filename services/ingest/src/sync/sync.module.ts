@@ -13,6 +13,7 @@ import { ProjectEntity } from '../projects/entities/project.entity';
 import { BitbucketModule } from '../bitbucket/bitbucket.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
+import { CredentialsModule } from '../credentials/credentials.module';
 import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
 import { SyncProcessor } from './sync.processor';
@@ -25,6 +26,7 @@ import { SYNC_QUEUE } from '../constants';
     BitbucketModule,
     ProvidersModule,
     RepositoriesModule,
+    CredentialsModule,
     SharedBullModule,
     BullModule.registerQueue({ name: SYNC_QUEUE }),
   ],

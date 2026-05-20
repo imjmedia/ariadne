@@ -23,6 +23,12 @@ openssl rand -base64 32
 - `app_password` — Bitbucket App Password (`extra.username` requerido). Permisos: Account: Read, Workspace membership: Read, Repositories: Read (ver docs/manual/CONFIGURACION_Y_USO.md)
 - `webhook_secret` — Secret para webhook Bitbucket (HMAC-SHA256)
 
-## Uso en repos
+## Alcance por usuario
 
-Al crear un repo con `credentialsRef` (UUID de la credencial), el sync y el webhook usan esa credencial en lugar de las variables de entorno.
+Cada credencial de tipo `token` / `app_password` se guarda con `user_id` (cabeceras `X-User-Id` / `X-User-Role` desde el proxy API). El listado solo muestra las del usuario; admin ve todas.
+
+## Uso en sync
+
+Al encolar sync desde la UI (`POST /repositories/:id/sync`), se usa la credencial del usuario que dispara el job; si no tiene, `repositories.credentialsRef`; si no, variables de entorno.
+
+Al crear un repo puedes fijar `credentialsRef` explícito (p. ej. credencial compartida legada). Webhooks sin usuario siguen con `credentialsRef` del repo o env.

@@ -33,15 +33,21 @@ export class SyncProcessor extends WorkerHost {
    * @returns jobId e indexed.
    */
   async process(
-    job: Job<{ repositoryId: string; syncJobId?: string; onlyProjectId?: string }>,
+    job: Job<{
+      repositoryId: string;
+      syncJobId?: string;
+      onlyProjectId?: string;
+      triggeredByUserId?: string;
+    }>,
   ): Promise<{ jobId: string; indexed: number }> {
-    const { repositoryId, syncJobId, onlyProjectId } = job.data;
+    const { repositoryId, syncJobId, onlyProjectId, triggeredByUserId } = job.data;
     this.logger.log(
       `Processing sync job ${job.id} for repository ${repositoryId}${onlyProjectId ? ` (project ${onlyProjectId})` : ''}`,
     );
     try {
       const result = await this.syncService.runFullSync(repositoryId, syncJobId, {
         ...(onlyProjectId && { onlyProjectId }),
+        ...(triggeredByUserId && { triggeredByUserId }),
       });
       this.logger.log(`Sync job ${job.id} completed — indexed ${result.indexed} files`);
       return result;

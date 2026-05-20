@@ -16,6 +16,9 @@ import { RepositoriesService } from './repositories.service';
 import { FileContentService } from './file-content.service';
 import { JobAnalysisService } from './job-analysis.service';
 import { EmbeddingModule } from '../embedding/embedding.module';
+import { CredentialsModule } from '../credentials/credentials.module';
+import { BitbucketModule } from '../bitbucket/bitbucket.module';
+import { ProvidersModule } from '../providers/providers.module';
 import { EmbedIndexService } from '../embedding/embed-index.service';
 import { SYNC_QUEUE } from '../constants';
 
@@ -23,6 +26,9 @@ import { SYNC_QUEUE } from '../constants';
   imports: [
     TypeOrmModule.forFeature([RepositoryEntity, ProjectRepositoryEntity, SyncJob, IndexedFile, ProjectEntity]),
     EmbeddingModule,
+    CredentialsModule,
+    BitbucketModule,
+    ProvidersModule,
     BullModule.registerQueue({ name: SYNC_QUEUE }),
   ],
   controllers: [RepositoriesController],

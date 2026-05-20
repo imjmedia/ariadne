@@ -5,6 +5,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { BitbucketService } from '../bitbucket/bitbucket.service';
 import { GitHubService } from '../providers/github.service';
 import { RepositoriesService } from './repositories.service';
+import { CredentialsService } from '../credentials/credentials.service';
 
 /**
  * Servicio de contenido de archivos: lee archivos y lista ramas desde Bitbucket o GitHub según el proveedor del repo.
@@ -15,6 +16,7 @@ export class FileContentService {
     private readonly repos: RepositoriesService,
     private readonly bitbucket: BitbucketService,
     private readonly github: GitHubService,
+    private readonly credentials: CredentialsService,
   ) {}
 
   /**
@@ -62,9 +64,17 @@ export class FileContentService {
   async listBranches(
     repositoryId: string,
     credentialsRef?: string | null,
+    triggeredByUserId?: string | null,
   ): Promise<string[]> {
     const repo = await this.repos.findOne(repositoryId);
-    const credRef = credentialsRef ?? repo.credentialsRef;
+    let credRef = credentialsRef ?? null;
+    if (!credRef) {
+      credRef = await this.credentials.resolveRefForSync({
+        repoCredentialsRef: repo.credentialsRef,
+        provider: repo.provider,
+        triggeredByUserId: triggeredByUserId ?? undefined,
+      });
+    }
     if (repo.provider === 'bitbucket') {
       return this.bitbucket.listBranches(
         repo.projectKey,
@@ -132,9 +142,17 @@ export class FileContentService {
     repositoryId: string,
     pathPrefix?: string,
     credentialsRef?: string | null,
+    triggeredByUserId?: string | null,
   ): Promise<string[]> {
     const repo = await this.repos.findOne(repositoryId);
-    const credRef = credentialsRef ?? repo.credentialsRef;
+    let credRef = credentialsRef ?? null;
+    if (!credRef) {
+      credRef = await this.credentials.resolveRefForSync({
+        repoCredentialsRef: repo.credentialsRef,
+        provider: repo.provider,
+        triggeredByUserId: triggeredByUserId ?? undefined,
+      });
+    }
     let files: string[];
     if (repo.provider === 'bitbucket') {
       files = await this.bitbucket.listFiles(

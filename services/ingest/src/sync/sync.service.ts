@@ -9,6 +9,7 @@ import { RepositoriesService } from '../repositories/repositories.service';
 import { EmbedIndexService } from '../embedding/embed-index.service';
 import { BitbucketService } from '../bitbucket/bitbucket.service';
 import { GitHubService } from '../providers/github.service';
+import { CredentialsService } from '../credentials/credentials.service';
 import { runShallowClone } from '../providers/git-clone.provider';
 import {
   getFalkorConfig,
@@ -102,6 +103,7 @@ export class SyncService {
     private readonly repos: RepositoriesService,
     private readonly bitbucket: BitbucketService,
     private readonly github: GitHubService,
+    private readonly credentials: CredentialsService,
     private readonly embedIndex: EmbedIndexService,
     @InjectRepository(SyncJob)
     private readonly syncJobRepo: Repository<SyncJob>,
@@ -250,13 +252,13 @@ export class SyncService {
    * Escribe nodos en cada proyecto al que pertenece el repo (standalone + project_repositories).
    * @param {string} repositoryId - ID del repositorio.
    * @param {string} [existingSyncJobId] - ID de job ya creado (opcional).
-   * @param {object} [options] - onlyProjectId: si se pasa, solo se indexa en ese proyecto (y antes se limpia ese projectId+repoId).
+   * @param {object} [options] - onlyProjectId; triggeredByUserId: token personal del usuario que encoló el sync.
    * @returns {Promise<{ jobId: string; indexed: number }>}
    */
   async runFullSync(
     repositoryId: string,
     existingSyncJobId?: string,
-    options?: { onlyProjectId?: string },
+    options?: { onlyProjectId?: string; triggeredByUserId?: string },
   ): Promise<{ jobId: string; indexed: number }> {
     const repo = await this.repos.findOne(repositoryId);
     const provider = this.getRepoProvider(repo.provider);
@@ -307,8 +309,14 @@ export class SyncService {
         projectIdsFromJunction.length > 0 ? projectIdsFromJunction : [repoId];
     }
 
+    const credentialsRef = await this.credentials.resolveRefForSync({
+      repoCredentialsRef: repo.credentialsRef,
+      provider: repo.provider,
+      triggeredByUserId: options?.triggeredByUserId,
+    });
+
     const hasCreds =
-      repo.credentialsRef ||
+      credentialsRef ||
       (repo.provider === 'bitbucket' && (process.env.BITBUCKET_TOKEN || process.env.BITBUCKET_APP_PASSWORD)) ||
       (repo.provider === 'github' && (process.env.GITHUB_TOKEN || process.env.GH_TOKEN));
 
@@ -316,8 +324,8 @@ export class SyncService {
     if (hasCreds && (repo.provider === 'bitbucket' || repo.provider === 'github')) {
       const cloneOpts =
         repo.provider === 'bitbucket'
-          ? await this.bitbucket.getCloneOpts(owner, repoSlug, ref, repo.credentialsRef)
-          : await this.github.getCloneOpts(owner, repoSlug, ref, repo.credentialsRef);
+          ? await this.bitbucket.getCloneOpts(owner, repoSlug, ref, credentialsRef)
+          : await this.github.getCloneOpts(owner, repoSlug, ref, credentialsRef);
       if (cloneOpts?.token) {
         try {
           await this.updateJobProgress(job.id, { phase: 'mapping', message: 'cloning' });
@@ -346,7 +354,7 @@ export class SyncService {
         getLatestCommitSha = cloneResult.getLatestCommitSha;
       } else {
         await this.updateJobProgress(job.id, { phase: 'mapping' });
-        const mapping = await this.phaseMapping(provider, owner, repoSlug, ref, repo.credentialsRef);
+        const mapping = await this.phaseMapping(provider, owner, repoSlug, ref, credentialsRef);
         paths = mapping.paths;
         pathSet = mapping.pathSet;
         const p = provider;
@@ -355,20 +363,27 @@ export class SyncService {
         }
         getContent = async (relPath: string) => {
           try {
-            return await p.getFileContent(owner, repoSlug, ref, relPath, repo.credentialsRef);
+            return await p.getFileContent(owner, repoSlug, ref, relPath, credentialsRef);
           } catch {
             return null;
           }
         };
         getLatestCommitSha = () =>
-          p.getLatestCommitSha(owner, repoSlug, ref, repo.credentialsRef);
+          p.getLatestCommitSha(owner, repoSlug, ref, credentialsRef);
       }
 
       if (repo.indexIncludeRules != null) {
         if (cloneResult) {
           paths = augmentClonePathsForIndexRules(cloneResult.workDir, paths, repo.indexIncludeRules);
         } else {
-          paths = await this.mergeIndexIncludeRulesApiPaths(repo, owner, repoSlug, ref, paths);
+          paths = await this.mergeIndexIncludeRulesApiPaths(
+            repo,
+            owner,
+            repoSlug,
+            ref,
+            paths,
+            credentialsRef,
+          );
         }
         pathSet = new Set(paths);
       }
@@ -394,7 +409,7 @@ export class SyncService {
           owner,
           repoSlug,
           ref,
-          repo.credentialsRef,
+          credentialsRef,
         );
       }
 
@@ -851,6 +866,7 @@ export class SyncService {
     repoSlug: string,
     ref: string,
     paths: string[],
+    credentialsRef: string | null,
   ): Promise<string[]> {
     const rules = repo.indexIncludeRules;
     if (!rules) return paths;
@@ -858,9 +874,9 @@ export class SyncService {
     let rootNames: string[] = [];
     try {
       if (repo.provider === 'github') {
-        rootNames = await this.github.listRootFiles(owner, repoSlug, ref, repo.credentialsRef);
+        rootNames = await this.github.listRootFiles(owner, repoSlug, ref, credentialsRef);
       } else if (repo.provider === 'bitbucket') {
-        rootNames = await this.bitbucket.listRootFiles(owner, repoSlug, ref, repo.credentialsRef);
+        rootNames = await this.bitbucket.listRootFiles(owner, repoSlug, ref, credentialsRef);
       }
     } catch (e) {
       console.warn('Sync: listRootFiles failed', e);

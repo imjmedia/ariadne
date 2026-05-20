@@ -71,6 +71,10 @@ async function bootstrap() {
         const response = res as Response;
         const requestId = response.locals.requestId || extractRequestId(req.headers);
         if (requestId) proxyReq.setHeader('X-Request-Id', requestId);
+        const user = (req as import('express').Request & { user?: { userId?: string; role?: string } })
+          .user;
+        if (user?.userId) proxyReq.setHeader('X-User-Id', user.userId);
+        if (user?.role) proxyReq.setHeader('X-User-Role', user.role);
       },
     },
   });

@@ -1,7 +1,8 @@
 /**
  * @fileoverview CRUD repos, branches, file content, embed-index, jobs.
  */
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query } from '@nestjs/common';
+import { actorFromHeaders } from '../credentials/credential-actor';
 import { RepositoriesService } from './repositories.service';
 import { JobAnalysisService } from './job-analysis.service';
 import { CreateRepositoryDto } from './dto/create-repository.dto';
@@ -50,8 +51,14 @@ export class RepositoriesController {
   async listBranches(
     @Param('id') id: string,
     @Query('credentialsRef') credentialsRef: string | undefined,
+    @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    const branches = await this.fileContent.listBranches(id, credentialsRef ?? null);
+    const { userId } = actorFromHeaders(headers);
+    const branches = await this.fileContent.listBranches(
+      id,
+      credentialsRef ?? null,
+      userId,
+    );
     return { branches };
   }
 
@@ -80,8 +87,15 @@ export class RepositoriesController {
     @Param('id') id: string,
     @Query('path') path: string | undefined,
     @Query('credentialsRef') credentialsRef: string | undefined,
+    @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
-    const files = await this.fileContent.listFiles(id, path?.trim() || undefined, credentialsRef ?? null);
+    const { userId } = actorFromHeaders(headers);
+    const files = await this.fileContent.listFiles(
+      id,
+      path?.trim() || undefined,
+      credentialsRef ?? null,
+      userId,
+    );
     return { files };
   }
 
