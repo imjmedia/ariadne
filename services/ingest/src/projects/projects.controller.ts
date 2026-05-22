@@ -167,6 +167,15 @@ export class ProjectsController {
     return this.service.setRepositoryRole(projectId, repoId, body.role);
   }
 
+  /**
+   * Desasocia el repo del proyecto (quita project_repositories y nodos Falkor de ese slice).
+   * No borra el repositorio en Postgres ni en /repositorios.
+   */
+  @Delete(':id/repositories/:repoId')
+  async detachRepository(@Param('id') projectId: string, @Param('repoId') repoId: string) {
+    return this.reposService.detachFromProject(projectId, repoId);
+  }
+
   @Delete(':id')
   async remove(@Param('id') id: string) {
     await this.service.remove(id);
