@@ -1,5 +1,5 @@
 /**
- * Parseo de Strapi v4 `content-types/**/schema.json` → atributos y relaciones para grafo + RAG.
+ * Parseo de Strapi v4 schema.json bajo content-types (atributos y relaciones para grafo + RAG).
  */
 import { isStrapiIndexableJsonPath } from '../providers/sync-path-filter';
 
@@ -57,22 +57,22 @@ function buildAttributesSummary(attrs: StrapiAttributeField[]): string {
   return attrs
     .map((f) => {
       if (f.type === 'relation' && f.target) {
-        const rel = f.relation ? `${f.relation}→` : '→';
-        return `${f.name}:relation(${rel}${f.target})`;
+        const rel = f.relation ? f.relation + '->' : '->';
+        return f.name + ':relation(' + rel + f.target + ')';
       }
       if (f.target && (f.type === 'component' || f.type === 'dynamiczone')) {
-        return `${f.name}:${f.type}(${f.target})`;
+        return f.name + ':' + f.type + '(' + f.target + ')';
       }
       const flags = [f.required ? 'required' : null, f.multiple ? 'multiple' : null]
         .filter(Boolean)
         .join(',');
-      return flags ? `${f.name}:${f.type}[${flags}]` : `${f.name}:${f.type}`;
+      return flags ? f.name + ':' + f.type + '[' + flags + ']' : f.name + ':' + f.type;
     })
     .join('; ');
 }
 
 /**
- * Parsea un `schema.json` de Strapi v4. Devuelve null si el path no aplica o el JSON es inválido.
+ * Parsea schema.json de Strapi v4. Devuelve null si el path no aplica o el JSON es invalido.
  */
 export function parseStrapiSchemaJson(path: string, source: string): StrapiContentTypeParsed | null {
   const norm = path.replace(/\\/g, '/');
@@ -126,27 +126,40 @@ export function formatStrapiSchemasForRag(
   lines.push('### Strapi (content-types / schema.json)');
   lines.push('');
   if (entries.length === 0) {
-    lines.push('_(No hay `schema.json` de content-types en este snapshot.)_');
+    lines.push('_(No hay schema.json de content-types en este snapshot.)_');
     lines.push('');
     return lines;
   }
   for (const { path, schema } of entries) {
     const label = schema.displayName ?? schema.name;
-    const coll = schema.collectionName ? ` — colección \`${schema.collectionName}\`` : '';
-    const kind = schema.kind ? ` (${schema.kind})` : '';
-    lines.push(`- **${label}** \`${schema.name}\`${kind}${coll} — \`${path}\``);
+    const coll = schema.collectionName ? ' - coleccion `' + schema.collectionName + '`' : '';
+    const kind = schema.kind ? ' (' + schema.kind + ')' : '';
+    lines.push('- **' + label + '** `' + schema.name + '`' + kind + coll + ' - `' + path + '`');
     if (schema.attributes.length === 0) {
       lines.push('  - _(sin attributes en schema)_');
     } else {
       for (const a of schema.attributes) {
         if (a.type === 'relation' && a.target) {
           lines.push(
-            `  - \`${a.name}\`: relation ${a.relation ?? ''} → \`${a.target}\`${a.required ? ' (required)' : ''}`,
+            '  - `' +
+              a.name +
+              '`: relation ' +
+              (a.relation ?? '') +
+              ' -> `' +
+              a.target +
+              '`' +
+              (a.required ? ' (required)' : ''),
           );
         } else {
-          const extra = a.target ? ` (${a.target})` : '';
+          const extra = a.target ? ' (' + a.target + ')' : '';
           lines.push(
-            `  - \`${a.name}\`: ${a.type}${extra}${a.required ? ' (required)' : ''}${a.multiple ? ' (multiple)' : ''}`,
+            '  - `' +
+              a.name +
+              '`: ' +
+              a.type +
+              extra +
+              (a.required ? ' (required)' : '') +
+              (a.multiple ? ' (multiple)' : ''),
           );
         }
       }
