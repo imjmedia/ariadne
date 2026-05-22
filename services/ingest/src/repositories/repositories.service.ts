@@ -126,6 +126,26 @@ export class RepositoriesService {
   }
 
   /**
+   * Quita el repo del proyecto: borra el slice Falkor (projectId, repoId) y la fila en project_repositories.
+   * El registro en `repositories` y su índice standalone (si existía) no se eliminan.
+   */
+  async detachFromProject(
+    projectId: string,
+    repoId: string,
+  ): Promise<{ projectId: string; repoId: string; deletedNodes: number }> {
+    await this.findOne(repoId);
+    const link = await this.projectRepoRepo.findOne({ where: { projectId, repoId } });
+    if (!link) {
+      throw new NotFoundException(
+        `Repositorio ${repoId} no está asociado al proyecto ${projectId}`,
+      );
+    }
+    const { deletedNodes } = await this.clearProjectRepoGraphSlice(projectId, repoId);
+    await this.removeRepoFromProject(repoId, projectId);
+    return { projectId, repoId, deletedNodes };
+  }
+
+  /**
    * Obtiene un repositorio por ID. Lanza NotFoundException si no existe.
    * @param {string} id - UUID del repositorio.
    * @returns {Promise<RepositoryEntity>}
@@ -380,11 +400,11 @@ export class RepositoriesService {
     const projectIds = await this.getProjectIdsForRepo(repositoryId);
     let deletedNodes = 0;
     if (projectIds.length === 0) {
-      const r = await this.clearProjectRepo(repositoryId, repositoryId);
+      const r = await this.clearProjectRepoGraphSlice(repositoryId, repositoryId);
       deletedNodes += r.deletedNodes;
     } else {
       for (const projectId of projectIds) {
-        const r = await this.clearProjectRepo(projectId, repositoryId);
+        const r = await this.clearProjectRepoGraphSlice(projectId, repositoryId);
         deletedNodes += r.deletedNodes;
       }
     }
@@ -392,7 +412,10 @@ export class RepositoriesService {
   }
 
   /** Borra del grafo Falkor solo los nodos de un (projectId, repoId). */
-  private async clearProjectRepo(projectId: string, repoId: string): Promise<{ deletedNodes: number }> {
+  async clearProjectRepoGraphSlice(
+    projectId: string,
+    repoId: string,
+  ): Promise<{ deletedNodes: number }> {
     const config = getFalkorConfig();
     const client = await FalkorDB.connect({
       socket: { host: config.host, port: config.port },

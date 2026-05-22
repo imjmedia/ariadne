@@ -91,6 +91,12 @@ export const api = {
       `/projects/${projectId}/repositories/${repoId}`,
       { method: 'PATCH', body: JSON.stringify({ role: role === '' ? null : role }) },
     ),
+  /** Quita el repo del proyecto sin eliminar el registro del repositorio. */
+  detachProjectRepository: (projectId: string, repoId: string) =>
+    request<{ projectId: string; repoId: string; deletedNodes: number }>(
+      `/projects/${projectId}/repositories/${repoId}`,
+      { method: 'DELETE' },
+    ),
   regenerateProjectId: (projectId: string) =>
     request<{ newProjectId: string }>(`/projects/${projectId}/regenerate-id`, {
       method: 'POST',

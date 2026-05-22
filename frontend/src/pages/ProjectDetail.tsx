@@ -34,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Pencil, RefreshCw } from 'lucide-react';
+import { Link2Off, Pencil, RefreshCw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { ArchitecturePanel } from './ProjectDetail/ArchitecturePanel';
@@ -258,6 +258,7 @@ export function ProjectDetail() {
   const [regeneratingProjectId, setRegeneratingProjectId] = useState(false);
   const [resyncProjectBusy, setResyncProjectBusy] = useState(false);
   const [roleSavingRepoId, setRoleSavingRepoId] = useState<string | null>(null);
+  const [detachingRepoId, setDetachingRepoId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<'general' | 'architecture'>('general');
   const [domains, setDomains] = useState<Domain[]>([]);
   const [savingDomain, setSavingDomain] = useState(false);
@@ -348,6 +349,29 @@ export function ProjectDetail() {
       setError(e instanceof Error ? e.message : 'Error al guardar rol');
     } finally {
       setRoleSavingRepoId(null);
+    }
+  };
+
+  /** Quita el repo de este proyecto (no borra el registro en /repositorios). */
+  const detachRepo = async (repo: { id: string; projectKey: string; repoSlug: string }) => {
+    if (!id) return;
+    const label = `${repo.projectKey}/${repo.repoSlug}`;
+    if (
+      !window.confirm(
+        `¿Quitar "${label}" de este proyecto?\n\nSe eliminará su índice en el grafo de este proyecto. El repositorio seguirá existiendo en Ariadne y podrás volver a asociarlo.`,
+      )
+    ) {
+      return;
+    }
+    setDetachingRepoId(repo.id);
+    setError(null);
+    try {
+      await api.detachProjectRepository(id, repo.id);
+      await fetchProject();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al desasociar el repositorio');
+    } finally {
+      setDetachingRepoId(null);
     }
   };
 
@@ -851,6 +875,18 @@ export function ProjectDetail() {
                               </Button>
                               <Button variant="outline" size="sm" className="rounded-lg" asChild>
                                 <Link to={`/repos/${r.id}`}>Detalle</Link>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg text-[var(--destructive)] hover:bg-[color-mix(in_oklch,var(--destructive)_12%,var(--card))]"
+                                disabled={detachingRepoId === r.id}
+                                title="Quitar del proyecto (no elimina el repositorio)"
+                                onClick={() => void detachRepo(r)}
+                              >
+                                <Link2Off className="mr-1 inline size-3.5" aria-hidden />
+                                {detachingRepoId === r.id ? 'Quitando…' : 'Quitar'}
                               </Button>
                             </div>
                           </TableCell>
