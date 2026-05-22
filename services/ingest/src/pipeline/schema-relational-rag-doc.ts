@@ -8,6 +8,7 @@ import { cypherSafe } from 'ariadne-common';
 import type { ParsedFile } from './parser';
 import { listOpenApiOperations } from './openapi-spec-ingest';
 import { STORYBOOK_MAX_EMBED_CHARS } from './storybook-documentation';
+import { formatStrapiSchemasForRag, type StrapiContentTypeParsed } from './strapi-schema-extract';
 
 /** Path virtual (no existe en el repo); no se registra en `indexed_files`. */
 export const SCHEMA_RELATIONAL_RAG_SOURCE_PATH = 'graph-internal/relational-schema-rag-index.md';
@@ -24,9 +25,31 @@ export async function buildSchemaRelationalRagDocumentationText(input: {
   lines.push('## Esquema relacional');
   lines.push('');
   lines.push(
-    'Vista consolidada de datos y contratos HTTP para búsqueda semántica: tablas, modelos, entidades, relaciones entre modelos, base de datos, Prisma, TypeORM, OpenAPI, swagger.',
+    'Vista consolidada de datos y contratos HTTP para búsqueda semántica: tablas, modelos, entidades, Strapi content-types, relaciones, Prisma, TypeORM, OpenAPI, swagger.',
   );
   lines.push('');
+
+  const strapiEntries: Array<{ path: string; schema: StrapiContentTypeParsed }> = [];
+  for (const p of input.parsedFiles) {
+    if (!/\/content-types\/[^/]+\/schema\.json$/i.test(p.path.replace(/\\/g, '/'))) continue;
+    for (const ct of p.strapiContentTypes ?? []) {
+      strapiEntries.push({
+        path: p.path,
+        schema: {
+          name: ct.name,
+          apiName: ct.apiName,
+          kind: ct.kind,
+          collectionName: ct.collectionName,
+          displayName: ct.displayName,
+          singularName: ct.singularName,
+          pluralName: ct.pluralName,
+          attributes: ct.attributes ?? [],
+          attributesSummary: ct.attributesSummary ?? '',
+        },
+      });
+    }
+  }
+  lines.push(...formatStrapiSchemasForRag(strapiEntries));
 
   if (input.prismaFiles.length === 0) {
     lines.push('### Prisma');
