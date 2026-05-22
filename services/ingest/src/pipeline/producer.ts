@@ -434,8 +434,16 @@ export function buildCypherForFile(
   }
 
   for (const ct of parsed.strapiContentTypes ?? []) {
+    const displayName = ct.displayName != null ? cypherSafe(ct.displayName) : 'null';
+    const collectionName = ct.collectionName != null ? cypherSafe(ct.collectionName) : 'null';
+    const kind = ct.kind != null ? cypherSafe(ct.kind) : 'null';
+    const apiName = ct.apiName != null ? cypherSafe(ct.apiName) : 'null';
+    const attrs =
+      ct.attributesSummary != null && ct.attributesSummary.length > 0
+        ? cypherSafe(ct.attributesSummary)
+        : 'null';
     statements.push(
-      `MERGE (ct:StrapiContentType {path: ${cypherSafe(path)}, name: ${cypherSafe(ct.name)}, projectId: ${pid}, repoId: ${rid}})`,
+      `MERGE (ct:StrapiContentType {path: ${cypherSafe(path)}, name: ${cypherSafe(ct.name)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET ct.displayName = ${displayName}, ct.collectionName = ${collectionName}, ct.kind = ${kind}, ct.apiName = ${apiName}, ct.attributesSummary = ${attrs} ON MATCH SET ct.displayName = ${displayName}, ct.collectionName = ${collectionName}, ct.kind = ${kind}, ct.apiName = ${apiName}, ct.attributesSummary = ${attrs}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ct:StrapiContentType {path: ${cypherSafe(path)}, name: ${cypherSafe(ct.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(ct)`,

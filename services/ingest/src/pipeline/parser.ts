@@ -19,6 +19,7 @@ import {
   type StorybookDocumentationExtract,
 } from './storybook-documentation';
 import { extractStorybookCsfMetaTargets, isStorybookStoriesPath } from './storybook-csf-ast';
+import { parseStrapiSchemaJson } from './strapi-schema-extract';
 
 const ts = TypeScript as unknown as { typescript: unknown; tsx: unknown };
 const LANG_JS = JavaScript as unknown;
@@ -133,6 +134,14 @@ export interface NestServiceInfo {
 /** Strapi v4 content-type (schema file). */
 export interface StrapiContentTypeInfo {
   name: string;
+  apiName?: string;
+  kind?: string;
+  collectionName?: string;
+  displayName?: string;
+  singularName?: string;
+  pluralName?: string;
+  attributesSummary?: string;
+  attributes?: import('./strapi-schema-extract').StrapiAttributeField[];
 }
 
 /** Strapi v4 API controller. */
@@ -367,11 +376,21 @@ function findNodesByType(
 }
 
 /** Strapi v4: detect by path pattern (api/content-types, api/controllers, api/services). */
-function collectStrapiFromPath(path: string, result: ParsedFile): void {
+function collectStrapiFromPath(path: string, source: string, result: ParsedFile): void {
   const norm = path.replace(/\\/g, '/');
-  const contentTypesMatch = norm.match(/\/api\/([^/]+)\/content-types\/([^/]+)\/schema\.(json|ts|js)$/);
+  const schemaJsonMatch = norm.match(/\/api\/([^/]+)\/content-types\/([^/]+)\/schema\.json$/i);
+  if (schemaJsonMatch) {
+    const parsed = parseStrapiSchemaJson(path, source);
+    if (parsed) {
+      result.strapiContentTypes.push(parsed);
+      return;
+    }
+    result.strapiContentTypes.push({ name: schemaJsonMatch[2]!, apiName: schemaJsonMatch[1] });
+    return;
+  }
+  const contentTypesMatch = norm.match(/\/api\/([^/]+)\/content-types\/([^/]+)\/schema\.(ts|js)$/);
   if (contentTypesMatch) {
-    result.strapiContentTypes.push({ name: contentTypesMatch[2] });
+    result.strapiContentTypes.push({ name: contentTypesMatch[2]!, apiName: contentTypesMatch[1] });
     return;
   }
   const controllersMatch = norm.match(/\/api\/([^/]+)\/controllers\/([^/]+)\.(ts|js)$/);
@@ -553,10 +572,18 @@ export function parseSource(
   domainConcepts: [],
   };
 
-  collectStrapiFromPath(path, result);
+  collectStrapiFromPath(path, source, result);
 
   const normPathEarly = path.replace(/\\/g, '/');
   const lowerEarly = normPathEarly.toLowerCase();
+  if (/\/content-types\/[^/]+\/schema\.json$/i.test(normPathEarly)) {
+    if (options.returnAst) {
+      const stubParser = new Parser();
+      stubParser.setLanguage(LANG_TS as Parameters<Parser['setLanguage']>[0]);
+      return { parsed: result, root: stubParser.parse('').rootNode, source };
+    }
+    return result.strapiContentTypes.length > 0 ? result : null;
+  }
   if (
     /(^|\/)tsconfig(\.[^/]+)?\.json$/.test(lowerEarly) ||
     lowerEarly.endsWith('/tsconfig.json') ||
