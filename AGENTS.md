@@ -1,89 +1,75 @@
-# Protocolo para Agentes (AriadneSpecs Oracle)
+# AGENTS.md — Ariadne Codebase Intelligence
 
-## Protocolo de sesión
+You have access to **Ariadne MCP** — a knowledge graph of this codebase powered by FalkorDB. It knows every component, function, route, model, import, and prop contract. Use it **before** writing code, not after.
 
-Al iniciar una sesión de desarrollo con el MCP AriadneSpecs Oracle:
+## First steps (every session)
 
-1. **OBLIGATORIO: Ejecutar `list_known_projects`** al inicio. Respuesta: `[{ id, name, roots: [{ id, name, branch? }] }]` — `id` = proyecto Ariadne; `roots[].id` = cada repo indexado. Para **`get_modification_plan`** con varios repos en el mismo proyecto, pasa como `projectId` el **`roots[].id` del repositorio donde está el código** (p. ej. frontend), no solo el `id` del proyecto, para no depender del orden interno de repos.
-2. **OBLIGATORIO: Verificar que el `projectId` existe** antes de proponer modificaciones en componentes o funciones. Si una herramienta devuelve `[NOT_FOUND_IN_GRAPH]`, no proceder: solicitar reindexación (sync/resync) o verificar el nombre del nodo.
-3. Usar el resultado para saber qué `projectId` corresponde a cada proyecto cuando consultes el grafo.
-
-## Dominios y contexto multi-grafo
-
-Si el proyecto tiene **dependencias a dominios** (`ProjectDomainDependency` en ingest), el sistema consulta también los grafos Falkor de otros proyectos en esos dominios. Las herramientas y el chat usan **`cypherShardContexts`** (`graphName` + `cypherProjectId` por shard): en Cypher, el parámetro `$projectId` debe coincidir con el `projectId` almacenado en los nodos de ese grafo (no asumir solo el UUID del proyecto “actual”).
-
-## Preferencia projectId
-
-**Fijar proyecto (recomendado):** Si existe `.ariadne-project` en la raíz del workspace, leer su `projectId` y usarlo en **todas** las llamadas al MCP. Evita errores por inferencia o pérdida de contexto.
-
-```json
-// .ariadne-project (raíz del repo que se mantiene)
-{ "projectId": "uuid-del-proyecto" }
+```
+list_known_projects()
 ```
 
-Cuando no hay `.ariadne-project`:
+This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo ID) as `projectId` in multi-root projects, not the project UUID. If you're editing a file, pass `currentFilePath` instead — the server infers the project.
 
-- Pasa **`projectId`** a las herramientas para evitar ambigüedad. Suele valer proyecto Ariadne o **`roots[].id`**; file/chat resuelven con fallback. **`get_project_analysis`:** el MCP llama a `POST /repositories/:id/analyze` si el UUID es **repo** (`roots[].id`) o a `POST /projects/:id/analyze` si es **proyecto** (body con `mode` y, en multi-root, `idePath` / `repositoryId` cuando el ingest lo requiere). **`get_modification_plan`** en multi-root: preferir **`roots[].id`**.
-- Si no pasas `projectId`, usa **`currentFilePath`** (ruta del archivo que el IDE está editando); el sistema intentará inferir el proyecto.
-- **Prioriza pasar `projectId`** explícito. Nunca inventes ni asumas IDs.
+## Core workflow
 
-## Herramientas por intención
+```
+1. semantic_search("what you're looking for")   → find relevant code
+2. get_file_context(filePath) or get_file_content(path)  → read the file
+3. validate_before_edit(nodeName)                → check impact + contract
+4. Edit the code
+5. analyze_local_changes()                       → pre-commit blast radius check
+```
 
-| Intención del usuario | Herramienta MCP | Flujo |
-|----------------------|-----------------|-------|
-| **Diagnóstico de archivo/componente/hook específico** ("diagnóstico de usePauta.tsx", "analiza Board") | **`get_component_graph`**, **`get_legacy_impact`**, **`get_definitions`**, **`get_references`** | `list_known_projects` → projectId → `get_component_graph(componentName/hookName)` + `get_legacy_impact(nodeName)` + `get_definitions` / `get_references` para estructura, impacto y usos. **No solo Read/Grep.** |
-| Diagnóstico por repo/proyecto: deuda técnica, duplicados, reingeniería, código muerto, auditoría heurística de seguridad (`seguridad`) | **`get_project_analysis`** | `list_known_projects` → `projectId` = **`roots[].id`** del repo **o** id del proyecto Ariadne; con varios roots, **`currentFilePath`** (o `repositoryId` explícito en ingest) para resolver el repo → `get_project_analysis(projectId?, mode, currentFilePath?)` |
-| Preguntas abiertas en lenguaje natural ("¿cómo funciona X?", "explica el flujo de Y") | **`ask_codebase`** | Ingest u orchestrator (Coordinator: grafo Falkor + archivos: Prisma, OpenAPI, package.json, `.env.example`, tsconfig). Opcional **`scope`**, **`twoPhase`**, **`responseMode`** (`default` \| `evidence_first` \| `raw_evidence`) y **`deterministicRetriever`** (solo `raw_evidence`). Con **`evidence_first`** la respuesta es **JSON MDD de 7 secciones** (`summary`, `openapi_spec`, `entities`, `api_contracts`, `business_logic`, `infrastructure`, `risk_report`, `evidence_paths`) para LegacyCoordinator/The Forge; con orchestrator se construye vía `POST /internal/repositories/:id/mdd-evidence`. Requiere **INGEST_URL** y **LLM** (`LLM_*`); por red Docker interna. **MCP:** si omites `responseMode`, el servidor MCP usa **`raw_evidence`** + **`deterministicRetriever: true`** (no es lo mismo que “Chat normal” en la UI The Forge); para prosa+ReAct pasa **`responseMode: "default"`**. Ver `docs/notebooklm/mcp_server_specs.md` (*Modo The Forge*). |
-| **Lista de archivos a modificar + preguntas de afinación (flujo legacy/MaxPrime)** | **`get_modification_plan`** | `list_known_projects` → `projectId` = `roots[].id` en multi-root. Body opcional **`scope`**. `POST /projects/:id/modification-plan` (proyecto o repo). |
-| Búsqueda por término, exploración | `semantic_search`, `find_similar_implementations` | Consulta directa al grafo. |
-| Antes de editar componente/función | `validate_before_edit` | Ver sección Flujo SDD. |
+## Tool catalog
 
-**Proyecto por nombre:** `list_known_projects` → localizar por `name`. Para **`get_project_analysis`**, preferir **`roots[].id`** del repo a analizar; si pasas el **`id` del proyecto** y hay varios repos, aporta **`currentFilePath`** para que el MCP envíe `idePath` al ingest. Para **`get_modification_plan`** (multi-root), **`roots[].id`** del repo donde está el código.
+### Discovery (find things)
+- **`semantic_search`** — Hybrid vector+keyword search. Most common entry point. Pass `query` + optional `projectId`/`limit`.
+- **`find_similar_implementations`** — Before writing a new function, check if something similar already exists.
+- **`ask_codebase`** — Natural language Q&A over the codebase. Requires `question`. Pass `responseMode: "raw_evidence"` for structured JSON. **Route to cheaper tools** (get_file_content, get_definitions) when you already know the path/symbol.
+- **`list_known_projects`** — All indexed projects with IDs and branches.
 
-## Flujo de diagnóstico de archivo/componente/hook
+### Read code
+- **`get_file_content`** — Fetch file contents from Bitbucket/GitHub. Requires `path`. Optional: `projectId`, `ref` (branch).
+- **`get_file_context`** — File contents + its imports + exports. Use as step 2 after finding a file.
+- **`get_definitions`** — Where a symbol is defined (file, line numbers). Avoids hallucinating locations.
+- **`get_references`** — Every place that uses a symbol. Critical before renaming.
+- **`get_implementation_details`** — Props, signatures, descriptions, endpoints for a component/function.
+- **`get_functions_in_file`** — List all functions/components inside a specific file.
 
-**OBLIGATORIO** cuando el usuario pide un diagnóstico o análisis de un archivo/componente/hook específico (ej. "diagnóstico de usePauta.tsx", "analiza Board", "revisa Header"):
+### Graphs & architecture
+- **`get_component_graph`** — Dependency tree (RENDERS, IMPORTS, USES_HOOK). Uses Nest API with auth forwarding.
+- **`get_c4_model`** — C4 architecture model (systems, containers, relationships).
+- **`get_import_graph`** — What a file imports and exports.
+- **`generate_navigation_map`** — Full frontend route map with components, forms, and API endpoints. Supports diff mode.
+- **`extract_design_tokens`** — Parse Tailwind/CSS tokens into structured JSON.
 
-1. **`list_known_projects`** para obtener `projectId` (o leer `.ariadne-project`).
-2. **`get_component_graph`** con el nombre del componente/hook para ver dependencias y estructura.
-3. **`get_legacy_impact`** con el nombre del nodo para ver qué se rompe si se modifica.
-4. **`get_definitions`** y **`get_references`** para ubicar definición y todos los usos.
+### Impact analysis (before editing)
+- **`validate_before_edit`** — **MANDATORY** before touching any component/function. Returns dependents + prop contract.
+- **`get_legacy_impact`** — Who calls or renders a node. Uses Nest API, falls back to Falkor.
+- **`get_affected_scopes`** — Full blast radius: which files/nodes break if you modify X.
+- **`check_breaking_changes`** — Alerts if you're about to remove a parameter still in use.
+- **`get_contract_specs`** — Real prop names and types from the graph. Force the AI to use correct names.
 
-**No usar solo Read/Grep.** El grafo indexado aporta información estructural que no se obtiene leyendo el archivo.
+### Code health
+- **`trace_reachability`** — Find dead code (unreachable from entry points like routes/index/main).
+- **`check_export_usage`** — Exports with no imports anywhere in the monorepo.
+- **`get_debt_report`** — Orphan nodes dead code + structural complexity report.
+- **`find_duplicates`** — Identical files by content hash.
+- **`get_project_analysis`** — Full analysis: `diagnostico`, `duplicados`, `reingenieria`, `codigo_muerto`, `seguridad`.
 
----
+### Planning & review
+- **`get_modification_plan`** — Returns `filesToModify` + business questions. Multi-root: pass `roots[].id`.
+- **`analyze_local_changes`** — Pre-commit: runs `git diff --cached` against the knowledge graph. Returns impact score per change.
+- **`review_diff`** — Review any diff or PR URL with legacy context enrichment.
+- **`get_sync_status`** — Is the graph up to date? Check before trusting results.
+- **`get_project_standards`** — Prettier, ESLint, tsconfig snippets. Make new code indistinguishable.
 
-## Flujo SDD (Spec-Driven Development)
+## Rules
 
-**OBLIGATORIO** antes de modificar un componente o función en código legacy:
-
-1. **Ejecutar `validate_before_edit`** con el `nodeName` (o `get_legacy_impact` + `get_contract_specs` por separado).
-2. Si el nodo **no existe**: no proceder; verificar el nombre o reindexar. Las herramientas devuelven `[NOT_FOUND_IN_GRAPH]` cuando el nodo/archivo no está en el grafo — indicador estructurado para no alucinar. Solicitar sync/resync del proyecto.
-3. Para **componentes**: usar las props del contrato (sección 2). Para **funciones**: revisar la sección 3 (path, descripción, endpoints) — no inventar firmas ni params.
-4. Consultar `get_legacy_impact` para saber qué se rompería si modificas el nodo.
-5. **No inventes props ni asumas nombres:** usa los que devuelve el grafo.
-6. Para ver el código actual: `get_file_content`.
-
-## Flujo de refactorización (árbol de llamadas)
-
-| Paso | Operación MCP | Resultado |
-|------|---------------|-----------|
-| 1. Intención | `semantic_search` / `find_similar_implementations` | Entiende dónde debe trabajar. |
-| 2. Contexto | `get_file_context` / `get_definitions` + `get_references` | Lee el archivo, dependencias y usos. |
-| 3. Validación | `validate_before_edit` + `check_breaking_changes` | Verifica impacto antes del cambio. |
-| 4. Ejecución | (Cursor aplica la edición) | Cambio quirúrgico solo en líneas necesarias. |
-| 5. Imports | Ver sección "Imports al crear archivos" | Rutas correctas; build sin errores. |
-
-**Antes de renombrar:** `get_references` evita romper archivos no abiertos. **Antes de crear código nuevo:** `find_similar_implementations` + `get_project_standards` evitan duplicación y desvío de estándares.
-
-## Imports al crear archivos nuevos (extracciones, hooks, módulos)
-
-**OBLIGATORIO** al extraer código a un archivo nuevo (hook, utilidad, componente):
-
-1. **No asumir estructura de carpetas.** Ejemplo: `contexts` puede estar en `src/contexts` o en `src/components/contexts`. La ruta relativa cambia según la ubicación real.
-2. **Derivar rutas desde el archivo que refactorizas.** Usa las rutas de import del archivo original como referencia. Si el original importa `../../contexts/usePauta`, el módulo está a 2 niveles arriba del original. Desde el nuevo archivo, calcula la ruta equivalente (p. ej. desde `Views/hooks/` → `../../../contexts` si contexts está en `components/contexts`).
-3. **Verificar la ubicación real** de cada módulo importado: `get_definitions` (path del nodo) o listar el repo para confirmar la ruta. No inventar rutas.
-4. **Incluir en el plan de refactorización:**
-   - Paso: "Tras crear el archivo nuevo, comprobar que las rutas de import sean correctas desde su ubicación."
-   - Paso: "Ejecutar `npm run build` o `npm run dev` y corregir errores de resolución de imports hasta que todo compile."
-5. Al escribir imports en el archivo nuevo, la ruta relativa debe resolverse **desde la carpeta del archivo nuevo**, no desde el archivo de origen.
+1. **Always validate before editing** — `validate_before_edit` on the node you're about to touch. No exceptions.
+2. **Resolve projectId early** — Cache it. Every tool that accepts `projectId` works better with it.
+3. **Multi-root projects** — Pass `roots[].id` (repo ID) as `projectId`, not the project UUID. Use `currentFilePath` to let the server resolve it.
+4. **Route to cheap tools** — If you know the symbol/path, use `get_file_content`/`get_definitions`/`get_references` instead of `ask_codebase`. Less latency, fewer tokens.
+5. **Check for duplicates before writing** — `find_similar_implementations` before implementing anything new.
+6. **Pre-commit review** — `analyze_local_changes()` before every commit to catch broken dependencies.
+7. **Graph freshness** — If results look stale, `get_sync_status` to check when the project was last indexed.
