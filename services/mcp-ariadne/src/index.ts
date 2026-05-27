@@ -1466,6 +1466,10 @@ async function fetchFileFromIngest(
 
   if (name === "list_known_projects") {
     const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "";
+    const cache = getMcpToolCache();
+    const cacheKeyProjects = `ariadne:list_known_projects:v1`;
+    const cachedProjects = await cache.get(cacheKeyProjects);
+    if (cachedProjects) return { content: [{ type: "text", text: cachedProjects }] };
     if (ingestUrl) {
       try {
         const base = ingestUrl.replace(/\/$/, "");
@@ -1515,11 +1519,13 @@ async function fetchFileFromIngest(
           }
         }
         const json = JSON.stringify(projects, null, 2);
+        const projText = `## Proyectos indexados (multi-root)\n\nCada elemento tiene \`id\` (proyecto Ariadne) y \`roots[]\` (repos). Para **get_modification_plan** con varios repos, pasa como \`projectId\` el \`roots[].id\` del repositorio donde está el código (p. ej. frontend), no solo el \`id\` global del proyecto.\n\n\`\`\`json\n${json}\n\`\`\``;
+        await cache.set(cacheKeyProjects, projText, 60);
         return {
           content: [
             {
               type: "text",
-              text: `## Proyectos indexados (multi-root)\n\nCada elemento tiene \`id\` (proyecto Ariadne) y \`roots[]\` (repos). Para **get_modification_plan** con varios repos, pasa como \`projectId\` el \`roots[].id\` del repositorio donde está el código (p. ej. frontend), no solo el \`id\` global del proyecto.\n\n\`\`\`json\n${json}\n\`\`\``,
+              text: projText,
             },
           ],
         };
@@ -1543,8 +1549,10 @@ async function fetchFileFromIngest(
       };
     });
     const json = JSON.stringify(projectsFromGraph, null, 2);
+    const graphProjText = `## Proyectos indexados\n\n\`\`\`json\n${json}\n\`\`\``;
+    await cache.set(cacheKeyProjects, graphProjText, 60);
     return {
-      content: [{ type: "text", text: `## Proyectos indexados\n\n\`\`\`json\n${json}\n\`\`\`` }],
+      content: [{ type: "text", text: graphProjText }],
     };
   }
 
@@ -1907,6 +1915,10 @@ async function fetchFileFromIngest(
         isError: true,
       };
     }
+    const cache = getMcpToolCache();
+    const cacheKeyFile = `ariadne:file_content:v1:${projectId}:${pathParam}:${ref ?? "HEAD"}`;
+    const cachedFile = await cache.get(cacheKeyFile);
+    if (cachedFile) return { content: [{ type: "text", text: cachedFile }] };
     const { graphPath } = await resolveFileForPath(pathParam, projectId, currentFilePath);
     const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002";
     try {
@@ -1917,8 +1929,10 @@ async function fetchFileFromIngest(
           isError: true,
         };
       }
+      const fileText = `## Contenido: ${graphPath}\n\n\`\`\`\n${result.content}\n\`\`\``;
+      await cache.set(cacheKeyFile, fileText, 120);
       return {
-        content: [{ type: "text", text: `## Contenido: ${graphPath}\n\n\`\`\`\n${result.content}\n\`\`\`` }],
+        content: [{ type: "text", text: fileText }],
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1950,6 +1964,10 @@ async function fetchFileFromIngest(
         isError: true,
       };
     }
+    const cache = getMcpToolCache();
+    const cacheKeySem = `ariadne:semantic_search:v1:${projectId ?? "global"}:${query}:${limit}`;
+    const cachedSem = await cache.get(cacheKeySem);
+    if (cachedSem) return { content: [{ type: "text", text: cachedSem }] };
     const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002";
     /** Id pedido por el cliente (a menudo `roots[].id` = repo). */
     const requestedScopeId = projectId;
@@ -2301,7 +2319,9 @@ async function fetchFileFromIngest(
         "_Sugerencias: `projectId` puede ser el id del **repositorio** (`roots[].id`); el MCP resuelve el `projectId` de Falkor. Si sigue vacío: `POST /repositories/:id/embed-index`, términos del código (p. ej. `paciente`, `cita`) o Cypher._",
       );
     }
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const semText = lines.join("\n");
+    await cache.set(cacheKeySem, semText, 300);
+    return { content: [{ type: "text", text: semText }] };
   }
 
   if (name === "get_sync_status") {
@@ -2350,6 +2370,10 @@ async function fetchFileFromIngest(
     if (!projectId) {
       return { content: [{ type: "text", text: "**Error:** Se requiere `projectId`." }], isError: true };
     }
+    const cache = getMcpToolCache();
+    const cacheKeyDebt = `ariadne:debt_report:v1:${projectId}`;
+    const cachedDebt = await cache.get(cacheKeyDebt);
+    if (cachedDebt) return { content: [{ type: "text", text: cachedDebt }] };
 
     try {
       const q = `
@@ -2364,7 +2388,9 @@ async function fetchFileFromIngest(
       const isolated = res.data as Array<Record<string, any>> || [];
       const lines = isolated.map((r) => `- \`${r.nodeName}\` en \`${r.filePath}\``);
       const text = lines.length ? lines.join("\n") : "No se encontró código muerto o aislado evidente.";
-      return { content: [{ type: "text", text: `### Informe de Deuda Técnica (Nativo)\n\n**Posibles nodos huérfanos/muertos:**\n${text}` }] };
+      const debtText = `### Informe de Deuda Técnica (Nativo)\n\n**Posibles nodos huérfanos/muertos:**\n${text}`;
+      await cache.set(cacheKeyDebt, debtText, 300);
+      return { content: [{ type: "text", text: debtText }] };
     } catch (err: any) {
       return { content: [{ type: "text", text: `**Error:** ${err.message}` }], isError: true };
     }
@@ -2379,6 +2405,10 @@ async function fetchFileFromIngest(
     if (!projectId) {
       return { content: [{ type: "text", text: "**Error:** Se requiere `projectId`." }], isError: true };
     }
+    const cache = getMcpToolCache();
+    const cacheKeyDup = `ariadne:find_duplicates:v1:${projectId}`;
+    const cachedDup = await cache.get(cacheKeyDup);
+    if (cachedDup) return { content: [{ type: "text", text: cachedDup }] };
     
     try {
       const q = `
@@ -2392,14 +2422,18 @@ async function fetchFileFromIngest(
       const res = await graph.query(q, { params: { projectId } });
       const duplicates = res.data as Array<Record<string, any>> || [];
       if (duplicates.length === 0) {
-        return { content: [{ type: "text", text: "No se encontraron duplicados exactos basados en hash de contenido." }] };
+        const noDupText = "No se encontraron duplicados exactos basados en hash de contenido.";
+        await cache.set(cacheKeyDup, noDupText, 300);
+        return { content: [{ type: "text", text: noDupText }] };
       }
 
       const text = duplicates.map((r, i) => 
         `#### Grupo ${i+1} (${r.count} archivos)\n- **Hash:** \`${String(r.cHash).substring(0, 8)}\`\n- **Archivos:**\n${(r.files as string[]).map(f => `  - \`${f}\``).join("\n")}`
       ).join("\n\n");
 
-      return { content: [{ type: "text", text: `### Análisis de Duplicados (Nativo)\n\nSe encontraron ${duplicates.length} grupos de archivos idénticos en el proyecto.\n\n${text}` }] };
+      const dupText = `### Análisis de Duplicados (Nativo)\n\nSe encontraron ${duplicates.length} grupos de archivos idénticos en el proyecto.\n\n${text}`;
+      await cache.set(cacheKeyDup, dupText, 300);
+      return { content: [{ type: "text", text: dupText }] };
     } catch (err: any) {
       return { content: [{ type: "text", text: `**Error:** ${err.message}` }], isError: true };
     }
@@ -2698,6 +2732,10 @@ async function fetchFileFromIngest(
       projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
     }
     graph = await getGraph(projectId ?? undefined);
+    const cache = getMcpToolCache();
+    const cacheKeyVal = `ariadne:validate_before_edit:v1:${projectId ?? "global"}:${nodeName}`;
+    const cachedVal = await cache.get(cacheKeyVal);
+    if (cachedVal) return { content: [{ type: "text", text: cachedVal }] };
     const exists = await nodeExists(graph, nodeName, projectId ?? null);
     if (!exists) {
       return {
@@ -2781,7 +2819,9 @@ async function fetchFileFromIngest(
       }
     }
     lines.push("", "---", "**Antes de editar:** usa las props/firmas reales del grafo y considera el impacto en los dependientes.");
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const valText = lines.join("\n");
+    await cache.set(cacheKeyVal, valText, 120);
+    return { content: [{ type: "text", text: valText }] };
   }
 
   // --- get_definitions ---
@@ -2792,6 +2832,10 @@ async function fetchFileFromIngest(
     if (!projectId && currentFilePath) {
       projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
     }
+    const cache = getMcpToolCache();
+    const cacheKeyDefs = `ariadne:definitions:v1:${projectId ?? "global"}:${symbolName}`;
+    const cachedDefs = await cache.get(cacheKeyDefs);
+    if (cachedDefs) return { content: [{ type: "text", text: cachedDefs }] };
     graph = await getGraph(projectId ?? undefined);
     const params: Record<string, string> = { symbolName };
     if (projectId) params.projectId = projectId;
@@ -2854,7 +2898,9 @@ async function fetchFileFromIngest(
         isError: true,
       };
     }
-    return { content: [{ type: "text", text: `## Definiciones: ${symbolName}\n\n${results.join("\n")}` }] };
+    const defText = `## Definiciones: ${symbolName}\n\n${results.join("\n")}`;
+    await cache.set(cacheKeyDefs, defText, 120);
+    return { content: [{ type: "text", text: defText }] };
   }
 
   // --- get_references ---
@@ -2865,6 +2911,10 @@ async function fetchFileFromIngest(
     if (!projectId && currentFilePath) {
       projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
     }
+    const cache = getMcpToolCache();
+    const cacheKeyRefs = `ariadne:references:v1:${projectId ?? "global"}:${symbolName}`;
+    const cachedRefs = await cache.get(cacheKeyRefs);
+    if (cachedRefs) return { content: [{ type: "text", text: cachedRefs }] };
     graph = await getGraph(projectId ?? undefined);
     const exists = await nodeExists(graph, symbolName, projectId ?? null);
     if (!exists) {
@@ -2904,7 +2954,9 @@ async function fetchFileFromIngest(
       lines.push(`- **${kind}** \`${depName}\`${pathStr}`);
     }
     if (lines.length === 2) lines.push("Ninguna referencia encontrada (nadie lo llama ni lo renderiza).");
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const refText = lines.join("\n");
+    await cache.set(cacheKeyRefs, refText, 120);
+    return { content: [{ type: "text", text: refText }] };
   }
 
   // --- get_implementation_details ---
@@ -2915,6 +2967,10 @@ async function fetchFileFromIngest(
     if (!projectId && currentFilePath) {
       projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
     }
+    const cache = getMcpToolCache();
+    const cacheKeyImpl = `ariadne:impl_details:v1:${projectId ?? "global"}:${symbolName}`;
+    const cachedImpl = await cache.get(cacheKeyImpl);
+    if (cachedImpl) return { content: [{ type: "text", text: cachedImpl }] };
     graph = await getGraph(projectId ?? undefined);
     const exists = await nodeExists(graph, symbolName, projectId ?? null);
     if (!exists) {
@@ -2963,7 +3019,9 @@ async function fetchFileFromIngest(
         if (description) lines.push(`  ${String(description).slice(0, mcpLimits.implementationInlineDescChars)}`);
       }
     }
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const implText = lines.join("\n");
+    await cache.set(cacheKeyImpl, implText, 120);
+    return { content: [{ type: "text", text: implText }] };
   }
 
   // --- trace_reachability ---
@@ -2980,6 +3038,10 @@ async function fetchFileFromIngest(
         isError: true,
       };
     }
+    const cache = getMcpToolCache();
+    const cacheKeyTrace = `ariadne:trace_reachability:v1:${resolvedProjectId}`;
+    const cachedTrace = await cache.get(cacheKeyTrace);
+    if (cachedTrace) return { content: [{ type: "text", text: cachedTrace }] };
     graph = await getGraph(resolvedProjectId);
     const params = { projectId: resolvedProjectId };
     const entryComponentsQ = `MATCH (r:Route {projectId: $projectId}) RETURN r.componentName AS name`;
@@ -3041,7 +3103,9 @@ async function fetchFileFromIngest(
       "**Funciones sin referencias:** (muestra)",
       ...(unreachableFuncs.length ? unreachableFuncs.slice(0, mcpLimits.traceUnreachableFuncsMax).map((f) => `- ${f}`) : ["(ninguna detectada)"]),
     ];
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const traceText = lines.join("\n");
+    await cache.set(cacheKeyTrace, traceText, 300);
+    return { content: [{ type: "text", text: traceText }] };
   }
 
   // --- check_export_usage ---
@@ -3059,6 +3123,10 @@ async function fetchFileFromIngest(
         isError: true,
       };
     }
+    const cache = getMcpToolCache();
+    const cacheKeyExp = `ariadne:export_usage:v1:${resolvedProjectId}`;
+    const cachedExp = await cache.get(cacheKeyExp);
+    if (cachedExp) return { content: [{ type: "text", text: cachedExp }] };
     graph = await getGraph(resolvedProjectId);
     const params: Record<string, string> = { projectId: resolvedProjectId };
     if (filePath) params.filePath = filePath;
@@ -3095,7 +3163,9 @@ async function fetchFileFromIngest(
       "",
       ...(unused.length ? unused.slice(0, mcpLimits.unusedExportsMax).map((u) => `- ${u}`) : ["No se detectaron exports obvios sin uso."]),
     ];
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const expText = lines.join("\n");
+    await cache.set(cacheKeyExp, expText, 120);
+    return { content: [{ type: "text", text: expText }] };
   }
 
   // --- get_affected_scopes ---
@@ -3108,6 +3178,10 @@ async function fetchFileFromIngest(
       projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
     }
     graph = await getGraph(projectId ?? undefined);
+    const cache = getMcpToolCache();
+    const cacheKeyScopes = `ariadne:affected_scopes:v1:${projectId ?? "global"}:${nodeName}:${includeTestFiles}`;
+    const cachedScopes = await cache.get(cacheKeyScopes);
+    if (cachedScopes) return { content: [{ type: "text", text: cachedScopes }] };
     const exists = await nodeExists(graph, nodeName, projectId ?? null);
     if (!exists) {
       return {
@@ -3144,7 +3218,9 @@ async function fetchFileFromIngest(
       ...(affectedFiles.size ? [...affectedFiles].map((f) => `- ${f}`).slice(0, mcpLimits.affectedFilesMax) : ["(ninguno)"]),
       ...(includeTestFiles ? ["", "💡 Revisar también archivos *.test.* y *.spec.* en directorios afectados."] : []),
     ];
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const scopesText = lines.join("\n");
+    await cache.set(cacheKeyScopes, scopesText, 120);
+    return { content: [{ type: "text", text: scopesText }] };
   }
 
   // --- check_breaking_changes ---
@@ -3157,6 +3233,11 @@ async function fetchFileFromIngest(
       projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
     }
     graph = await getGraph(projectId ?? undefined);
+    const cache = getMcpToolCache();
+    const rmParamsKey = removedParams.sort().join(",");
+    const cacheKeyBreak = `ariadne:breaking_changes:v1:${projectId ?? "global"}:${nodeName}:${rmParamsKey}`;
+    const cachedBreak = await cache.get(cacheKeyBreak);
+    if (cachedBreak) return { content: [{ type: "text", text: cachedBreak }] };
     const exists = await nodeExists(graph, nodeName, projectId ?? null);
     if (!exists) {
       return {
@@ -3194,7 +3275,9 @@ async function fetchFileFromIngest(
           ? ["(Los parámetros indicados no existen en el contrato actual; revisar nombres.)"]
           : ["Sin parámetros indicados para eliminar. Si cambias la firma, verificar manualmente los dependientes."]),
     ];
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const breakText = lines.join("\n");
+    await cache.set(cacheKeyBreak, breakText, 120);
+    return { content: [{ type: "text", text: breakText }] };
   }
 
   // --- find_similar_implementations ---
@@ -3224,6 +3307,10 @@ async function fetchFileFromIngest(
         isError: true,
       };
     }
+    const cache = getMcpToolCache();
+    const cacheKeySim = `ariadne:find_similar:v1:${resolvedProjectId ?? "global"}:${query}:${limit}`;
+    const cachedSim = await cache.get(cacheKeySim);
+    if (cachedSim) return { content: [{ type: "text", text: cachedSim }] };
     const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002";
     /** Mismo criterio que semantic_search: el id puede ser proyecto Falkor o `repositories.id` (roots[].id). */
     const requestedScopeId = resolvedProjectId;
@@ -3389,7 +3476,9 @@ async function fetchFileFromIngest(
       }
     }
     const lines = [`## Implementaciones similares: "${query}"${usedVector ? " (vector)" : ""}`, "", ...results.slice(0, limit).map((r) => `- **${r.type}:** ${r.name}`)];
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    const simText = lines.join("\n");
+    await cache.set(cacheKeySim, simText, 300);
+    return { content: [{ type: "text", text: simText }] };
   }
 
   // --- get_project_standards ---
