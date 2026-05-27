@@ -2,11 +2,9 @@
  * @fileoverview Auth OTP: token JWT local, request/verify OTP contra API.
  * Incluye decodificación del JWT para extraer userId, role y email.
  */
-const API_BASE =
-  ((import.meta.env.VITE_API_URL as string) || 'http://localhost:3000').replace(
-    /\/$/,
-    '',
-  ) + '/api';
+import { getApiBase } from '../lib/api-base';
+
+const API_BASE = getApiBase();
 
 const TOKEN_KEY = 'ariadne_token';
 const USER_KEY = 'ariadne_user';

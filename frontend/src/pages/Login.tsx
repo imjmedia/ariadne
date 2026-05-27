@@ -28,12 +28,9 @@ import {
   getToken,
   isTokenExpired,
 } from '../utils/auth';
+import { getApiBase } from '@/lib/api-base';
 
-const API_BASE =
-  ((import.meta.env.VITE_API_URL as string) || 'http://localhost:3000').replace(
-    /\/$/,
-    '',
-  ) + '/api';
+const API_BASE = getApiBase();
 
 type Step = 'email' | 'code' | 'sso';
 

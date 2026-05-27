@@ -9,12 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getApiBase } from '@/lib/api-base';
 
-const API_BASE =
-  ((import.meta.env.VITE_API_URL as string) || 'http://localhost:3000').replace(
-    /\/$/,
-    '',
-  ) + '/api';
+const API_BASE = getApiBase();
 
 export function SetupPage() {
   const navigate = useNavigate();

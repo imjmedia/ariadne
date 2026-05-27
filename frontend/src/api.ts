@@ -5,10 +5,10 @@
  * @module api
  */
 import { getToken, removeToken } from './utils/auth';
+import { getApiBase } from './lib/api-base';
 
-/** Base URL para llamadas API (incluye /api). */
-export const API_BASE =
-  ((import.meta.env.VITE_API_URL as string) || 'http://localhost:3000').replace(/\/$/, '') + '/api';
+/** Base URL para llamadas API (por defecto `${VITE_API_URL}/api`). */
+export const API_BASE = getApiBase();
 
 const BASE = API_BASE;
 
