@@ -742,12 +742,192 @@ export class GraphService {
     });
   }
 
+  // ── Helper queries for multi-dimensional compare ──────────────────────
+
+  /** Sets of string names from {name, ...}[] */
+  private static nameSet(items: { name: string }[]): Set<string> {
+    return new Set(items.map((i) => i.name));
+  }
+
+  /** Diff two arrays of named objects: {match, main, shadow, missing, extra} */
+  private static diffNamed<T extends { name: string }>(
+    main: T[],
+    shadow: T[],
+  ): { match: boolean; main: T[]; shadow: T[]; missing: string[]; extra: string[] } {
+    const mSet = GraphService.nameSet(main);
+    const sSet = GraphService.nameSet(shadow);
+    const missing = main.filter((p) => !sSet.has(p.name)).map((p) => p.name);
+    const extra = shadow.filter((p) => !mSet.has(p.name)).map((p) => p.name);
+    return { match: missing.length === 0 && extra.length === 0, main, shadow, missing, extra };
+  }
+
+  /** Query a graph and return rows as {name: string, ...rest} */
+  private async queryNamed(
+    graph: FalkorGraph,
+    cypher: string,
+    params: Record<string, string> = {},
+  ): Promise<{ name: string }[]> {
+    const r = (await graph.query(cypher, { params })) as FalkorResult;
+    const data = r.data ?? [];
+    const headers = r.headers ?? [];
+    const nameIdx = headers.length ? headers.indexOf('name') : -1;
+    return data.map((row: unknown) => {
+      const arr = Array.isArray(row) ? row : [row];
+      const name = (nameIdx >= 0 ? String(arr[nameIdx] ?? '') : String(arr[0] ?? ''));
+      return { name };
+    }).filter((x) => x.name);
+  }
+
+  // ── Per-dimension queries ─────────────────────────────────────────────
+
+  private async getRelationNames(
+    graph: FalkorGraph,
+    componentName: string,
+    relKind: string,
+    projectId?: string,
+  ): Promise<{ name: string }[]> {
+    const proj = projectId ? ', projectId: $projectId' : '';
+    const params: Record<string, string> = { componentName };
+    if (projectId) params.projectId = projectId;
+    if (relKind === 'USES_HOOK') {
+      return this.queryNamed(graph,
+        `MATCH (c:Component {name: $componentName${proj}})-[:USES_HOOK]->(h:Hook) RETURN h.name AS name`,
+        params);
+    }
+    if (relKind === 'RENDERS') {
+      return this.queryNamed(graph,
+        `MATCH (c:Component {name: $componentName${proj}})-[:RENDERS]->(child:Component) RETURN child.name AS name`,
+        params);
+    }
+    return [];
+  }
+
+  private async getImportTargets(
+    graph: FalkorGraph,
+    componentName: string,
+    projectId?: string,
+  ): Promise<{ name: string }[]> {
+    const proj = projectId ? ', projectId: $projectId' : '';
+    const params: Record<string, string> = { componentName };
+    if (projectId) params.projectId = projectId;
+    return this.queryNamed(graph,
+      `MATCH (f:File)-[:CONTAINS]->(c:Component {name: $componentName${proj}}) MATCH (f)-[:IMPORTS]->(imp:File) RETURN imp.path AS name`,
+      params);
+  }
+
+  private async getCrossFileCallees(
+    graph: FalkorGraph,
+    componentName: string,
+    projectId?: string,
+  ): Promise<{ name: string }[]> {
+    const proj = projectId ? ', projectId: $projectId' : '';
+    const params: Record<string, string> = { componentName };
+    if (projectId) params.projectId = projectId;
+    return this.queryNamed(graph,
+      `MATCH (f:File)-[:CONTAINS]->(c:Component {name: $componentName${proj}})
+       MATCH (f)-[:CONTAINS]->(fn:Function)-[:CALLS]->(callee:Function)
+       WHERE callee.path <> f.path OR NOT EXISTS(callee.path)
+       RETURN DISTINCT callee.path + '::' + callee.name AS name`,
+      params);
+  }
+
+  private async getFileFunctions(
+    graph: FalkorGraph,
+    componentName: string,
+    projectId?: string,
+  ): Promise<{ name: string; startLine?: number; endLine?: number }[]> {
+    const proj = projectId ? ', projectId: $projectId' : '';
+    const params: Record<string, string> = { componentName };
+    if (projectId) params.projectId = projectId;
+    const r = (await graph.query(
+      `MATCH (f:File)-[:CONTAINS]->(c:Component {name: $componentName${proj}})
+       MATCH (f)-[:CONTAINS]->(fn:Function)
+       RETURN fn.name AS name, fn.startLine AS startLine, fn.endLine AS endLine`,
+      { params },
+    )) as FalkorResult;
+    const data = r.data ?? [];
+    const headers = r.headers ?? [];
+    const nameIdx = headers.indexOf('name');
+    const slIdx = headers.indexOf('startLine');
+    const elIdx = headers.indexOf('endLine');
+    return data.map((row: unknown) => {
+      const arr = Array.isArray(row) ? row : [row];
+      const sl = slIdx >= 0 ? Number(arr[slIdx]) : undefined;
+      const el = elIdx >= 0 ? Number(arr[elIdx]) : undefined;
+      return {
+        name: String(nameIdx >= 0 ? arr[nameIdx] ?? '' : arr[0] ?? ''),
+        startLine: Number.isFinite(sl) ? sl : undefined,
+        endLine: Number.isFinite(el) ? el : undefined,
+      };
+    }).filter((x) => x.name);
+  }
+
+  /** Components that RENDER this one in the main graph. */
+  private async getDependentComponents(
+    mainGraph: FalkorGraph,
+    componentName: string,
+    projectId?: string,
+  ): Promise<{ name: string }[]> {
+    const proj = projectId ? ', projectId: $projectId' : '';
+    const params: Record<string, string> = { componentName };
+    if (projectId) params.projectId = projectId;
+    return this.queryNamed(mainGraph,
+      `MATCH (dep:Component)-[:RENDERS]->(c:Component {name: $componentName${proj}}) RETURN dep.name AS name`,
+      params);
+  }
+
+  /** For a dependent component, check which of its required RENDERS targets
+   *  would be missing if this component's props changed in the shadow. */
+  private async getDependentBreakingDetails(
+    mainGraph: FalkorGraph,
+    shadowGraph: FalkorGraph,
+    componentName: string,
+    dependentName: string,
+    mainProps: { name: string; required: boolean }[],
+    shadowProps: { name: string; required: boolean }[],
+    projectId?: string,
+  ): Promise<{
+    missingProps: string[];
+    newlyRequired: string[];
+    removedInShadow: string[];
+  } | null> {
+    // Props that disappeared in shadow
+    const shadowPropNames = new Set(shadowProps.map((p) => p.name));
+    const missingInShadow = mainProps
+      .filter((p) => p.required && !shadowPropNames.has(p.name))
+      .map((p) => p.name);
+
+    // Props that became required in shadow but weren't before
+    const mainRequired = new Set(mainProps.filter((p) => p.required).map((p) => p.name));
+    const newlyRequired = shadowProps
+      .filter((p) => p.required && !mainRequired.has(p.name))
+      .map((p) => p.name);
+
+    // Props that were in main but are gone in shadow (optional props disappearing)
+    const mainPropNames = new Set(mainProps.map((p) => p.name));
+    const removed = mainProps
+      .filter((p) => !shadowPropNames.has(p.name))
+      .map((p) => p.name);
+
+    if (missingInShadow.length === 0 && newlyRequired.length === 0 && removed.length === 0) {
+      return null;
+    }
+    return { missingProps: missingInShadow, newlyRequired, removedInShadow: removed };
+  }
+
+  private static verdict(checks: boolean[]): 'approved' | 'breaking_changes' {
+    return checks.every(Boolean) ? 'approved' : 'breaking_changes';
+  }
+
+  // ── Enhanced compare ──────────────────────────────────────────────────
+
   async compare(
     componentName: string,
     projectId?: string,
     shadowSessionId?: string,
     scopePath?: string,
   ) {
+    // 1. Locate main graph (shard-aware)
     const mainGraph = await this.pickShardGraph(projectId, scopePath, async (g) => {
       const matchProj = projectId ? ', projectId: $projectId' : '';
       const params: Record<string, string> = { componentName };
@@ -765,23 +945,163 @@ export class GraphService {
       }
       return Number.isFinite(c) && c > 0;
     });
+
     const shadowGraph = await this.falkor.getShadowGraph(shadowSessionId ?? undefined);
-    const [mainProps, shadowProps] = await Promise.all([
-      this.getPropsForComponent(mainGraph, componentName, projectId),
-      this.getPropsForComponent(shadowGraph, componentName, undefined),
-    ]);
-    const mainSet = new Set(mainProps.map((p) => p.name));
-    const shadowSet = new Set(shadowProps.map((p) => p.name));
-    const missingInShadow = mainProps.filter((p) => !shadowSet.has(p.name)).map((p) => p.name);
-    const extraInShadow = shadowProps.filter((p) => !mainSet.has(p.name)).map((p) => p.name);
-    const match = missingInShadow.length === 0 && extraInShadow.length === 0;
-    return {
-      componentName,
-      match,
+
+    // 2. Fetch all dimensions in parallel
+    const [
       mainProps,
       shadowProps,
-      missingInShadow,
-      extraInShadow,
+      mainRenders,
+      shadowRenders,
+      mainHooks,
+      shadowHooks,
+      mainImports,
+      shadowImports,
+      mainCrossCalls,
+      shadowCrossCalls,
+      mainFunctions,
+      shadowFunctions,
+      dependents,
+    ] = await Promise.all([
+      // Props
+      this.getPropsForComponent(mainGraph, componentName, projectId),
+      this.getPropsForComponent(shadowGraph, componentName, undefined),
+      // Relations
+      this.getRelationNames(mainGraph, componentName, 'RENDERS', projectId),
+      this.getRelationNames(shadowGraph, componentName, 'RENDERS'),
+      this.getRelationNames(mainGraph, componentName, 'USES_HOOK', projectId),
+      this.getRelationNames(shadowGraph, componentName, 'USES_HOOK'),
+      // Imports
+      this.getImportTargets(mainGraph, componentName, projectId),
+      this.getImportTargets(shadowGraph, componentName),
+      // Cross-file calls
+      this.getCrossFileCallees(mainGraph, componentName, projectId),
+      this.getCrossFileCallees(shadowGraph, componentName),
+      // Functions
+      this.getFileFunctions(mainGraph, componentName, projectId),
+      this.getFileFunctions(shadowGraph, componentName),
+      // Dependents (main graph only — who uses this component)
+      this.getDependentComponents(mainGraph, componentName, projectId),
+    ]);
+
+    // 3. Compute diffs
+    const props = {
+      ...GraphService.diffNamed(mainProps, shadowProps),
+      // Deep comparison: detect changed props (same name, different required/default)
+      changed: this.detectChangedProps(mainProps, shadowProps),
+    };
+
+    const relations = {
+      renders: GraphService.diffNamed(mainRenders, shadowRenders),
+      usesHook: GraphService.diffNamed(mainHooks, shadowHooks),
+    };
+
+    const dependencies = {
+      imports: GraphService.diffNamed(mainImports, shadowImports),
+      crossFileCalls: GraphService.diffNamed(mainCrossCalls, shadowCrossCalls),
+    };
+
+    const functions = {
+      ...GraphService.diffNamed(mainFunctions, shadowFunctions),
+      changed: this.detectChangedFunctions(mainFunctions, shadowFunctions),
+    };
+
+    // 4. Dependents impact analysis
+    const dependentsImpact = await this.buildDependentsImpact(
+      mainGraph,
+      shadowGraph,
+      componentName,
+      dependents,
+      mainProps,
+      shadowProps,
+      projectId,
+    );
+
+    // 5. Overall verdict
+    const allChecks = [
+      props.match,
+      relations.renders.match,
+      relations.usesHook.match,
+      dependencies.imports.match,
+      dependencies.crossFileCalls.match,
+      functions.match,
+      dependentsImpact.breakingFor.length === 0,
+    ];
+    const verdict = GraphService.verdict(allChecks);
+
+    return {
+      componentName,
+      match: allChecks.every(Boolean),
+      verdict,
+      props,
+      relations,
+      dependencies,
+      functions,
+      dependentsImpact,
+    };
+  }
+
+  /** Detect props that exist in both but differ in required/default status. */
+  private detectChangedProps(
+    main: { name: string; required: boolean }[],
+    shadow: { name: string; required: boolean }[],
+  ): { name: string; main: { required: boolean }; shadow: { required: boolean } }[] {
+    const shadowMap = new Map(shadow.map((p) => [p.name, p]));
+    const changed: { name: string; main: { required: boolean }; shadow: { required: boolean } }[] = [];
+    for (const mp of main) {
+      const sp = shadowMap.get(mp.name);
+      if (sp && sp.required !== mp.required) {
+        changed.push({ name: mp.name, main: { required: mp.required }, shadow: { required: sp.required } });
+      }
+    }
+    return changed;
+  }
+
+  /** Detect functions that changed signature (name match, line range diff = body change). */
+  private detectChangedFunctions(
+    main: { name: string; startLine?: number; endLine?: number }[],
+    shadow: { name: string; startLine?: number; endLine?: number }[],
+  ): { name: string; linesChanged: boolean }[] {
+    const shadowMap = new Map(shadow.map((f) => [f.name, f]));
+    const changed: { name: string; linesChanged: boolean }[] = [];
+    for (const mf of main) {
+      const sf = shadowMap.get(mf.name);
+      if (sf) {
+        const linesChanged =
+          mf.startLine !== sf.startLine || mf.endLine !== sf.endLine;
+        if (linesChanged) {
+          changed.push({ name: mf.name, linesChanged: true });
+        }
+      }
+    }
+    return changed;
+  }
+
+  /** For each dependent component, check if shadow prop changes would break it. */
+  private async buildDependentsImpact(
+    mainGraph: FalkorGraph,
+    shadowGraph: FalkorGraph,
+    componentName: string,
+    dependents: { name: string }[],
+    mainProps: { name: string; required: boolean }[],
+    shadowProps: { name: string; required: boolean }[],
+    projectId?: string,
+  ) {
+    const depMap = new Map<string, { missingProps: string[]; newlyRequired: string[]; removedInShadow: string[] }>();
+    for (const dep of dependents) {
+      const detail = await this.getDependentBreakingDetails(
+        mainGraph, shadowGraph, componentName, dep.name,
+        mainProps, shadowProps, projectId,
+      );
+      if (detail) depMap.set(dep.name, detail);
+    }
+    const affected = dependents.map((d) => d.name);
+    const breakingFor = [...depMap.keys()];
+    return {
+      affected,
+      breakingFor,
+      details: Object.fromEntries(depMap),
     };
   }
 

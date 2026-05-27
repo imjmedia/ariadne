@@ -142,9 +142,9 @@ export const openApiSpec = {
     "/graph/compare/{componentName}": {
       get: {
         operationId: "getGraphCompare",
-        summary: "Comparar componente: main vs shadow",
+        summary: "Comparar componente: main vs shadow (5 dimensiones)",
         description:
-          "Tras POST /graph/shadow, compara props en el grafo principal vs el grafo shadow de esa sesión (query shadowSessionId devuelto por el indexado). Sin query se lee el grafo legacy FalkorSpecsShadow.",
+          "Tras POST /graph/shadow, compara el componente en el grafo principal vs el grafo shadow en 5 dimensiones: props, relaciones (RENDERS, USES_HOOK), dependencias (imports, cross-file calls), funciones exportadas, e impacto en dependientes. Query shadowSessionId devuelto por el indexado.",
         parameters: [
           { name: "componentName", in: "path", required: true, schema: { type: "string" } },
           {
@@ -157,7 +157,7 @@ export const openApiSpec = {
         ],
         responses: {
           "200": {
-            description: "match, mainProps, shadowProps, missingInShadow, extraInShadow",
+            description: "Veredicto multi-dimensional: props, relations, dependencies, functions, dependentsImpact",
             content: {
               "application/json": {
                 schema: {
@@ -165,16 +165,91 @@ export const openApiSpec = {
                   properties: {
                     componentName: { type: "string" },
                     match: { type: "boolean" },
-                    mainProps: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: { name: { type: "string" }, required: { type: "boolean" } },
+                    verdict: { type: "string", enum: ["approved", "breaking_changes"] },
+                    props: {
+                      type: "object",
+                      properties: {
+                        match: { type: "boolean" },
+                        missing: { type: "array", items: { type: "string" } },
+                        extra: { type: "array", items: { type: "string" } },
+                        changed: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              name: { type: "string" },
+                              main: { type: "object", properties: { required: { type: "boolean" } } },
+                              shadow: { type: "object", properties: { required: { type: "boolean" } } },
+                            },
+                          },
+                        },
                       },
                     },
-                    shadowProps: { type: "array", items: { type: "object" } },
-                    missingInShadow: { type: "array", items: { type: "string" } },
-                    extraInShadow: { type: "array", items: { type: "string" } },
+                    relations: {
+                      type: "object",
+                      properties: {
+                        renders: {
+                          type: "object",
+                          properties: {
+                            match: { type: "boolean" },
+                            missing: { type: "array", items: { type: "string" } },
+                            extra: { type: "array", items: { type: "string" } },
+                          },
+                        },
+                        usesHook: {
+                          type: "object",
+                          properties: {
+                            match: { type: "boolean" },
+                            missing: { type: "array", items: { type: "string" } },
+                            extra: { type: "array", items: { type: "string" } },
+                          },
+                        },
+                      },
+                    },
+                    dependencies: {
+                      type: "object",
+                      properties: {
+                        imports: {
+                          type: "object",
+                          properties: {
+                            match: { type: "boolean" },
+                            missing: { type: "array", items: { type: "string" } },
+                            extra: { type: "array", items: { type: "string" } },
+                          },
+                        },
+                        crossFileCalls: {
+                          type: "object",
+                          properties: {
+                            match: { type: "boolean" },
+                            missing: { type: "array", items: { type: "string" } },
+                            extra: { type: "array", items: { type: "string" } },
+                          },
+                        },
+                      },
+                    },
+                    functions: {
+                      type: "object",
+                      properties: {
+                        match: { type: "boolean" },
+                        missing: { type: "array", items: { type: "string" } },
+                        extra: { type: "array", items: { type: "string" } },
+                        changed: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: { name: { type: "string" }, linesChanged: { type: "boolean" } },
+                          },
+                        },
+                      },
+                    },
+                    dependentsImpact: {
+                      type: "object",
+                      properties: {
+                        affected: { type: "array", items: { type: "string" } },
+                        breakingFor: { type: "array", items: { type: "string" } },
+                        details: { type: "object" },
+                      },
+                    },
                   },
                 },
               },
