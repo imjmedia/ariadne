@@ -32,7 +32,7 @@ OPENAI_API_KEY=<tu-key>
 LLM_CHAT_MODEL=gpt-4o-mini
 CREDENTIALS_ENCRYPTION_KEY=<generar con: openssl rand -base64 32>
 
-# MCP: cada desarrollador pone Bearer en ~/.cursor/mcp.json (Secret MCP `ari_…` en Perfil o JWT de sesión). No uses `ARIADNE_API_*` en Environment para eso.
+# MCP Ariadne: cada desarrollador pone Bearer en ~/.cursor/mcp.json (Secret MCP `ari_…` en Perfil o JWT de sesión). No uses `ARIADNE_API_*` en Environment para eso.
 
 # API Nest — firma JWT OTP/SSO (obligatorio en producción para la web)
 JWT_SECRET=<openssl rand -base64 32>
@@ -119,7 +119,27 @@ Variables requeridas para Postgres (ingest):
 
 - `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`
 
-## 8. Resumen de comprobaciones
+## 8. Troubleshooting: 404 en `/` y `/api` pero MCP responde
+
+Síntoma: `404 page not found` (texto plano de Traefik) en el SPA y en `/api/health`, mientras `/mcp` devuelve 401/JSON.
+
+Causa habitual: contenedores **`frontend`** o **`api`** en estado **unhealthy** → Dokploy no registra esas rutas en Traefik.
+
+Comprobación en el servidor:
+
+```bash
+docker ps --filter name=relic --format '{{.Names}} {{.Status}}'
+curl -sS -o /dev/null -w '%{http_code}\n' https://tu-dominio/api/health
+```
+
+Healthchecks correctos (imagen actual):
+
+- **api:** `GET http://localhost:3000/api/health` (Nest usa prefijo global `/api`).
+- **frontend:** `curl -fsS http://localhost:80/` (nginx:alpine no incluye `wget`).
+
+Tras redeploy, ambos deben pasar a **healthy**; si no, **Settings → Reload Traefik** en Dokploy.
+
+## 9. Resumen de comprobaciones
 
 - [ ] Postgres con variables `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` en ingest
 - [ ] `CORS_ORIGIN=https://ariadne.kreoint.mx` en API e Ingest

@@ -7,9 +7,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ### Fixed
 
+- **Healthchecks Dokploy / Traefik:** Con contenedores `unhealthy`, Dokploy no publica rutas Traefik → `404 page not found` en `/` y `/api` mientras `/mcp` sigue (MCP healthy).
+  - `services/api/Dockerfile`: probe en `/api/health` (Nest usa prefijo global `api`, no `/health`).
+  - `frontend/Dockerfile`: `curl` en nginx:alpine (`wget` no viene en la imagen base).
 - **Healthchecks reactivados en frontend y mcp-ariadne:** Se habían desactivado con el comentario "Dokploy no lo soporta correctamente". El problema real era usar `127.0.0.1` o DNS service-name en los healthchecks, no `localhost`. `localhost` es el loopback real del contenedor tanto en Compose como en Swarm, y funciona correctamente con Dokploy.
-  - `frontend/Dockerfile`: `wget --spider http://localhost:80/`
-  - `services/mcp-ariadne/Dockerfile`: `wget --spider http://localhost:8080/health`
+  - `services/mcp-ariadne/Dockerfile`: Node.js nativo en `http://localhost:8080/health`
 
 ### Added
 
