@@ -28,10 +28,8 @@ RUN mkdir -p frontend/dist/mcp && mv services/mcp-ariadne/ariadne-mcp-*.tgz fron
 
 # serve
 FROM nginx:alpine
-RUN apk add --no-cache curl
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -fsS http://localhost:80/ >/dev/null || exit 1
+# Sin HEALTHCHECK (ver services/api/Dockerfile).
 CMD ["nginx", "-g", "daemon off;"]
