@@ -35,4 +35,28 @@ describe('parseStrapiSchemaJson', () => {
       parseStrapiSchemaJson('src/api/x/content-types/x/schema.json', '{ bad'),
     ).toBeNull();
   });
+
+  it('parsea schema.json bajo src/extensions (users-permissions)', () => {
+    const path = 'src/extensions/users-permissions/content-types/User/schema.json';
+    const content = JSON.stringify({
+      kind: 'collectionType',
+      collectionName: 'up_users',
+      info: { singularName: 'user', pluralName: 'users', displayName: 'User' },
+      attributes: {
+        nombre: { type: 'string' },
+        role: {
+          type: 'relation',
+          relation: 'manyToOne',
+          target: 'plugin::users-permissions.role',
+        },
+      },
+    });
+    const out = parseStrapiSchemaJson(path, content);
+    expect(out?.name).toBe('User');
+    expect(out?.apiName).toBe('users-permissions');
+    expect(out?.collectionName).toBe('up_users');
+    expect(out?.attributes).toHaveLength(2);
+    expect(out?.attributesSummary).toContain('nombre:string');
+    expect(out?.strapiUid).toBe('plugin::users-permissions.user');
+  });
 });

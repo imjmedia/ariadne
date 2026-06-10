@@ -63,4 +63,26 @@ describe('sync-path-filter (e2e / tests)', () => {
     expect(shouldSyncIndexPath('swagger.json')).toBe(true);
     expect(shouldSyncIndexPath('config/random.json')).toBe(false);
   });
+
+  it('incluye Strapi extension schemas y documentación OpenAPI', () => {
+    expect(
+      shouldSyncIndexPath(
+        'src/extensions/users-permissions/content-types/User/schema.json',
+      ),
+    ).toBe(true);
+    expect(
+      shouldSyncIndexPath(
+        'src/extensions/documentation/documentation/1.0.0/full_documentation.json',
+      ),
+    ).toBe(true);
+    expect(
+      shouldSyncIndexPath(
+        'src/extensions/users-permissions/documentation/1.0.0/users-permissions-User.json',
+      ),
+    ).toBe(true);
+    expect(shouldSyncIndexPath('src/extensions/users-permissions/config/routes.json')).toBe(true);
+    expect(shouldSyncIndexPath('src/plugins/converto/config/routes.json')).toBe(true);
+    expect(shouldSyncIndexPath('config/api.js')).toBe(true);
+    expect(shouldSyncIndexPath('src/plugins/converto/controllers/Html2Pdf.js')).toBe(true);
+  });
 });

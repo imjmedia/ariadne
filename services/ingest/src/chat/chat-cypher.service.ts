@@ -182,6 +182,11 @@ export class ChatCypherService {
       'Function',
       'Model',
       'OpenApiOperation',
+      'StrapiContentType',
+      'StrapiRoute',
+      'StrapiController',
+      'StrapiService',
+      'ApiClientReference',
       'Route',
       'Hook',
       'Context',
@@ -277,6 +282,14 @@ export class ChatCypherService {
               else if (label === 'OpenApiOperation') {
                 /** Ver `openapi-spec-ingest.ts`: method, pathTemplate, specPath (sin concat `+` por compat Falkor). */
                 sampleQuery = `MATCH (n:OpenApiOperation) WHERE n.projectId = $projectId${wn} AND ${noiseSpec} RETURN n.method AS method, n.pathTemplate AS pathTemplate, n.specPath AS specPath ORDER BY n.specPath, n.pathTemplate, n.method${rowLimit}`;
+              } else if (label === 'StrapiContentType') {
+                sampleQuery = `MATCH (n:StrapiContentType) WHERE n.projectId = $projectId${wn} RETURN n.path AS path, n.name AS name, n.strapiUid AS strapiUid ORDER BY n.path${rowLimit}`;
+              } else if (label === 'StrapiRoute') {
+                sampleQuery = `MATCH (n:StrapiRoute) WHERE n.projectId = $projectId${wn} RETURN n.method AS method, n.routePath AS routePath, n.apiName AS apiName ORDER BY n.routePath, n.method${rowLimit}`;
+              } else if (label === 'ApiClientReference') {
+                sampleQuery = `MATCH (n:ApiClientReference) WHERE n.projectId = $projectId${wn} RETURN n.apiPath AS apiPath, n.filePath AS filePath ORDER BY n.apiPath${rowLimit}`;
+              } else if (label === 'StrapiController' || label === 'StrapiService') {
+                sampleQuery = `MATCH (n:${label}) WHERE n.projectId = $projectId${wn} RETURN n.path AS path, n.name AS name, n.apiName AS apiName ORDER BY n.path, n.name${rowLimit}`;
               } else if (label === 'Prop') {
                 sampleQuery = `MATCH (n:Prop) WHERE n.projectId = $projectId${wn} RETURN n.name AS name, coalesce(n.componentName, '') AS path ORDER BY n.componentName, n.name${rowLimit}`;
               } else sampleQuery = `MATCH (n:${label}) WHERE n.projectId = $projectId${wn} AND ${noiseN} AND ${archN} RETURN n.name as name, n.path as path ORDER BY n.path, n.name${rowLimit}`;

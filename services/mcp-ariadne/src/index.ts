@@ -32,6 +32,7 @@ import {
 } from "./mcp-scope-enrichment.js";
 import { mcpLimits } from "./mcp-tool-limits.js";
 import { resolveGraphScopeFromProjectOrRepoId, whereProjectRepo } from "./resolve-graph-scope.js";
+import { invokeIngestLegacyDocumentation, type LegacyDocumentationScope } from "./legacy-documentation.js";
 
 const MCP_PATH = "/mcp";
 
@@ -662,9 +663,39 @@ function createMcpServer(): Server {
       },
     },
     {
+      name: "generate_legacy_documentation",
+      description:
+        "**Modo único para documentación legacy (TheForge SDD).** Genera el MDD de partida desde el índice Falkor con máxima fidelidad al código: retrieve determinista + `buildMddEvidenceDocument` (sin prosa LLM). Devuelve JSON con las 7 claves MDD (`summary`, `openapi_spec`, `entities`, `api_contracts`, `business_logic`, `infrastructure`, `risk_report`, `evidence_paths`) y metadatos. **Usar esta tool** en lugar de `ask_codebase` con `responseMode` distintos para doc. de partida. Requiere INGEST_URL. En multi-root pasa `scope.repoIds` (roots[].id) o `projectId` del workspace; opcional `currentFilePath` para inferir repo.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: {
+            type: "string",
+            description: "ID del proyecto Ariadne o roots[].id del repo (list_known_projects)",
+          },
+          currentFilePath: {
+            type: "string",
+            description: "Ruta absoluta en el IDE (opcional): ancla el repo en multi-root",
+          },
+          scope: {
+            type: "object",
+            description: "Acotar multi-root: repoIds, prefijos de path, globs de exclusión.",
+            properties: {
+              repoIds: { type: "array", items: { type: "string" } },
+              includePathPrefixes: { type: "array", items: { type: "string" } },
+              excludePathGlobs: { type: "array", items: { type: "string" } },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "ask_codebase",
       description:
-        "Pregunta en lenguaje natural sobre el código. **Default MCP (sin `responseMode`):** `default` — prosa + sintetizador + ReAct en retrieve (mismo que «Chat normal» en la UI). responseMode=evidence_first: answer = JSON MDD (7 claves). responseMode=raw_evidence: JSON parseable (ver docs). Requiere INGEST_URL. Para filesToModify usa get_modification_plan. Routing (menos tokens/latencia): si ya conoces path o símbolo, usa get_file_content / get_definitions / get_references / get_component_graph en lugar de esta tool; en monorepo pasa scope (repoIds=roots[].id, prefijos) o projectId=roots[].id del repo objetivo. Ver docs mcp_server_specs — ask_codebase — Política de routing.",
+        "Pregunta en lenguaje natural sobre el código (Q&A humano). **No uses esta tool para generar la documentación legacy de partida** — usa `generate_legacy_documentation`. Default MCP (sin `responseMode`): `default` — prosa + sintetizador + ReAct. responseMode=evidence_first: JSON MDD puntual. responseMode=raw_evidence: JSON crudo (debug). Requiere INGEST_URL. Para filesToModify usa get_modification_plan.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -2002,11 +2033,14 @@ async function fetchFileFromIngest(
           const mdVecQ = `CALL db.idx.vector.queryNodes('MarkdownDoc', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.title AS name, node.sourcePath AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
           const modelVecQ = `CALL db.idx.vector.queryNodes('Model', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
           const enumVecQ = `CALL db.idx.vector.queryNodes('Enum', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
+          const openApiVecQ = `CALL db.idx.vector.queryNodes('OpenApiOperation', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.method AS method, node.pathTemplate AS pathTemplate, node.projectId AS projectId, node.repoId AS repoId, score`;
+          const strapiCtVecQ = `CALL db.idx.vector.queryNodes('StrapiContentType', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.name AS name, node.path AS path, node.strapiUid AS strapiUid, node.projectId AS projectId, node.repoId AS repoId, score`;
+          const strapiSrVecQ = `CALL db.idx.vector.queryNodes('StrapiRoute', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.method AS method, node.routePath AS routePath, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
           try {
             const seen = new Set<string>();
             await runOnProjectGraphs(graphRouteId, async (g, ctx) => {
               try {
-                const [fRes, cRes, dRes, sbRes, mdRes, modelVecRes, enumVecRes] = await Promise.all([
+                const [fRes, cRes, dRes, sbRes, mdRes, modelVecRes, enumVecRes, openApiVecRes, strapiCtVecRes, strapiSrVecRes] = await Promise.all([
                   g.query(funcVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
                   g.query(compVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
                   g.query(docVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
@@ -2014,6 +2048,9 @@ async function fetchFileFromIngest(
                   g.query(mdVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
                   g.query(modelVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
                   g.query(enumVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
+                  g.query(openApiVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
+                  g.query(strapiCtVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
+                  g.query(strapiSrVecQ) as Promise<{ data?: Array<Record<string, unknown>> }>,
                 ]);
                 if (
                   (fRes.data?.length ?? 0) +
@@ -2022,7 +2059,10 @@ async function fetchFileFromIngest(
                     (sbRes.data?.length ?? 0) +
                     (mdRes.data?.length ?? 0) +
                     (modelVecRes.data?.length ?? 0) +
-                    (enumVecRes.data?.length ?? 0) >
+                    (enumVecRes.data?.length ?? 0) +
+                    (openApiVecRes.data?.length ?? 0) +
+                    (strapiCtVecRes.data?.length ?? 0) +
+                    (strapiSrVecRes.data?.length ?? 0) >
                   0
                 )
                   usedVector = true;
@@ -2128,6 +2168,56 @@ async function fetchFileFromIngest(
                   results.push({
                     type: "Enum",
                     name: path ? `${name} — ${path}` : name,
+                    projectId: pid,
+                  });
+                }
+                for (const row of openApiVecRes.data ?? []) {
+                  if (results.length >= limit) return;
+                  const method = _rv<string>(row, "method") ?? "";
+                  const pathTemplate = _rv<string>(row, "pathTemplate") ?? "";
+                  const pid = _rv<string>(row, "projectId");
+                  if (ctx.cypherProjectId && pid !== ctx.cypherProjectId) continue;
+                  if (scopeRepoId && _rv<string>(row, "repoId") !== scopeRepoId) continue;
+                  const key = `OpenApiOperation:${method}:${pathTemplate}`;
+                  if (seen.has(key)) continue;
+                  seen.add(key);
+                  results.push({
+                    type: "OpenApiOperation",
+                    name: `${method} ${pathTemplate}`.trim(),
+                    projectId: pid,
+                  });
+                }
+                for (const row of strapiCtVecRes.data ?? []) {
+                  if (results.length >= limit) return;
+                  const name = _rv<string>(row, "name") ?? "";
+                  const path = _rv<string>(row, "path") ?? "";
+                  const uid = _rv<string>(row, "strapiUid") ?? "";
+                  const pid = _rv<string>(row, "projectId");
+                  if (ctx.cypherProjectId && pid !== ctx.cypherProjectId) continue;
+                  if (scopeRepoId && _rv<string>(row, "repoId") !== scopeRepoId) continue;
+                  const key = `StrapiContentType:${uid || name}:${path}`;
+                  if (seen.has(key)) continue;
+                  seen.add(key);
+                  results.push({
+                    type: "StrapiContentType",
+                    name: uid ? `${name} (${uid}) — ${path}` : path ? `${name} — ${path}` : name,
+                    projectId: pid,
+                  });
+                }
+                for (const row of strapiSrVecRes.data ?? []) {
+                  if (results.length >= limit) return;
+                  const method = _rv<string>(row, "method") ?? "";
+                  const routePath = _rv<string>(row, "routePath") ?? "";
+                  const path = _rv<string>(row, "path") ?? "";
+                  const pid = _rv<string>(row, "projectId");
+                  if (ctx.cypherProjectId && pid !== ctx.cypherProjectId) continue;
+                  if (scopeRepoId && _rv<string>(row, "repoId") !== scopeRepoId) continue;
+                  const key = `StrapiRoute:${method}:${routePath}:${path}`;
+                  if (seen.has(key)) continue;
+                  seen.add(key);
+                  results.push({
+                    type: "StrapiRoute",
+                    name: `${method} ${routePath} — ${path}`.trim(),
                     projectId: pid,
                   });
                 }
@@ -2269,7 +2359,7 @@ async function fetchFileFromIngest(
       }
     }
 
-    /** OpenAPI indexado (:OpenApiOperation) no suele tener embedding → no aparece en vector; mezclar por Cypher si hay cupo. */
+    /** OpenApiOperation sin embedding aún cae en keyword fallback si hay cupo tras vector. */
     if (requestedScopeId && results.length < limit) {
       const kwOp = Math.min(200, mcpLimits.semanticKeywordSubqueryLimit);
       const openApiQ = `MATCH (op:OpenApiOperation) WHERE ${whereProjectRepo("op", hasRepoScope)} RETURN op.method AS method, op.pathTemplate AS pathTemplate, op.specPath AS specPath LIMIT ${kwOp}`;
@@ -2531,6 +2621,70 @@ async function fetchFileFromIngest(
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `**Error:** No se pudo obtener el análisis. ¿INGEST_URL configurado? ${msg}` }], isError: true };
     }
+  }
+
+  if (name === "generate_legacy_documentation") {
+    let projectId = args?.projectId as string | undefined;
+    const currentFilePath = args?.currentFilePath as string | undefined;
+    if (!projectId && currentFilePath) {
+      projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
+    }
+    if (!projectId) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "**Error:** Se requiere `projectId` o `currentFilePath`. Usa list_known_projects para IDs.",
+          },
+        ],
+        isError: true,
+      };
+    }
+    const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002";
+    const scopeRaw = args?.scope;
+    let scope: LegacyDocumentationScope | undefined =
+      scopeRaw && typeof scopeRaw === "object" && !Array.isArray(scopeRaw)
+        ? (scopeRaw as LegacyDocumentationScope)
+        : undefined;
+    if (projectId && currentFilePath) {
+      const augmented = await augmentScopeWithInferredRepo(projectId, currentFilePath, scope as Record<string, unknown> | undefined);
+      scope = augmented as LegacyDocumentationScope;
+    }
+    const timeoutMs = (() => {
+      const raw = process.env.MCP_LEGACY_DOCUMENTATION_TIMEOUT_MS?.trim() ?? process.env.MCP_ASK_CODEBASE_TIMEOUT_MS?.trim();
+      if (!raw) return 900_000;
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) && n >= 60_000 ? n : 900_000;
+    })();
+    const result = await invokeIngestLegacyDocumentation({
+      ingestUrl,
+      projectId,
+      scope,
+      currentFilePath,
+      timeoutMs,
+    });
+    if (!result.ok) {
+      const rateHint = result.status === 429 ? "\n\n_(Límite de tasa LLM/orquestador.)_" : "";
+      return {
+        content: [{ type: "text", text: `**Error:** ${result.error}${rateHint}` }],
+        isError: true,
+      };
+    }
+    const envelope = {
+      format: "legacy_mdd_v1",
+      source: "generate_legacy_documentation",
+      mddDocument: (() => {
+        try {
+          return JSON.parse(result.answer.trim());
+        } catch {
+          return null;
+        }
+      })(),
+      answer: result.answer,
+    };
+    const parts = [JSON.stringify(envelope, null, 2)];
+    if (result.cypher) parts.push("", "```cypher", result.cypher, "```");
+    return { content: [{ type: "text", text: parts.join("\n") }] };
   }
 
   if (name === "ask_codebase") {

@@ -28,7 +28,7 @@ El Cartographer debe poblar los siguientes nodos y relaciones:
 - `(:Prop {name: string, componentName: string, projectId: string, required: boolean})`
 - `(:Function {path, name, projectId, startLine?, endLine?, loc?, complexity?, nestingDepth?, description?})` — funciones nombradas; `loc` = líneas de código; `complexity` = McCabe; `nestingDepth` = profundidad de bloques.
 - **NestJS (opcional):** `(:NestModule {path, name})`, `(:NestController {path, name, route?})`, `(:NestService {path, name})` — detectados por decoradores `@Module()`, `@Controller()`, `@Injectable()`.
-- **Strapi v4 (opcional):** `(:StrapiContentType {path, name})`, `(:StrapiController {path, name, apiName?})`, `(:StrapiService {path, name, apiName?})` — detectados por patrón de path `src/api/**/content-types/**/schema.*`, `**/controllers/*`, `**/services/*`.
+- **Strapi v4 (opcional):** `(:StrapiContentType)`, `(:StrapiController)`, `(:StrapiService)`, `(:StrapiRoute)` — paths `src/api/**` y **`src/extensions/**/content-types/**/schema.*`**, `**/routes/*.{json,js}`.
 
 ### Relaciones
 

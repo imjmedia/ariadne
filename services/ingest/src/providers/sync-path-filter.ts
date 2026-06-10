@@ -11,6 +11,13 @@
  */
 
 import { isProjectMarkdownPath, isStorybookDocumentationPath } from '../pipeline/storybook-documentation';
+import {
+  isOpenApiSpecSyncPath,
+  isStrapiConfigJsPath,
+  isStrapiGraphqlSchemaPath,
+  isStrapiPluginSyncPath,
+  isStrapiRoutesJsonPath,
+} from '../pipeline/strapi-path-patterns';
 
 const CODE_EXT = ['.js', '.jsx', '.ts', '.tsx'];
 
@@ -94,21 +101,18 @@ export function isManifestOrOpenApiSyncPath(path: string): boolean {
   const norm = path.replace(/\\/g, '/');
   const base = norm.slice(norm.lastIndexOf('/') + 1).toLowerCase();
   if (base === 'package.json') return true;
-  if (base === 'swagger.json') return true;
-  if (base === 'openapi.json') return true;
-  if (base === 'openapi.yaml' || base === 'openapi.yml') return true;
+  if (isOpenApiSpecSyncPath(norm)) return true;
   return false;
 }
 
 /**
- * JSON necesarios para el grafo Strapi (ApiRoute / StrapiContentType desde schema).
+ * JSON necesarios para el grafo Strapi (StrapiContentType / StrapiRoute desde schema y routes JSON).
  * El resto de .json (package-lock, tsconfig, etc.) se excluye para no inflar el índice.
  */
 export function isStrapiIndexableJsonPath(path: string): boolean {
   const norm = path.replace(/\\/g, '/');
   if (/\/content-types\/[^/]+\/schema\.json$/i.test(norm)) return true;
-  if (/\/api\/[^/]+\/routes\/[^/]+\.json$/i.test(norm)) return true;
-  if (/\/extensions\/[^/]+\/(?:server\/)?routes\/[^/]+\.json$/i.test(norm)) return true;
+  if (isStrapiRoutesJsonPath(norm)) return true;
   return false;
 }
 
@@ -133,10 +137,14 @@ export function shouldSyncIndexPath(path: string): boolean {
   const ext = norm.slice(norm.lastIndexOf('.')).toLowerCase();
   const ignoreRe = shouldIndexTests() ? /\.log$|\/\.env$|^\.env$/ : IGNORE_FILE;
   if (CODE_EXT.includes(ext) && !ignoreRe.test(norm)) return true;
+  if (ext === '.js' && (isStrapiConfigJsPath(norm) || isStrapiPluginSyncPath(norm)) && !ignoreRe.test(norm)) {
+    return true;
+  }
   if (isProjectMarkdownPath(norm)) return true;
   if (ext === '.mdx' && isStorybookDocumentationPath(norm)) return true;
   if (ext === '.json' && isStrapiIndexableJsonPath(norm)) return true;
   if (ext === '.json' && isManifestOrOpenApiSyncPath(norm)) return true;
+  if (ext === '.graphql' && isStrapiGraphqlSchemaPath(norm)) return true;
   if ((ext === '.yaml' || ext === '.yml') && isManifestOrOpenApiSyncPath(norm)) return true;
   if ((ext === '.mjs' || ext === '.cjs') && !ignoreRe.test(norm)) return true;
   if (ext === '.prisma') return true;

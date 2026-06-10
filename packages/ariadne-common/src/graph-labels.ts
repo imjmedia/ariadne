@@ -14,6 +14,12 @@ export const FALKOR_EMBEDDABLE_NODE_LABELS = [
   'Model',
   /** Prisma enums (`prisma-extract`). */
   'Enum',
+  /** Contratos HTTP OpenAPI / Strapi documentation plugin. */
+  'OpenApiOperation',
+  /** Content-types Strapi v4 (`schema.json`). */
+  'StrapiContentType',
+  /** Rutas REST Strapi (`routes.json`, core router inferido). */
+  'StrapiRoute',
 ] as const;
 
 export type FalkorEmbeddableLabel = (typeof FALKOR_EMBEDDABLE_NODE_LABELS)[number];

@@ -34,6 +34,10 @@ import {
 } from '../pipeline/producer';
 import { buildCypherForPrismaSchema } from '../pipeline/prisma-extract';
 import { buildCypherForOpenApiSpec } from '../pipeline/openapi-spec-ingest';
+import { buildCrossRepoApiLinkCypher } from '../pipeline/cross-repo-api-link';
+import { enrichParsedFilesWithCoreRouterRoutes } from '../pipeline/strapi-core-router-infer';
+import { buildStrapiContentTypeRelationCypher } from '../pipeline/strapi-content-type-relations';
+import { isOpenApiSpecSyncPath } from '../pipeline/strapi-path-patterns';
 import {
   SCHEMA_RELATIONAL_RAG_SOURCE_PATH,
   SCHEMA_RELATIONAL_RAG_TITLE,
@@ -448,7 +452,7 @@ export class SyncService {
             prismaFiles.push({ path: relPath, content });
             continue;
           }
-          if (/swagger\.json$/i.test(relPath) || /openapi\.(yaml|yml|json)$/i.test(relPath)) {
+          if (isOpenApiSpecSyncPath(relPath)) {
             continue;
           }
           if (isFirstSync) {
@@ -478,9 +482,7 @@ export class SyncService {
         }
       }
 
-      const openApiPathCount = paths.filter(
-        (p) => /swagger\.json$/i.test(p) || /openapi\.(yaml|yml|json)$/i.test(p),
-      ).length;
+      const openApiPathCount = paths.filter((p) => isOpenApiSpecSyncPath(p)).length;
       /** En cuanto termina el barrido de rutas: si no, la UI se queda en "Indexando N/N" durante deps/tsconfig (puede tardar mucho). */
       await this.updateJobProgress(job.id, {
         phase: 'writing_graph',
@@ -497,6 +499,16 @@ export class SyncService {
 
       const parsedFiles = Array.from(parsedByPath.values());
 
+      try {
+        await enrichParsedFilesWithCoreRouterRoutes(parsedByPath, getContent, parsedFiles);
+      } catch (coreRouterErr) {
+        console.warn(
+          '[sync] Strapi core router infer:',
+          coreRouterErr instanceof Error ? coreRouterErr.message : String(coreRouterErr),
+        );
+      }
+      const parsedFilesEnriched = Array.from(parsedByPath.values());
+
       let tsconfigPaths: Awaited<ReturnType<typeof loadRepoTsconfigPaths>> = null;
       try {
         tsconfigPaths = await loadRepoTsconfigPaths(getContent);
@@ -507,7 +519,7 @@ export class SyncService {
       const resolveOpts = tsconfigPaths ? { tsconfig: tsconfigPaths, prefix: '' } : { prefix: '' };
       const resolvePath = (from: string, spec: string) =>
         resolveImportPath(from, spec, pathSet, resolveOpts);
-      const resolvedCalls = resolveCrossFileCalls(parsedFiles, pathSet, resolvePath);
+      const resolvedCalls = resolveCrossFileCalls(parsedFilesEnriched, pathSet, resolvePath);
 
       const commitSha = await getLatestCommitSha();
       const chunkingContext = commitSha ? { commitSha } : undefined;
@@ -565,7 +577,7 @@ export class SyncService {
           return graphClient;
         };
 
-        for (const parsed of parsedFiles) {
+        for (const parsed of parsedFilesEnriched) {
           try {
             const resolvedImports: string[] = [];
             for (const imp of parsed.imports) {
@@ -604,9 +616,7 @@ export class SyncService {
             if (projectId === projectIds[0]) skippedIndex.push(pf.path);
           }
         }
-        const openApiPaths = paths.filter(
-          (p) => /swagger\.json$/i.test(p) || /openapi\.(yaml|yml|json)$/i.test(p),
-        );
+        const openApiPaths = paths.filter((p) => isOpenApiSpecSyncPath(p));
         for (const oaPath of openApiPaths) {
           try {
             const content = await getContent(oaPath);
@@ -630,7 +640,7 @@ export class SyncService {
           }
           const schemaRagText = await buildSchemaRelationalRagDocumentationText({
             prismaFiles,
-            parsedFiles,
+            parsedFiles: parsedFilesEnriched,
             openApiSpecs,
           });
           const schemaRagCy = buildCypherForSchemaRelationalRagDoc(
@@ -682,6 +692,34 @@ export class SyncService {
           }
         } catch (c4Err) {
           console.warn('[sync] C4 ingest:', c4Err instanceof Error ? c4Err.message : String(c4Err));
+        }
+
+        try {
+          const relationCy = buildStrapiContentTypeRelationCypher(
+            parsedFilesEnriched,
+            projectId,
+            repoId,
+          );
+          if (relationCy.length > 0) {
+            const relGraph = await prepareGraph('strapi-content-type-relations');
+            await runCypherBatch(relGraph, relationCy);
+          }
+        } catch (relErr) {
+          console.warn(
+            '[sync] Strapi content-type relations:',
+            relErr instanceof Error ? relErr.message : String(relErr),
+          );
+        }
+
+        try {
+          const linkCy = buildCrossRepoApiLinkCypher(projectId);
+          const linkGraph = await prepareGraph('cross-repo-api-link');
+          await runCypherBatch(linkGraph, linkCy);
+        } catch (linkErr) {
+          console.warn(
+            '[sync] cross-repo API link:',
+            linkErr instanceof Error ? linkErr.message : String(linkErr),
+          );
         }
 
         if (projRow) {

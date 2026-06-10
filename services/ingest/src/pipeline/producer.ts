@@ -442,8 +442,9 @@ export function buildCypherForFile(
       ct.attributesSummary != null && ct.attributesSummary.length > 0
         ? cypherSafe(ct.attributesSummary)
         : 'null';
+    const strapiUid = ct.strapiUid != null ? cypherSafe(ct.strapiUid) : 'null';
     statements.push(
-      `MERGE (ct:StrapiContentType {path: ${cypherSafe(path)}, name: ${cypherSafe(ct.name)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET ct.displayName = ${displayName}, ct.collectionName = ${collectionName}, ct.kind = ${kind}, ct.apiName = ${apiName}, ct.attributesSummary = ${attrs} ON MATCH SET ct.displayName = ${displayName}, ct.collectionName = ${collectionName}, ct.kind = ${kind}, ct.apiName = ${apiName}, ct.attributesSummary = ${attrs}`,
+      `MERGE (ct:StrapiContentType {path: ${cypherSafe(path)}, name: ${cypherSafe(ct.name)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET ct.displayName = ${displayName}, ct.collectionName = ${collectionName}, ct.kind = ${kind}, ct.apiName = ${apiName}, ct.attributesSummary = ${attrs}, ct.strapiUid = ${strapiUid} ON MATCH SET ct.displayName = ${displayName}, ct.collectionName = ${collectionName}, ct.kind = ${kind}, ct.apiName = ${apiName}, ct.attributesSummary = ${attrs}, ct.strapiUid = ${strapiUid}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ct:StrapiContentType {path: ${cypherSafe(path)}, name: ${cypherSafe(ct.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(ct)`,
@@ -465,6 +466,59 @@ export function buildCypherForFile(
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (s:StrapiService {path: ${cypherSafe(path)}, name: ${cypherSafe(s.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(s)`,
+    );
+  }
+
+  for (const rt of parsed.strapiRoutes ?? []) {
+    const handler = rt.handler != null ? cypherSafe(rt.handler) : 'null';
+    const apiName = rt.apiName != null ? cypherSafe(rt.apiName) : 'null';
+    const routeSource = cypherSafe(rt.routeSource);
+    const description = rt.description != null ? cypherSafe(rt.description.slice(0, 500)) : 'null';
+    statements.push(
+      `MERGE (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description} ON MATCH SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(sr)`,
+    );
+  }
+
+  for (const ref of parsed.apiClientReferences ?? []) {
+    statements.push(
+      `MERGE (acr:ApiClientReference {apiPath: ${cypherSafe(ref.apiPath)}, normalizedPath: ${cypherSafe(ref.normalizedPath)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET acr.isDynamic = ${ref.isDynamic ? 'true' : 'false'} ON MATCH SET acr.isDynamic = ${ref.isDynamic ? 'true' : 'false'}`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (acr:ApiClientReference {apiPath: ${cypherSafe(ref.apiPath)}, normalizedPath: ${cypherSafe(ref.normalizedPath)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:REFERENCES_API]->(acr)`,
+    );
+  }
+
+  for (const ext of parsed.externalApiReferences ?? []) {
+    statements.push(
+      `MERGE (ear:ExternalApiReference {baseUrl: ${cypherSafe(ext.baseUrl)}, apiPath: ${cypherSafe(ext.apiPath)}, normalizedPath: ${cypherSafe(ext.normalizedPath)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET ear.service = ${cypherSafe(ext.service)}, ear.isDynamic = ${ext.isDynamic ? 'true' : 'false'} ON MATCH SET ear.service = ${cypherSafe(ext.service)}, ear.isDynamic = ${ext.isDynamic ? 'true' : 'false'}`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ear:ExternalApiReference {baseUrl: ${cypherSafe(ext.baseUrl)}, apiPath: ${cypherSafe(ext.apiPath)}, normalizedPath: ${cypherSafe(ext.normalizedPath)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:REFERENCES_EXTERNAL_API]->(ear)`,
+    );
+  }
+
+  for (const gq of parsed.graphQlQueries ?? []) {
+    const desc = gq.description != null ? cypherSafe(gq.description) : 'null';
+    const resolverOf = gq.resolverOf != null ? cypherSafe(gq.resolverOf) : 'null';
+    statements.push(
+      `MERGE (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf} ON MATCH SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(gq)`,
+    );
+  }
+
+  const normPath = path.replace(/\\/g, '/');
+  const lifecycleMatch = normPath.match(
+    /\/(?:api|extensions)\/([^/]+)\/content-types\/([^/]+)\/lifecycles\.js$/i,
+  );
+  if (lifecycleMatch) {
+    const schemaPath = normPath.replace(/lifecycles\.js$/i, 'schema.json');
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ct:StrapiContentType {path: ${cypherSafe(schemaPath)}, name: ${cypherSafe(lifecycleMatch[2]!)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:LIFECYCLE_OF]->(ct)`,
     );
   }
 
@@ -649,6 +703,11 @@ const REPOID_BACKFILL_LABELS = [
   'StrapiContentType',
   'StrapiController',
   'StrapiService',
+  'StrapiRoute',
+  'ApiClientReference',
+  'ExternalApiReference',
+  'GraphQlQuery',
+  'OpenApiOperation',
   'DomainConcept',
   'Prop',
   'Hook',

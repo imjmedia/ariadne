@@ -19,7 +19,23 @@ import {
   type StorybookDocumentationExtract,
 } from './storybook-documentation';
 import { extractStorybookCsfMetaTargets, isStorybookStoriesPath } from './storybook-csf-ast';
-import { parseStrapiSchemaJson } from './strapi-schema-extract';
+import { parseStrapiSchemaJson, buildStrapiUidFromSchema } from './strapi-schema-extract';
+import { parseStrapiRoutesFile } from './strapi-routes-extract';
+import {
+  extractApiClientReferences,
+  extractExternalApiReferences,
+  type ApiClientReferenceParsed,
+  type ExternalApiReferenceParsed,
+} from './api-client-reference-extract';
+import { parseStrapiGraphqlSchema, type GraphQlQueryInfo } from './strapi-graphql-extract';
+import {
+  isStrapiConfigJsPath,
+  isStrapiGraphqlSchemaPath,
+  isStrapiLifecycleJsPath,
+  isStrapiPluginSyncPath,
+  isStrapiRoutesJsonPath,
+  matchStrapiSchemaJsonPath,
+} from './strapi-path-patterns';
 
 const ts = TypeScript as unknown as { typescript: unknown; tsx: unknown };
 const LANG_JS = JavaScript as unknown;
@@ -142,6 +158,7 @@ export interface StrapiContentTypeInfo {
   pluralName?: string;
   attributesSummary?: string;
   attributes?: import('./strapi-schema-extract').StrapiAttributeField[];
+  strapiUid?: string;
 }
 
 /** Strapi v4 API controller. */
@@ -155,6 +172,24 @@ export interface StrapiServiceInfo {
   name: string;
   apiName?: string;
 }
+
+/** Ruta HTTP declarada en Strapi routes.json o routes/*.js. */
+export interface StrapiRouteInfo {
+  method: string;
+  path: string;
+  handler?: string;
+  description?: string;
+  apiName?: string;
+  routeSource: 'json' | 'js' | 'core_router';
+}
+
+/** Referencia literal a `api/...` en código cliente (multi-root → OpenApiOperation). */
+export type ApiClientReferenceInfo = ApiClientReferenceParsed;
+
+/** API externa (SSO/tasks) referenciada desde frontend. */
+export type ExternalApiReferenceInfo = ExternalApiReferenceParsed;
+
+export type { GraphQlQueryInfo };
 
 /** React Router Route: path -> component. Para flujos de UI en manuales. */
 export interface RouteInfo {
@@ -176,7 +211,7 @@ export interface ModelInfo {
 }
 
 /** Rol de archivo de configuración indexado (alias, env). */
-export type IndexedFileRole = 'tsconfig' | 'env_example' | 'package_json';
+export type IndexedFileRole = 'tsconfig' | 'env_example' | 'package_json' | 'strapi_config' | 'strapi_plugin';
 
 /** Concepto de dominio (tipos, opciones). Definido en domain-types. */
 export type { DomainConceptInfo } from './domain-types';
@@ -214,6 +249,13 @@ export interface ParsedFile {
   strapiContentTypes: StrapiContentTypeInfo[];
   strapiControllers: StrapiControllerInfo[];
   strapiServices: StrapiServiceInfo[];
+  strapiRoutes: StrapiRouteInfo[];
+  /** Literales `api/...` detectados en TS/JS (enlace post-sync con OpenAPI de otros repos). */
+  apiClientReferences: ApiClientReferenceInfo[];
+  /** URLs externas SSO/tasks detectadas en frontend. */
+  externalApiReferences: ExternalApiReferenceInfo[];
+  /** Queries/mutations GraphQL custom Strapi (`schema.graphql`). */
+  graphQlQueries: GraphQlQueryInfo[];
   /** React Router Route definitions (path -> component). */
   routes: RouteInfo[];
   /** Modelos de datos (clases sin JSX, path Models/, nombre *Model). */
@@ -375,17 +417,21 @@ function findNodesByType(
   return out;
 }
 
-/** Strapi v4: detect by path pattern (api/content-types, api/controllers, api/services). */
+/** Strapi v4: detect by path pattern (api/extensions content-types, controllers, services, routes). */
 function collectStrapiFromPath(path: string, source: string, result: ParsedFile): void {
   const norm = path.replace(/\\/g, '/');
-  const schemaJsonMatch = norm.match(/\/api\/([^/]+)\/content-types\/([^/]+)\/schema\.json$/i);
-  if (schemaJsonMatch) {
+  const schemaMatch = matchStrapiSchemaJsonPath(norm);
+  if (schemaMatch) {
     const parsed = parseStrapiSchemaJson(path, source);
     if (parsed) {
       result.strapiContentTypes.push(parsed);
       return;
     }
-    result.strapiContentTypes.push({ name: schemaJsonMatch[2]!, apiName: schemaJsonMatch[1] });
+    result.strapiContentTypes.push({
+      name: schemaMatch.name,
+      apiName: schemaMatch.apiName,
+      strapiUid: buildStrapiUidFromSchema(schemaMatch, { name: schemaMatch.name }),
+    });
     return;
   }
   const contentTypesMatch = norm.match(/\/api\/([^/]+)\/content-types\/([^/]+)\/schema\.(ts|js)$/);
@@ -393,7 +439,7 @@ function collectStrapiFromPath(path: string, source: string, result: ParsedFile)
     result.strapiContentTypes.push({ name: contentTypesMatch[2]!, apiName: contentTypesMatch[1] });
     return;
   }
-  const controllersMatch = norm.match(/\/api\/([^/]+)\/controllers\/([^/]+)\.(ts|js)$/);
+  const controllersMatch = norm.match(/\/(?:api|plugins)\/([^/]+)\/controllers\/([^/]+)\.(ts|js)$/);
   if (controllersMatch) {
     result.strapiControllers.push({
       name: controllersMatch[2],
@@ -401,12 +447,20 @@ function collectStrapiFromPath(path: string, source: string, result: ParsedFile)
     });
     return;
   }
-  const servicesMatch = norm.match(/\/api\/([^/]+)\/services\/([^/]+)\.(ts|js)$/);
+  const servicesMatch = norm.match(/\/(?:api|plugins)\/([^/]+)\/services\/([^/]+)\.(ts|js)$/);
   if (servicesMatch) {
     result.strapiServices.push({
       name: servicesMatch[2],
       apiName: servicesMatch[1],
     });
+  }
+}
+
+function collectStrapiRoutesFromPath(path: string, source: string, result: ParsedFile): void {
+  const parsed = parseStrapiRoutesFile(path, source);
+  if (!parsed) return;
+  for (const route of parsed.routes) {
+    result.strapiRoutes.push(route);
   }
 }
 
@@ -478,6 +532,10 @@ function tryParseTruncated(
       strapiContentTypes: [],
       strapiControllers: [],
       strapiServices: [],
+      strapiRoutes: [],
+      apiClientReferences: [],
+      externalApiReferences: [],
+      graphQlQueries: [],
       routes: [],
       models: [],
       domainConcepts: [],
@@ -567,15 +625,25 @@ export function parseSource(
   strapiContentTypes: [],
   strapiControllers: [],
   strapiServices: [],
+  strapiRoutes: [],
+  apiClientReferences: [],
+  externalApiReferences: [],
+  graphQlQueries: [],
   routes: [],
   models: [],
   domainConcepts: [],
   };
 
   collectStrapiFromPath(path, source, result);
+  collectStrapiRoutesFromPath(path, source, result);
 
   const normPathEarly = path.replace(/\\/g, '/');
   const lowerEarly = normPathEarly.toLowerCase();
+  if (isStrapiConfigJsPath(normPathEarly)) {
+    result.fileRole = 'strapi_config';
+  } else if (isStrapiPluginSyncPath(normPathEarly)) {
+    result.fileRole = 'strapi_plugin';
+  }
   if (/\/content-types\/[^/]+\/schema\.json$/i.test(normPathEarly)) {
     if (options.returnAst) {
       const stubParser = new Parser();
@@ -583,6 +651,23 @@ export function parseSource(
       return { parsed: result, root: stubParser.parse('').rootNode, source };
     }
     return result.strapiContentTypes.length > 0 ? result : null;
+  }
+  if (isStrapiRoutesJsonPath(normPathEarly)) {
+    if (options.returnAst) {
+      const stubParser = new Parser();
+      stubParser.setLanguage(LANG_TS as Parameters<Parser['setLanguage']>[0]);
+      return { parsed: result, root: stubParser.parse('').rootNode, source };
+    }
+    return result;
+  }
+  if (isStrapiGraphqlSchemaPath(normPathEarly)) {
+    result.graphQlQueries = parseStrapiGraphqlSchema(path, source);
+    if (options.returnAst) {
+      const stubParser = new Parser();
+      stubParser.setLanguage(LANG_TS as Parameters<Parser['setLanguage']>[0]);
+      return { parsed: result, root: stubParser.parse('').rootNode, source };
+    }
+    return result.graphQlQueries.length > 0 ? result : null;
   }
   if (
     /(^|\/)tsconfig(\.[^/]+)?\.json$/.test(lowerEarly) ||
@@ -653,7 +738,8 @@ export function parseSource(
     const hasStrapi =
       result.strapiContentTypes.length > 0 ||
       result.strapiControllers.length > 0 ||
-      result.strapiServices.length > 0;
+      result.strapiServices.length > 0 ||
+      result.strapiRoutes.length > 0;
     if (!hasStrapi) recordParseFailed();
     return hasStrapi ? result : null;
   }
@@ -847,6 +933,11 @@ export function parseSource(
   result.domainConcepts = options.extractDomainConcepts
     ? options.extractDomainConcepts(result, source, root, options.domainConfig ?? undefined)
     : [];
+  const ext = normPathEarly.slice(normPathEarly.lastIndexOf('.')).toLowerCase();
+  if (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'].includes(ext)) {
+    result.apiClientReferences = extractApiClientReferences(source);
+    result.externalApiReferences = extractExternalApiReferences(source);
+  }
   return result;
 }
 
