@@ -69,6 +69,12 @@ export class CacheService implements OnModuleDestroy {
       : `component:v3:${name}:${depth}${tail}`;
   }
 
+  /** Genera la clave de cache para snapshot del índice Falkor (relaciones crudas). */
+  indexedSnapshotKey(projectId: string, repoId?: string, limit?: number): string {
+    const rid = repoId ? `:${repoId}` : '';
+    return `indexed:v1:${projectId}${rid}:${limit ?? 500}`;
+  }
+
   /** Genera la clave de cache para contrato (props) de un componente. */
   contractKey(componentName: string, projectId?: string, scopePath?: string): string {
     const tail = scopePath ? `:${encodeURIComponent(scopePath).slice(0, 200)}` : '';

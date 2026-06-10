@@ -35,6 +35,28 @@ export class GraphController {
     }
   }
 
+  /** GET /graph/indexed-snapshot — Relaciones indexadas en Falkor (IMPORTS, CONTAINS, CALLS, …). */
+  @Get('indexed-snapshot')
+  async indexedSnapshot(
+    @Query('projectId') projectId?: string,
+    @Query('repoId') repoId?: string,
+    @Query('limit') limitStr?: string,
+  ) {
+    const pid = projectId?.trim();
+    if (!pid) {
+      throw new HttpException('projectId required', HttpStatus.BAD_REQUEST);
+    }
+    const limit = Math.min(
+      2000,
+      Math.max(50, parseInt(limitStr ?? '500', 10) || 500),
+    );
+    try {
+      return await this.graph.getIndexedSnapshot(pid, repoId?.trim() || undefined, limit);
+    } catch (err) {
+      throw new HttpException(String(err), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   /** GET /graph/component/:name?depth= — Árbol de dependencias del componente hasta depth. */
   @Get('component/:name')
   async component(

@@ -342,6 +342,22 @@ export const api = {
     }>(`/graph/component/${encodeURIComponent(name)}${qs ? `?${qs}` : ''}`);
   },
 
+  /** Relaciones crudas indexadas en Falkor (IMPORTS, CONTAINS, CALLS, RENDERS, …). */
+  getIndexedGraphSnapshot: (opts: { projectId: string; repoId?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    q.set('projectId', opts.projectId);
+    if (opts.repoId) q.set('repoId', opts.repoId);
+    if (opts.limit != null) q.set('limit', String(opts.limit));
+    return request<{
+      projectId: string;
+      repoId?: string;
+      limit: number;
+      truncated: boolean;
+      nodes: Array<{ id: string; kind: string; name?: string; path?: string }>;
+      edges: Array<{ source: string; target: string; kind: string }>;
+    }>(`/graph/indexed-snapshot?${q.toString()}`);
+  },
+
   /**
    * Cypher de solo lectura contra Falkor vía Nest (misma conexión que el resto del grafo).
    * Requiere FALKOR_DEBUG_CYPHER=1 en el API.
