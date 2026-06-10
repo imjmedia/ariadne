@@ -31,7 +31,8 @@
  * | `validate_before_edit` | Precondición SDD: impacto + contrato antes de editar nodo. |
  * | `semantic_search` | Búsqueda híbrida vector+keyword; `projectId` puede ser repo o proyecto. |
  * | `get_project_analysis` | POST análisis ingest (`diagnostico`, `duplicados`, `reingenieria`, `codigo_muerto`, `seguridad`). |
- * | `ask_codebase` | Pregunta NL; modos `responseMode` / `deterministicRetriever` (ver specs MCP en docs). |
+ * | `generate_legacy_documentation` | **Doc. legacy única:** MDD 7§ determinista (`evidence_first` fijo). TheForge doc. partida. |
+ * | `ask_codebase` | Pregunta NL (Q&A); **no** doc. legacy de partida — usar `generate_legacy_documentation`. |
  * | `get_modification_plan` | Plan legacy: `filesToModify` + preguntas; preferir `roots[].id` en multi-root. |
  * | `get_definitions` | Definición de símbolo (archivo + líneas). |
  * | `get_references` | Usos de símbolo (refactor seguro). |

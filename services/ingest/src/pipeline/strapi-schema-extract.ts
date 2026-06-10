@@ -2,6 +2,7 @@
  * Parseo de Strapi v4 schema.json bajo content-types (atributos y relaciones para grafo + RAG).
  */
 import { isStrapiIndexableJsonPath } from '../providers/sync-path-filter';
+import { matchStrapiSchemaJsonPath, type StrapiSchemaPathMatch } from './strapi-path-patterns';
 
 export interface StrapiAttributeField {
   name: string;
@@ -23,6 +24,8 @@ export interface StrapiContentTypeParsed {
   attributes: StrapiAttributeField[];
   /** Resumen compacto para propiedades en Falkor y búsqueda. */
   attributesSummary: string;
+  /** UID Strapi (`api::foo.bar` / `plugin::users-permissions.user`). */
+  strapiUid?: string;
 }
 
 function normalizeTarget(target: unknown): string | undefined {
@@ -71,6 +74,17 @@ function buildAttributesSummary(attrs: StrapiAttributeField[]): string {
     .join('; ');
 }
 
+export function buildStrapiUidFromSchema(
+  matched: StrapiSchemaPathMatch,
+  info: { singularName?: string; name?: string },
+): string {
+  const singular = (info.singularName ?? info.name ?? matched.name).toLowerCase();
+  if (matched.source === 'extension') {
+    return `plugin::${matched.apiName}.${singular}`;
+  }
+  return `api::${matched.apiName}.${singular}`;
+}
+
 /**
  * Parsea schema.json de Strapi v4. Devuelve null si el path no aplica o el JSON es invalido.
  */
@@ -78,8 +92,8 @@ export function parseStrapiSchemaJson(path: string, source: string): StrapiConte
   const norm = path.replace(/\\/g, '/');
   if (!isStrapiIndexableJsonPath(norm) || !/\/schema\.json$/i.test(norm)) return null;
 
-  const m = norm.match(/\/api\/([^/]+)\/content-types\/([^/]+)\/schema\.json$/i);
-  if (!m) return null;
+  const matched = matchStrapiSchemaJsonPath(norm);
+  if (!matched) return null;
 
   let doc: Record<string, unknown>;
   try {
@@ -103,18 +117,24 @@ export function parseStrapiSchemaJson(path: string, source: string): StrapiConte
 
   const displayName =
     typeof info.displayName === 'string' ? info.displayName.trim() : undefined;
+  const singularName = typeof info.singularName === 'string' ? info.singularName : undefined;
+  const infoName = typeof info.name === 'string' ? info.name : undefined;
 
   return {
-    name: m[2]!,
-    apiName: m[1],
+    name: matched.name,
+    apiName: matched.apiName,
     kind: typeof doc.kind === 'string' ? doc.kind : undefined,
     collectionName:
       typeof doc.collectionName === 'string' ? doc.collectionName : undefined,
     displayName,
-    singularName: typeof info.singularName === 'string' ? info.singularName : undefined,
+    singularName,
     pluralName: typeof info.pluralName === 'string' ? info.pluralName : undefined,
     attributes,
     attributesSummary: buildAttributesSummary(attributes),
+    strapiUid: buildStrapiUidFromSchema(matched, {
+      singularName,
+      name: infoName ?? matched.name,
+    }),
   };
 }
 

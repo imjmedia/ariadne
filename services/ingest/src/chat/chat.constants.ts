@@ -4,19 +4,34 @@
 
 export const SCHEMA = `
 Grafo FalkorDB (Cypher). Nodos:
-- File {path, projectId, openApiTruth?, fileRole? (tsconfig|env_example), specKind?}
-- Component {name, projectId}
-- Function {path, name, projectId, complexity, nestingDepth, loc, description}
-- Model {path, name, projectId, source (prisma|typeorm), fieldSummary?}
-- OpenApiOperation {pathTemplate, method, specPath, projectId, docSource}
-- Route {path, projectId, componentName}
-- Hook {name, projectId}
-- DomainConcept {name, projectId, category, sourcePath, options?, description?} — conceptos de dominio (tipos, opciones de enums/constantes)
-- NestController, NestService, NestModule {path, name, projectId}
+- File {path, projectId, repoId, openApiTruth?, fileRole? (tsconfig|env_example|strapi_config|strapi_plugin), specKind?}
+- Component {name, projectId, repoId}
+- Function {path, name, projectId, repoId, complexity, nestingDepth, loc, description}
+- Model {path, name, projectId, repoId, source (prisma|typeorm), fieldSummary?}
+- OpenApiOperation {pathTemplate, method, specPath, projectId, repoId, docSource}
+- StrapiContentType {path, name, projectId, repoId, apiName, strapiUid, attributesSummary, displayName, collectionName}
+- StrapiController, StrapiService {path, name, projectId, repoId, apiName?}
+- StrapiRoute {path, method, routePath, projectId, repoId, handler?, apiName?, routeSource? (json|js|core_router)}
+- ApiClientReference {apiPath, normalizedPath, filePath, projectId, repoId, isDynamic?}
+- ExternalApiReference {service, baseUrl, apiPath, normalizedPath, filePath, projectId, repoId} — SSO/tasks fuera del ERP
+- GraphQlQuery {path, name, operationKind (query|mutation), apiName, description?, resolverOf?}
+- Route {path, projectId, repoId, componentName} — React Router (front)
+- Hook {name, projectId, repoId}
+- DomainConcept {name, projectId, repoId, category, sourcePath, options?, description?}
+- NestController, NestService, NestModule, NestRoute, NestGuard {path, name, projectId, repoId}
 
-Relaciones: (File)-[:CONTAINS]->(Component|Function|...), (File)-[:DEFINES_OP]->(OpenApiOperation), (File)-[:IMPORTS]->(File), (Component)-[:RENDERS]->(Component), (Component)-[:USES_HOOK]->(Hook), (DomainConcept)-[:DEFINED_IN]->(File)
+Relaciones:
+- (File)-[:CONTAINS]->(Component|Function|StrapiContentType|StrapiRoute|…)
+- (File)-[:DEFINES_OP]->(OpenApiOperation)
+- (File)-[:REFERENCES_API]->(ApiClientReference)
+- (File)-[:REFERENCES_EXTERNAL_API]->(ExternalApiReference)
+- (File)-[:CONTAINS]->(GraphQlQuery)
+- (ApiClientReference)-[:CALLS_API]->(OpenApiOperation) — multi-repo front→back
+- (StrapiContentType)-[:RELATES_TO {attribute, relation}]->(StrapiContentType) — relaciones schema.json
+- (File)-[:LIFECYCLE_OF]->(StrapiContentType) — lifecycles.js del content-type
+- (File)-[:IMPORTS]->(File), (Component)-[:RENDERS]->(Component), (Function)-[:CALLS]->(Function)
 
-IMPORTANTE: Toda consulta debe filtrar con projectId = $projectId. FalkorDB NO tiene toLower: usa CONTAINS con la palabra exacta o prueba variantes (Login, login).
+IMPORTANTE: Toda consulta debe filtrar con projectId = $projectId (y repoId = $repoId en multi-root). FalkorDB NO tiene toLower: usa CONTAINS con la palabra exacta o prueba variantes.
 `;
 
 export const EXAMPLES = `
@@ -137,9 +152,40 @@ ORDER BY m.path
 → OPCION C (monorepo): probar apps/api/prisma/schema.prisma, libs/db/prisma/schema.prisma, libs/*/entity*.ts, **/entities/*.ts
 
 Pregunta: "rutas de API", "endpoints", "listado de rutas REST"
+→ Strapi backend: OpenApiOperation (swagger/full_documentation) o StrapiRoute (routes custom/core):
 \`\`\`cypher
-MATCH (nc:NestController) WHERE nc.projectId = $projectId RETURN nc.path as path, nc.name as name
+MATCH (op:OpenApiOperation) WHERE op.projectId = $projectId RETURN op.method AS method, op.pathTemplate AS pathTemplate, op.specPath AS specPath ORDER BY op.pathTemplate, op.method
 \`\`\`
+\`\`\`cypher
+MATCH (sr:StrapiRoute) WHERE sr.projectId = $projectId RETURN sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, sr.routeSource AS routeSource ORDER BY sr.routePath
+\`\`\`
+→ NestJS: NestController. → React front: Route.
+
+Pregunta: "content-types Strapi", "modelo de datos campania", "schema User permissions"
+\`\`\`cypher
+MATCH (ct:StrapiContentType) WHERE ct.projectId = $projectId AND (ct.name CONTAINS 'campania' OR ct.strapiUid CONTAINS 'campania' OR ct.attributesSummary CONTAINS 'campania') RETURN ct.path AS path, ct.name AS name, ct.strapiUid AS strapiUid, ct.attributesSummary AS attributesSummary
+\`\`\`
+
+Pregunta: "relaciones entre entidades Strapi", "qué modelos enlaza campania"
+\`\`\`cypher
+MATCH (src:StrapiContentType)-[r:RELATES_TO]->(tgt:StrapiContentType) WHERE src.projectId = $projectId AND tgt.projectId = $projectId RETURN src.strapiUid AS from, r.attribute AS attribute, r.relation AS relation, tgt.strapiUid AS to
+\`\`\`
+
+Pregunta: "qué front llama a qué API", "referencias api/campanias en el código"
+\`\`\`cypher
+MATCH (f:File)-[:REFERENCES_API]->(ref:ApiClientReference)-[:CALLS_API]->(op:OpenApiOperation) WHERE f.projectId = $projectId RETURN f.path AS file, ref.apiPath AS apiPath, op.method AS method, op.pathTemplate AS pathTemplate LIMIT 50
+\`\`\`
+
+Pregunta: "lifecycles de campania", "hooks beforeUpdate"
+\`\`\`cypher
+MATCH (f:File)-[:LIFECYCLE_OF]->(ct:StrapiContentType) WHERE f.projectId = $projectId AND ct.projectId = $projectId RETURN f.path AS lifecycleFile, ct.strapiUid AS contentType
+\`\`\`
+
+Pregunta: "config Strapi", "middlewares", "plugins activos"
+\`\`\`cypher
+MATCH (f:File) WHERE f.projectId = $projectId AND f.fileRole = 'strapi_config' RETURN f.path AS path ORDER BY f.path
+\`\`\`
+
 (O también Route para frontend. NestController tiene .route en propiedades; get_file_content en path para ver decoradores @Get, @Post.)
 
 Pregunta: "variables de entorno", "configuración env", "qué env vars usa"

@@ -102,11 +102,16 @@ export function buildCypherForOpenApiSpec(
 
   for (const op of operations) {
     const sum = op.summary ? `, op.summary = ${cypherSafe(op.summary)}` : '';
+    const pathEsc = cypherSafe(path);
+    const isFullDoc = path.endsWith('full_documentation.json');
+    const specPathOnMatch = isFullDoc
+      ? `, op.specPath = ${pathEsc}`
+      : `, op.specPath = CASE WHEN op.specPath IS NULL OR NOT op.specPath ENDS WITH 'full_documentation.json' THEN ${pathEsc} ELSE op.specPath END`;
     statements.push(
-      `MERGE (op:OpenApiOperation {pathTemplate: ${cypherSafe(op.pathTemplate)}, method: ${cypherSafe(op.method)}, specPath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET op.docSource = 'swagger'${sum} ON MATCH SET op.docSource = 'swagger'${sum}`,
+      `MERGE (op:OpenApiOperation {pathTemplate: ${cypherSafe(op.pathTemplate)}, method: ${cypherSafe(op.method)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET op.docSource = 'swagger', op.specPath = ${pathEsc}${sum} ON MATCH SET op.docSource = 'swagger'${specPathOnMatch}${sum}`,
     );
     statements.push(
-      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (op:OpenApiOperation {pathTemplate: ${cypherSafe(op.pathTemplate)}, method: ${cypherSafe(op.method)}, specPath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:DEFINES_OP]->(op)`,
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (op:OpenApiOperation {pathTemplate: ${cypherSafe(op.pathTemplate)}, method: ${cypherSafe(op.method)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:DEFINES_OP]->(op)`,
     );
   }
 

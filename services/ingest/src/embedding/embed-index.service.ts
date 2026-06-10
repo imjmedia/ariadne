@@ -1,5 +1,5 @@
 /**
- * @fileoverview Indexa embeddings en Function, Component, Document (chunks legado), StorybookDoc, MarkdownDoc, Model (Prisma/TypeORM) y Enum (Prisma) para RAG.
+ * @fileoverview Indexa embeddings en Function, Component, Document (chunks legado), StorybookDoc, MarkdownDoc, Model (Prisma/TypeORM), Enum (Prisma), OpenApiOperation, StrapiContentType y StrapiRoute para RAG.
  * Requiere EMBEDDING_PROVIDER + FalkorDB con soporte vectorial (`vecf32`, CREATE VECTOR INDEX), p. ej. FalkorDB 4.x según docs.
  * Si ves `Unknown function 'vecf32'`, actualiza FalkorDB o desactiva embed post-sync con SYNC_SKIP_EMBED_INDEX=1.
  *
@@ -510,6 +510,115 @@ export class EmbedIndexService {
       } catch (e) {
         errors += chunk.length;
         if (errors <= 3) console.warn(`[embed-index] Enum UNWIND write failed:`, e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    // ── OpenApiOperations ─────────────────────────────────────────────────
+    const opRes = (await graph.query(
+      `MATCH (op:OpenApiOperation) WHERE op.projectId = $projectId AND op.repoId = $repoId RETURN op.pathTemplate AS pathTemplate, op.method AS method, op.summary AS summary, op.specPath AS specPath`,
+      { params: { projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
+    )) as { data?: unknown[] };
+    interface OpItem { text: string; pathTemplate: string; method: string }
+    const opItems: OpItem[] = (opRes.data ?? [])
+      .map(r => rowAsRecord(r, ['pathTemplate', 'method', 'summary', 'specPath']))
+      .map(r => {
+        const pathTemplate = String(r.pathTemplate ?? '');
+        const method = String(r.method ?? '');
+        const text = [method, pathTemplate, r.summary != null ? String(r.summary) : '', r.specPath != null ? String(r.specPath) : ''].filter(Boolean).join(' ').slice(0, 8000);
+        return { text, pathTemplate, method };
+      })
+      .filter(i => i.text.length >= 4);
+
+    const opEmbeds = await embedAll(opItems.map(i => i.text), embed, batchSize, concurrency);
+    const opSuccesses = opItems.map((item, i) => ({ item, result: opEmbeds[i] })).filter(({ result }) => result.ok);
+    errors += opEmbeds.filter(r => !r.ok).length;
+
+    for (const chunk of chunkArray(opSuccesses, batchSize)) {
+      const batch = chunk.map(({ item, result }) => ({
+        pathTemplate: item.pathTemplate, method: item.method, vec: (result as { ok: true; vec: number[] }).vec,
+      }));
+      try {
+        await graph.query(
+          `UNWIND $batch AS item MATCH (op:OpenApiOperation {pathTemplate: item.pathTemplate, method: item.method, projectId: $projectId, repoId: $repoId}) SET op.${prop} = vecf32(item.vec)`,
+          { params: { batch, projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
+        );
+        indexed += chunk.length;
+      } catch (e) {
+        errors += chunk.length;
+        if (errors <= 3) console.warn(`[embed-index] OpenApiOperation UNWIND write failed:`, e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    // ── StrapiContentTypes ────────────────────────────────────────────────
+    const ctRes = (await graph.query(
+      `MATCH (ct:StrapiContentType) WHERE ct.projectId = $projectId AND ct.repoId = $repoId RETURN ct.path AS path, ct.name AS name, ct.displayName AS displayName, ct.strapiUid AS strapiUid, ct.attributesSummary AS attributesSummary, ct.apiName AS apiName`,
+      { params: { projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
+    )) as { data?: unknown[] };
+    interface CtItem { text: string; path: string; name: string }
+    const ctItems: CtItem[] = (ctRes.data ?? [])
+      .map(r => rowAsRecord(r, ['path', 'name', 'displayName', 'strapiUid', 'attributesSummary', 'apiName']))
+      .map(r => {
+        const path = String(r.path ?? '');
+        const name = String(r.name ?? '');
+        const text = [name, r.displayName != null ? String(r.displayName) : '', r.strapiUid != null ? String(r.strapiUid) : '', r.apiName != null ? String(r.apiName) : '', r.attributesSummary != null ? String(r.attributesSummary) : '', path].filter(Boolean).join('\n').slice(0, 12_000);
+        return { text, path, name };
+      })
+      .filter(i => i.text.length >= 8);
+
+    const ctEmbeds = await embedAll(ctItems.map(i => i.text), embed, batchSize, concurrency);
+    const ctSuccesses = ctItems.map((item, i) => ({ item, result: ctEmbeds[i] })).filter(({ result }) => result.ok);
+    errors += ctEmbeds.filter(r => !r.ok).length;
+
+    for (const chunk of chunkArray(ctSuccesses, batchSize)) {
+      const batch = chunk.map(({ item, result }) => ({
+        path: item.path, name: item.name, vec: (result as { ok: true; vec: number[] }).vec,
+      }));
+      try {
+        await graph.query(
+          `UNWIND $batch AS item MATCH (ct:StrapiContentType {path: item.path, name: item.name, projectId: $projectId, repoId: $repoId}) SET ct.${prop} = vecf32(item.vec)`,
+          { params: { batch, projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
+        );
+        indexed += chunk.length;
+      } catch (e) {
+        errors += chunk.length;
+        if (errors <= 3) console.warn(`[embed-index] StrapiContentType UNWIND write failed:`, e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    // ── StrapiRoutes ──────────────────────────────────────────────────────
+    const srRes = (await graph.query(
+      `MATCH (sr:StrapiRoute) WHERE sr.projectId = $projectId AND sr.repoId = $repoId RETURN sr.path AS path, sr.method AS method, sr.routePath AS routePath, sr.handler AS handler, sr.apiName AS apiName, sr.routeSource AS routeSource`,
+      { params: { projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
+    )) as { data?: unknown[] };
+    interface SrItem { text: string; path: string; method: string; routePath: string }
+    const srItems: SrItem[] = (srRes.data ?? [])
+      .map(r => rowAsRecord(r, ['path', 'method', 'routePath', 'handler', 'apiName', 'routeSource']))
+      .map(r => {
+        const path = String(r.path ?? '');
+        const method = String(r.method ?? '');
+        const routePath = String(r.routePath ?? '');
+        const text = [method, routePath, r.handler != null ? String(r.handler) : '', r.apiName != null ? String(r.apiName) : '', r.routeSource != null ? String(r.routeSource) : '', path].filter(Boolean).join(' ').slice(0, 8000);
+        return { text, path, method, routePath };
+      })
+      .filter(i => i.text.length >= 4);
+
+    const srEmbeds = await embedAll(srItems.map(i => i.text), embed, batchSize, concurrency);
+    const srSuccesses = srItems.map((item, i) => ({ item, result: srEmbeds[i] })).filter(({ result }) => result.ok);
+    errors += srEmbeds.filter(r => !r.ok).length;
+
+    for (const chunk of chunkArray(srSuccesses, batchSize)) {
+      const batch = chunk.map(({ item, result }) => ({
+        path: item.path, method: item.method, routePath: item.routePath, vec: (result as { ok: true; vec: number[] }).vec,
+      }));
+      try {
+        await graph.query(
+          `UNWIND $batch AS item MATCH (sr:StrapiRoute {path: item.path, method: item.method, routePath: item.routePath, projectId: $projectId, repoId: $repoId}) SET sr.${prop} = vecf32(item.vec)`,
+          { params: { batch, projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
+        );
+        indexed += chunk.length;
+      } catch (e) {
+        errors += chunk.length;
+        if (errors <= 3) console.warn(`[embed-index] StrapiRoute UNWIND write failed:`, e instanceof Error ? e.message : String(e));
       }
     }
 

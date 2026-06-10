@@ -9,6 +9,7 @@ import type { ParsedFile } from './parser';
 import { listOpenApiOperations } from './openapi-spec-ingest';
 import { STORYBOOK_MAX_EMBED_CHARS } from './storybook-documentation';
 import { formatStrapiSchemasForRag, type StrapiContentTypeParsed } from './strapi-schema-extract';
+import { formatStrapiRoutesForRag, type StrapiRouteParsed } from './strapi-routes-extract';
 
 /** Path virtual (no existe en el repo); no se registra en `indexed_files`. */
 export const SCHEMA_RELATIONAL_RAG_SOURCE_PATH = 'graph-internal/relational-schema-rag-index.md';
@@ -50,6 +51,14 @@ export async function buildSchemaRelationalRagDocumentationText(input: {
     }
   }
   lines.push(...formatStrapiSchemasForRag(strapiEntries));
+
+  const strapiRouteEntries: StrapiRouteParsed[] = [];
+  for (const p of input.parsedFiles) {
+    for (const rt of p.strapiRoutes ?? []) {
+      strapiRouteEntries.push(rt);
+    }
+  }
+  lines.push(...formatStrapiRoutesForRag(strapiRouteEntries));
 
   if (input.prismaFiles.length === 0) {
     lines.push('### Prisma');
