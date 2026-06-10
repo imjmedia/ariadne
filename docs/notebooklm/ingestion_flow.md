@@ -37,9 +37,9 @@ No se indexa todo en un solo proceso síncrono. Se usa una cola Redis/BullMQ:
 
 1. **`POST /repositories/:id/sync`** → encola el job
 2. **Worker** procesa en background:
-   - Shallow clone o API según estrategia
-   - Fases 1–3
-   - Escritura en FalkorDB (nodos con `projectId` y `repoId`) + PostgreSQL. Multi-root: se escribe para cada proyecto del repo (standalone + `project_repositories`).
+ - Shallow clone o API según estrategia
+ - Fases 1–3
+ - Escritura en FalkorDB (nodos con `projectId` y `repoId`) + PostgreSQL. Multi-root: se escribe para cada proyecto del repo (standalone + `project_repositories`).
 3. **Resync:** `POST /repositories/:id/resync` — borra ámbito standalone del repo y reindexa todo (standalone + todos los proyectos). `POST /repositories/:id/resync-for-project` con body `{ projectId }` — borra solo el slice (projectId, repoId) y reindexa solo ese proyecto para ese repo.
 
 ### Shallow Clone (opcional)
@@ -64,11 +64,11 @@ git clone --depth 1 [URL_DEL_REPO]
 
 ## 4. GitHub vs Bitbucket
 
-| Característica   | GitHub                       | Bitbucket                    |
+| Característica | GitHub | Bitbucket |
 |------------------|------------------------------|------------------------------|
-| Auth             | PAT (BD o `GITHUB_TOKEN`)    | App Password / OAuth (BD o env) |
-| API listado      | `/repos/{owner}/{repo}`      | `repositories/{workspace}`   |
-| Rate limit       | 5.000 req/h (auth)           | Depende del plan             |
+| Auth | PAT (BD o `GITHUB_TOKEN`) | App Password / OAuth (BD o env) |
+| API listado | `/repos/{owner}/{repo}` | `repositories/{workspace}` |
+| Rate limit | 5.000 req/h (auth) | Depende del plan |
 
 ## 5. Puente hacia Webhooks
 

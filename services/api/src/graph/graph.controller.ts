@@ -35,6 +35,28 @@ export class GraphController {
     }
   }
 
+  /** GET /graph/indexed-snapshot — Relaciones indexadas en Falkor (IMPORTS, CONTAINS, CALLS, …). */
+  @Get('indexed-snapshot')
+  async indexedSnapshot(
+    @Query('projectId') projectId?: string,
+    @Query('repoId') repoId?: string,
+    @Query('limit') limitStr?: string,
+  ) {
+    const pid = projectId?.trim();
+    if (!pid) {
+      throw new HttpException('projectId required', HttpStatus.BAD_REQUEST);
+    }
+    const limit = Math.min(
+      2000,
+      Math.max(50, parseInt(limitStr ?? '500', 10) || 500),
+    );
+    try {
+      return await this.graph.getIndexedSnapshot(pid, repoId?.trim() || undefined, limit);
+    } catch (err) {
+      throw new HttpException(String(err), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   /** GET /graph/component/:name?depth= — Árbol de dependencias del componente hasta depth. */
   @Get('component/:name')
   async component(
@@ -69,19 +91,6 @@ export class GraphController {
     }
     try {
       return this.graph.getContract(componentName, projectId || undefined, scopePath || undefined);
-    } catch (err) {
-      throw new HttpException(String(err), HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  /** GET /graph/c4-model?projectId= — Modelo C4 (sistemas, contenedores, COMMUNICATES_WITH). projectId obligatorio con sharding. */
-  @Get('c4-model')
-  async c4Model(@Query('projectId') projectId: string) {
-    if (!projectId?.trim()) {
-      throw new HttpException('projectId required', HttpStatus.BAD_REQUEST);
-    }
-    try {
-      return await this.graph.getC4Model(projectId.trim());
     } catch (err) {
       throw new HttpException(String(err), HttpStatus.INTERNAL_SERVER_ERROR);
     }

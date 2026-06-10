@@ -1,263 +1,662 @@
 /**
- * @fileoverview Legacy Impact Explorer — árbol de dependencias con scores.
- * Reemplaza al antiguo canvas visual de nodos (React Flow).
- * Muestra impacto legacy de componentes y funciones como árbol expandible
- * con indicadores de riesgo y cobertura de tests.
+ * Explorador visual del grafo de componente: dependencias + impacto legacy (vis-network).
+ * Alcance: proyecto / repo → graph-summary → GET /graph/component.
  */
-import { useState, useCallback } from 'react';
-import { MagnifyingGlass, CaretDown, CaretRight, Warning, ShieldCheck, FileText } from '@phosphor-icons/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Info, Share2 } from 'lucide-react';
+import { api } from '@/api';
+import type { ScopeOption } from '@/lib/graphScope';
+import { buildScopeOptions, extractComponentNames } from '@/lib/graphScope';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { cn } from '@/lib/utils';
+import { type GraphEdge, type GraphNode } from './componentGraphFlow';
+import { mergeGraphEdges, mergeGraphNodes } from './graphMerge';
+import { ComponentGraphDebugPanel } from './ComponentGraphDebugPanel';
+import { ComponentGraphVisView } from './ComponentGraphVisView';
 
-// ── Tipos ──────────────────────────────────────────
+const GRAPH_EXPLORER_MODULE_HELP =
+  'Elige un proyecto o repositorio indexado y carga el grafo Falkor tal cual quedó tras el sync: nodos (File, Component, Function, NestService, …) y aristas reales (IMPORTS, CONTAINS, CALLS, RENDERS, …). Sin capa C4. Opcional: elige un componente para ver un subgrafo de dependencias.';
 
-interface LegacyImpactData {
-  nodeName: string;
-  dependents: number;
-  files: string[];
-  breakingRisk: 'low' | 'medium' | 'high';
+const panelClass = cn(
+  'rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm',
+  'transition-shadow duration-[var(--transition-base)] hover:shadow-md',
+);
+
+const selectTriggerClass = cn(
+  'h-11 w-full min-w-0 justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 shadow-sm',
+  'text-left text-sm font-normal text-[var(--foreground)] hover:bg-[var(--card)]',
+  'focus-visible:ring-1 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-0',
+);
+
+/** Fusiona conteos de varias respuestas graph-summary (multi-repo). */
+function mergeSummaryCounts(summaries: Array<{ counts?: Record<string, number> }>): Record<string, number> | null {
+  const acc: Record<string, number> = {};
+  for (const s of summaries) {
+    if (!s.counts) continue;
+    for (const [k, v] of Object.entries(s.counts)) {
+      if (typeof v === 'number' && Number.isFinite(v)) acc[k] = (acc[k] ?? 0) + v;
+    }
+  }
+  return Object.keys(acc).length > 0 ? acc : null;
 }
 
-interface ComponentGraphNode {
-  name: string;
-  type: string;
-  dependents: string[];
-}
+const GRAPH_SUMMARY_TRAFFIC_KEYS = ['Component', 'File', 'Function', 'Route'] as const;
 
-// ── Componentes ────────────────────────────────────
-
-function RiskBadge({ risk }: { risk: string }) {
-  if (risk === 'high') return <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Alto</span>;
-  if (risk === 'medium') return <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Medio</span>;
-  return <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Bajo</span>;
-}
-
-function TreeItem({ name, label, depth = 0, hasTests, children }: {
-  name: string;
-  label: string;
-  depth: number;
-  hasTests?: boolean;
-  children?: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(depth < 1);
-
+/** Semáforo sobre la muestra del índice (mismos datos que el desplegable de componentes). */
+function GraphSummaryTraffic({ counts }: { counts: Record<string, number> }) {
   return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors hover:bg-[color-mix(in_oklch,var(--foreground)_4%,var(--card))]"
-      >
-        {children ? (
-          open ? <CaretDown weight="fill" className="size-3 shrink-0 text-[var(--foreground-muted)]" /> : <CaretRight weight="fill" className="size-3 shrink-0 text-[var(--foreground-muted)]" />
-        ) : (
-          <span className="size-3 shrink-0" />
-        )}
-        <span className="font-mono text-sm">{name}</span>
-        <span className="text-xs text-[var(--foreground-muted)]">{label}</span>
-        {hasTests === false && <span title="Sin tests"><Warning weight="fill" className="size-3.5 text-amber-500" /></span>}
-      </button>
-      {open && children && <div className="ml-4 border-l border-[var(--border)] pl-2">{children}</div>}
-    </div>
-  );
-}
-
-function ImpactCard({ data, graphData }: { data: LegacyImpactData; graphData: ComponentGraphNode[] }) {
-  return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <h3 className="font-mono text-lg font-semibold">{data.nodeName}</h3>
-          <p className="text-sm text-[var(--foreground-muted)]">
-            {data.dependents} dependente{data.dependents !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <RiskBadge risk={data.breakingRisk} />
-      </div>
-
-      <div className="mb-3 flex gap-4 text-sm">
-        <div className="flex items-center gap-1">
-          <ShieldCheck weight="fill" className="size-4 text-[var(--primary)]" />
-          <span>Impacto: <strong>{data.breakingRisk === 'high' ? 'ALTO' : data.breakingRisk === 'medium' ? 'MEDIO' : 'BAJO'}</strong></span>
-        </div>
-      </div>
-
-      {data.files.length > 0 && (
-        <div>
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-            Archivos dependientes
-          </h4>
-          <div className="space-y-1">
-            {data.files.map((file) => (
-              <div key={file} className="flex items-center gap-2 rounded-md bg-[color-mix(in_oklch,var(--foreground)_3%,var(--card))] px-2.5 py-1.5 text-sm">
-                <FileText className="size-3.5 shrink-0 text-[var(--foreground-muted)]" />
-                <code className="flex-1 truncate text-xs">{file}</code>
-              </div>
-            ))}
-          </div>
-        </div>
+    <div
+      className={cn(
+        'flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_35%,var(--card))] px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4',
       )}
-
-      {graphData.length > 0 && (
-        <div className="mt-4">
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-            Dependencias del componente
-          </h4>
-          <div className="max-h-48 space-y-0.5 overflow-y-auto">
-            {graphData.map((dep) => (
-              <TreeItem key={dep.name} name={dep.name} label={dep.type} depth={0}>
-                {dep.dependents.length > 0 && (
-                  <div className="py-1">
-                    {dep.dependents.map((d) => (
-                      <TreeItem key={d} name={d} label="dependiente" depth={1} />
-                    ))}
-                  </div>
+    >
+      <span className="shrink-0 text-xs font-semibold text-[var(--foreground)]">Índice (graph-summary)</span>
+      <div className="flex flex-wrap gap-2">
+        {GRAPH_SUMMARY_TRAFFIC_KEYS.map((key) => {
+          const n = counts[key] ?? 0;
+          const ok = n > 0;
+          return (
+            <span
+              key={key}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-xs shadow-sm"
+              title={ok ? `${n} nodos ${key} en la muestra` : `Sin nodos ${key} en la muestra`}
+            >
+              <span
+                className={cn(
+                  'size-2.5 shrink-0 rounded-full',
+                  ok ? 'bg-emerald-500 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]' : 'bg-[var(--muted)]',
                 )}
-              </TreeItem>
-            ))}
-          </div>
-        </div>
-      )}
+                aria-hidden
+              />
+              <span className="text-[var(--foreground-muted)]">{key}</span>
+              <span className="font-mono tabular-nums text-[var(--foreground)]">{n}</span>
+            </span>
+          );
+        })}
+      </div>
+      <p className="m-0 w-full text-[10px] leading-snug text-[var(--foreground-muted)] sm:order-last sm:basis-full">
+        Verde = hay nodos de ese tipo en el índice. Gris = cero en la muestra (revisa ingest o el alcance repo/proyecto).
+      </p>
     </div>
   );
 }
-
-// ── Página principal ───────────────────────────────
 
 export function ComponentGraphExplorer() {
-  const [query, setQuery] = useState('');
+  const [search, setSearch] = useSearchParams();
+  const [scopeKey, setScopeKey] = useState<string>(() => search.get('scope') ?? '');
+  const [graphProjectId, setGraphProjectId] = useState(() => search.get('projectId') ?? '');
+  const [name, setName] = useState(() => search.get('name') ?? '');
+  const [depth, setDepth] = useState(() => search.get('depth') ?? '2');
+
+  const [scopeOptions, setScopeOptions] = useState<ScopeOption[]>([]);
+  const [scopesLoading, setScopesLoading] = useState(true);
+  const [scopesErr, setScopesErr] = useState<string | null>(null);
+
+  const [summaryCounts, setSummaryCounts] = useState<Record<string, number> | null>(null);
+  const [componentNames, setComponentNames] = useState<string[]>([]);
+  const [componentsLoading, setComponentsLoading] = useState(false);
+  const [componentsErr, setComponentsErr] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
-  const [impactData, setImpactData] = useState<LegacyImpactData | null>(null);
-  const [graphData, setGraphData] = useState<ComponentGraphNode[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [nodes, setNodes] = useState<GraphNode[]>([]);
+  const [edges, setEdges] = useState<GraphEdge[]>([]);
+  const [meta, setMeta] = useState<{ componentName: string; depth: number } | null>(null);
+  /** Incrementa en cada carga exitosa para forzar remount del grafo (vis-network). */
+  const [graphNonce, setGraphNonce] = useState(0);
+  const [expanding, setExpanding] = useState(false);
+  const [expandErr, setExpandErr] = useState<string | null>(null);
+  /** API: sin depends salientes pero chat sí ve RENDERS — sugerir resync / misma causa raíz. */
+  const [graphHints, setGraphHints] = useState<{ suggestResync?: boolean; messageEs?: string } | null>(null);
+  const [indexedMode, setIndexedMode] = useState(true);
+  const [indexedTruncated, setIndexedTruncated] = useState(false);
+  const [indexedLimit, setIndexedLimit] = useState('500');
+  /** Evita refetch del mismo componente al expandir (se resetea al cargar un grafo nuevo). */
+  const expandedNamesRef = useRef<Set<string>>(new Set());
 
-  const handleSearch = useCallback(async () => {
-    const trimmed = query.trim();
-    if (!trimmed) return;
+  /** Nombre en URL para hidratar el select cuando carguen los componentes del alcance. */
+  const urlComponentRef = useRef<string | null>(search.get('name'));
 
-    setLoading(true);
-    setError(null);
-    setImpactData(null);
-    setGraphData([]);
+  const selectedScope = useMemo(
+    () => scopeOptions.find((o) => o.key === scopeKey) ?? null,
+    [scopeOptions, scopeKey],
+  );
 
-    try {
-      // Llamar a get_legacy_impact via API
-      const ingestUrl = (window as any).__INGEST_URL__ || '/api';
-      const res = await fetch(
-        `${ingestUrl}/api/internal/graph/impact/${encodeURIComponent(trimmed)}`,
-        { signal: AbortSignal.timeout(15_000) },
-      );
+  const rootFocalName = meta?.componentName ?? name.trim();
+  const graphKey = useMemo(() => {
+    if (nodes.length === 0) return '';
+    return `${rootFocalName}|${graphNonce}|${nodes.length}|${edges.length}|${meta?.depth ?? ''}`;
+  }, [rootFocalName, graphNonce, nodes.length, edges.length, meta?.depth]);
 
-      if (res.status === 404) {
-        setError(`"${trimmed}" no encontrado en el grafo. Verifica el nombre o ejecuta sync del repositorio.`);
-        return;
-      }
-      if (!res.ok) {
-        setError(`Error HTTP ${res.status}`);
-        return;
-      }
-
-      const payload = await res.json() as {
-        nodeId: string;
-        dependents: Array<{ name?: unknown }>;
-      };
-
-      const dependents = (payload.dependents ?? [])
-        .map((d) => String(d.name ?? ''))
-        .filter(Boolean);
-
-      setImpactData({
-        nodeName: trimmed,
-        dependents: dependents.length,
-        files: dependents.slice(0, 20),
-        breakingRisk: dependents.length > 10 ? 'high' : dependents.length > 3 ? 'medium' : 'low',
-      });
-
-      // También obtener grafo de componentes si es posible
+  const expandNode = useCallback(
+    async (componentName: string) => {
+      const pid = graphProjectId.trim();
+      if (!pid) return;
+      if (expandedNamesRef.current.has(componentName)) return;
+      setExpandErr(null);
+      setExpanding(true);
       try {
-        const graphRes = await fetch(
-          `${ingestUrl}/api/internal/graph/component/${encodeURIComponent(trimmed)}`,
-          { signal: AbortSignal.timeout(10_000) },
-        );
-        if (graphRes.ok) {
-          const graphPayload = await graphRes.json() as {
-            rows?: Array<{ name?: string; type?: string }>;
-          };
-          const rows = graphPayload.rows ?? [];
-          setGraphData(
-            rows.map((r) => ({
-              name: r.name ?? '',
-              type: r.type ?? 'Component',
-              dependents: [],
-            })),
-          );
-        }
-      } catch {
-        // Graph component es best-effort
+        const data = await api.getComponentGraph(componentName, {
+          depth: 1,
+          projectId: pid,
+        });
+        setNodes((prev) => mergeGraphNodes(prev, data.nodes ?? []));
+        setEdges((prev) => mergeGraphEdges(prev, data.edges ?? []));
+        expandedNamesRef.current.add(componentName);
+        setGraphNonce((x) => x + 1);
+      } catch (e) {
+        setExpandErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        setExpanding(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error de conexión');
+    },
+    [graphProjectId],
+  );
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setScopesLoading(true);
+      setScopesErr(null);
+      try {
+        const [projects, repos] = await Promise.all([api.getProjects(), api.getRepositories()]);
+        if (cancel) return;
+        const opts = buildScopeOptions(projects, repos);
+        setScopeOptions(opts);
+
+        const urlPid = search.get('projectId') ?? '';
+        const urlScope = search.get('scope') ?? '';
+        if (urlScope && opts.some((o) => o.key === urlScope)) {
+          setScopeKey(urlScope);
+        } else if (urlPid) {
+          const hit =
+            opts.find((o) => o.graphProjectId === urlPid) ??
+            opts.find((o) => o.repoIdsForSummary.includes(urlPid));
+          if (hit) setScopeKey(hit.key);
+          else {
+            setGraphProjectId(urlPid);
+            setScopeKey('');
+          }
+        }
+      } catch (e) {
+        if (!cancel) setScopesErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancel) setScopesLoading(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedScope) {
+      setComponentNames([]);
+      setSummaryCounts(null);
+      setComponentsErr(null);
+      return;
+    }
+    setGraphProjectId(selectedScope.graphProjectId);
+    let cancel = false;
+    (async () => {
+      setComponentsLoading(true);
+      setComponentsErr(null);
+      try {
+        /** Proyecto agregado: un graph-summary ya trae todo el shard; por repo: ?repoScoped=1. */
+        let summaries: Awaited<ReturnType<typeof api.getGraphSummary>>[];
+        if (selectedScope.repoScoped && selectedScope.repoIdsForSummary[0]) {
+          summaries = [
+            await api.getGraphSummary(selectedScope.repoIdsForSummary[0], true, true),
+          ];
+        } else if (selectedScope.repoIdsForSummary[0]) {
+          summaries = [await api.getGraphSummary(selectedScope.repoIdsForSummary[0], true, false)];
+        } else {
+          summaries = [];
+        }
+        if (cancel) return;
+        const merged = new Set<string>();
+        setSummaryCounts(mergeSummaryCounts(summaries));
+        for (const s of summaries) {
+          for (const n of extractComponentNames(s.samples)) merged.add(n);
+        }
+        const list = [...merged].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        setComponentNames(list);
+        const want = urlComponentRef.current;
+        if (want && list.includes(want)) {
+          setName(want);
+          urlComponentRef.current = null;
+          setErr(null);
+        }
+      } catch (e) {
+        if (!cancel) {
+          setComponentsErr(e instanceof Error ? e.message : String(e));
+          setComponentNames([]);
+          setSummaryCounts(null);
+        }
+      } finally {
+        if (!cancel) setComponentsLoading(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [selectedScope?.key]);
+
+  const load = useCallback(async () => {
+    const n = name.trim();
+    const pid = graphProjectId.trim();
+    if (!pid) {
+      setErr('Elige un proyecto o repositorio indexado.');
+      return;
+    }
+    setErr(null);
+    setLoading(true);
+    setGraphHints(null);
+    setIndexedTruncated(false);
+    try {
+      if (n && n !== '__all__') {
+        const d = Math.min(10, Math.max(1, parseInt(depth, 10) || 2));
+        const data = await api.getComponentGraph(n, {
+          depth: d,
+          projectId: pid,
+        });
+        setNodes(data.nodes ?? []);
+        setEdges(data.edges ?? []);
+        setGraphHints(data.graphHints ?? null);
+        setMeta({ componentName: data.componentName, depth: data.depth });
+        setIndexedMode(false);
+        expandedNamesRef.current.clear();
+        setGraphNonce((x) => x + 1);
+        setSearch((prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('name', n);
+          p.set('projectId', pid);
+          p.set('depth', String(d));
+          if (scopeKey) p.set('scope', scopeKey);
+          else p.delete('scope');
+          return p;
+        });
+        return;
+      }
+
+      const limit = Math.min(2000, Math.max(50, parseInt(indexedLimit, 10) || 500));
+      const repoId =
+        selectedScope?.repoScoped && selectedScope.repoIdsForSummary[0]
+          ? selectedScope.repoIdsForSummary[0]
+          : undefined;
+      const data = await api.getIndexedGraphSnapshot({
+        projectId: pid,
+        repoId,
+        limit,
+      });
+      setNodes(data.nodes ?? []);
+      setEdges(data.edges ?? []);
+      setMeta(null);
+      setIndexedMode(true);
+      setIndexedTruncated(Boolean(data.truncated));
+      expandedNamesRef.current.clear();
+      setGraphNonce((x) => x + 1);
+      setSearch((prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('name');
+        p.delete('depth');
+        p.set('projectId', pid);
+        if (scopeKey) p.set('scope', scopeKey);
+        else p.delete('scope');
+        return p;
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setNodes([]);
+      setEdges([]);
+      setGraphHints(null);
+      setMeta(null);
+      setIndexedTruncated(false);
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [name, graphProjectId, depth, indexedLimit, scopeKey, selectedScope, setSearch]);
+
+  const projectOpts = scopeOptions.filter((o) => o.group === 'project');
+  const projectRepoOpts = scopeOptions.filter((o) => o.group === 'project_repo');
+  const standaloneOpts = scopeOptions.filter((o) => o.group === 'standalone');
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Grafo de Impacto Legacy</h1>
-        <p className="mt-1 text-sm text-[var(--foreground-muted)]">
-          Busca un componente o función para ver sus dependencias y riesgo de ruptura.
-        </p>
-      </div>
-
-      {/* Buscador */}
-      <div className="mb-6 flex gap-2">
-        <div className="relative flex-1">
-          <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--foreground-muted)]" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Ej: processClaim, calculatePremium, Header..."
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]"
-          />
-        </div>
-        <button
-          onClick={handleSearch}
-          disabled={loading || !query.trim()}
-          className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {loading ? 'Buscando...' : 'Buscar'}
-        </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Resultado */}
-      {impactData && <ImpactCard data={impactData} graphData={graphData} />}
-
-      {/* Estado vacío */}
-      {!loading && !error && !impactData && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <ShareNetworkIcon className="mb-4 size-12 text-[var(--foreground-muted)] opacity-30" />
-          <p className="text-sm text-[var(--foreground-muted)]">
-            Busca un componente o función para ver su impacto legacy
+    <div className="space-y-10">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-4xl font-semibold tracking-tight text-[var(--foreground)]">Explorador de grafo</h1>
+            <HoverCard openDelay={200} closeDelay={100}>
+              <HoverCardTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'inline-flex size-9 shrink-0 items-center justify-center rounded-full text-[var(--foreground-muted)] transition-colors',
+                    'hover:bg-[color-mix(in_oklch,var(--foreground)_6%,transparent)] hover:text-[var(--primary)]',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]',
+                  )}
+                  aria-label="Información: explorador de grafo"
+                >
+                  <Info className="size-5" strokeWidth={1.75} aria-hidden />
+                </button>
+              </HoverCardTrigger>
+              <HoverCardContent
+                side="bottom"
+                align="start"
+                className="w-[min(22rem,calc(100vw-2rem))] max-w-md border-[var(--border)] bg-[var(--card)] p-4 text-sm leading-relaxed text-[var(--foreground)] shadow-md"
+              >
+                <p className="m-0 text-[var(--foreground-muted)]">{GRAPH_EXPLORER_MODULE_HELP}</p>
+              </HoverCardContent>
+            </HoverCard>
+          </div>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
+            Visualiza relaciones reales del índice Falkor (sync/resync). Opcionalmente enfoca un componente React/Nest.
           </p>
         </div>
+      </div>
+
+      {scopesErr ? (
+        <Alert variant="destructive">
+          <AlertTitle>No se pudieron cargar los alcances</AlertTitle>
+          <AlertDescription>{scopesErr}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {scopesLoading ? (
+        <section className={panelClass}>
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-56 rounded-lg" />
+            <Skeleton className="h-4 w-full max-w-2xl rounded-lg" />
+          </div>
+          <div className="mt-6 flex flex-wrap items-end gap-4">
+            <Skeleton className="h-11 w-full min-w-[200px] max-w-md flex-1 rounded-xl" />
+            <Skeleton className="h-11 w-full min-w-[200px] max-w-md flex-1 rounded-xl" />
+            <Skeleton className="h-11 w-20 rounded-xl" />
+            <Skeleton className="h-11 w-36 rounded-xl" />
+          </div>
+          <Skeleton className="mt-8 h-[min(24rem,50vh)] w-full rounded-2xl" />
+        </section>
+      ) : (
+        <>
+          {scopeOptions.length === 0 && !scopesErr ? (
+            <section className={panelClass}>
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">Alcance</h2>
+                <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+                  Hace falta al menos un proyecto o un repositorio indexado para consultar el grafo.
+                </p>
+              </div>
+              <div className="mt-8">
+                <div
+                  className={cn(
+                    'flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border)]',
+                    'bg-[color-mix(in_oklch,var(--muted)_45%,transparent)] px-6 py-14 text-center',
+                  )}
+                >
+                  <div className="flex size-12 items-center justify-center rounded-2xl bg-[color-mix(in_oklch,var(--primary)_10%,transparent)] text-[var(--primary)]">
+                    <Share2 className="size-6" strokeWidth={1.75} aria-hidden />
+                  </div>
+                  <p className="mt-4 text-sm font-semibold text-[var(--foreground)]">Sin proyectos ni repositorios</p>
+                  <p className="mt-1 max-w-md text-xs leading-relaxed text-[var(--foreground-muted)]">
+                    Crea un proyecto y vincula repos con ingest, o registra un repositorio aislado. Tras indexar, el
+                    desplegable de alcance se llenará solo.
+                  </p>
+                  <div className="mt-6 flex w-full max-w-sm flex-col gap-2 sm:flex-row sm:justify-center">
+                    <Button className="h-11 w-full rounded-xl sm:w-auto" asChild>
+                      <Link to="/projects/new">Crear proyecto</Link>
+                    </Button>
+                    <Button variant="outline" className="h-11 w-full rounded-xl border-[var(--border)] sm:w-auto" asChild>
+                      <Link to="/repos">Ir a repositorios</Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {scopeOptions.length > 0 ? (
+            <section className={panelClass}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="min-w-0 flex-1 basis-[min(100%,20rem)] space-y-2">
+                  <Label className="text-xs font-medium text-[var(--foreground-muted)]">Proyecto o repositorio</Label>
+                  <Select
+                    value={scopeKey || undefined}
+                    onValueChange={(v) => {
+                      setScopeKey(v);
+                      setName('');
+                      setNodes([]);
+                      setEdges([]);
+                      setMeta(null);
+                      setGraphHints(null);
+                      setErr(null);
+                    }}
+                    disabled={scopesLoading || scopeOptions.length === 0}
+                  >
+                    <SelectTrigger className={selectTriggerClass}>
+                      <SelectValue placeholder="Selecciona alcance" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projectOpts.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Proyectos</SelectLabel>
+                          {projectOpts.map((o) => (
+                            <SelectItem key={o.key} value={o.key}>
+                              <span className="font-medium">{o.label}</span>
+                              <span className="block max-w-[280px] truncate text-xs text-[var(--foreground-muted)]">
+                                {o.detail}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {projectRepoOpts.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Repos por proyecto</SelectLabel>
+                          {projectRepoOpts.map((o) => (
+                            <SelectItem key={o.key} value={o.key}>
+                              <span className="font-medium">{o.label}</span>
+                              <span className="block max-w-[280px] truncate text-xs text-[var(--foreground-muted)]">
+                                {o.detail}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {standaloneOpts.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Repositorios aislados</SelectLabel>
+                          {standaloneOpts.map((o) => (
+                            <SelectItem key={o.key} value={o.key}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="min-w-0 flex-1 basis-[min(100%,18rem)] space-y-2">
+                  <Label htmlFor="comp-select" className="text-xs font-medium text-[var(--foreground-muted)]">
+                    Componente (opcional)
+                  </Label>
+                  <Select
+                    value={name.trim() && name !== '__all__' ? name.trim() : '__all__'}
+                    onValueChange={(v) => {
+                      setName(v === '__all__' ? '' : v);
+                      setErr(null);
+                      setNodes([]);
+                      setEdges([]);
+                      setMeta(null);
+                      setGraphHints(null);
+                      setIndexedTruncated(false);
+                    }}
+                    disabled={!selectedScope || componentsLoading}
+                  >
+                    <SelectTrigger id="comp-select" className={selectTriggerClass}>
+                      <SelectValue
+                        placeholder={
+                          !selectedScope
+                            ? 'Primero el alcance'
+                            : componentsLoading
+                              ? 'Cargando índice…'
+                              : componentNames.length === 0
+                                ? 'Todo el índice (sin foco)'
+                                : 'Todo el índice (sin foco)'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      <SelectItem value="__all__">Todo el índice (relaciones crudas)</SelectItem>
+                      {componentNames.map((cn) => (
+                        <SelectItem key={cn} value={cn}>
+                          Enfocar: {cn}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[5.5rem]">
+                  <Label htmlFor="indexed-limit" className="text-xs font-medium text-[var(--foreground-muted)]">
+                    {name.trim() && name !== '__all__' ? 'Profundidad' : 'Límite aristas'}
+                  </Label>
+                  {name.trim() && name !== '__all__' ? (
+                    <Input
+                      id="depth"
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={depth}
+                      onChange={(e) => {
+                        setDepth(e.target.value);
+                        setErr(null);
+                      }}
+                      className="h-11 w-full rounded-xl border-[var(--border)] bg-[var(--card)] sm:w-20"
+                    />
+                  ) : (
+                    <Select value={indexedLimit} onValueChange={setIndexedLimit}>
+                      <SelectTrigger id="indexed-limit" className={cn(selectTriggerClass, 'sm:w-28')}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="300">300</SelectItem>
+                        <SelectItem value="500">500</SelectItem>
+                        <SelectItem value="1000">1000</SelectItem>
+                        <SelectItem value="2000">2000</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:shrink-0">
+                  <Label className="pointer-events-none select-none opacity-0" aria-hidden="true">
+                    Profundidad
+                  </Label>
+                  <Button
+                    type="button"
+                    className="h-11 w-full shrink-0 rounded-xl sm:w-auto sm:min-w-[10.5rem]"
+                    onClick={() => void load()}
+                    disabled={loading || !selectedScope}
+                  >
+                    {loading ? 'Cargando…' : name.trim() && name !== '__all__' ? 'Cargar enfoque' : 'Cargar grafo indexado'}
+                  </Button>
+                </div>
+              </div>
+
+              {selectedScope ? (
+                <p
+                  className="mt-3 truncate rounded-lg border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_14%,var(--card))] px-3 py-2 font-mono text-xs text-[var(--foreground-muted)]"
+                  title={selectedScope.graphProjectId}
+                >
+                  <span className="font-sans font-medium text-[var(--foreground)]">projectId</span>{' '}
+                  {selectedScope.graphProjectId}
+                </p>
+              ) : null}
+              {graphProjectId && !selectedScope ? (
+                <p className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-50">
+                  El projectId de la URL no coincide con ningún proyecto o repo aislado en esta cuenta. Revisa el UUID
+                  o sincroniza el índice.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {componentsErr ? (
+            <Alert variant="destructive">
+              <AlertTitle>Componentes</AlertTitle>
+              <AlertDescription>{componentsErr}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {err ? (
+            <Alert variant="destructive">
+              <AlertTitle>Grafo</AlertTitle>
+              <AlertDescription>{err}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {indexedTruncated ? (
+            <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-950 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-50">
+              <AlertTitle>Vista parcial</AlertTitle>
+              <AlertDescription>
+                Se alcanzó el límite de aristas. Sube el límite, acota a un solo repo, o usa el panel Cypher debug abajo.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {graphHints?.suggestResync && graphHints.messageEs ? (
+            <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-950 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-50">
+              <AlertTitle>Aristas ausentes</AlertTitle>
+              <AlertDescription>
+                <span className="font-semibold">Sugerencia: </span>
+                {graphHints.messageEs}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {selectedScope && summaryCounts ? <GraphSummaryTraffic counts={summaryCounts} /> : null}
+
+          {expandErr ? (
+            <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-950 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-50">
+              <AlertTitle>Expansión</AlertTitle>
+              <AlertDescription>{expandErr}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <ComponentGraphVisView
+            graphNodes={nodes}
+            graphEdges={edges}
+            rootFocalName={rootFocalName}
+            graphKey={graphKey}
+            projectId={graphProjectId}
+            expanding={expanding}
+            indexedMode={indexedMode}
+            onExpandNode={expandNode}
+          />
+
+          <ComponentGraphDebugPanel
+            graphProjectId={graphProjectId}
+            prefillComponentName={meta?.componentName ?? name.trim()}
+          />
+        </>
       )}
     </div>
-  );
-}
-
-/** Icono inline de ShareNetwork (Phosphor no exporta como componente directo fácil). */
-function ShareNetworkIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 256 256" fill="currentColor">
-      <path d="M176,160a39.89,39.89,0,0,0-28.28,11.72L103.79,141.3a40,40,0,0,0,0-26.6l43.93-30.42A40,40,0,1,0,144,64a42.31,42.31,0,0,0,.81,8.08L100.88,102.5a40,40,0,1,0,0,51l43.93,30.42A42.31,42.31,0,0,0,144,192a40,40,0,1,0,32-32Zm0-128a16,16,0,1,1-16,16A16,16,0,0,1,176,32ZM64,144a16,16,0,1,1,16-16A16,16,0,0,1,64,144Zm112,48a16,16,0,1,1,16-16A16,16,0,0,1,176,192Z" />
-    </svg>
   );
 }

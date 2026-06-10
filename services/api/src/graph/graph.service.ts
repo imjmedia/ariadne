@@ -6,33 +6,6 @@ import { isProjectShardingEnabled } from 'ariadne-common';
 import { FalkorService } from '../falkor.service';
 import { CacheService } from '../cache.service';
 
-/** Contenedor C4 (nivel 2). */
-export interface C4ContainerNodeDto {
-  key: string;
-  name: string;
-  repoId: string;
-  technology?: string;
-  c4Kind: string;
-}
-
-/** Sistema software (nivel 1) con hijos y aristas abstractas. */
-export interface C4SystemNodeDto {
-  repoId: string;
-  name: string;
-  containers: C4ContainerNodeDto[];
-  communicates: Array<{
-    sourceKey: string;
-    targetKey: string;
-    reason?: string;
-  }>;
-}
-
-/** Respuesta jerárquica GET /graph/c4-model. */
-export interface C4ModelResponseDto {
-  projectId: string;
-  systems: C4SystemNodeDto[];
-}
-
 interface FalkorResult {
   headers?: string[];
   data?: unknown[][];
@@ -221,6 +194,32 @@ function addGraphEdge(
  * Falkor a veces devuelve `headers: []` y cada fila como `{ c: node, dependency: node }` o envuelta en `[[{...}]]`.
  * Sin esto, el código asumía `[a,b]` posicional y `arr[1]` quedaba undefined → sin aristas en getComponentGraph.
  */
+function extractFalkorRowCells(
+  row: unknown,
+  keys: string[],
+  headers: string[],
+): unknown[] {
+  let r: unknown = row;
+  if (Array.isArray(r) && r.length === 1) {
+    const only = r[0];
+    if (only != null && typeof only === 'object' && !Array.isArray(only)) {
+      const o = only as Record<string, unknown>;
+      if (keys.some((k) => k in o)) r = only;
+    }
+  }
+  if (r != null && typeof r === 'object' && !Array.isArray(r)) {
+    const o = r as Record<string, unknown>;
+    if (keys.some((k) => k in o)) {
+      return keys.map((k) => o[k]);
+    }
+  }
+  const arr = Array.isArray(r) ? r : [r];
+  return keys.map((k, i) => {
+    const idx = headers.length ? headers.indexOf(k) : -1;
+    return idx >= 0 ? arr[idx] : arr[i];
+  });
+}
+
 function extractFalkorTwoColumnRow(
   row: unknown,
   colA: string,
@@ -662,7 +661,7 @@ export class GraphService {
         ? {
             suggestResync: true,
             messageEs:
-              'Sin aristas depends salientes ni consumidores (RENDERS/CALLS/IMPORTS→Component) hacia este foco. En repos **Nest/backend** suele ser **normal**: el índice pone servicios/controladores en :NestService/:NestController y el grafo de **componente** prioriza React (:Component, RENDERS). Tras reindexar, **RBAC**: **:AccessRole** con **ALLOWS_ACCESS_ROLE** desde **:NestController** y, por ruta HTTP, **:NestRoute** con **REQUIRES_ROLE** / **USES_GUARD** hacia **:NestGuard** (no en esta vista). Para acoplamiento usa **índice del repo**, **C4** o Cypher sobre :Function / :NestService / :NestRoute / :AccessRole. Si crees que es React mal enlazado: resync, alcance «solo este repo» y comprueba projectId en Falkor.',
+              'Sin aristas depends salientes ni consumidores (RENDERS/CALLS/IMPORTS→Component) hacia este foco. En repos **Nest/backend** suele ser **normal**: el índice pone servicios/controladores en :NestService/:NestController y el grafo de **componente** prioriza React (:Component, RENDERS). Tras reindexar, **RBAC**: **:AccessRole** con **ALLOWS_ACCESS_ROLE** desde **:NestController** y, por ruta HTTP, **:NestRoute** con **REQUIRES_ROLE** / **USES_GUARD** hacia **:NestGuard** (no en esta vista). Para acoplamiento usa **índice del repo** o Cypher sobre :Function / :NestService / :NestRoute / :AccessRole. Si crees que es React mal enlazado: resync, alcance «solo este repo» y comprueba projectId en Falkor.',
           }
         : undefined;
 
@@ -680,6 +679,95 @@ export class GraphService {
       payload,
       this.cache.TTL.component,
     );
+    return payload;
+  }
+
+  /**
+   * Muestra relaciones crudas del índice Falkor (sin capa C4 ni roll-up de componente).
+   * Devuelve hasta `limit` aristas `(a)-[r]->(b)` con `type(r)` tal cual en el grafo.
+   */
+  async getIndexedSnapshot(projectId: string, repoId?: string, limit = 500) {
+    const pid = projectId.trim();
+    const rid = repoId?.trim() || undefined;
+    const lim = Math.min(2000, Math.max(50, limit));
+    const cacheKey = this.cache.indexedSnapshotKey(pid, rid, lim);
+    const cached = await this.cache.get<{
+      projectId: string;
+      repoId?: string;
+      limit: number;
+      truncated: boolean;
+      nodes: GraphNodeDto[];
+      edges: GraphEdgeDto[];
+    }>(cacheKey);
+    if (cached) return cached;
+
+    const nodes = new Map<string, GraphNodeDto>();
+    const edgeKey = new Set<string>();
+    const edges: GraphEdgeDto[] = [];
+    let rowCount = 0;
+    let truncated = false;
+
+    const repoFilter = rid ? ' AND a.repoId = $repoId AND b.repoId = $repoId' : '';
+    const cypher =
+      `MATCH (a)-[r]->(b) WHERE a.projectId = $projectId${repoFilter} AND NOT a:Project ` +
+      `RETURN a, type(r) AS rel, b LIMIT $limit`;
+
+    const shardContexts = await this.falkor.getCypherShardContexts(pid);
+    const contexts =
+      shardContexts.length > 0
+        ? shardContexts
+        : [
+            {
+              graphName: (await this.falkor.getProjectGraphNames(pid))[0] ?? 'FalkorSpecs',
+              cypherProjectId: pid,
+            },
+          ];
+
+    for (const ctx of contexts) {
+      if (rowCount >= lim) {
+        truncated = true;
+        break;
+      }
+      const remaining = lim - rowCount;
+      const params: Record<string, string | number> = {
+        projectId: ctx.cypherProjectId,
+        limit: remaining,
+      };
+      if (rid) params.repoId = rid;
+      try {
+        const graph = await this.falkor.selectGraphByLogicalName(ctx.graphName);
+        const result = (await graph.query(cypher, { params })) as FalkorResult;
+        const headers =
+          result.headers && result.headers.length ? result.headers : ['a', 'rel', 'b'];
+        for (const row of result.data ?? []) {
+          if (rowCount >= lim) {
+            truncated = true;
+            break;
+          }
+          const [aCell, relCell, bCell] = extractFalkorRowCells(row, ['a', 'rel', 'b'], headers);
+          const rel = falkorScalarToString(relCell) ?? 'REL';
+          const aNode = parseGraphNodeCell(aCell);
+          const bNode = parseGraphNodeCell(bCell);
+          if (!aNode || !bNode) continue;
+          nodes.set(aNode.id, aNode);
+          nodes.set(bNode.id, bNode);
+          addGraphEdge(edges, edgeKey, aNode.id, bNode.id, rel);
+          rowCount += 1;
+        }
+      } catch {
+        /* shard vacío o grafo inexistente */
+      }
+    }
+
+    const payload = {
+      projectId: pid,
+      ...(rid ? { repoId: rid } : {}),
+      limit: lim,
+      truncated,
+      nodes: [...nodes.values()],
+      edges,
+    };
+    await this.cache.set(cacheKey, payload, this.cache.TTL.component);
     return payload;
   }
 
@@ -1103,110 +1191,6 @@ export class GraphService {
       breakingFor,
       details: Object.fromEntries(depMap),
     };
-  }
-
-  async getC4Model(projectId: string): Promise<C4ModelResponseDto> {
-    const pid = String(projectId ?? '').trim();
-    if (!pid) {
-      throw new Error('projectId required');
-    }
-    const cached = await this.cache.get<C4ModelResponseDto>(this.cache.c4ModelKey(pid));
-    if (cached) return cached;
-
-    const shardContexts = await this.falkor.getCypherShardContexts(pid);
-    type SysAgg = { repoId: string; name: string; containers: Map<string, C4ContainerNodeDto> };
-    const byRepo = new Map<string, SysAgg>();
-    const commByRepo = new Map<string, C4SystemNodeDto['communicates']>();
-
-    const mergeComm = (repoId: string, row: { sourceKey: string; targetKey: string; reason?: string }) => {
-      const list = commByRepo.get(repoId) ?? [];
-      const ek = `${row.sourceKey}|${row.targetKey}|${row.reason ?? ''}`;
-      const exists = list.some(
-        (x) => `${x.sourceKey}|${x.targetKey}|${x.reason ?? ''}` === ek,
-      );
-      if (!exists) list.push(row);
-      commByRepo.set(repoId, list);
-    };
-
-    for (const { graphName: nm, cypherProjectId } of shardContexts) {
-      const g = await this.falkor.selectGraphByLogicalName(nm);
-      const r1 = (await g.query(
-        `MATCH (s:System {projectId: $projectId}) OPTIONAL MATCH (s)-[:HAS_CONTAINER]->(c:Container)
-         RETURN s.repoId AS repoId, s.name AS sysName, c.key AS ck, c.name AS cname, c.technology AS tech, c.c4Kind AS kind, c.repoId AS cRepo`,
-        { params: { projectId: cypherProjectId } },
-      )) as FalkorResult;
-      const d1 = r1.data ?? [];
-      const h1 = r1.headers ?? [];
-      const idx = (name: string) => h1.indexOf(name);
-      const iRepo = idx('repoId');
-      const iName = idx('sysName');
-      const iCk = idx('ck');
-      const iCn = idx('cname');
-      const iTech = idx('tech');
-      const iKind = idx('kind');
-      const iCrepo = idx('cRepo');
-      for (const row of d1 as unknown[]) {
-        const arr = Array.isArray(row) ? row : [row];
-        const repoId = falkorScalarToString(arr[iRepo >= 0 ? iRepo : 0] as unknown);
-        const sysName = falkorScalarToString(arr[iName >= 0 ? iName : 1] as unknown);
-        if (!repoId) continue;
-        let agg = byRepo.get(repoId);
-        if (!agg) {
-          agg = { repoId, name: sysName || repoId, containers: new Map() };
-          byRepo.set(repoId, agg);
-        } else if (sysName) {
-          agg.name = sysName;
-        }
-        const ck = iCk >= 0 ? falkorScalarToString(arr[iCk] as unknown) : undefined;
-        if (!ck) continue;
-        const cname = falkorScalarToString(arr[iCn >= 0 ? iCn : 0] as unknown) ?? ck;
-        const tech = falkorScalarToString(arr[iTech >= 0 ? iTech : 0] as unknown);
-        const kind = falkorScalarToString(arr[iKind >= 0 ? iKind : 0] as unknown) ?? 'software';
-        const cRepo = falkorScalarToString(arr[iCrepo >= 0 ? iCrepo : 0] as unknown) ?? repoId;
-        agg.containers.set(ck, {
-          key: ck,
-          name: cname,
-          repoId: cRepo,
-          ...(tech ? { technology: tech } : {}),
-          c4Kind: kind,
-        });
-      }
-
-      const r2 = (await g.query(
-        `MATCH (a:Container {projectId: $projectId})-[r:COMMUNICATES_WITH]->(b:Container {projectId: $projectId})
-         WHERE a.repoId = b.repoId
-         RETURN a.repoId AS repoId, a.key AS src, b.key AS tgt, r.reason AS reason`,
-        { params: { projectId: cypherProjectId } },
-      )) as FalkorResult;
-      const d2 = r2.data ?? [];
-      const h2 = r2.headers ?? [];
-      const j = (name: string) => h2.indexOf(name);
-      const jr = j('repoId');
-      const js = j('src');
-      const jt = j('tgt');
-      const jrns = j('reason');
-      for (const row of d2 as unknown[]) {
-        const arr = Array.isArray(row) ? row : [row];
-        const repoId = falkorScalarToString(arr[jr >= 0 ? jr : 0] as unknown);
-        const src = falkorScalarToString(arr[js >= 0 ? js : 1] as unknown);
-        const tgt = falkorScalarToString(arr[jt >= 0 ? jt : 2] as unknown);
-        const reason = falkorScalarToString(arr[jrns >= 0 ? jrns : 3] as unknown);
-        if (!repoId || !src || !tgt) continue;
-        mergeComm(repoId, { sourceKey: src, targetKey: tgt, ...(reason ? { reason } : {}) });
-      }
-    }
-
-    const systems: C4SystemNodeDto[] = [...byRepo.values()].map((agg) => ({
-      repoId: agg.repoId,
-      name: agg.name,
-      containers: [...agg.containers.values()].sort((a, b) => a.key.localeCompare(b.key)),
-      communicates: commByRepo.get(agg.repoId) ?? [],
-    }));
-    systems.sort((a, b) => a.repoId.localeCompare(b.repoId));
-
-    const payload: C4ModelResponseDto = { projectId: pid, systems };
-    await this.cache.set(this.cache.c4ModelKey(pid), payload, this.cache.TTL.component);
-    return payload;
   }
 
   async getManual(projectId?: string): Promise<string> {

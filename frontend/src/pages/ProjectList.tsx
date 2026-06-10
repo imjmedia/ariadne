@@ -24,7 +24,7 @@ import { DashboardMetricCard } from "@/components/dashboard/DashboardMetricCard"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 
 const PROJECTS_MODULE_HELP =
-  "Cada proyecto agrupa varios repositorios (multi-root). La columna Ingesta resume cuántos repos están en estado ready frente al total, según el API. Asigna un dominio de arquitectura en el detalle del proyecto para gobierno C4 y shards Falkor."
+  "Cada proyecto agrupa varios repositorios (multi-root). La columna Ingesta resume cuántos repos están en estado ready frente al total, según el API. Asigna un dominio de arquitectura en el detalle del proyecto para gobierno de shards Falkor y whitelist."
 
 const panelClass = cn(
   "rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm",
@@ -192,12 +192,12 @@ export function ProjectList() {
             value={withDomainCount}
             trend={
               withDomainCount === projects.length && projects.length > 0
-                ? { direction: "up", label: "C4 / gobierno" }
+                ? { direction: "up", label: "Gobierno / dominio" }
                 : { direction: "neutral", label: "Arquitectura" }
             }
             footer={
               <span className="text-[var(--foreground-subtle)]">
-                Con <span className="font-mono text-xs">domain_id</span> para visibilidad C4 y whitelist en Arquitectura.
+                Con <span className="font-mono text-xs">domain_id</span> para visibilidad entre dominios y whitelist en Arquitectura.
               </span>
             }
           />
@@ -237,7 +237,7 @@ export function ProjectList() {
               <p className="mt-4 text-sm font-semibold text-[var(--foreground)]">No hay proyectos todavía</p>
               <p className="mt-1 max-w-md text-xs leading-relaxed text-[var(--foreground-muted)]">
                 Crea el primero y luego vincula repositorios desde el detalle. Podrás ver la salud de ingesta y asignar
-                dominio para C4.
+                dominio de arquitectura.
               </p>
               <Button type="button" className="mt-6 rounded-xl" onClick={() => setCreateOpen(true)}>
                 {CREATE_PROJECT_LABEL}

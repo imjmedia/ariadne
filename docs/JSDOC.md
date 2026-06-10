@@ -19,17 +19,17 @@ Este documento define **cómo documentamos** el monorepo Ariadne para que colabo
 
 ## Convenciones JSDoc (TypeScript)
 
-| Etiqueta        | Uso |
+| Etiqueta | Uso |
 |----------------|-----|
 | `@fileoverview` | Qué hace el archivo/módulo y su papel en la arquitectura (ingest, api, MCP, frontend). |
-| `@module`      | Nombre lógico del módulo (opcional; útil en entry points). |
+| `@module` | Nombre lógico del módulo (opcional; útil en entry points). |
 | `@packageDocumentation` | Solo en `*.ts` de entrada de paquete si usas TypeDoc con `entryPointStrategy`. |
-| `@param`       | Cada parámetro público de funciones exportadas o métodos de clase pública. |
+| `@param` | Cada parámetro público de funciones exportadas o métodos de clase pública. |
 | `@returns` / `@return` | Valor de retorno; usa `void` o `Promise<...>` explícito. |
-| `@throws`      | Errores que el llamador debe manejar (`NotFoundException`, `Error`, etc.). |
-| `@see`         | Rutas a docs (`docs/notebooklm/...`), otros módulos o endpoints HTTP. |
-| `@deprecated`  | Con sustituto o fecha de retirada si aplica. |
-| `@internal`    | API no estable; no garantizada entre versiones menores. |
+| `@throws` | Errores que el llamador debe manejar (`NotFoundException`, `Error`, etc.). |
+| `@see` | Rutas a docs (`docs/notebooklm/...`), otros módulos o endpoints HTTP. |
+| `@deprecated` | Con sustituto o fecha de retirada si aplica. |
+| `@internal` | API no estable; no garantizada entre versiones menores. |
 
 ### NestJS (servicios, controladores, processors)
 

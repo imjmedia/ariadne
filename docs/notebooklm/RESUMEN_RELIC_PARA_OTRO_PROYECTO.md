@@ -25,15 +25,15 @@ Para que Cursor use ese conocimiento **desde un workspace que no es el repo Aria
 Cursor debe tener configurado el servidor MCP de AriadneSpecs. Opciones típicas:
 
 - **Producción (URL):** En `~/.cursor/mcp.json` (o Cursor Settings → MCP):
-  ```json
-  {
-    "mcpServers": {
-      "ariadnespecs": {
-        "url": "https://ariadne.kreoint.mx/mcp"
-      }
-    }
-  }
-  ```
+ ```json
+ {
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "https://ariadne.kreoint.mx/mcp"
+ }
+ }
+ }
+ ```
 - **Local / túnel:** Si Ariadne corre en tu máquina o usas túnel SSH a FalkorDB, arrancar el MCP (`node services/mcp-ariadne/dist/index.js` con `FALKORDB_HOST`, `INGEST_URL`, `PORT=8080`) y poner `"url": "http://localhost:8080/mcp"`.
 
 Sin esta conexión, las herramientas no están disponibles.
@@ -43,10 +43,10 @@ Sin esta conexión, las herramientas no están disponibles.
 El grafo puede tener **varios proyectos** indexados. Cada uno tiene un `projectId` (UUID). Para que la IA no mezcle “Legacy” con “Moderno”:
 
 - **Recomendado:** En la **raíz del repo del otro proyecto** (el que quieres mantener con ayuda de Ariadne), crear un archivo **`.ariadne-project`**:
-  ```json
-  { "projectId": "uuid-del-proyecto-indexado-en-ariadne" }
-  ```
-  El agente debe leer este archivo y usar siempre ese `projectId` en las llamadas al MCP.
+ ```json
+ { "projectId": "uuid-del-proyecto-indexado-en-ariadne" }
+ ```
+ El agente debe leer este archivo y usar siempre ese `projectId` en las llamadas al MCP.
 
 - **Alternativa:** Pasar `projectId` (o `currentFilePath` para inferir proyecto) en cada llamada. Para saber el `projectId`, la IA debe llamar primero a **`list_known_projects`**: devuelve `[{ id, name, roots: [{ id, name, branch? }] }]` (proyecto + repos) y así se mapea nombre → id / `roots[].id`.
 

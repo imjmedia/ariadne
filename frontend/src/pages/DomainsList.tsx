@@ -1,5 +1,5 @@
 /**
- * @fileoverview CRUD de dominios de arquitectura (color, metadata, recuento de proyectos, visibilidad C4).
+ * @fileoverview CRUD de dominios de arquitectura (color, metadata, recuento de proyectos, visibilidad entre dominios).
  */
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
@@ -41,7 +41,7 @@ import { DashboardMetricCard } from "@/components/dashboard/DashboardMetricCard"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 
 const DOMAINS_MODULE_HELP =
-  "Gobierno de arquitectura C4: agrupa proyectos, define visibilidad dirigida entre dominios para el visor C4 / shards Falkor, y la whitelist proyecto→dominio en la pestaña Arquitectura del proyecto."
+  "Gobierno de arquitectura: agrupa proyectos, define visibilidad dirigida entre dominios para shards Falkor, y la whitelist proyecto→dominio en la pestaña Arquitectura del proyecto."
 
 const panelClass = cn(
   "rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm",
@@ -288,7 +288,7 @@ export function DomainsList() {
             }
             footer={
               <span className="text-[var(--foreground-subtle)]">
-                Aún no vinculados a un proyecto; revisa gobierno C4.
+                Aún no vinculados a un proyecto; revisa gobierno de dominios.
               </span>
             }
           />
@@ -299,7 +299,7 @@ export function DomainsList() {
         <div>
           <h2 className="text-sm font-semibold tracking-tight text-[var(--foreground)]">Crear dominio</h2>
           <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)]">
-            Nombre en estilo host o legible, color hexadecimal para PlantUML, badges y el visor C4.
+            Nombre en estilo host o legible, color hexadecimal para badges en la UI.
           </p>
         </div>
         <div className="mt-8 grid gap-8 lg:grid-cols-12 lg:items-stretch">
@@ -358,13 +358,13 @@ export function DomainsList() {
           >
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground-subtle)]">
-                Color en C4 / UI
+                Color en UI
               </p>
               <Label htmlFor="dc" className="text-xs font-medium text-[var(--foreground-muted)]">
                 Marca visual
               </Label>
               <p className="text-[11px] leading-snug text-[var(--foreground-muted)]">
-                Hex para PlantUML y badges. Abre el panel para ajustar o elegir un preset.
+                Hex para badges y UI. Abre el panel para ajustar o elegir un preset.
               </p>
               <HexColorPickerField id="dc" value={color} onChange={setColor} disabled={saving} className="pt-1" />
             </div>
@@ -388,7 +388,7 @@ export function DomainsList() {
             <code className="rounded bg-[var(--muted)] px-1 py-0.5 font-mono text-[11px] text-[var(--foreground)]">
               projects.domain_id
             </code>
-            . <span className="font-medium text-[var(--foreground)]">Visibilidad C4</span> edita{" "}
+            . <span className="font-medium text-[var(--foreground)]">Visibilidad</span> edita{" "}
             <code className="rounded bg-[var(--muted)] px-1 py-0.5 font-mono text-[11px] text-[var(--foreground)]">
               domain_domain_visibility
             </code>{" "}
@@ -416,7 +416,7 @@ export function DomainsList() {
               <p className="mt-4 text-sm font-semibold text-[var(--foreground)]">No hay dominios todavía</p>
               <p className="mt-1 max-w-md text-xs leading-relaxed text-[var(--foreground-muted)]">
                 Crea el primero con el formulario anterior. Los dominios permiten agrupar proyectos y configurar
-                visibilidad para el modelo C4.
+                visibilidad entre dominios (shards extendidos).
               </p>
             </div>
           ) : (
@@ -479,7 +479,7 @@ export function DomainsList() {
                             className="rounded-xl border-[var(--border)]"
                             onClick={() => openVisDialog(d)}
                           >
-                            Visibilidad C4
+                            Visibilidad
                           </Button>
                           <Button type="button" variant="destructive" size="sm" className="rounded-xl" onClick={() => void remove(d.id)}>
                             Eliminar

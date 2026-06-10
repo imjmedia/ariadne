@@ -11,12 +11,12 @@ Guía para **implementar llamadas HTTP/HTTPS** desde una aplicación al servidor
 
 ## 1. Endpoint y método
 
-| Propiedad    | Valor                                                       |
+| Propiedad | Valor |
 | ------------ | ----------------------------------------------------------- |
-| Método       | `POST`                                                      |
-| URL          | `https://<host>/mcp` (ej. `https://ariadne.kreoint.mx/mcp`) |
-| Content-Type | `application/json`                                          |
-| Accept       | `application/json`, `text/event-stream`                     |
+| Método | `POST` |
+| URL | `https://<host>/mcp` (ej. `https://ariadne.kreoint.mx/mcp`) |
+| Content-Type | `application/json` |
+| Accept | `application/json`, `text/event-stream` |
 
 ---
 
@@ -26,10 +26,10 @@ Todas las peticiones son mensajes JSON-RPC 2.0 en el body del POST:
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "<método>",
-  "params": { ... }
+ "jsonrpc": "2.0",
+ "id": 1,
+ "method": "<método>",
+ "params": { ... }
 }
 ```
 
@@ -68,17 +68,17 @@ Algunos clientes envían `initialize` antes de usar herramientas. El servidor Ar
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "initialize",
-  "params": {
-    "protocolVersion": "2025-03-26",
-    "capabilities": {},
-    "clientInfo": {
-      "name": "mi-aplicacion",
-      "version": "1.0.0"
-    }
-  }
+ "jsonrpc": "2.0",
+ "id": 1,
+ "method": "initialize",
+ "params": {
+ "protocolVersion": "2025-03-26",
+ "capabilities": {},
+ "clientInfo": {
+ "name": "mi-aplicacion",
+ "version": "1.0.0"
+ }
+ }
 }
 ```
 
@@ -96,10 +96,10 @@ Obtener la lista de herramientas disponibles y sus esquemas.
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 2,
-  "method": "tools/list",
-  "params": {}
+ "jsonrpc": "2.0",
+ "id": 2,
+ "method": "tools/list",
+ "params": {}
 }
 ```
 
@@ -107,35 +107,35 @@ Obtener la lista de herramientas disponibles y sus esquemas.
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 2,
-  "result": {
-    "tools": [
-      {
-        "name": "list_known_projects",
-        "description": "Lista los proyectos indexados...",
-        "inputSchema": {
-          "type": "object",
-          "properties": {},
-          "additionalProperties": false
-        }
-      },
-      {
-        "name": "get_legacy_impact",
-        "description": "Dependientes del nodo; preferencia API Nest GET /api/graph/impact; fallback Falkor...",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "nodeName": { "type": "string", "description": "..." },
-            "projectId": { "type": "string", "description": "..." },
-            "currentFilePath": { "type": "string", "description": "..." }
-          },
-          "required": ["nodeName"],
-          "additionalProperties": false
-        }
-      }
-    ]
-  }
+ "jsonrpc": "2.0",
+ "id": 2,
+ "result": {
+ "tools": [
+ {
+ "name": "list_known_projects",
+ "description": "Lista los proyectos indexados...",
+ "inputSchema": {
+ "type": "object",
+ "properties": {},
+ "additionalProperties": false
+ }
+ },
+ {
+ "name": "get_legacy_impact",
+ "description": "Dependientes del nodo; preferencia API Nest GET /api/graph/impact; fallback Falkor...",
+ "inputSchema": {
+ "type": "object",
+ "properties": {
+ "nodeName": { "type": "string", "description": "..." },
+ "projectId": { "type": "string", "description": "..." },
+ "currentFilePath": { "type": "string", "description": "..." }
+ },
+ "required": ["nodeName"],
+ "additionalProperties": false
+ }
+ }
+ ]
+ }
 }
 ```
 
@@ -149,16 +149,16 @@ Ejecutar una herramienta con nombre y argumentos.
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 3,
-  "method": "tools/call",
-  "params": {
-    "name": "<nombre_herramienta>",
-    "arguments": {
-      "<param1>": "<valor1>",
-      "<param2>": "<valor2>"
-    }
-  }
+ "jsonrpc": "2.0",
+ "id": 3,
+ "method": "tools/call",
+ "params": {
+ "name": "<nombre_herramienta>",
+ "arguments": {
+ "<param1>": "<valor1>",
+ "<param2>": "<valor2>"
+ }
+ }
 }
 ```
 
@@ -166,17 +166,17 @@ Ejecutar una herramienta con nombre y argumentos.
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 3,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "Contenido en texto plano o Markdown devuelto por la herramienta."
-      }
-    ],
-    "isError": false
-  }
+ "jsonrpc": "2.0",
+ "id": 3,
+ "result": {
+ "content": [
+ {
+ "type": "text",
+ "text": "Contenido en texto plano o Markdown devuelto por la herramienta."
+ }
+ ],
+ "isError": false
+ }
 }
 ```
 
@@ -184,17 +184,17 @@ Si hay error en la ejecución de la herramienta:
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 3,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "[NOT_FOUND_IN_GRAPH] Nodo X no encontrado."
-      }
-    ],
-    "isError": true
-  }
+ "jsonrpc": "2.0",
+ "id": 3,
+ "result": {
+ "content": [
+ {
+ "type": "text",
+ "text": "[NOT_FOUND_IN_GRAPH] Nodo X no encontrado."
+ }
+ ],
+ "isError": true
+ }
 }
 ```
 
@@ -204,37 +204,36 @@ Si hay error en la ejecución de la herramienta:
 
 Los nombres de argumentos deben coincidir con el esquema devuelto por `tools/list` (ver [mcp_server_specs.md](mcp_server_specs.md) para descripción funcional).
 
-**Grafo vía API Nest:** `get_component_graph`, `get_legacy_impact` y `get_c4_model` intentan primero el API Nest (`GraphService`) si el proceso MCP tiene JWT hacia `ARIADNE_API_URL`; el Markdown indica fuente o fallback. No es configurable por cabecera desde el cliente HTTP del §1.
+**Grafo vía API Nest:** `get_component_graph` y `get_legacy_impact` intentan primero el API Nest (`GraphService`) si el proceso MCP tiene JWT hacia `ARIADNE_API_URL`; el Markdown indica fuente o fallback. No es configurable por cabecera desde el cliente HTTP del §1.
 
-| Herramienta                     | Argumentos requeridos   | Argumentos opcionales                                                                 |
+| Herramienta | Argumentos requeridos | Argumentos opcionales |
 | ------------------------------- | ----------------------- | ------------------------------------------------------------------------------------- |
-| `list_known_projects`           | —                       | —                                                                                     |
-| `get_legacy_impact`             | `nodeName`              | `projectId`, `currentFilePath`                                                       |
-| `get_contract_specs`            | `componentName`         | `projectId`, `currentFilePath`                                                       |
-| `get_component_graph`           | `componentName`         | `depth`, `projectId`, `currentFilePath`                                                |
-| `get_c4_model`                  | `projectId`             | — (requiere API Nest + JWT en el servidor MCP)                                        |
-| `get_file_content`              | `path` + (`projectId` **o** `currentFilePath`) | `ref`                                                                              |
-| `semantic_search`             | `query`; con sharding también **`projectId`** | `limit`; **`projectId`** opcional sin sharding (acota al UUID proyecto o `roots[].id`). **No** admite `scope` ni `currentFilePath`. |
-| `validate_before_edit`        | `nodeName`              | `projectId`, `currentFilePath`                                                       |
-| `get_project_analysis`          | —                       | `projectId`, `currentFilePath` (multi-root → `idePath` en ingest), `mode` (`diagnostico`, `duplicados`, `reingenieria`, `codigo_muerto`, `seguridad`) |
-| `ask_codebase`                  | `question`              | `projectId`, `currentFilePath`, `scope`, `twoPhase`, **`responseMode`** (`default` \| **`evidence_first`**) — ver [mcp_server_specs.md](mcp_server_specs.md). **`evidence_first`:** respuesta **JSON MDD** (7 secciones); orchestrator usa ingest `mdd-evidence` |
-| `get_modification_plan`         | `userDescription`       | `projectId`, `currentFilePath`, `scope`                                               |
-| `get_definitions`               | `symbolName`            | `projectId`, `currentFilePath`                                                       |
-| `get_references`                | `symbolName`            | `projectId`, `currentFilePath`                                                       |
-| `get_implementation_details`    | `symbolName`            | `projectId`, `currentFilePath`                                                       |
-| `get_functions_in_file`         | `path` + (`projectId` **o** `currentFilePath`) | —                                                                 |
-| `get_import_graph`              | `filePath` + (`projectId` **o** `currentFilePath`) | —                                                                                |
-| `trace_reachability`            | `projectId` **o** `currentFilePath` | — (el `inputSchema` marca solo `projectId`; el runtime acepta inferencia por ruta) |
-| `check_export_usage`            | `projectId` **o** `currentFilePath` | `filePath` opcional                                                                 |
-| `get_affected_scopes`          | `nodeName`              | `projectId`, `currentFilePath`, `includeTestFiles`                                   |
-| `check_breaking_changes`        | `nodeName`              | `projectId`, `currentFilePath`, `removedParams`                                         |
-| `find_similar_implementations` | `query`                 | `projectId`, `currentFilePath`, `limit` — con sharding activo, ver §7.1              |
-| `get_project_standards`        | `projectId` **o** `currentFilePath` | — (idem discrepancia schema vs runtime)                                            |
-| `get_file_context`             | `filePath` + (`projectId` **o** `currentFilePath`) | `ref`                                                                            |
-| `analyze_local_changes`        | —                       | `projectId` o `currentFilePath`; `workspaceRoot` o `stagedDiff`                      |
-| `get_sync_status`              | —                       | `projectId`, `currentFilePath` — estado sync vía **ingest** `GET /projects/:id/sync-status` |
-| `get_debt_report`              | `projectId`             | `currentFilePath` — heurística **Falkor** (nodos aislados); no sustituye `get_project_analysis` |
-| `find_duplicates`              | `projectId`             | `currentFilePath` — duplicados por `contentHash` en grafo (nativo MCP)              |
+| `list_known_projects` | — | — |
+| `get_legacy_impact` | `nodeName` | `projectId`, `currentFilePath` |
+| `get_contract_specs` | `componentName` | `projectId`, `currentFilePath` |
+| `get_component_graph` | `componentName` | `depth`, `projectId`, `currentFilePath` |
+| `get_file_content` | `path` + (`projectId` **o** `currentFilePath`) | `ref` |
+| `semantic_search` | `query`; con sharding también **`projectId`** | `limit`; **`projectId`** opcional sin sharding (acota al UUID proyecto o `roots[].id`). **No** admite `scope` ni `currentFilePath`. |
+| `validate_before_edit` | `nodeName` | `projectId`, `currentFilePath` |
+| `get_project_analysis` | — | `projectId`, `currentFilePath` (multi-root → `idePath` en ingest), `mode` (`diagnostico`, `duplicados`, `reingenieria`, `codigo_muerto`, `seguridad`) |
+| `ask_codebase` | `question` | `projectId`, `currentFilePath`, `scope`, `twoPhase`, **`responseMode`** (`default` \| **`evidence_first`**) — ver [mcp_server_specs.md](mcp_server_specs.md). **`evidence_first`:** respuesta **JSON MDD** (7 secciones); orchestrator usa ingest `mdd-evidence` |
+| `get_modification_plan` | `userDescription` | `projectId`, `currentFilePath`, `scope` |
+| `get_definitions` | `symbolName` | `projectId`, `currentFilePath` |
+| `get_references` | `symbolName` | `projectId`, `currentFilePath` |
+| `get_implementation_details` | `symbolName` | `projectId`, `currentFilePath` |
+| `get_functions_in_file` | `path` + (`projectId` **o** `currentFilePath`) | — |
+| `get_import_graph` | `filePath` + (`projectId` **o** `currentFilePath`) | — |
+| `trace_reachability` | `projectId` **o** `currentFilePath` | — (el `inputSchema` marca solo `projectId`; el runtime acepta inferencia por ruta) |
+| `check_export_usage` | `projectId` **o** `currentFilePath` | `filePath` opcional |
+| `get_affected_scopes` | `nodeName` | `projectId`, `currentFilePath`, `includeTestFiles` |
+| `check_breaking_changes` | `nodeName` | `projectId`, `currentFilePath`, `removedParams` |
+| `find_similar_implementations` | `query` | `projectId`, `currentFilePath`, `limit` — con sharding activo, ver §7.1 |
+| `get_project_standards` | `projectId` **o** `currentFilePath` | — (idem discrepancia schema vs runtime) |
+| `get_file_context` | `filePath` + (`projectId` **o** `currentFilePath`) | `ref` |
+| `analyze_local_changes` | — | `projectId` o `currentFilePath`; `workspaceRoot` o `stagedDiff` |
+| `get_sync_status` | — | `projectId`, `currentFilePath` — estado sync vía **ingest** `GET /projects/:id/sync-status` |
+| `get_debt_report` | `projectId` | `currentFilePath` — heurística **Falkor** (nodos aislados); no sustituye `get_project_analysis` |
+| `find_duplicates` | `projectId` | `currentFilePath` — duplicados por `contentHash` en grafo (nativo MCP) |
 
 > **projectId:** ID de proyecto Ariadne o ID de repo (`roots[].id`). Ver [mcp_server_specs.md §2](mcp_server_specs.md) (proyecto vs repo).
 >
@@ -262,29 +261,29 @@ La API REST Nest (`GET /api/graph/*`) acepta query **`projectId`** (y en algunos
 const MCP_URL = "https://ariadne.kreoint.mx/mcp";
 /** Mismo Bearer que en Cursor: Secret MCP (`ari_…`) o JWT tras login web. El MCP lo reenvía al Nest. */
 const AUTHORIZATION_BEARER =
-  process.env.USER_MCP_OR_SESSION_BEARER ?? "<paste-from-profile-or-session>";
+ process.env.USER_MCP_OR_SESSION_BEARER ?? "<paste-from-profile-or-session>";
 
 async function callMcpTool(name: string, args: Record<string, unknown>) {
-  const res = await fetch(MCP_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-      "MCP-Protocol-Version": "2025-03-26",
-      ...(AUTHORIZATION_BEARER && AUTHORIZATION_BEARER !== "<paste-from-profile-or-session>"
-        ? { Authorization: `Bearer ${AUTHORIZATION_BEARER}` }
-        : {}),
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: Date.now(),
-      method: "tools/call",
-      params: { name, arguments: args },
-    }),
-  });
+ const res = await fetch(MCP_URL, {
+ method: "POST",
+ headers: {
+ "Content-Type": "application/json",
+ Accept: "application/json, text/event-stream",
+ "MCP-Protocol-Version": "2025-03-26",
+ ...(AUTHORIZATION_BEARER && AUTHORIZATION_BEARER !== "<paste-from-profile-or-session>"
+ ? { Authorization: `Bearer ${AUTHORIZATION_BEARER}` }
+ : {}),
+ },
+ body: JSON.stringify({
+ jsonrpc: "2.0",
+ id: Date.now(),
+ method: "tools/call",
+ params: { name, arguments: args },
+ }),
+ });
 
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+ if (!res.ok) throw new Error(`HTTP ${res.status}`);
+ return res.json();
 }
 
 // Ejemplo: listar proyectos
@@ -292,8 +291,8 @@ const projects = await callMcpTool("list_known_projects", {});
 
 // Ejemplo: impacto legacy
 const impact = await callMcpTool("get_legacy_impact", {
-  nodeName: "Header",
-  projectId: "uuid-del-proyecto",
+ nodeName: "Header",
+ projectId: "uuid-del-proyecto",
 });
 ```
 
@@ -302,19 +301,19 @@ const impact = await callMcpTool("get_legacy_impact", {
 ```bash
 # Listar proyectos
 curl -X POST https://ariadne.kreoint.mx/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "MCP-Protocol-Version: 2025-03-26" \
-  -H "Authorization: Bearer <token>" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+ -H "Content-Type: application/json" \
+ -H "Accept: application/json, text/event-stream" \
+ -H "MCP-Protocol-Version: 2025-03-26" \
+ -H "Authorization: Bearer <token>" \
+ -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 
 # Invocar get_legacy_impact
 curl -X POST https://ariadne.kreoint.mx/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "MCP-Protocol-Version: 2025-03-26" \
-  -H "Authorization: Bearer <token>" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_legacy_impact","arguments":{"nodeName":"Header","projectId":"uuid-proyecto"}}}'
+ -H "Content-Type: application/json" \
+ -H "Accept: application/json, text/event-stream" \
+ -H "MCP-Protocol-Version: 2025-03-26" \
+ -H "Authorization: Bearer <token>" \
+ -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_legacy_impact","arguments":{"nodeName":"Header","projectId":"uuid-proyecto"}}}'
 ```
 
 ---
@@ -330,11 +329,11 @@ Para un cliente simple que solo hace POST y espera JSON, la mayoría de respuest
 
 ```typescript
 function extractToolResult(response: {
-  result?: { content?: Array<{ type: string; text: string }> };
+ result?: { content?: Array<{ type: string; text: string }> };
 }) {
-  const content = response.result?.content ?? [];
-  const text = content.find((c) => c.type === "text")?.text ?? "";
-  return text;
+ const content = response.result?.content ?? [];
+ const text = content.find((c) => c.type === "text")?.text ?? "";
+ return text;
 }
 ```
 
@@ -342,14 +341,14 @@ function extractToolResult(response: {
 
 ## 10. Códigos HTTP
 
-| Código | Significado                                                               |
+| Código | Significado |
 | ------ | ------------------------------------------------------------------------- |
-| 200    | OK — Respuesta JSON-RPC en body                                           |
-| 202    | Accepted — Notificación aceptada (sin body)                               |
-| 400    | Bad Request — JSON malformado o método inválido                           |
-| 401    | Unauthorized — Falta Bearer o token inválido en **`/mcp`** (validación ingest) salvo desarrollo con `MCP_HTTP_ALLOW_UNAUTHENTICATED`. Fallos contra el API Nest en tools suelen llegar como **200** con Markdown/aviso u otro contenido en `result`. |
-| 404    | Not Found — Ruta incorrecta (verificar que sea `/mcp`)                    |
-| 500    | Internal Server Error — Error del servidor                                |
+| 200 | OK — Respuesta JSON-RPC en body |
+| 202 | Accepted — Notificación aceptada (sin body) |
+| 400 | Bad Request — JSON malformado o método inválido |
+| 401 | Unauthorized — Falta Bearer o token inválido en **`/mcp`** (validación ingest) salvo desarrollo con `MCP_HTTP_ALLOW_UNAUTHENTICATED`. Fallos contra el API Nest en tools suelen llegar como **200** con Markdown/aviso u otro contenido en `result`. |
+| 404 | Not Found — Ruta incorrecta (verificar que sea `/mcp`) |
+| 500 | Internal Server Error — Error del servidor |
 
 ---
 
@@ -385,6 +384,6 @@ El servidor MCP y el MDD del ingest usan **variables de entorno** con defaults a
 
 ## 13. Referencias
 
-- [Especificación MCP — Herramientas](mcp_server_specs.md) — Lista completa, API Nest vs Falkor, `get_c4_model`.
+- [Especificación MCP — Herramientas](mcp_server_specs.md) — Lista completa, API Nest vs Falkor.
 - [Transports — Streamable HTTP](https://modelcontextprotocol.io/docs/concepts/transports#streamable-http) — Protocolo oficial.
 - [Monorepos y limitaciones](MONOREPO_Y_LIMITACIONES_INDEXADO.md) — Prisma, scope, path aliases.

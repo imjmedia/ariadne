@@ -9,10 +9,10 @@
 ## Frontend (`frontend`)
 
 - **Unitario:** Vitest — `pnpm run test:unit` (o `npm run test:unit` tras instalar deps).
-  - Ejemplo: `src/pages/RepoDetail/utils.spec.ts` (`formatJobPayload`).
+ - Ejemplo: `src/pages/RepoDetail/utils.spec.ts` (`formatJobPayload`).
 - **E2E:** Playwright — `pnpm exec playwright install chromium` (primera vez) y `pnpm run test:e2e`.
-  - Arranca Vite con **`VITE_E2E_AUTH_BYPASS=true`** (solo pruebas; ver `ProtectedRoute`).
-  - Los smoke mockean `GET /api/projects` y `GET /api/repositories` para no depender del API real.
+ - Arranca Vite con **`VITE_E2E_AUTH_BYPASS=true`** (solo pruebas; ver `ProtectedRoute`).
+ - Los smoke mockean `GET /api/projects` y `GET /api/repositories` para no depender del API real.
 
 ## MCP (`services/mcp-ariadne`)
 

@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Visibilidad dominio → dominio (C4 / whitelist de grafos entre ecosistemas).
+ * Visibilidad dominio → dominio (whitelist de grafos entre ecosistemas).
  * Distinto de project_domain_dependencies (proyecto → dominio externo).
  */
 export class DomainDomainVisibility1744100000000 implements MigrationInterface {

@@ -1,6 +1,6 @@
 # PROJECT_BRAIN_DUMP — Ariadne / AriadneSpecs
 
-> **Propósito del documento:** fuente de verdad técnica para un cuaderno **NotebookLM**. Describe el monorepo real (no proyectos de clientes indexados en Falkor).  
+> **Propósito del documento:** fuente de verdad técnica para un cuaderno **NotebookLM**. Describe el monorepo real (no proyectos de clientes indexados en Falkor). 
 > **Última revisión según árbol de código:** abril 2026.
 
 ---
@@ -36,48 +36,48 @@ No es MVC clásico: es **API + workers + graph DB + MCP**.
 | `services/orchestrator` | LangGraph + Redis: flujos de validación SDD (refactor). |
 | `services/mcp-ariadne` | Servidor MCP (tools → Falkor + ingest HTTP). |
 | `services/cartographer` | Legacy / shadow según docs; ingest asume pipeline principal remoto. |
-| `frontend` | Vite + React 19: shell con sidebar (Gobierno / Ingeniería / Plataforma), repos, jobs, credenciales, chat por repo/proyecto, C4, explorador de grafo (React Flow). |
+| `frontend` | Vite + React 19: shell con sidebar (Gobierno / Ingeniería / Plataforma), repos, jobs, credenciales, chat por repo/proyecto, explorador de grafo (React Flow). |
 | `docs/` | Arquitectura, MCP, chat, despliegue, esquema DB. |
 
 ### Flujo de datos principal
 
 ```mermaid
 flowchart LR
-  subgraph remote [Origen]
-    BB[Bitbucket / GitHub]
-  end
-  subgraph ingest [Ingest :3002]
-    SYNC[Sync / BullMQ]
-    TS[Tree-sitter]
-    CYP[Cypher MERGE]
-    CHAT[Chat NL + LLM]
-    EMB[Embed index]
-  end
-  subgraph stores [Almacenamiento]
-    PG[(PostgreSQL)]
-    RD[(Redis)]
-    FK[(FalkorDB)]
-  end
-  subgraph consumers [Consumidores]
-    API[API :3000]
-    MCP[MCP Ariadne]
-    UI[Frontend]
-    ORC[Orchestrator :3001]
-  end
-  BB --> SYNC
-  SYNC --> TS --> CYP --> FK
-  SYNC --> PG
-  SYNC --> RD
-  CHAT --> FK
-  CHAT --> PG
-  EMB --> FK
-  API --> FK
-  API --> RD
-  MCP --> FK
-  MCP --> ingest
-  UI --> API
-  UI --> ingest
-  ORC --> RD
+ subgraph remote [Origen]
+ BB[Bitbucket / GitHub]
+ end
+ subgraph ingest [Ingest :3002]
+ SYNC[Sync / BullMQ]
+ TS[Tree-sitter]
+ CYP[Cypher MERGE]
+ CHAT[Chat NL + LLM]
+ EMB[Embed index]
+ end
+ subgraph stores [Almacenamiento]
+ PG[(PostgreSQL)]
+ RD[(Redis)]
+ FK[(FalkorDB)]
+ end
+ subgraph consumers [Consumidores]
+ API[API :3000]
+ MCP[MCP Ariadne]
+ UI[Frontend]
+ ORC[Orchestrator :3001]
+ end
+ BB --> SYNC
+ SYNC --> TS --> CYP --> FK
+ SYNC --> PG
+ SYNC --> RD
+ CHAT --> FK
+ CHAT --> PG
+ EMB --> FK
+ API --> FK
+ API --> RD
+ MCP --> FK
+ MCP --> ingest
+ UI --> API
+ UI --> ingest
+ ORC --> RD
 ```
 
 ### Capas lógicas
@@ -152,35 +152,35 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-  subgraph clients [Clientes]
-    Cursor[Cursor / IDE MCP]
-    Browser[Browser Frontend]
-  end
-  subgraph edge [Edge / Gateway]
-    Proxy[Reverse proxy opcional same host]
-  end
-  MCP_SRV[mcp-ariadne]
-  ING[ingest :3002]
-  API[api :3000]
-  ORC[orchestrator :3001]
-  FK[(FalkorDB)]
-  PG[(Postgres)]
-  RD[(Redis)]
+ subgraph clients [Clientes]
+ Cursor[Cursor / IDE MCP]
+ Browser[Browser Frontend]
+ end
+ subgraph edge [Edge / Gateway]
+ Proxy[Reverse proxy opcional same host]
+ end
+ MCP_SRV[mcp-ariadne]
+ ING[ingest :3002]
+ API[api :3000]
+ ORC[orchestrator :3001]
+ FK[(FalkorDB)]
+ PG[(Postgres)]
+ RD[(Redis)]
 
-  Cursor --> MCP_SRV
-  Browser --> Proxy
-  Proxy --> ING
-  Proxy --> API
-  MCP_SRV --> FK
-  MCP_SRV --> ING
-  ING --> FK
-  ING --> PG
-  ING --> RD
-  API --> FK
-  API --> RD
-  ORC --> RD
-  Browser --> ING
-  Browser --> API
+ Cursor --> MCP_SRV
+ Browser --> Proxy
+ Proxy --> ING
+ Proxy --> API
+ MCP_SRV --> FK
+ MCP_SRV --> ING
+ ING --> FK
+ ING --> PG
+ ING --> RD
+ API --> FK
+ API --> RD
+ ORC --> RD
+ Browser --> ING
+ Browser --> API
 ```
 
 **Comunicación resumida:**

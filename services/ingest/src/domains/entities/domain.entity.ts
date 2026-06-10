@@ -1,5 +1,5 @@
 /**
- * @fileoverview Dominio de gobierno de arquitectura (C4 L1, color UI/PlantUML).
+ * @fileoverview Dominio de gobierno de arquitectura (nombre, color UI, metadata).
  */
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
@@ -14,7 +14,7 @@ export class DomainEntity {
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
-  /** Hex para UI / PlantUML (#RRGGBB). */
+  /** Hex para UI y badges (#RRGGBB). */
   @Column({ type: 'varchar', length: 16, default: '#6366f1' })
   color!: string;
 

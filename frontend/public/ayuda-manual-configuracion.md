@@ -8,38 +8,38 @@ Guía completa para configurar y usar el sistema: variables de entorno, credenci
 
 ### 1.1 Requisitos
 
-| Requisito      | Versión / Nota                                                           |
+| Requisito | Versión / Nota |
 | -------------- | ------------------------------------------------------------------------ |
-| Node.js        | ≥ 20                                                                     |
-| Docker         | Para levantar el stack completo                                          |
+| Node.js | ≥ 20 |
+| Docker | Para levantar el stack completo |
 | Colima (macOS) | Opcional; `scripts/ensure-docker.js` lo arranca si no hay Docker Desktop |
 
 ### 1.2 Variables de entorno
 
 #### Servicio Ingest (puerto 3002)
 
-| Variable                            | Obligatoria | Default                | Descripción                                                                                                      |
+| Variable | Obligatoria | Default | Descripción |
 | ----------------------------------- | ----------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `PORT`                              | No          | 3002                   | Puerto HTTP                                                                                                      |
-| `PGHOST`                            | Sí\*        | localhost              | PostgreSQL host                                                                                                  |
-| `PGPORT`                            | Sí\*        | 5432                   | PostgreSQL puerto                                                                                                |
-| `PGUSER`                            | Sí\*        | falkorspecs            | Usuario PostgreSQL                                                                                               |
-| `PGPASSWORD`                        | Sí\*        | falkorspecs            | Contraseña PostgreSQL                                                                                            |
-| `PGDATABASE`                        | Sí\*        | falkorspecs            | Base de datos                                                                                                    |
-| `FALKORDB_HOST`                     | Sí\*        | localhost              | FalkorDB host                                                                                                    |
-| `FALKORDB_PORT`                     | Sí\*        | 6379                   | FalkorDB puerto                                                                                                  |
-| `REDIS_URL`                         | Sí\*        | redis://localhost:6380 | Redis para cola de sync (BullMQ)                                                                                 |
-| `BITBUCKET_TOKEN`                   | Condicional | —                      | Token OAuth Bitbucket                                                                                            |
-| `BITBUCKET_APP_PASSWORD`            | Condicional | —                      | App Password Bitbucket                                                                                           |
-| `BITBUCKET_USER`                    | Condicional | —                      | Usuario Bitbucket (con App Password)                                                                             |
-| `GITHUB_TOKEN`                      | Condicional | —                      | PAT GitHub (provider=github). Fallback si no hay credencial en BD.                                               |
-| `BITBUCKET_WEBHOOK_SECRET`          | Condicional | —                      | Secret webhook. Fallback si no hay credencial en BD.                                                             |
-| `CREDENTIALS_ENCRYPTION_KEY`        | Condicional | —                      | Clave para cifrar credenciales en BD. Base64 32 bytes o hex 64 chars. Ej: `openssl rand -base64 32`.             |
-| `EMBEDDING_PROVIDER`                | Condicional | openai                 | RAG: `openai` o `google`                                                                                         |
-| `OPENAI_API_KEY`                    | Condicional | —                      | API key OpenAI: chat, diagnósticos/analyze y (si provider=openai) embeddings. **Obligatorio** para chat/analyze. |
-| `LLM_CHAT_MODEL`                        | Condicional | gpt-4o-mini            | Modelo OpenAI para chat                                                                                          |
-| `GOOGLE_API_KEY` / `GEMINI_API_KEY` | Condicional | —                      | API key Google AI (si provider=google). Para `gemini-embedding-001` (768 dims).                                  |
-| `NODE_ENV`                          | No          | development            | Si ≠ production, TypeORM usa synchronize                                                                         |
+| `PORT` | No | 3002 | Puerto HTTP |
+| `PGHOST` | Sí\* | localhost | PostgreSQL host |
+| `PGPORT` | Sí\* | 5432 | PostgreSQL puerto |
+| `PGUSER` | Sí\* | falkorspecs | Usuario PostgreSQL |
+| `PGPASSWORD` | Sí\* | falkorspecs | Contraseña PostgreSQL |
+| `PGDATABASE` | Sí\* | falkorspecs | Base de datos |
+| `FALKORDB_HOST` | Sí\* | localhost | FalkorDB host |
+| `FALKORDB_PORT` | Sí\* | 6379 | FalkorDB puerto |
+| `REDIS_URL` | Sí\* | redis://localhost:6380 | Redis para cola de sync (BullMQ) |
+| `BITBUCKET_TOKEN` | Condicional | — | Token OAuth Bitbucket |
+| `BITBUCKET_APP_PASSWORD` | Condicional | — | App Password Bitbucket |
+| `BITBUCKET_USER` | Condicional | — | Usuario Bitbucket (con App Password) |
+| `GITHUB_TOKEN` | Condicional | — | PAT GitHub (provider=github). Fallback si no hay credencial en BD. |
+| `BITBUCKET_WEBHOOK_SECRET` | Condicional | — | Secret webhook. Fallback si no hay credencial en BD. |
+| `CREDENTIALS_ENCRYPTION_KEY` | Condicional | — | Clave para cifrar credenciales en BD. Base64 32 bytes o hex 64 chars. Ej: `openssl rand -base64 32`. |
+| `EMBEDDING_PROVIDER` | Condicional | openai | RAG: `openai` o `google` |
+| `OPENAI_API_KEY` | Condicional | — | API key OpenAI: chat, diagnósticos/analyze y (si provider=openai) embeddings. **Obligatorio** para chat/analyze. |
+| `LLM_CHAT_MODEL` | Condicional | gpt-4o-mini | Modelo OpenAI para chat |
+| `GOOGLE_API_KEY` / `GEMINI_API_KEY` | Condicional | — | API key Google AI (si provider=google). Para `gemini-embedding-001` (768 dims). |
+| `NODE_ENV` | No | development | Si ≠ production, TypeORM usa synchronize |
 
 \* En Docker las variables vienen del compose; en local hay que definirlas.
 
@@ -60,37 +60,37 @@ GOOGLE_API_KEY=xxx
 
 #### Servicio API (puerto 3000)
 
-| Variable           | Obligatoria | Default                | Descripción                             |
+| Variable | Obligatoria | Default | Descripción |
 | ------------------ | ----------- | ---------------------- | --------------------------------------- |
-| `PORT`             | No          | 3000                   | Puerto HTTP                             |
-| `FALKORDB_HOST`    | Sí          | localhost              | FalkorDB host                           |
-| `FALKORDB_PORT`    | Sí          | 6379                   | FalkorDB puerto                         |
-| `REDIS_URL`        | Sí          | redis://localhost:6380 | Redis (caché)                           |
-| `INGEST_URL`       | No          | `http://localhost:3002` (Docker: `http://ingest:3002`) | URL del ingest: **proxy shadow** y reenvío de `/api/projects`, `/api/repositories`, `/api/credentials`, `/api/domains`, … (pathRewrite quita `/api`). |
-| `CARTOGRAPHER_URL` | No          | —                      | Fallback shadow si ingest no disponible |
+| `PORT` | No | 3000 | Puerto HTTP |
+| `FALKORDB_HOST` | Sí | localhost | FalkorDB host |
+| `FALKORDB_PORT` | Sí | 6379 | FalkorDB puerto |
+| `REDIS_URL` | Sí | redis://localhost:6380 | Redis (caché) |
+| `INGEST_URL` | No | `http://localhost:3002` (Docker: `http://ingest:3002`) | URL del ingest: **proxy shadow** y reenvío de `/api/projects`, `/api/repositories`, `/api/credentials`, `/api/domains`, … (pathRewrite quita `/api`). |
+| `CARTOGRAPHER_URL` | No | — | Fallback shadow si ingest no disponible |
 
 #### Orchestrator (puerto 3001)
 
-| Variable             | Obligatoria | Default         | Descripción   |
+| Variable | Obligatoria | Default | Descripción |
 | -------------------- | ----------- | --------------- | ------------- |
-| `PORT`               | No          | 3001            | Puerto HTTP   |
-| `FALKORSPEC_API_URL` | No          | http://api:3000 | URL de la API |
+| `PORT` | No | 3001 | Puerto HTTP |
+| `FALKORSPEC_API_URL` | No | http://api:3000 | URL de la API |
 
 #### MCP AriadneSpecs (Streamable HTTP)
 
-| Variable         | Obligatoria | Default               | Descripción                                         |
+| Variable | Obligatoria | Default | Descripción |
 | ---------------- | ----------- | --------------------- | --------------------------------------------------- |
-| `PORT`           | No          | 8080                  | Puerto del servidor HTTP                            |
-| `FALKORDB_HOST`  | Sí          | localhost             | FalkorDB host                                       |
-| `FALKORDB_PORT`  | Sí          | 6379                  | FalkorDB puerto                                     |
-| `INGEST_URL`     | No          | http://localhost:3002 | **Obligatorio** para routing completo: `get_file_content`, listados, **`GET /projects/:id/graph-routing`** (`cypherShardContexts`, whitelist de dominios). Sin esto, el MCP cae a heurísticas locales. |
-| `MCP_HTTP_ALLOW_UNAUTHENTICATED` | No          | **`1`** (solo dev local) | Omite validación Bearer en `/mcp` — no usar expuesto                                          |
+| `PORT` | No | 8080 | Puerto del servidor HTTP |
+| `FALKORDB_HOST` | Sí | localhost | FalkorDB host |
+| `FALKORDB_PORT` | Sí | 6379 | FalkorDB puerto |
+| `INGEST_URL` | No | http://localhost:3002 | **Obligatorio** para routing completo: `get_file_content`, listados, **`GET /projects/:id/graph-routing`** (`cypherShardContexts`, whitelist de dominios). Sin esto, el MCP cae a heurísticas locales. |
+| `MCP_HTTP_ALLOW_UNAUTHENTICATED` | No | **`1`** (solo dev local) | Omite validación Bearer en `/mcp` — no usar expuesto |
 
 #### Frontend (puerto 5173)
 
-| Variable       | Obligatoria | Default               | Descripción             |
+| Variable | Obligatoria | Default | Descripción |
 | -------------- | ----------- | --------------------- | ----------------------- |
-| `VITE_API_URL` | No          | `http://localhost:3000` o `http://localhost:3002` | Base URL del backend: **API :3000** (recomendado: rutas `/api/*` unificadas + OTP) o **ingest :3002** directo. |
+| `VITE_API_URL` | No | `http://localhost:3000` o `http://localhost:3002` | Base URL del backend: **API :3000** (recomendado: rutas `/api/*` unificadas + OTP) o **ingest :3002** directo. |
 
 ---
 
@@ -102,18 +102,18 @@ Las credenciales pueden guardarse en la **base de datos** (cifradas) o en variab
 
 1. Definir la clave de cifrado:
 
-   ```bash
-   # Generar clave (32 bytes base64)
-   openssl rand -base64 32
-   # Añadir a .env o docker-compose
-   CREDENTIALS_ENCRYPTION_KEY=<resultado>
-   ```
+ ```bash
+ # Generar clave (32 bytes base64)
+ openssl rand -base64 32
+ # Añadir a .env o docker-compose
+ CREDENTIALS_ENCRYPTION_KEY=<resultado>
+ ```
 
 2. En el frontend: **Credenciales** → **+ Nueva credencial**.
-   - Provider: Bitbucket o GitHub.
-   - Tipo: Token, App Password o Webhook Secret.
-   - Valor: el token/password/secret (nunca se muestra después).
-   - Para App Password: usuario de Bitbucket.
+ - Provider: Bitbucket o GitHub.
+ - Tipo: Token, App Password o Webhook Secret.
+ - Valor: el token/password/secret (nunca se muestra después).
+ - Para App Password: usuario de Bitbucket.
 
 3. Al crear un repo, elegir la credencial en el desplegable.
 
@@ -123,12 +123,12 @@ Las credenciales pueden guardarse en la **base de datos** (cifradas) o en variab
 
 Para que el formulario de alta de repositorio liste workspaces, repos y branches, y para sync y webhook incremental, la credencial de Bitbucket debe tener estos permisos (marcar al crear el App Password en Bitbucket → Personal settings → App passwords):
 
-| Permiso                  | Nivel | Uso                                                      |
+| Permiso | Nivel | Uso |
 | ------------------------ | ----- | -------------------------------------------------------- |
-| **Account**              | Read  | Listar workspaces del usuario                            |
-| **Workspace membership** | Read  | Listar workspaces (desplegable en alta de repo)          |
-| **Repositories**         | Read  | Listar repos, branches, archivos; clone; diff por commit |
-| **Projects**             | Read  | Opcional; algunos planes lo incluyen con Repositories    |
+| **Account** | Read | Listar workspaces del usuario |
+| **Workspace membership** | Read | Listar workspaces (desplegable en alta de repo) |
+| **Repositories** | Read | Listar repos, branches, archivos; clone; diff por commit |
+| **Projects** | Read | Opcional; algunos planes lo incluyen con Repositories |
 
 Sin **Account: Read** y **Workspace membership: Read** obtendrás 403 al listar workspaces. **Repositories: Read** es obligatorio para sync y lectura de archivos.
 
@@ -157,31 +157,31 @@ npm run docker:down
 
 **Puertos en host:**
 
-| Servicio     | Puerto |
+| Servicio | Puerto |
 | ------------ | ------ |
-| API          | 3000   |
-| Ingest       | 3002   |
-| Orchestrator | 3001   |
-| Frontend     | 5173   |
-| FalkorDB     | 6379   |
-| PostgreSQL   | 5432   |
-| Redis        | 6380   |
+| API | 3000 |
+| Ingest | 3002 |
+| Orchestrator | 3001 |
+| Frontend | 5173 |
+| FalkorDB | 6379 |
+| PostgreSQL | 5432 |
+| Redis | 6380 |
 
 **Credenciales en Docker:** crear un `.env` en la raíz o usar override:
 
 ```yaml
 # docker-compose.override.yml (ejemplo)
 services:
-  ingest:
-    environment:
-      - CREDENTIALS_ENCRYPTION_KEY=${CREDENTIALS_ENCRYPTION_KEY}
-      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      # O variables de entorno legacy:
-      - BITBUCKET_USER=${BITBUCKET_USER}
-      - BITBUCKET_APP_PASSWORD=${BITBUCKET_APP_PASSWORD}
-      - BITBUCKET_WEBHOOK_SECRET=${BITBUCKET_WEBHOOK_SECRET}
+ ingest:
+ environment:
+ - CREDENTIALS_ENCRYPTION_KEY=${CREDENTIALS_ENCRYPTION_KEY}
+ - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+ - OPENAI_API_KEY=${OPENAI_API_KEY}
+ - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+ # O variables de entorno legacy:
+ - BITBUCKET_USER=${BITBUCKET_USER}
+ - BITBUCKET_APP_PASSWORD=${BITBUCKET_APP_PASSWORD}
+ - BITBUCKET_WEBHOOK_SECRET=${BITBUCKET_WEBHOOK_SECRET}
 ```
 
 Para credenciales en BD, solo necesitas `CREDENTIALS_ENCRYPTION_KEY`; el resto se gestiona desde el frontend. Para RAG con embeddings (`GET /embed`, `POST /repositories/:id/embed-index`), configura `EMBEDDING_PROVIDER=openai|google` y la API key correspondiente. Si cambias de proveedor, reejecuta `embed-index` (dimensiones distintas: OpenAI 1536, Google 768).
@@ -192,30 +192,30 @@ Para credenciales en BD, solo necesitas `CREDENTIALS_ENCRYPTION_KEY`; el resto s
 
 1. Levantar PostgreSQL, FalkorDB y Redis (contenedores o binarios).
 2. Crear base de datos:
-   ```bash
-   createdb -U postgres falkorspecs
-   # o con usuario falkorspecs
-   ```
+ ```bash
+ createdb -U postgres falkorspecs
+ # o con usuario falkorspecs
+ ```
 3. Ejecutar migraciones del ingest:
-   ```bash
-   cd services/ingest
-   PGHOST=localhost PGPORT=5432 PGUSER=falkorspecs PGPASSWORD=falkorspecs PGDATABASE=falkorspecs npm run migration:run
-   ```
+ ```bash
+ cd services/ingest
+ PGHOST=localhost PGPORT=5432 PGUSER=falkorspecs PGPASSWORD=falkorspecs PGDATABASE=falkorspecs npm run migration:run
+ ```
 4. Arrancar servicios en orden:
 
-   ```bash
-   # Terminal 1 - Ingest
-   cd services/ingest && npm run start
+ ```bash
+ # Terminal 1 - Ingest
+ cd services/ingest && npm run start
 
-   # Terminal 2 - API
-   cd services/api && npm run dev
+ # Terminal 2 - API
+ cd services/api && npm run dev
 
-   # Terminal 3 - Orchestrator
-   cd services/orchestrator && npm run start
+ # Terminal 3 - Orchestrator
+ cd services/orchestrator && npm run start
 
-   # Terminal 4 - Frontend
-   cd frontend && npm run dev
-   ```
+ # Terminal 4 - Frontend
+ cd frontend && npm run dev
+ ```
 
 5. MCP: configurar en el IDE (ver 2.6).
 
@@ -226,7 +226,7 @@ Para credenciales en BD, solo necesitas `CREDENTIALS_ENCRYPTION_KEY`; el resto s
 1. Bitbucket → Repository settings → Webhooks → Add webhook.
 2. **Title:** p. ej. "Ariadne Ingest".
 3. **URL:** `https://<tu-host>/webhooks/bitbucket`
-   - Local: usar ngrok o similar: `https://xxxx.ngrok.io/webhooks/bitbucket`.
+ - Local: usar ngrok o similar: `https://xxxx.ngrok.io/webhooks/bitbucket`.
 4. **Triggers:** Repository push.
 5. **Secret:** mismo valor que `BITBUCKET_WEBHOOK_SECRET` en el ingest.
 
@@ -242,32 +242,32 @@ Ver [bitbucket_webhook.md](../notebooklm/bitbucket_webhook.md) para más detalle
 
 ```bash
 curl -X POST http://localhost:3002/repositories \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider": "bitbucket",
-    "projectKey": "TU_WORKSPACE",
-    "repoSlug": "nombre-repo",
-    "defaultBranch": "main"
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+ "provider": "bitbucket",
+ "projectKey": "TU_WORKSPACE",
+ "repoSlug": "nombre-repo",
+ "defaultBranch": "main"
+ }'
 ```
 
 **GitHub:**
 
 ```bash
 curl -X POST http://localhost:3002/repositories \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider": "github",
-    "projectKey": "owner-org",
-    "repoSlug": "nombre-repo",
-    "defaultBranch": "main"
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+ "provider": "github",
+ "projectKey": "owner-org",
+ "repoSlug": "nombre-repo",
+ "defaultBranch": "main"
+ }'
 ```
 
-| Campo      | Bitbucket       | GitHub               |
+| Campo | Bitbucket | GitHub |
 | ---------- | --------------- | -------------------- |
-| projectKey | Workspace       | Owner o organización |
-| repoSlug   | Nombre del repo | Nombre del repo      |
+| projectKey | Workspace | Owner o organización |
+| repoSlug | Nombre del repo | Nombre del repo |
 
 ---
 
@@ -275,28 +275,28 @@ curl -X POST http://localhost:3002/repositories \
 
 1. Listar repos:
 
-   ```bash
-   curl http://localhost:3002/repositories
-   ```
+ ```bash
+ curl http://localhost:3002/repositories
+ ```
 
 2. Disparar sync (el job se encola en Redis):
 
-   ```bash
-   curl -X POST http://localhost:3002/repositories/<UUID>/sync
-   ```
+ ```bash
+ curl -X POST http://localhost:3002/repositories/<UUID>/sync
+ ```
 
-   Respuesta: `{ "jobId": "...", "queued": true }`
+ Respuesta: `{ "jobId": "...", "queued": true }`
 
 3. Ver jobs de un repo:
 
-   ```bash
-   curl http://localhost:3002/repositories/<UUID>/jobs
-   ```
+ ```bash
+ curl http://localhost:3002/repositories/<UUID>/jobs
+ ```
 
 4. Estado del repo:
-   ```bash
-   curl http://localhost:3002/repositories/<UUID>
-   ```
+ ```bash
+ curl http://localhost:3002/repositories/<UUID>
+ ```
 
 5. **Alcance del índice (opcional):** `PATCH /repositories/<UUID>` con `indexIncludeRules`: `null` restaura indexado completo; `{ "entries": [ { "kind": "path_prefix"|"file", "path": "…" } ] }` restringe (manifiestos en raíz siempre). UI: `/repos/<UUID>/edit`. Tras cambiar, **resync**. Detalle: [MONOREPO_Y_LIMITACIONES_INDEXADO.md](../notebooklm/MONOREPO_Y_LIMITACIONES_INDEXADO.md).
 
@@ -304,22 +304,21 @@ curl -X POST http://localhost:3002/repositories \
 
 ### 2.3 Chat y análisis (ingest)
 
-| Recurso        | Método | Descripción |
+| Recurso | Método | Descripción |
 | -------------- | ---------------------------------------- | ----------- |
-| Chat           | `POST /repositories/:id/chat`            | NL → Cypher → FalkorDB. Body: `{ message, history?, scope?, twoPhase?, responseMode? }` |
-| Chat proyecto  | `POST /projects/:projectId/chat`         | Igual; agrega todos los repos del proyecto en el contexto. |
-| Análisis repo  | `POST /repositories/:id/analyze`         | `id` = repo. Body: `{ mode: 'diagnostico' \| 'duplicados' \| 'reingenieria' \| 'codigo_muerto' \| 'seguridad' }` |
-| Análisis proyecto | `POST /projects/:projectId/analyze`   | Modos de código como arriba + opcional `idePath` / `repositoryId` si hay multi-root; o `mode: 'agents' \| 'skill'`. |
-| Resumen grafo  | `GET /repositories/:id/graph-summary`    | Conteos y muestras de nodos indexados |
+| Chat | `POST /repositories/:id/chat` | NL → Cypher → FalkorDB. Body: `{ message, history?, scope?, twoPhase?, responseMode? }` |
+| Chat proyecto | `POST /projects/:projectId/chat` | Igual; agrega todos los repos del proyecto en el contexto. |
+| Análisis repo | `POST /repositories/:id/analyze` | `id` = repo. Body: `{ mode: 'diagnostico' \| 'duplicados' \| 'reingenieria' \| 'codigo_muerto' \| 'seguridad' }` |
+| Análisis proyecto | `POST /projects/:projectId/analyze` | Modos de código como arriba + opcional `idePath` / `repositoryId` si hay multi-root; o `mode: 'agents' \| 'skill'`. |
+| Resumen grafo | `GET /repositories/:id/graph-summary` | Conteos y muestras de nodos indexados |
 
 Requieren `OPENAI_API_KEY`. Ver [CHAT_Y_ANALISIS.md](../notebooklm/CHAT_Y_ANALISIS.md) para detalles.
 
-#### Dominios, C4 y enrutamiento Falkor (ingest)
+#### Dominios y enrutamiento Falkor (ingest)
 
 | Recurso | Método | Descripción |
 | ------- | ------ | ----------- |
 | Dominios | `GET /domains`, `POST /domains`, `GET /domains/:id`, `PATCH /domains/:id`, `DELETE /domains/:id` | Gobierno de arquitectura (nombre, color, `metadata`). |
-| C4 PlantUML | `GET /projects/:id/architecture/c4?level=…&sessionId=` (`level` 1, 2 o 3) | DSL C4; `sessionId` opcional compara con grafo shadow. |
 | Enrutamiento | `GET /projects/:id/graph-routing` | `cypherShardContexts`, `extendedGraphShardNames`, `shardMode`, `domainSegments`. |
 | Whitelist | `GET /projects/:id/domain-dependencies`, `POST ...`, `DELETE .../:depId` | Proyecto → depende de dominio (`connection_type`, `description`). |
 
@@ -339,14 +338,14 @@ Añade tus prefijos según la estructura de tu repo. Ver [services/ingest/src/ch
 
 **Prefijo `/api` → ingest:** Con `INGEST_URL` configurado, la API reenvía al ingest (sin el prefijo `/api`) las rutas `/api/projects`, `/api/domains`, `/api/repositories`, `/api/credentials`, `/api/providers`, `/api/webhooks`. El health del servicio API sigue siendo `GET /health` (sin `/api`). Ejemplo dominios: `GET http://localhost:3000/api/domains`.
 
-| Recurso    | Método                               | Descripción                        |
+| Recurso | Método | Descripción |
 | ---------- | ------------------------------------ | ---------------------------------- |
-| Health     | `GET /health`                        | Estado del servicio                |
-| Impacto    | `GET /graph/impact/:nodeId`          | Dependientes del nodo              |
-| Componente | `GET /graph/component/:name?depth=2` | Dependencias del componente        |
-| Contrato   | `GET /graph/contract/:componentName` | Props del componente               |
-| Compare    | `GET /graph/compare/:componentName`  | Props main vs shadow               |
-| Shadow     | `POST /graph/shadow`                 | Indexar código propuesto en shadow |
+| Health | `GET /health` | Estado del servicio |
+| Impacto | `GET /graph/impact/:nodeId` | Dependientes del nodo |
+| Componente | `GET /graph/component/:name?depth=2` | Dependencias del componente |
+| Contrato | `GET /graph/contract/:componentName` | Props del componente |
+| Compare | `GET /graph/compare/:componentName` | Props main vs shadow |
+| Shadow | `POST /graph/shadow` | Indexar código propuesto en shadow |
 
 **Ejemplos:**
 
@@ -362,32 +361,32 @@ curl "http://localhost:3000/graph/contract/UserCard"
 
 # Shadow (indexar código propuesto)
 curl -X POST http://localhost:3000/graph/shadow \
-  -H "Content-Type: application/json" \
-  -d '{"files":[{"path":"src/Header.tsx","content":"..."}]}'
+ -H "Content-Type: application/json" \
+ -d '{"files":[{"path":"src/Header.tsx","content":"..."}]}'
 ```
 
 ---
 
 ### 2.5 Orquestador (flujo SDD)
 
-| Recurso  | Método                             | Descripción                       |
+| Recurso | Método | Descripción |
 | -------- | ---------------------------------- | --------------------------------- |
-| Refactor | `GET /workflow/refactor/:nodeId`   | Impacto + contratos + comparación |
-| Validar  | `POST /workflow/refactor/validate` | Validar props propuestas          |
-| Full     | `POST /workflow/refactor/full`     | Shadow + compare completo         |
+| Refactor | `GET /workflow/refactor/:nodeId` | Impacto + contratos + comparación |
+| Validar | `POST /workflow/refactor/validate` | Validar props propuestas |
+| Full | `POST /workflow/refactor/full` | Shadow + compare completo |
 
 **Ejemplo validación de props:**
 
 ```bash
 curl -X POST http://localhost:3001/workflow/refactor/validate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nodeId": "...",
-    "proposedProps": [
-      { "name": "title", "required": true },
-      { "name": "onClick", "required": false }
-    ]
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+ "nodeId": "...",
+ "proposedProps": [
+ { "name": "title", "required": true },
+ { "name": "onClick", "required": false }
+ ]
+ }'
 ```
 
 ---
@@ -396,23 +395,22 @@ curl -X POST http://localhost:3001/workflow/refactor/validate \
 
 URL: `http://localhost:5173`
 
-| Ruta              | Descripción                                                            |
+| Ruta | Descripción |
 | ----------------- | ---------------------------------------------------------------------- |
-| `/`               | Redirección a **`/dashboard`**                                         |
-| `/dashboard`      | Resumen (KPIs / accesos rápidos)                                       |
-| `/domains`        | CRUD de dominios de arquitectura                                       |
-| `/projects`       | Listado de proyectos Ariadne                                           |
-| `/projects/:id`   | Detalle: General (repos, roles, sync) y **Arquitectura** (dominio, whitelist, C4) |
-| `/projects/:id/chat` | Chat NL multi-repo del proyecto                                    |
-| `/repos`          | Lista de repositorios (título de vista *The Forge* en UI)               |
-| `/jobs`           | Cola de sync (jobs activos / historial según implementación)           |
-| `/repos/new`      | Alta de repositorio                                                    |
-| `/repos/:id`      | Detalle, Sync, Resync, jobs del repo                                   |
+| `/` | Redirección a **`/dashboard`** |
+| `/dashboard` | Resumen (KPIs / accesos rápidos) |
+| `/domains` | CRUD de dominios de arquitectura |
+| `/projects` | Listado de proyectos Ariadne |
+| `/projects/:id` | Detalle: General (repos, roles, sync) y **Arquitectura** (dominio, whitelist) |
+| `/projects/:id/chat` | Chat NL multi-repo del proyecto |
+| `/repos` | Lista de repositorios (título de vista *The Forge* en UI) |
+| `/jobs` | Cola de sync (jobs activos / historial según implementación) |
+| `/repos/new` | Alta de repositorio |
+| `/repos/:id` | Detalle, Sync, Resync, jobs del repo |
 | `/repos/:id/chat` | Chat con el repo (preguntas NL, Diagnóstico, Duplicados, Reingeniería) |
-| `/c4`             | C4 Viewer (Kroki / DSL)                                                |
-| `/graph-explorer` | Explorador de grafo de componentes                                     |
-| `/credentials`    | Credenciales cifradas                                                  |
-| `/ayuda/*`        | Ayuda (MCP + manual embebido)                                          |
+| `/graph-explorer` | Explorador de grafo de componentes |
+| `/credentials` | Credenciales cifradas |
+| `/ayuda/*` | Ayuda (MCP + manual embebido) |
 
 ---
 
@@ -421,16 +419,16 @@ URL: `http://localhost:5173`
 1. Arrancar el MCP: `cd services/mcp-ariadne && npm run build && PORT=8080 node dist/index.js` (con FALKORDB_HOST, INGEST_URL).
 2. Cursor → Settings → MCP.
 3. Añadir servidor (local o producción):
-   ```json
-   {
-     "mcpServers": {
-       "ariadnespecs": {
-         "url": "http://localhost:8080/mcp"
-       }
-     }
-   }
-   ```
-   Producción: `url`: `https://ariadne.kreoint.mx/mcp`. Con auth: añadir `"headers": { "Authorization": "Bearer <token>" }`.
+ ```json
+ {
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "http://localhost:8080/mcp"
+ }
+ }
+ }
+ ```
+ Producción: `url`: `https://ariadne.kreoint.mx/mcp`. Con auth: añadir `"headers": { "Authorization": "Bearer <token>" }`.
 4. Herramientas: `get_component_graph`, `get_legacy_impact`, `get_contract_specs`, `validate_before_edit`, `semantic_search`, `get_project_analysis`, etc.
 
 **Documentación completa:** [INSTALACION_MCP_CURSOR.md](../notebooklm/INSTALACION_MCP_CURSOR.md) — instalación paso a paso, escenarios local/producción (ariadne.kreoint.mx), troubleshooting.
@@ -468,14 +466,14 @@ URL: `http://localhost:5173`
 
 ## 4. Troubleshooting
 
-| Problema                      | Posible causa          | Solución                                 |
+| Problema | Posible causa | Solución |
 | ----------------------------- | ---------------------- | ---------------------------------------- |
-| Sync no arranca / job falla   | Sin credenciales       | Definir `BITBUCKET_*` o `GITHUB_TOKEN`   |
-| 401 en webhook                | Secret incorrecto      | Revisar `BITBUCKET_WEBHOOK_SECRET`       |
-| Redis connection refused      | Redis no levantado     | Levantar Redis en 6380 (o `REDIS_URL`)   |
-| FalkorDB no responde          | FalkorDB no levantado  | Verificar FalkorDB en 6379               |
-| Migraciones fallan            | Postgres no accesible  | Revisar `PGHOST`, `PGPORT`, credenciales |
-| Frontend no conecta al ingest | `VITE_API_URL` errónea | Ajustar en build o `.env` del frontend   |
+| Sync no arranca / job falla | Sin credenciales | Definir `BITBUCKET_*` o `GITHUB_TOKEN` |
+| 401 en webhook | Secret incorrecto | Revisar `BITBUCKET_WEBHOOK_SECRET` |
+| Redis connection refused | Redis no levantado | Levantar Redis en 6380 (o `REDIS_URL`) |
+| FalkorDB no responde | FalkorDB no levantado | Verificar FalkorDB en 6379 |
+| Migraciones fallan | Postgres no accesible | Revisar `PGHOST`, `PGPORT`, credenciales |
+| Frontend no conecta al ingest | `VITE_API_URL` errónea | Ajustar en build o `.env` del frontend |
 
 ---
 

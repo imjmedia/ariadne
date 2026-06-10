@@ -32,19 +32,19 @@ El MCP AriadneSpecs expone herramientas que permiten a la IA (Cursor, Antigravit
 
 Infraestructura y servicios corriendo en tu máquina. El MCP usa **Streamable HTTP** (puerto 8080).
 
-| Variable       | Valor                |
+| Variable | Valor |
 |----------------|----------------------|
-| FALKORDB_HOST  | `localhost`          |
-| FALKORDB_PORT  | `6379`               |
-| INGEST_URL     | `http://localhost:3002` |
-| PORT           | `8080` (default)     |
+| FALKORDB_HOST | `localhost` |
+| FALKORDB_PORT | `6379` |
+| INGEST_URL | `http://localhost:3002` |
+| PORT | `8080` (default) |
 
 **Previo:**
 ```bash
-pnpm run dev:infra      # FalkorDB, Postgres, Redis
-pnpm run dev:ingest     # Ingest (puerto 3002)
+pnpm run dev:infra # FalkorDB, Postgres, Redis
+pnpm run dev:ingest # Ingest (puerto 3002)
 pnpm -C services/mcp-ariadne build
-PORT=8080 node services/mcp-ariadne/dist/index.js   # MCP en segundo plano
+PORT=8080 node services/mcp-ariadne/dist/index.js # MCP en segundo plano
 ```
 
 ---
@@ -53,9 +53,9 @@ PORT=8080 node services/mcp-ariadne/dist/index.js   # MCP en segundo plano
 
 Si Ariadne está en Dokploy con MCP en Streamable HTTP (puerto 8080):
 
-| Variable       | Valor                              |
+| Variable | Valor |
 |----------------|------------------------------------|
-| URL            | `https://ariadne.kreoint.mx/mcp`       |
+| URL | `https://ariadne.kreoint.mx/mcp` |
 
 Cursor se conecta directamente por URL. En producción añade **`headers.Authorization: Bearer`** con tu **Secret MCP** (`ari_…` desde Perfil) o un **JWT de sesión** válido (ver Paso 4). Solo en desarrollo con `MCP_HTTP_ALLOW_UNAUTHENTICATED=1` puedes omitir el Bearer sobre `/mcp`.
 
@@ -63,11 +63,11 @@ Cursor se conecta directamente por URL. En producción añade **`headers.Authori
 
 Conectarse al backend con MCP corriendo localmente (HTTP en 8080) y túnel:
 
-| Variable       | Valor                              |
+| Variable | Valor |
 |----------------|------------------------------------|
-| FALKORDB_HOST  | `localhost` (vía túnel)            |
-| FALKORDB_PORT  | `6379`                             |
-| INGEST_URL     | `https://apiariadne.kreoint.mx`          |
+| FALKORDB_HOST | `localhost` (vía túnel) |
+| FALKORDB_PORT | `6379` |
+| INGEST_URL | `https://apiariadne.kreoint.mx` |
 
 **Previo:** `ssh -L 6379:127.0.0.1:6379 usuario@apiariadne.kreoint.mx` (y exponer FalkorDB en el host).
 
@@ -86,9 +86,9 @@ O en el compose de Dokploy:
 
 ```yaml
 falkordb:
-  # ...
-  ports:
-    - "127.0.0.1:6379:6379"
+ # ...
+ ports:
+ - "127.0.0.1:6379:6379"
 ```
 
 `127.0.0.1` limita el puerto al host; solo accesible vía túnel SSH.
@@ -159,11 +159,11 @@ Luego en Cursor usa la URL local:
 
 ```json
 {
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "http://localhost:8080/mcp"
-    }
-  }
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "http://localhost:8080/mcp"
+ }
+ }
 }
 ```
 
@@ -189,7 +189,7 @@ pnpm -C services/mcp-ariadne build
 ### Paso 3: Configurar el MCP en Cursor
 
 1. Abrir **Cursor** y abrir la carpeta `ariadne` como workspace.
-2. Ir a **Settings** (Cmd/Ctrl + ,) → **Cursor Settings** → **MCP**.
+2. Ir a **Settings** (Cmd/Ctrl +) → **Cursor Settings** → **MCP**.
 3. Editar el archivo de configuración MCP (o crearlo si no existe).
 
 En macOS/Linux suele estar en:
@@ -212,36 +212,36 @@ Previo: arrancar el MCP en tu máquina (`PORT=8080 node dist/index.js` con FALKO
 
 ```json
 {
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "http://localhost:8080/mcp"
-    }
-  }
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "http://localhost:8080/mcp"
+ }
+ }
 }
 ```
 
 **Producción por URL (Escenario B, sin túnel):**
 ```json
 {
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "https://ariadne.kreoint.mx/mcp"
-    }
-  }
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "https://ariadne.kreoint.mx/mcp"
+ }
+ }
 }
 ```
 
 **Producción con Bearer (recomendado):** mismo token que usarías tras login web o el **Secret MCP** de Perfil (no hay `ARIADNE_API_*` en `.env` para esto):
 ```json
 {
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "https://ariadne.kreoint.mx/mcp",
-      "headers": {
-        "Authorization": "Bearer <ari_… o JWT vigente>"
-      }
-    }
-  }
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "https://ariadne.kreoint.mx/mcp",
+ "headers": {
+ "Authorization": "Bearer <ari_… o JWT vigente>"
+ }
+ }
+ }
 }
 ```
 
@@ -251,11 +251,11 @@ Previo: túnel SSH activo + arrancar el MCP con `FALKORDB_HOST=localhost`, `INGE
 
 ```json
 {
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "http://localhost:8080/mcp"
-    }
-  }
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "http://localhost:8080/mcp"
+ }
+ }
 }
 ```
 
@@ -277,17 +277,17 @@ La IA debería poder invocar las herramientas del MCP. Si aparecen errores de co
 
 ## 5. Herramientas disponibles
 
-| Herramienta            | Uso típico                                             |
+| Herramienta | Uso típico |
 |------------------------|--------------------------------------------------------|
-| `list_known_projects`  | Al inicio: mapear IDs de repos a nombres               |
-| `validate_before_edit`  | **OBLIGATORIO** antes de editar componente o función  |
-| `get_legacy_impact`     | Ver qué se rompe si modificas un nodo                  |
-| `get_contract_specs`   | Props reales de un componente                         |
-| `get_component_graph`  | Árbol de dependencias de un componente                 |
-| `get_functions_in_file`| Funciones y componentes en un archivo                  |
-| `get_import_graph`     | Imports y contenido estructural de un archivo         |
-| `get_file_content`     | Contenido crudo de un archivo (requiere INGEST_URL)   |
-| `semantic_search`      | Búsqueda en componentes, funciones y archivos         |
+| `list_known_projects` | Al inicio: mapear IDs de repos a nombres |
+| `validate_before_edit` | **OBLIGATORIO** antes de editar componente o función |
+| `get_legacy_impact` | Ver qué se rompe si modificas un nodo |
+| `get_contract_specs` | Props reales de un componente |
+| `get_component_graph` | Árbol de dependencias de un componente |
+| `get_functions_in_file`| Funciones y componentes en un archivo |
+| `get_import_graph` | Imports y contenido estructural de un archivo |
+| `get_file_content` | Contenido crudo de un archivo (requiere INGEST_URL) |
+| `semantic_search` | Búsqueda en componentes, funciones y archivos |
 | `get_project_analysis` | Diagnóstico, duplicados, reingeniería, código muerto, seguridad (ingest); multi-root: conviene `currentFilePath` |
 
 ---
@@ -311,16 +311,16 @@ La regla `.cursor/rules/legacy-sdd-validation.mdc` refuerza este protocolo en ar
 
 El MCP usa **Streamable HTTP** en todas las configuraciones (puerto 8080, path /mcp).
 
-| Variable        | Descripción                               | Default        |
+| Variable | Descripción | Default |
 |-----------------|-------------------------------------------|----------------|
-| PORT            | Puerto del servidor HTTP                   | `8080`         |
-| MCP_HTTP_PORT   | Alias de PORT (legacy)                     | = PORT         |
-| FALKORDB_HOST   | Host de FalkorDB                           | `localhost`    |
-| FALKORDB_PORT   | Puerto de FalkorDB                         | `6379`         |
-| INGEST_URL      | URL base del Ingest (get_file_content, etc.) | —           |
-| FALKORSPEC_INGEST_URL | Alias de INGEST_URL                    | = INGEST_URL   |
-| `MCP_HTTP_ALLOW_UNAUTHENTICATED` | **`1`** (solo dev local): permite `/mcp` sin Bearer                           | — |
-| `ARIADNE_API_URL`               | URL base del API Nest (default `http://localhost:3000`; en Docker suele ser `http://api:3000`) | Compose lo inyecta |
+| PORT | Puerto del servidor HTTP | `8080` |
+| MCP_HTTP_PORT | Alias de PORT (legacy) | = PORT |
+| FALKORDB_HOST | Host de FalkorDB | `localhost` |
+| FALKORDB_PORT | Puerto de FalkorDB | `6379` |
+| INGEST_URL | URL base del Ingest (get_file_content, etc.) | — |
+| FALKORSPEC_INGEST_URL | Alias de INGEST_URL | = INGEST_URL |
+| `MCP_HTTP_ALLOW_UNAUTHENTICATED` | **`1`** (solo dev local): permite `/mcp` sin Bearer | — |
+| `ARIADNE_API_URL` | URL base del API Nest (default `http://localhost:3000`; en Docker suele ser `http://api:3000`) | Compose lo inyecta |
 
 ---
 

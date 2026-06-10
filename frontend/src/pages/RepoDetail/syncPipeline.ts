@@ -164,7 +164,7 @@ export function buildSyncPipelineSteps(job: {
       title: 'Escritura en grafo Falkor',
       describe: () =>
         graphBatch != null
-          ? `≈${graphBatch} fuentes → lotes Cypher (incluye Prisma/OpenAPI, C4 y limpieza)`
+          ? `≈${graphBatch} fuentes → lotes Cypher (incluye Prisma/OpenAPI y limpieza)`
           : 'Lotes Cypher hacia Falkor (varios grafos si aplica sharding)',
     },
     {

@@ -12,7 +12,7 @@ Protocol for using the MCP AriadneSpecs Oracle tools (get_component_graph, valid
 1. **Run `list_known_projects`** to map project names to IDs.
 2. If `.ariadne-project` exists in workspace root, read its `projectId` and use it in all MCP calls.
 3. If user mentions project by name (e.g. "oohbp2"), use `list_known_projects` → find matching `id` → pass as `projectId`.
-4. **Grafo de componente / impacto / C4:** el MCP llama al API Nest con **`ARIADNE_API_URL`** y el mismo **`Authorization: Bearer`** que envías desde Cursor (**Secret MCP** `ari_…` o **JWT de sesión**), reenviado por el proceso; si falta Bearer o la API rechaza la petición, `get_component_graph` y `get_legacy_impact` pueden hacer fallback Falkor. El Markdown de respuesta indica la fuente.
+4. **Grafo de componente / impacto:** el MCP llama al API Nest con **`ARIADNE_API_URL`** y el mismo **`Authorization: Bearer`** que envías desde Cursor (**Secret MCP** `ari_…` o **JWT de sesión**), reenviado por el proceso; si falta Bearer o la API rechaza la petición, `get_component_graph` y `get_legacy_impact` pueden hacer fallback Falkor. El Markdown de respuesta indica la fuente.
 
 ## Tools by Intent
 
@@ -102,6 +102,6 @@ Before renaming: `get_references`. Before new code: `find_similar_implementation
 - **Derive paths from the file being refactored.** Use the original file's import paths as reference. If it imports `../../contexts/usePauta`, the module is 2 levels up from the original. From the new file's folder, compute the equivalent path.
 - **Verify actual location** of each imported module: `get_definitions` (node path) or list repo. Never invent paths.
 - **Include in refactoring plan:**
-  - Step: "After creating the new file, verify import paths are correct from its location."
-  - Step: "Run `npm run build` or `npm run dev` and fix import resolution errors until everything compiles."
+ - Step: "After creating the new file, verify import paths are correct from its location."
+ - Step: "Run `npm run build` or `npm run dev` and fix import resolution errors until everything compiles."
 - Import paths in the new file must resolve **from the new file's folder**, not from the source file.

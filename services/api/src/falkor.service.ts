@@ -79,7 +79,7 @@ export class FalkorService implements OnModuleDestroy {
 
   /**
    * Grafos Falkor y el `projectId` que llevan los nodos en cada uno (propio + whitelist de dominios vía ingest).
-   * Usado por C4 y cualquier fan-out que deba alinearse con `graph-routing`.
+   * Usado por cualquier fan-out que deba alinearse con `graph-routing`.
    */
   async getCypherShardContexts(
     projectId: string,

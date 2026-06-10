@@ -28,7 +28,7 @@ export interface ShadowFile {
  * Limpia FalkorSpecsShadow e indexa los archivos en memoria (sin filesystem).
  * @param getShadowGraph - Factory que devuelve el cliente del grafo shadow.
  */
-export function createShadowServer(getShadowGraph: () => Promise<GraphClient>) {
+export function createShadowServer(getShadowGraph: () => Promise<GraphClient>): express.Application {
   const app = express();
   app.use(express.json({ limit: "2mb" }));
 

@@ -340,7 +340,7 @@ export function Dashboard() {
             footer={
               <>
                 <span className="block text-[var(--foreground-subtle)]">
-                  Sin dominio de gobierno asignado (C4 / whitelist).
+                  Sin dominio de gobierno asignado (whitelist / shards).
                 </span>
                 <Link to="/projects" className="mt-1 inline-block font-medium text-[var(--primary)] hover:underline">
                   Asignar en proyectos

@@ -734,7 +734,7 @@ export function ProjectDetail() {
           <section className={sectionShellClass} aria-labelledby="project-domain-heading">
             <div className={sectionHeaderClass}>
               <h2 id="project-domain-heading" className="text-base font-semibold text-[var(--foreground)]">
-                Dominio (gobierno C4)
+                Dominio (gobierno de arquitectura)
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)] sm:text-sm">
                 FK estructural en BD: el proyecto pertenece a un dominio. Afecta coloración, whitelist de grafos y

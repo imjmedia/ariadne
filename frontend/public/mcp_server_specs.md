@@ -84,20 +84,14 @@ RETURN dependent.name AS name, labels(dependent) AS labels
 
 (con filtros opcionales por `projectId` en `n` y `dependent` según implementación).
 
-### Tool: `get_c4_model`
-
-- **Descripción:** Modelo C4 agregado (sistemas, contenedores, relaciones `COMMUNICATES_WITH`) para un proyecto indexado.
-- **Argumentos:** `projectId: string` (obligatorio con sharding multi-grafo).
-- **Implementación:** `GET /api/graph/c4-model?projectId=` — requiere **`ARIADNE_API_URL`** y el mismo **Bearer** en la petición MCP (reenviado al Nest). Sin Bearer válido, no hay llamada Nest exitosa equivalente ni fallback Falkor en esta tool.
-
 ### Tool C: `get_contract_specs`
 
 - **Descripción:** Extrae las props y firma del componente detectadas por el Scanner (nodos `:Prop`, relación `HAS_PROP`).
 - **Argumentos:** `componentName: string`, `projectId?: string`, `currentFilePath?: string` (inferir proyecto).
 - **Consulta Interna (Cypher):**
-  ```cypher
-  MATCH (c:Component {name: $componentName, projectId: $projectId})-[:HAS_PROP]->(p:Prop) RETURN p.name, p.required
-  ```
+ ```cypher
+ MATCH (c:Component {name: $componentName, projectId: $projectId})-[:HAS_PROP]->(p:Prop) RETURN p.name, p.required
+ ```
 - **Propósito:** Forzar a la IA a usar los nombres de variables y tipos reales del grafo. La respuesta se formatea en Markdown (lista de props y si son requeridas).
 - **Implementación:** El servidor MCP usa transporte **Streamable HTTP** (puerto 8080, path /mcp); las herramientas se registran en `ListToolsRequestSchema` y se ejecutan en `CallToolRequestSchema` conectando a FalkorDB, al **API Nest** (`/api/graph/*` con Bearer **reenviado** desde cada `POST …/mcp`) y/o al servicio ingest. Cuando se proporciona `projectId` o `currentFilePath`, las consultas Cypher filtran por `n.projectId` para evitar ambigüedad. Herramientas que llaman al ingest: `get_file_content` (repositories/file o projects/file), `ask_codebase` (projects/chat o repositories/chat; con orchestrator, MDD vía ingest interno **`mdd-evidence`**), `get_file_context`, `get_project_standards`, `get_modification_plan` (projects/modification-plan), `get_project_analysis` (`POST /projects/:id/analyze` o `POST /repositories/:id/analyze` según si el id es proyecto Ariadne o `roots[].id`; ver [Tool: `get_project_analysis`](#tool-get_project_analysis)).
 
@@ -139,12 +133,12 @@ Ejemplo mínimo (JSON del tool `ask_codebase`):
 
 ```json
 {
-  "name": "ask_codebase",
-  "arguments": {
-    "projectId": "<uuid proyecto o roots[].id>",
-    "question": "¿Cómo está modelado el login?",
-    "responseMode": "evidence_first"
-  }
+ "name": "ask_codebase",
+ "arguments": {
+ "projectId": "<uuid proyecto o roots[].id>",
+ "question": "¿Cómo está modelado el login?",
+ "responseMode": "evidence_first"
+ }
 }
 ```
 
@@ -189,10 +183,10 @@ Ejemplo mínimo (JSON del tool `ask_codebase`):
 
 Distintas de `get_project_analysis` (pipeline completo en ingest con LLM):
 
-| Tool                  | Rol                                                                                                                                                                                          |
+| Tool | Rol |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`get_sync_status`** | `GET /projects/:id/sync-status` (ingest): última sync y jobs recientes. Caché opcional en MCP (`MCP_REDIS_*`).                                                                               |
-| **`get_debt_report`** | Consulta Cypher en Falkor: nodos `Function`/`Component` sin aristas `CALLS` entrantes ni salientes (heurística “aislado”). Límite de filas configurable: `MCP_DEBT_REPORT_ISOLATED_LIMIT`.   |
+| **`get_sync_status`** | `GET /projects/:id/sync-status` (ingest): última sync y jobs recientes. Caché opcional en MCP (`MCP_REDIS_*`). |
+| **`get_debt_report`** | Consulta Cypher en Falkor: nodos `Function`/`Component` sin aristas `CALLS` entrantes ni salientes (heurística “aislado”). Límite de filas configurable: `MCP_DEBT_REPORT_ISOLATED_LIMIT`. |
 | **`find_duplicates`** | Cypher: agrupa `File` por `contentHash` con más de un path. Límite de grupos: `MCP_FIND_DUPLICATES_GROUP_LIMIT`. No es el modo `duplicados` de `get_project_analysis` (embed/cross-package). |
 
 ### Volúmenes de salida (operadores / UI chat por repo)
@@ -206,18 +200,18 @@ Distintas de `get_project_analysis` (pipeline completo en ingest con LLM):
 
 Para que la IA no rompa código al refactorizar, el MCP implementa operaciones sobre el árbol de llamadas (AST indexado vía Tree-sitter en el Cartographer):
 
-| Tool                           | Propósito                                                                                               |
+| Tool | Propósito |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `get_definitions`              | Localiza el origen exacto (archivo, líneas) de una clase o función.                                     |
-| `get_references`               | Encuentra todos los sitios donde se usa un símbolo. Evita romper archivos no abiertos al renombrar.     |
-| `get_implementation_details`   | Expone firma, tipos y contratos (props) para que el nuevo código respete la estructura existente.       |
-| `trace_reachability`           | Desde puntos de entrada (rutas, index, main), rastrea qué funciones nunca son llamadas (código muerto). |
-| `check_export_usage`           | Identifica exports sin importaciones activas.                                                           |
-| `get_affected_scopes`          | Si modificas A, devuelve B,C,D afectados + archivos de tests.                                           |
-| `check_breaking_changes`       | Compara firma antes/después; alerta si eliminas params usados en N sitios.                              |
-| `find_similar_implementations` | Búsqueda semántica antes de escribir código nuevo (ej. "¿ya tenemos validación de email?").             |
-| `get_project_standards`        | Recupera Prettier, ESLint, tsconfig para que el código sea indistinguible del existente.                |
-| `get_file_context`             | Combina contenido + imports + exports. Paso 2 del flujo: search → get_file_context → validate → apply.  |
+| `get_definitions` | Localiza el origen exacto (archivo, líneas) de una clase o función. |
+| `get_references` | Encuentra todos los sitios donde se usa un símbolo. Evita romper archivos no abiertos al renombrar. |
+| `get_implementation_details` | Expone firma, tipos y contratos (props) para que el nuevo código respete la estructura existente. |
+| `trace_reachability` | Desde puntos de entrada (rutas, index, main), rastrea qué funciones nunca son llamadas (código muerto). |
+| `check_export_usage` | Identifica exports sin importaciones activas. |
+| `get_affected_scopes` | Si modificas A, devuelve B,C,D afectados + archivos de tests. |
+| `check_breaking_changes` | Compara firma antes/después; alerta si eliminas params usados en N sitios. |
+| `find_similar_implementations` | Búsqueda semántica antes de escribir código nuevo (ej. "¿ya tenemos validación de email?"). |
+| `get_project_standards` | Recupera Prettier, ESLint, tsconfig para que el código sea indistinguible del existente. |
+| `get_file_context` | Combina contenido + imports + exports. Paso 2 del flujo: search → get_file_context → validate → apply. |
 
 **Contexto de proyecto:** Las herramientas basadas en grafo aceptan `projectId` y/o `currentFilePath`. Si no se pasa `projectId`, se infiere desde `currentFilePath` (monolito) o, con **sharding**, vía ingest + barrido de shards cuando `INGEST_URL` está definido. El `projectId` puede ser ID de proyecto (Ariadne) o ID de repo (`roots[].id`); las herramientas que llaman al ingest para file/chat resuelven automáticamente (fallback repo → project o project → repo según el caso).
 
@@ -228,9 +222,9 @@ Para que la IA no rompa código al refactorizar, el MCP implementa operaciones s
 - **Descripción:** Revisión quirúrgica preventiva antes del commit. Lee el diff en stage (`git diff --cached`), identifica funciones/componentes **editados**, **eliminados** o **agregados**, y proyecta en el grafo FalkorDB el radio de explosión (quién depende de esos símbolos). Devuelve un **Resumen de Impacto** estructurado en Markdown.
 - **Argumentos:** `projectId` o `currentFilePath` (para inferir proyecto); `workspaceRoot` (ruta del repo donde ejecutar `git diff --cached`) **o** `stagedDiff` (salida cruda del comando, para MCP remoto sin acceso al filesystem).
 - **Flujo:**
-  - **Paso A:** Obtener diff en stage: `git diff --name-only --cached` y `git diff --cached` desde `workspaceRoot`, o usar `stagedDiff` si se proporciona.
-  - **Paso B:** Parsear el unified diff y extraer símbolos (funciones, clases, componentes JSX) de líneas `-` y `+`. Clasificar en: eliminados (solo en `-`), agregados (solo en `+`), editados (aparecen en ambos).
-  - **Paso C:** Para cada símbolo, consulta Cypher de radio de explosión: `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*]-(dep) WHERE ... RETURN count(dep) AS cnt`.
+ - **Paso A:** Obtener diff en stage: `git diff --name-only --cached` y `git diff --cached` desde `workspaceRoot`, o usar `stagedDiff` si se proporciona.
+ - **Paso B:** Parsear el unified diff y extraer símbolos (funciones, clases, componentes JSX) de líneas `-` y `+`. Clasificar en: eliminados (solo en `-`), agregados (solo en `+`), editados (aparecen en ambos).
+ - **Paso C:** Para cada símbolo, consulta Cypher de radio de explosión: `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*]-(dep) WHERE ... RETURN count(dep) AS cnt`.
 - **Salida:** Tabla Markdown: **Tipo de Cambio** | **Elemento** | **Impacto en el Sistema** | **Riesgo** (ALTO/MEDIO/BAJO). Ejemplo: eliminación con dependientes → ALTO; modificación con muchos dependientes → MEDIO; nuevo sin dependencias → BAJO. Si hay riesgo ALTO, se añade recomendación: revisar antes de push para no romper el build.
 
 ---
@@ -243,40 +237,39 @@ El servidor real es **`services/mcp-ariadne`** (Streamable HTTP, herramientas `g
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
+ CallToolRequestSchema,
+ ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 const server = new Server(
-  { name: "AriadneSpecs-Oracle", version: "1.0.0" },
-  { capabilities: { tools: {} } },
-);
+ { name: "AriadneSpecs-Oracle", version: "1.0.0" },
+ { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
-    {
-      name: "get_component_graph",
-      description:
-        "Árbol de dependencias del componente (ver especificación §2)",
-      inputSchema: {
-        type: "object",
-        properties: {
-          componentName: { type: "string" },
-          depth: { type: "number" },
-          projectId: { type: "string" },
-        },
-        required: ["componentName"],
-      },
-    },
-  ],
+ tools: [
+ {
+ name: "get_component_graph",
+ description:
+ "Árbol de dependencias del componente (ver especificación §2)",
+ inputSchema: {
+ type: "object",
+ properties: {
+ componentName: { type: "string" },
+ depth: { type: "number" },
+ projectId: { type: "string" },
+ },
+ required: ["componentName"],
+ },
+ },
+ ],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name === "get_component_graph") {
-    // 1) GET ARIADNE_API_URL/api/graph/component/... con Authorization: Bearer (mismo JWT o Secret MCP ari_* que envió el cliente en POST …/mcp)
-    // 2) si falla: Cypher contra Falkor en el shard del projectId (ver § Sharding)
-    return { content: [{ type: "text", text: "..." }] };
-  }
+ if (request.params.name === "get_component_graph") {
+ // 1) GET ARIADNE_API_URL/api/graph/component/... con Authorization: Bearer (mismo JWT o Secret MCP ari_* que envió el cliente en POST …/mcp)
+ // 2) si falla: Cypher contra Falkor en el shard del projectId (ver § Sharding)
+ return { content: [{ type: "text", text: "..." }] };
+ }
 });
 ```
 

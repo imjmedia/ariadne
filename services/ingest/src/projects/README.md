@@ -12,7 +12,7 @@ Endpoint de resolución: `GET /projects/:id/resolve-repo-for-path?path=<ruta abs
 
 ## Gobierno de arquitectura (dominios + Falkor)
 
-- **`domainId`** opcional en proyecto (`ProjectEntity`) — pertenencia a un dominio lógico (color/nombre en UI, PlantUML).
+- **`domainId`** opcional en proyecto (`ProjectEntity`) — pertenencia a un dominio lógico (color/nombre en UI).
 - **`getCypherShardContexts(projectId, { includeSiblingProjects? })`** — Pares `{ graphName, cypherProjectId }` para el proyecto actual **y** para otros proyectos cuyo `domainId` está en la whitelist (`ProjectDomainDependency`). Usado por **`ChatCypherService.executeCypher`**, resúmenes de grafo y documentación de MCP.
 - **`getGraphRouting(projectId)`** — Expone `shardMode`, `domainSegments`, `extendedGraphShardNames` (solo grafos ajenos al proyecto), **`cypherShardContexts`** (lista completa para consultas).
-- **REST:** `GET/PATCH /projects/:id`, `GET :id/architecture/c4?level=1|2|3&sessionId=`, `GET|POST :id/domain-dependencies`, `GET :id/graph-routing`. Ver módulo `../domains/`.
+- **REST:** `GET/PATCH /projects/:id`, `GET|POST :id/domain-dependencies`, `GET :id/graph-routing`. Ver módulo `../domains/`.

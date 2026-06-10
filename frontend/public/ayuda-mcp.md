@@ -18,11 +18,11 @@ En Cursor: **Settings** → **MCP** → editar `~/.cursor/mcp.json`:
 
 ```json
 {
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "https://ariadne.kreoint.mx/mcp"
-    }
-  }
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "https://ariadne.kreoint.mx/mcp"
+ }
+ }
 }
 ```
 
@@ -30,14 +30,14 @@ En Cursor: **Settings** → **MCP** → editar `~/.cursor/mcp.json`:
 
 ```json
 {
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "https://ariadne.kreoint.mx/mcp",
-      "headers": {
-        "Authorization": "Bearer <Secret MCP `ari_…` de Perfil o JWT de sesión>"
-      }
-    }
-  }
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "https://ariadne.kreoint.mx/mcp",
+ "headers": {
+ "Authorization": "Bearer <Secret MCP `ari_…` de Perfil o JWT de sesión>"
+ }
+ }
+ }
 }
 ```
 
@@ -101,9 +101,9 @@ Ejemplo **chat normal** desde MCP:
 
 ```json
 {
-  "projectId": "uuid-de-list_known_projects",
-  "question": "¿Qué componentes usan useState?",
-  "responseMode": "default"
+ "projectId": "uuid-de-list_known_projects",
+ "question": "¿Qué componentes usan useState?",
+ "responseMode": "default"
 }
 ```
 
@@ -111,9 +111,9 @@ Ejemplo **MDD**:
 
 ```json
 {
-  "projectId": "uuid-de-list_known_projects",
-  "question": "Resume contratos API y entidades de datos",
-  "responseMode": "evidence_first"
+ "projectId": "uuid-de-list_known_projects",
+ "question": "Resume contratos API y entidades de datos",
+ "responseMode": "evidence_first"
 }
 ```
 
@@ -128,8 +128,8 @@ Para que la IA siempre use el proyecto correcto y no inyecte IDs equivocados:
 **Crear `.ariadne-project` en la raíz del proyecto fuente** — el repo que Ariadne tiene indexado y que abres en Cursor (ej. `oohbp2`, `ariadne-ai-scout`). *No* en el repo de Ariadne (la UI de ariadne.kreoint.mx).
 
 ```
-oohbp2/               ← abre este repo en Cursor
-├── .ariadne-project    ← aquí, en la raíz
+oohbp2/ ← abre este repo en Cursor
+├── .ariadne-project ← aquí, en la raíz
 ├── src/
 ├── package.json
 └── ...
@@ -139,7 +139,7 @@ Contenido de `.ariadne-project`:
 
 ```json
 {
-  "projectId": "uuid-del-proyecto"
+ "projectId": "uuid-del-proyecto"
 }
 ```
 
