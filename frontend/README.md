@@ -8,7 +8,7 @@ Proyecto en la raíz del repo (`frontend/`), independiente de `services/`. UI pa
 - `src/api.ts` — cliente API para Ingest.
 - `src/types.ts` — tipos e interfaces.
 - `src/components/` — **Layout** (sidenav colapsable, **AppShellHeader**: breadcrumbs + búsqueda + selector de workspace), `SidebarModern`, **DataTable** (TanStack Table), StatusBadge, UI Shadcn (Button, Card, Input, Select, Badge, Alert, Skeleton, Table, Dialog).
-- `src/pages/` — **Dashboard** (`/dashboard`), listado de **proyectos** (`/`), **C4ViewerPage** (`/c4`), **ProjectDetail** (General + **Arquitectura** con `C4Previewer`), **DomainsList**, **RepoList** (The Forge, tabla filtrable), RepoDetail, RepoChat, RepoIndex, CreateRepo, EditRepo, CredentialsList, **CreateCredentialForm** (modal desde `/credentials?create=1`), EditCredential, **Ayuda**.
+- `src/pages/` — **Dashboard** (`/dashboard`), listado de **proyectos** (`/`), **ProjectDetail** (General + **Arquitectura**: dominio y whitelist), **DomainsList**, **RepoList** (The Forge, tabla filtrable), RepoDetail, RepoChat, RepoIndex, CreateRepo, EditRepo, CredentialsList, **CreateCredentialForm** (modal desde `/credentials?create=1`), EditCredential, **Ayuda**.
 - **Tests:** `pnpm run test:unit` (Vitest), `pnpm run test:e2e` (Playwright; instalar Chromium con `pnpm exec playwright install chromium`). Ver `docs/notebooklm/TESTING.md` y `e2e/smoke.spec.ts`.
 
 ## Stack
@@ -35,9 +35,8 @@ Proyecto en la raíz del repo (`frontend/`), independiente de `services/`. UI pa
 - `/` — Redirige a `/dashboard`.
 - `/dashboard` — Resumen KPI (proyectos, repos, dominios, salud de ingesta) desde `GET /projects`, `GET /repositories`, `GET /domains`.
 - `/projects` — Listado de proyectos (`GET /projects`).
-- `/c4` — Visor C4 dedicado: selector de proyecto + `C4Previewer` en layout split (diagrama + DSL).
 - `/domains` — CRUD de **dominios** de arquitectura (`GET/POST /domains` vía API → ingest).
-- `/projects/:id` — Detalle del proyecto: pestaña **General** (repos, roles, sync) y **Arquitectura** (asignación a dominio, dependencias cruzadas, diagrama C4 con Kroki y modo shadow opcional).
+- `/projects/:id` — Detalle del proyecto: pestaña **General** (repos, roles, sync) y **Arquitectura** (dominio del proyecto y dependencias cruzadas entre dominios).
 - `/repos/new` — Formulario de alta (`POST /repositories`). Provider → Credencial → Workspace/Owner → Proyecto (select) → Repo slug (editable) → Branch (select) → Webhook secret (Bitbucket, opcional). Carga workspaces, repos y branches desde la API con credencial.
 - `/repos/:id` — Detalle del repo, Editar, Chat, Sync, **Resync** (`POST /repositories/:id/resync`), tabla de jobs.
 - `/repos/:id/chat` — Layout split: **izquierda** botones Diagnóstico/Duplicados/Reingeniería y resultados (`POST /repositories/:id/analyze`); **derecha** chat NL→Cypher (`POST /repositories/:id/chat`). Requiere `OPENAI_API_KEY`. Spinner durante carga; errores visibles; markdown en respuestas.

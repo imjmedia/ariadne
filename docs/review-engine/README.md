@@ -12,16 +12,16 @@ Servicio de revisión automatizada de cambios en código *legacy*, accesible des
 
 ```
 IDE (cualquiero) → MCP Client
-       │
-       ▼
+ │
+ ▼
 Servidor MCP Ariadne (mcp-ariadne)
-       │  POST /api/internal/review/diff
-       ▼
+ │ POST /api/internal/review/diff
+ ▼
 Ingest Service (review module)
-       │
-  ┌────┼────┐
-  ▼    ▼    ▼
-Falkor  LLM  Artifact
+ │
+ ┌────┼────┐
+ ▼ ▼ ▼
+Falkor LLM Artifact
 (Graph) (API) (JSON)
 ```
 
@@ -42,19 +42,19 @@ Falkor  LLM  Artifact
 Fase 0 ─ Preflight
 ├── Parse diff → archivos modificados, líneas, stats
 ├── Consultar Ariadne graph:
-│   ├── get_legacy_impact por archivo
-│   ├── get_component_graph por archivo
-│   └── get_references por función modificada
+│ ├── get_legacy_impact por archivo
+│ ├── get_component_graph por archivo
+│ └── get_references por función modificada
 └── Calcular legacy_context (impacto, dependencias, test_coverage)
 
 Fase 1 ─ Detección (5 lentes paralelos)
 ├── L1: Correctness — bugs lógicos, null safety, edge cases
 ├── L2: Security — SQLi, XSS, auth bypass, data exposure
 ├── L3: Legacy Safety — breaking changes en APIs/firmas existentes,
-│                         side effects en funciones compartidas
+│ side effects en funciones compartidas
 ├── L4: Data Integrity — migraciones, cambios de tipo, validaciones
 └── L5: Architecture Consistency — violaciones de patrón, 
-         acoplamiento inesperado, duplicación
+ acoplamiento inesperado, duplicación
 
 Fase 2 ─ Dedup
 └── Sonnet normaliza findings equivalentes de distintos lentes
@@ -62,21 +62,21 @@ Fase 2 ─ Dedup
 Fase 3 ─ Scoring con Contexto Legacy
 ├── score_phase3: evaluación rápida Sonnet (0-100)
 ├── legacy_impact_penalty: ajuste según dependencias
-│   └── >5 dependencias → -10 puntos
+│ └── >5 dependencias → -10 puntos
 ├── test_gap_penalty: código sin tests → -15 puntos
 ├── Gate de entrada a validación profunda:
-│   score_compuesto ≥ 45 → pasa a Fase 4
-│   score_compuesto < 45 → below_gate (se reporta como informativo)
+│ score_compuesto ≥ 45 → pasa a Fase 4
+│ score_compuesto < 45 → below_gate (se reporta como informativo)
 └── source_families: cuantos lentes detectaron el mismo finding
 
 Fase 4 ─ Validación Profunda (con Ariadne)
 ├── Deep (correctness, security): Opus por finding
-│   └── incorpora contexto del grafo Ariadne
+│ └── incorpora contexto del grafo Ariadne
 ├── Light (legacy_safety, data_integrity, arch): Sonnet batch
 └── Disposición:
-    confianza < 45   → disproven
-    confianza 45-59  → uncertain  
-    confianza ≥ 60   → confirmed (strength: moderate/strong)
+ confianza < 45 → disproven
+ confianza 45-59 → uncertain 
+ confianza ≥ 60 → confirmed (strength: moderate/strong)
 
 Fase 5 ─ Cross-cutting Legacy
 ├── Opus revisa findings confirmados en conjunto
@@ -86,7 +86,7 @@ Fase 5 ─ Cross-cutting Legacy
 Fase 6 ─ Reporte Final
 ├── Render Markdown + JSON machine-readable
 ├── Por finding: descripción, archivo:línea, score, confianza,
-│   legacy_impact, acción sugerida
+│ legacy_impact, acción sugerida
 ├── Resumen ejecutivo
 └── Legacy risk score global + confidence_pct general
 ```
@@ -97,11 +97,11 @@ Fase 6 ─ Reporte Final
 
 ```
 confidence_pct = weighted_mean(
-    code_quality_score     (peso 0.40) — evaluación del lente Fase 4
-    legacy_impact_score    (peso 0.25) — cuánto código legacy toca
-    breaking_risk_score    (peso 0.20) — riesgo de romper dependencias
-    evidence_score         (peso 0.15) — cuántos lentes coinciden
-) - test_gap_penalty       (penalización fija: -0.10 si sin tests)
+ code_quality_score (peso 0.40) — evaluación del lente Fase 4
+ legacy_impact_score (peso 0.25) — cuánto código legacy toca
+ breaking_risk_score (peso 0.20) — riesgo de romper dependencias
+ evidence_score (peso 0.15) — cuántos lentes coinciden
+) - test_gap_penalty (penalización fija: -0.10 si sin tests)
 ```
 
 **Interpretación:**
@@ -132,19 +132,19 @@ Inicia una revisión de cambios legacy. Acepta un diff en formato unificado o un
 **Respuesta (modo wait):**
 ```json
 {
-  "reviewId": "rev_01JN...",
-  "status": "completed",
-  "overallConfidence": 68,
-  "summary": {
-    "totalFindings": 4,
-    "critical": 2,
-    "moderate": 1,
-    "info": 1,
-    "legacyRisk": "alto",
-    "testCoverage": "0% en archivos modificados"
-  },
-  "findings": [ ... ],
-  "reportMarkdown": "## 🧪 Legacy Change Review..."
+ "reviewId": "rev_01JN...",
+ "status": "completed",
+ "overallConfidence": 68,
+ "summary": {
+ "totalFindings": 4,
+ "critical": 2,
+ "moderate": 1,
+ "info": 1,
+ "legacyRisk": "alto",
+ "testCoverage": "0% en archivos modificados"
+ },
+ "findings": [ ... ],
+ "reportMarkdown": "## 🧪 Legacy Change Review..."
 }
 ```
 
@@ -173,23 +173,23 @@ Obtiene el reporte renderizado.
 
 ```json
 {
-  "id": "F001",
-  "type": "correctness",
-  "severity": "critical",
-  "filePath": "src/services/claims.service.ts",
-  "lineStart": 234,
-  "lineEnd": 240,
-  "title": "Posible null pointer en processClaim()",
-  "description": "La función processClaim() llama a getPolicy() sin null-check...",
-  "confidence": 82,
-  "legacyImpact": {
-    "dependents": 3,
-    "files": ["policy.service.ts", "reports.service.ts", "admin.controller.ts"],
-    "breakingRisk": "medium"
-  },
-  "testGap": true,
-  "suggestedAction": "Agregar null-check antes de llamar a getPolicy()",
-  "fixHint": "```typescript\nconst policy = await getPolicy(claim.policyId);\nif (!policy) throw new NotFoundException('Póliza no encontrada');\n```"
+ "id": "F001",
+ "type": "correctness",
+ "severity": "critical",
+ "filePath": "src/services/claims.service.ts",
+ "lineStart": 234,
+ "lineEnd": 240,
+ "title": "Posible null pointer en processClaim()",
+ "description": "La función processClaim() llama a getPolicy() sin null-check...",
+ "confidence": 82,
+ "legacyImpact": {
+ "dependents": 3,
+ "files": ["policy.service.ts", "reports.service.ts", "admin.controller.ts"],
+ "breakingRisk": "medium"
+ },
+ "testGap": true,
+ "suggestedAction": "Agregar null-check antes de llamar a getPolicy()",
+ "fixHint": "```typescript\nconst policy = await getPolicy(claim.policyId);\nif (!policy) throw new NotFoundException('Póliza no encontrada');\n```"
 }
 ```
 

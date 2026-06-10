@@ -8,7 +8,7 @@ El `main.ts` enruta hacia **`INGEST_URL`** (default `http://localhost:3002`) con
 
 - `/api/projects`, `/api/repositories`, `/api/credentials`, `/api/providers`, `/api/webhooks`, **`/api/domains`**
 
-Así el frontend usa un solo origen (`VITE_API_URL` → API :3000) y obtiene también `GET /api/projects/:id/architecture/c4`, `GET /api/projects/:id/graph-routing`, dependencias de dominio, etc.
+Así el frontend usa un solo origen (`VITE_API_URL` → API :3000) y obtiene también `GET /api/projects/:id/graph-routing`, dependencias de dominio, etc.
 
 ## Endpoints (grafo Falkor / shadow)
 

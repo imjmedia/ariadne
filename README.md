@@ -1,26 +1,26 @@
 # Ariadne / AriadneSpecs
 
 <p align="center">
-  <a href="https://github.com/kreodevs/ariadne">
-    <img src="frontend/public/brand/wordmark-light.png#gh-light-mode-only" alt="Ariadne" width="320" />
-  </a>
+ <a href="https://github.com/kreodevs/ariadne">
+ <img src="frontend/public/brand/wordmark-light.png#gh-light-mode-only" alt="Ariadne" width="320" />
+ </a>
 </p>
 
 <p align="center">
-  Monorepo <strong>NestJS</strong> (ingest, API, orquestador, MCP) + <strong>React</strong> (Vite) + <strong>FalkorDB</strong>, <strong>PostgreSQL</strong> y <strong>Redis</strong>.<br />
-  Despliegue listo para <strong>Dokploy</strong> / Docker.
+ Monorepo <strong>NestJS</strong> (ingest, API, orquestador, MCP) + <strong>React</strong> (Vite) + <strong>FalkorDB</strong>, <strong>PostgreSQL</strong> y <strong>Redis</strong>.<br />
+ Despliegue listo para <strong>Dokploy</strong> / Docker.
 </p>
 
 <p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat&colorA=1a1425&colorB=6d58a6" alt="License" /></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%E2%89%A520-1a1425.svg?style=flat&colorA=1a1425&colorB=6d58a6" alt="Node" /></a>
-  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=fff&style=flat&colorA=1a1425" alt="TypeScript" /></a>
-  <a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-6d58a6.svg?style=flat&colorA=1a1425" alt="PRs Welcome" /></a>
+ <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat&colorA=1a1425&colorB=6d58a6" alt="License" /></a>
+ <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%E2%89%A520-1a1425.svg?style=flat&colorA=1a1425&colorB=6d58a6" alt="Node" /></a>
+ <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=fff&style=flat&colorA=1a1425" alt="TypeScript" /></a>
+ <a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-6d58a6.svg?style=flat&colorA=1a1425" alt="PRs Welcome" /></a>
 </p>
 
-> **Ariadne** es el mapa de arquitectura y el conocimiento vivo del código: sincroniza repositorios, indexa dependencias y reglas de dominio, y ofrece chat NL→Cypher, API, MCP y vistas C4 para gobierno de arquitectura.
+> **Ariadne** es el mapa de arquitectura y el conocimiento vivo del código: sincroniza repositorios, indexa dependencias y reglas de dominio, y ofrece chat NL→Cypher, API, MCP y gobierno de dominios.
 
-Arquitectura: **Ingest** (repos remotos + sync) + **PostgreSQL** (metadatos: repos, proyectos, **dominios de arquitectura**, whitelist proyecto→dominio) + **FalkorDB** (grafo particionado por proyecto/dominio; shadow SDD) + **Chat/Analysis** (NL→Cypher + diagnósticos) + **MCP** (herramientas para la IA) + **gobierno C4** (DSL PlantUML, preview en frontend).
+Arquitectura: **Ingest** (repos remotos + sync) + **PostgreSQL** (metadatos: repos, proyectos, **dominios de arquitectura**, whitelist proyecto→dominio) + **FalkorDB** (grafo particionado por proyecto/dominio; shadow SDD) + **Chat/Analysis** (NL→Cypher + diagnósticos) + **MCP** (herramientas para la IA) + **gobierno de dominios** (whitelist, shards Falkor).
 
 **[Arquitectura (doc)](docs/notebooklm/architecture.md)** · **[Contribuir](CONTRIBUTING.md)** · **[CHANGELOG](CHANGELOG.md)** · **[AUTHORS](AUTHORS.md)**
 
@@ -30,16 +30,16 @@ Arquitectura: **Ingest** (repos remotos + sync) + **PostgreSQL** (metadatos: rep
 
 ```
 ariadne/
-├── frontend/             — React (Vite): gobierno, proyectos/repos, dominios, chat, C4, explorador de grafo
+├── frontend/ — React (Vite): gobierno, proyectos/repos, dominios, chat, explorador de grafo
 ├── packages/
-│   └── ariadne-common/   — Tipos y utilidades FalkorDB/Cypher compartidas (ingest + MCP)
+│ └── ariadne-common/ — Tipos y utilidades FalkorDB/Cypher compartidas (ingest + MCP)
 ├── services/
-│   ├── api/              — REST NestJS: impacto, contratos, grafo, auth OTP
-│   ├── ingest/           — Sync Bitbucket/GitHub, webhooks, índice, chat NL→Cypher, análisis
-│   ├── orchestrstrator/  — NestJS + LangGraph (validación SDD)
-│   └── mcp-ariadne/      — Servidor MCP (herramientas para agentes / IDE)
-├── docs/                 — Arquitectura, manual, diagramas, capturas README
-├── docker-compose.yml    — Stack producción
+│ ├── api/ — REST NestJS: impacto, contratos, grafo, auth OTP
+│ ├── ingest/ — Sync Bitbucket/GitHub, webhooks, índice, chat NL→Cypher, análisis
+│ ├── orchestrstrator/ — NestJS + LangGraph (validación SDD)
+│ └── mcp-ariadne/ — Servidor MCP (herramientas para agentes / IDE)
+├── docs/ — Arquitectura, manual, diagramas, capturas README
+├── docker-compose.yml — Stack producción
 └── docker-compose.dev.yml — Overrides locales (puertos expuestos, etc.)
 ```
 
@@ -52,27 +52,27 @@ Vista del producto en producción: gobierno (dashboard, proyectos), explorador d
 ### Acceso seguro (OTP)
 
 <p align="center">
-  <img src="docs/readme/screenshot-login.png" alt="Pantalla de acceso con OTP y selector de tema" width="92%" />
+ <img src="docs/readme/screenshot-login.png" alt="Pantalla de acceso con OTP y selector de tema" width="92%" />
 </p>
 
 ### Dashboard — resumen en tiempo real
 
 <p align="center">
-  <img src="docs/readme/screenshot-dashboard-light.png" alt="Dashboard en tema claro" width="46%" />
-  &nbsp;
-  <img src="docs/readme/screenshot-dashboard-dark.png" alt="Dashboard en tema oscuro" width="46%" />
+ <img src="docs/readme/screenshot-dashboard-light.png" alt="Dashboard en tema claro" width="46%" />
+ &nbsp;
+ <img src="docs/readme/screenshot-dashboard-dark.png" alt="Dashboard en tema oscuro" width="46%" />
 </p>
 
 ### Proyectos — catálogo multi-repo e ingesta
 
 <p align="center">
-  <img src="docs/readme/screenshot-projects.png" alt="Listado de proyectos con métricas de ingesta y dominio" width="92%" />
+ <img src="docs/readme/screenshot-projects.png" alt="Listado de proyectos con métricas de ingesta y dominio" width="92%" />
 </p>
 
 ### Explorador de grafo (Falkor / vis-network)
 
 <p align="center">
-  <img src="docs/readme/screenshot-graph-explorer.png" alt="Explorador de grafo con alcance y profundidad" width="92%" />
+ <img src="docs/readme/screenshot-graph-explorer.png" alt="Explorador de grafo con alcance y profundidad" width="92%" />
 </p>
 
 ---
@@ -93,7 +93,7 @@ Ver [docs/notebooklm/DEPLOYMENT_DOKPLOY.md](docs/notebooklm/DEPLOYMENT_DOKPLOY.m
 - **api** — REST NestJS: impacto, componente, contrato, compare, shadow (puerto 3000).
 - **orchestrator** — NestJS + LangGraph: validación SDD (puerto 3001).
 - **mcp-ariadne** — MCP stdio: `get_component_graph`, `get_legacy_impact`, `get_contract_specs`, `semantic_search`, `get_file_content`, `validate_before_edit`, `get_project_analysis`, `generate_navigation_map`, `extract_design_tokens`.
-- **frontend** — React+Vite: proyectos, repos, **dominios** (CRUD), detalle de proyecto (**pestaña Arquitectura**: dominio, dependencias cruzadas, **C4** vía Kroki), credenciales, **Chat con repo**, índice FalkorDB, resync (puerto 5173).
+- **frontend** — React+Vite: proyectos, repos, **dominios** (CRUD), detalle de proyecto (**pestaña Arquitectura**: dominio, dependencias cruzadas, dominio y whitelist), credenciales, **Chat con repo**, índice FalkorDB, resync (puerto 5173).
 
 ## Diagrama de Arquitectura
 
@@ -103,58 +103,58 @@ Ver [docs/notebooklm/DEPLOYMENT_DOKPLOY.md](docs/notebooklm/DEPLOYMENT_DOKPLOY.m
 
 ```mermaid
 graph TB
-    %% ─── Estilos ────────────────────────────────────────
-    classDef frontend fill:#083344,stroke:#22d3ee,stroke-width:2px,color:#e2e8f0
-    classDef backend fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#e2e8f0
-    classDef db fill:#2e1065,stroke:#a78bfa,stroke-width:2px,color:#e2e8f0
-    classDef external fill:#1e293b,stroke:#94a3b8,stroke-width:2px,color:#e2e8f0
-    classDef auth fill:#881337,stroke:#fb7185,stroke-width:2px,color:#e2e8f0
+ %% ─── Estilos ────────────────────────────────────────
+ classDef frontend fill:#083344,stroke:#22d3ee,stroke-width:2px,color:#e2e8f0
+ classDef backend fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#e2e8f0
+ classDef db fill:#2e1065,stroke:#a78bfa,stroke-width:2px,color:#e2e8f0
+ classDef external fill:#1e293b,stroke:#94a3b8,stroke-width:2px,color:#e2e8f0
+ classDef auth fill:#881337,stroke:#fb7185,stroke-width:2px,color:#e2e8f0
 
-    %% ─── Externos ───────────────────────────────────────
-    GH["Repos Remotos<br/>Bitbucket / GitHub"]:::external
-    SSO["SSO Auth OTP"]:::auth
+ %% ─── Externos ───────────────────────────────────────
+ GH["Repos Remotos<br/>Bitbucket / GitHub"]:::external
+ SSO["SSO Auth OTP"]:::auth
 
-    %% ─── Application Layer ──────────────────────────────
-    subgraph Dokploy["🔶 Dokploy — ariadne.kreoint.mx"]
-        FE["Frontend<br/>React + Vite"]:::frontend
-        API["API REST<br/>NestJS / OpenAPI 3.1"]:::backend
-        ING["Ingest<br/>NestJS + TypeORM"]:::backend
-        ORC["Orchestrator<br/>NestJS + LangGraph"]:::backend
-        MCP["MCP Ariadne<br/>Streamable HTTP"]:::backend
+ %% ─── Application Layer ──────────────────────────────
+ subgraph Dokploy["🔶 Dokploy — ariadne.kreoint.mx"]
+ FE["Frontend<br/>React + Vite"]:::frontend
+ API["API REST<br/>NestJS / OpenAPI 3.1"]:::backend
+ ING["Ingest<br/>NestJS + TypeORM"]:::backend
+ ORC["Orchestrator<br/>NestJS + LangGraph"]:::backend
+ MCP["MCP Ariadne<br/>Streamable HTTP"]:::backend
 
-        %% ─── Data Layer ─────────────────────────────────
-        FK["FalkorDB<br/>Grafo de código"]:::db
-        PG["PostgreSQL<br/>Metadatos (repos, jobs)"]:::db
-        RD["Redis<br/>BullMQ + Caché LRU"]:::db
+ %% ─── Data Layer ─────────────────────────────────
+ FK["FalkorDB<br/>Grafo de código"]:::db
+ PG["PostgreSQL<br/>Metadatos (repos, jobs)"]:::db
+ RD["Redis<br/>BullMQ + Caché LRU"]:::db
 
-        %% ─── Conexiones App ─────────────────────────────
-        FE -->|REST| API
-        API -->|Proxy| ING
-        API -.->|Graph queries| FK
-        API -.->|Caché| RD
-        ING -->|CRUD| PG
-        ING -->|Graph CRUD| FK
-        ING -->|Cola| RD
-        ING <-->|Delegación| ORC
-        ORC -.->|Graph queries| API
-        MCP -.->|Graph read| FK
-        MCP -.->|Delegate| ING
-    end
+ %% ─── Conexiones App ─────────────────────────────
+ FE -->|REST| API
+ API -->|Proxy| ING
+ API -.->|Graph queries| FK
+ API -.->|Caché| RD
+ ING -->|CRUD| PG
+ ING -->|Graph CRUD| FK
+ ING -->|Cola| RD
+ ING <-->|Delegación| ORC
+ ORC -.->|Graph queries| API
+ MCP -.->|Graph read| FK
+ MCP -.->|Delegate| ING
+ end
 
-    %% ─── Conexiones Externas ───────────────────────────
-    GH -->|Sync / webhooks| ING
-    SSO -.->|Auth OTP| API
+ %% ─── Conexiones Externas ───────────────────────────
+ GH -->|Sync / webhooks| ING
+ SSO -.->|Auth OTP| API
 ```
 
 ## Uso con Docker
 
 1. Coloca el código a analizar en `./src` (o monta otro directorio).
 2. Levanta el stack:
-   - **Con Colima (local):** `pnpm run docker:up` o `pnpm run dev:infra` — usa `docker-compose.yml` + `docker-compose.dev.yml` (expone puertos para conectar desde el host).
-   - **Sin script (local):** `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d`.
-   - **Producción (sin puertos expuestos):** `docker compose -f docker-compose.yml up -d`.
-   - Para omitir el script: `SKIP_ENSURE_DOCKER=1 <comando>`.
-   - Para bajar el stack y parar Colima: `pnpm run docker:down` o `npm run docker:down`.
+ - **Con Colima (local):** `pnpm run docker:up` o `pnpm run dev:infra` — usa `docker-compose.yml` + `docker-compose.dev.yml` (expone puertos para conectar desde el host).
+ - **Sin script (local):** `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d`.
+ - **Producción (sin puertos expuestos):** `docker compose -f docker-compose.yml up -d`.
+ - Para omitir el script: `SKIP_ENSURE_DOCKER=1 <comando>`.
+ - Para bajar el stack y parar Colima: `pnpm run docker:down` o `npm run docker:down`.
 3. El Cartographer corre al iniciar e indexa una vez. mcp-ariadne se ejecuta con stdio (para Cursor, configura el MCP apuntando al `node dist/index.js` del servicio mcp-ariadne).
 
 ## Documentación
@@ -185,15 +185,15 @@ Infraestructura (una vez): pnpm run dev:infra
 - Sube falkordb, postgres, redis en Docker (ingest/API en el mismo compose)
 - No arranca api, ingest ni orchestrator
 - Servicios en local (una terminal por servicio):
-  - pnpm run dev:api — API (puerto 3000) con watch
-  - pnpm run dev:ingest — Ingest (puerto 3002) con watch
-  - pnpm run dev:orchestrator — Orchestrator (puerto 3001) con watch
+ - pnpm run dev:api — API (puerto 3000) con watch
+ - pnpm run dev:ingest — Ingest (puerto 3002) con watch
+ - pnpm run dev:orchestrator — Orchestrator (puerto 3001) con watch
 - Orden sugerido
-  - pnpm run dev:infra
-  - pnpm run dev:ingest (en otra terminal)
-  - pnpm run dev:api (en otra terminal)
-  - pnpm run dev:orchestrator (en otra terminal)
-  - pnpm run dev:front (en otra terminal)
+ - pnpm run dev:infra
+ - pnpm run dev:ingest (en otra terminal)
+ - pnpm run dev:api (en otra terminal)
+ - pnpm run dev:orchestrator (en otra terminal)
+ - pnpm run dev:front (en otra terminal)
 
 ## Variables de Entorno — Referencia Completa
 
@@ -266,7 +266,6 @@ Estas variables controlan cómo se particionan los datos entre grafos FalkorDB.
 | `INDEX_E2E` | — | **`1`/`true`:** incluir carpetas e2e/cypress/playwright y `*.e2e.*` (default: excluidos) |
 | `INDEX_MIGRATIONS` | — | **`1`/`true`:** incluir rutas bajo `migrations/` (default: excluidos — suelen añadir ruido) |
 | `TRUNCATE_PARSE_MAX_BYTES` | `25000` | Límite de bytes para truncar archivos grandes antes de parsear |
-| `KROKI_URL` | `https://kroki.io` | URL base de Kroki para renderizar diagramas C4 (puede ser interna sin internet) |
 | `DOMAIN_COMPONENT_PATTERNS` / `DOMAIN_CONST_NAMES` | — | Fallback global si el proyecto no tiene domain_config |
 | `ORCHESTRATOR_URL` | `http://orchestrator:3001` | URL del orquestador LangGraph. Si está definido, el chat delega en él |
 

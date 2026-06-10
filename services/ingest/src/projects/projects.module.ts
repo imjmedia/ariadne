@@ -12,7 +12,6 @@ import { DomainEntity } from '../domains/entities/domain.entity';
 import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
 import { RepositoriesModule } from '../repositories/repositories.module';
-import { ArchitectureModule } from '../architecture/architecture.module';
 import { DomainsModule } from '../domains/domains.module';
 
 @Module({
@@ -26,7 +25,6 @@ import { DomainsModule } from '../domains/domains.module';
       DomainEntity,
     ]),
     RepositoriesModule,
-    ArchitectureModule,
     DomainsModule,
   ],
   controllers: [ProjectsController],

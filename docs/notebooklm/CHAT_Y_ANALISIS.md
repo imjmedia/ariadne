@@ -24,16 +24,16 @@ Documentación del sistema de chat con repositorios, diagnósticos, métricas de
 Todas las preguntas pasan por el mismo pipeline. No hay clasificación code vs knowledge.
 
 1. **Fase Retriever** — ReAct con tools (máx 4 turnos):
-   - `execute_cypher`: busca archivos, componentes, funciones, DomainConcept en FalkorDB; con dominios permitidos recorre los pares de **`getCypherShardContexts`** (varios grafos / `projectId` por shard).
-   - `semantic_search`: búsqueda vectorial (RAG) sobre Function, Component, Document, StorybookDoc y MarkdownDoc si hay embed-index.
-   - `get_graph_summary`: conteos y muestras del grafo.
-   - `get_file_content`: lee el código de los paths relevantes.
-   - El Retriever NO escribe la respuesta; solo reúne contexto.
+ - `execute_cypher`: busca archivos, componentes, funciones, DomainConcept en FalkorDB; con dominios permitidos recorre los pares de **`getCypherShardContexts`** (varios grafos / `projectId` por shard).
+ - `semantic_search`: búsqueda vectorial (RAG) sobre Function, Component, Document, StorybookDoc y MarkdownDoc si hay embed-index.
+ - `get_graph_summary`: conteos y muestras del grafo.
+ - `get_file_content`: lee el código de los paths relevantes.
+ - El Retriever NO escribe la respuesta; solo reúne contexto.
 
 2. **Fase Synthesizer** — Depende de **`responseMode`**:
-   - **`default`:** Un solo LLM con el contexto reunido. Opcionalmente precedido por **JSON `retrieval_summary`** cuando `twoPhase` está activo (`CHAT_TWO_PHASE` en ingest). Responde en prosa (procesos, flujos, impacto).
-   - **`evidence_first` (ingest local):** Tras el Retriever, si el contexto está vacío se aplica **`injectPhysicalEvidenceFallback`** (paths `File` + lectura de `package.json`, prisma, env, openapi, etc.). Luego **no** se usa el LLM de prosa: se genera **`buildMddEvidenceDocument`** → **`answer`** = JSON MDD (7 claves) y **`mddDocument`** en la respuesta HTTP.
-   - **`evidence_first` (con `ORCHESTRATOR_URL`):** El cliente pega al orchestrator; tras retrieve, **`nodeSynthesize`** llama **`POST /internal/repositories/:id/mdd-evidence`** en ingest y devuelve el mismo JSON (más **`mddDocument`** parseado en el orchestrator).
+ - **`default`:** Un solo LLM con el contexto reunido. Opcionalmente precedido por **JSON `retrieval_summary`** cuando `twoPhase` está activo (`CHAT_TWO_PHASE` en ingest). Responde en prosa (procesos, flujos, impacto).
+ - **`evidence_first` (ingest local):** Tras el Retriever, si el contexto está vacío se aplica **`injectPhysicalEvidenceFallback`** (paths `File` + lectura de `package.json`, prisma, env, openapi, etc.). Luego **no** se usa el LLM de prosa: se genera **`buildMddEvidenceDocument`** → **`answer`** = JSON MDD (7 claves) y **`mddDocument`** en la respuesta HTTP.
+ - **`evidence_first` (con `ORCHESTRATOR_URL`):** El cliente pega al orchestrator; tras retrieve, **`nodeSynthesize`** llama **`POST /internal/repositories/:id/mdd-evidence`** en ingest y devuelve el mismo JSON (más **`mddDocument`** parseado en el orchestrator).
 3. **Formato** — `formatResultsHuman()`: agrupa por path en los datos pasados al Synthesizer (solo aplica al modo **`default`**).
 
 **Schema en prompt:** Nodos `File`, `Component`, `Function`, `StorybookDoc`, `MarkdownDoc`, `Route`, `Hook`, `Prop`, `NestController`, **`Model`**, **`OpenApiOperation`**, etc. Relaciones `CONTAINS`, `IMPORTS`, `CALLS`, `RENDERS`, `HAS_PROP`, **`DEFINES_OP`**. FalkorDB NO soporta `NOT EXISTS`; usar `OPTIONAL MATCH` + `count(x)=0`.
@@ -162,6 +162,6 @@ Todas las preguntas pasan por el mismo pipeline. No hay clasificación code vs k
 ## 10. Frontend (Chat UI)
 
 - **Ruta:** `/repos/:id/chat` (`RepoChat`, selector `ChatPipelineModeSelect`). La lista en `/repos` puede mostrar el título de vista **The Forge** (copy de página; no es un grupo del menú lateral).
-- **Menú lateral:** accesos planos en **Ingeniería**: **Repositorios** (`/repos`), **Cola de Sync** (`/jobs`), **Nuevo Repo** (`/repos/new`), luego **C4 Viewer** (`/c4`). **Proyectos** está en **Gobierno** encima de esa sección.
+- **Menú lateral:** accesos planos en **Ingeniería**: **Repositorios** (`/repos`), **Cola de Sync** (`/jobs`), **Nuevo Repo** (`/repos/new`). **Proyectos** está en **Gobierno** encima de esa sección.
 - **Layout:** Dos columnas: izquierda = botones (Diagnóstico, Duplicados, Reingeniería, Ver índice) + resultados; derecha = chat (mensajes + input).
 - **API:** `api.chat()`, `api.analyze()`, `api.getGraphSummary()` en `frontend/src/api.ts`.

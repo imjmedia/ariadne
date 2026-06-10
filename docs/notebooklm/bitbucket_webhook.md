@@ -8,15 +8,15 @@ Para que el microservicio de ingesta reciba actualizaciones incrementales al hac
 
 1. En Bitbucket: **Repository** → **Repository settings** → **Webhooks** (o **Workspace settings** → **Webhooks** para varios repos).
 2. **Add webhook**:
-   - **Title:** p. ej. "Ariadne Ingest"
-   - **URL:** `https://<host>/webhooks/bitbucket`  
-     En Docker, si el ingest está expuesto: `https://tu-dominio.com/webhooks/bitbucket` o, en pruebas, una URL pública (ngrok, etc.).
+ - **Title:** p. ej. "Ariadne Ingest"
+ - **URL:** `https://<host>/webhooks/bitbucket` 
+ En Docker, si el ingest está expuesto: `https://tu-dominio.com/webhooks/bitbucket` o, en pruebas, una URL pública (ngrok, etc.).
 3. **Triggers:** marcar **Repository push**.
 4. **Secret (recomendado):** En Bitbucket define un **secret**. El ingest lo obtiene por repositorio:
-   - **Por repositorio:** Campo "Webhook secret" en el formulario de alta y edición del repo (frontend). Prioridad sobre el resto.
-   - **Credencial en BD:** Crear credencial tipo `webhook_secret` en `/credentials/new` (fallback global).
-   - **Variable de entorno:** `BITBUCKET_WEBHOOK_SECRET` (fallback).
-   Valida el header `X-Hub-Signature` (HMAC-SHA256). Si hay secret y la firma no coincide, responde 401.
+ - **Por repositorio:** Campo "Webhook secret" en el formulario de alta y edición del repo (frontend). Prioridad sobre el resto.
+ - **Credencial en BD:** Crear credencial tipo `webhook_secret` en `/credentials/new` (fallback global).
+ - **Variable de entorno:** `BITBUCKET_WEBHOOK_SECRET` (fallback).
+ Valida el header `X-Hub-Signature` (HMAC-SHA256). Si hay secret y la firma no coincide, responde 401.
 
 ## Archivos cambiados por commit (ingesta incremental)
 
@@ -35,8 +35,8 @@ Antes de que el webhook tenga efecto, el repositorio debe estar registrado en el
 
 ```bash
 curl -X POST http://localhost:3002/repositories \
-  -H "Content-Type: application/json" \
-  -d '{"provider":"bitbucket","projectKey":"TU_WORKSPACE","repoSlug":"nombre-repo","defaultBranch":"main","credentialsRef":"<uuid-opcional>"}'
+ -H "Content-Type: application/json" \
+ -d '{"provider":"bitbucket","projectKey":"TU_WORKSPACE","repoSlug":"nombre-repo","defaultBranch":"main","credentialsRef":"<uuid-opcional>"}'
 ```
 
 Luego ejecuta un full sync una vez (o deja que el webhook solo haga incrementales si ya indexaste por otro medio):

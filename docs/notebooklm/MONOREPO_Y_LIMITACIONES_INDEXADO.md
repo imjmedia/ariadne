@@ -9,11 +9,11 @@ Este documento explica limitaciones históricas del indexado en **monorepos** y 
 ```
 repo/
 ├── apps/
-│   ├── admin/     # React frontend
-│   ├── api/       # NestJS backend
-│   └── worker/    # Procesamiento AI
-├── libs/          # Código compartido
-├── prisma/        # Schema de BD (schema.prisma)
+│ ├── admin/ # React frontend
+│ ├── api/ # NestJS backend
+│ └── worker/ # Procesamiento AI
+├── libs/ # Código compartido
+├── prisma/ # Schema de BD (schema.prisma)
 └── package.json
 ```
 
@@ -100,11 +100,11 @@ Las herramientas `ask_codebase` y `get_modification_plan` aceptan **scope** para
 
 ```json
 {
-  "scope": {
-    "includePathPrefixes": ["apps/api", "libs/db"],
-    "excludePathGlobs": ["**/*.test.ts", "**/__mocks__/**"],
-    "repoIds": ["uuid-repo-frontend"]
-  }
+ "scope": {
+ "includePathPrefixes": ["apps/api", "libs/db"],
+ "excludePathGlobs": ["**/*.test.ts", "**/__mocks__/**"],
+ "repoIds": ["uuid-repo-frontend"]
+ }
 }
 ```
 
@@ -178,14 +178,14 @@ Orden de candidatos: se prueba cada uno contra `pathSet` (archivos indexados); e
 ```json
 // tsconfig.json o tsconfig.base.json en raíz
 {
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@repo/shared": ["libs/shared/src"],
-      "@repo/shared/*": ["libs/shared/src/*"],
-      "@api/*": ["apps/api/src/*"]
-    }
-  }
+ "compilerOptions": {
+ "baseUrl": ".",
+ "paths": {
+ "@repo/shared": ["libs/shared/src"],
+ "@repo/shared/*": ["libs/shared/src/*"],
+ "@api/*": ["apps/api/src/*"]
+ }
+ }
 }
 ```
 

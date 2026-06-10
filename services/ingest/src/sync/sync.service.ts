@@ -48,8 +48,6 @@ import { loadRepoTsconfigPaths } from '../pipeline/tsconfig-resolve';
 import { buildProjectMergeCypher } from '../pipeline/project';
 import type { ParsedFile } from '../pipeline/parser';
 import { recordSyncJobFailed } from '../metrics/ingest-metrics';
-import { scanC4Infrastructure } from '../pipeline/c4-infrastructure';
-import { buildC4IngestCypher } from '../pipeline/c4-cypher';
 import {
   augmentClonePathsForIndexRules,
   filterPathsByRepoIndexRules,
@@ -665,33 +663,6 @@ export class SyncService {
             const graphClient = await prepareGraph(f.path);
             await runCypherBatch(graphClient, buildCypherDeleteFile(f.path, projectId, repoId));
           }
-        }
-
-        try {
-          const c4Spec = await scanC4Infrastructure(pathSet, getContent, projectName);
-          const batch = buildC4IngestCypher(c4Spec, projectId, repoId);
-          const graphNamesForC4 =
-            ensuredGraphs.size > 0
-              ? [...ensuredGraphs]
-              : [
-                  shardMode === 'domain'
-                    ? graphNameForProject(pidArgForProject, {
-                        shardMode: 'domain',
-                        domainSegment: '_root',
-                      })
-                    : graphNameForProject(pidArgForProject),
-                ];
-          for (const gname of graphNamesForC4) {
-            const graph = client.selectGraph(gname);
-            const gc = { query: (q: string) => graph.query(q) };
-            await runCypherBatch(gc, batch.cleanup);
-            await runCypherBatch(gc, batch.merge);
-            await runCypherBatch(gc, batch.linkFiles);
-            await graph.query(batch.rollupImports);
-            await graph.query(batch.rollupCalls);
-          }
-        } catch (c4Err) {
-          console.warn('[sync] C4 ingest:', c4Err instanceof Error ? c4Err.message : String(c4Err));
         }
 
         try {

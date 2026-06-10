@@ -45,8 +45,8 @@ AriadneSpecs AI utiliza inteligencia artificial para transformar sistemas hereda
 ### Módulo 2: Context Provider (The Anti-Hallucination Oracle)
 
 - **Función:** Antes de que la IA reciba un componente para refactorizar, este módulo ejecuta una consulta en FalkorDB:
-  - _Query:_ `MATCH (c:Component {name: $target})-[*1..2]->(d) RETURN d`
-  - _Propósito:_ Traer no solo el código del componente, sino también la firma de todas sus dependencias directas e indirectas.
+ - _Query:_ `MATCH (c:Component {name: $target})-[*1..2]->(d) RETURN d`
+ - _Propósito:_ Traer no solo el código del componente, sino también la firma de todas sus dependencias directas e indirectas.
 
 ### Módulo 3: API Service (OpenAPI 3.1)
 

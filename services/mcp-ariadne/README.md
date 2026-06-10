@@ -28,7 +28,6 @@ npm publish
 - **get_component_graph** — Por defecto intenta **`GET /api/graph/component/:name`** (mismo grafo que el explorador: RENDERS, USES_HOOK, IMPORTS, `graphHints`, fusión multi-shard). Requiere **`ARIADNE_API_URL`** y **`Authorization: Bearer`** en Cursor (Secret MCP `ari_…` o JWT web); el proceso lo reenvía al Nest **sin variables `ARIADNE_API_*`** en `.env`. Sin Bearer válido, **fallback** Falkor genérico `-[*1..depth]->`.
 - **get_legacy_impact** — Preferencia: **`GET /api/graph/impact/:nodeId`** (`GraphService.getImpact`). Misma regla Bearer reenviable que `get_component_graph`. Fallback: Falkor `CALLS|RENDERS*` en un shard.
 - **get_contract_specs** — Props (con `description` JSDoc si existe); sigue siendo solo Falkor.
-- **get_c4_model** — `GET /api/graph/c4-model`. **`ARIADNE_API_URL`** + Bearer reenviado igual que herramientas grafo arriba.
 - **get_functions_in_file**, **get_import_graph** — Contenido estructural de archivos.
 - **get_file_content** — Contenido crudo del archivo desde Bitbucket/GitHub (requiere INGEST_URL).
 - **validate_before_edit** — OBLIGATORIO antes de editar: impacto + contrato en un llamado.
@@ -98,7 +97,7 @@ Las herramientas ya no recortan agresivamente listados y snippets; puedes **baja
 - Transporte: **Streamable HTTP** en `0.0.0.0:8080` (o `PORT`).
 - Requiere FalkorDB con el grafo `AriadneSpecs` ya poblado.
 - **Conexión Falkor:** el cliente registra `error` (no tumba el proceso ante `Socket closed unexpectedly`), usa `pingInterval` y `reconnectStrategy` vía Redis. Reinicios de Falkor o cortes de red pueden loguearse sin exit de Node; si el servicio MCP sigue unhealthy, revisa red/DNS hasta Falkor.
-- **Auth (`/mcp`, producción):** el cliente envía **`Authorization: Bearer`** (Secret MCP `ari_…` de Perfil o JWT de sesión); el proceso valida vía ingest y reenvía el mismo Bearer al Nest en grafos/C4.
+- **Auth (`/mcp`, producción):** el cliente envía **`Authorization: Bearer`** (Secret MCP `ari_…` de Perfil o JWT de sesión); el proceso valida vía ingest y reenvía el mismo Bearer al Nest en herramientas de grafo.
 
 Variables: `PORT` (8080), `FALKORDB_HOST`, `FALKORDB_PORT`, `INGEST_URL`, **`ARIADNE_API_URL`** (solo URL base Nest; sin tokens de usuario en `.env`).
 
@@ -108,14 +107,14 @@ Servidor **Streamable HTTP** en `http://127.0.0.1:9888/mcp` cuando usas **docker
 
 ```json
 {
-  "mcpServers": {
-    "ariadne-local": {
-      "url": "http://127.0.0.1:9888/mcp",
-      "headers": {
-        "Authorization": "Bearer <Secret MCP del Perfil (ari_…) o JWT de sesión>"
-      }
-    }
-  }
+ "mcpServers": {
+ "ariadne-local": {
+ "url": "http://127.0.0.1:9888/mcp",
+ "headers": {
+ "Authorization": "Bearer <Secret MCP del Perfil (ari_…) o JWT de sesión>"
+ }
+ }
+ }
 }
 ```
 

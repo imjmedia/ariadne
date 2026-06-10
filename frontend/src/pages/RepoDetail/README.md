@@ -19,18 +19,18 @@ Refactorizado con **compound components** para reducir complejidad (antes: nesti
 
 ```
 RepoDetail/
-├── index.tsx          # Orquestador: usa useRepoDetail, compone compound children
-├── useRepoDetail.ts   # Hook: estado, side-effects, handlers; compone useRepoDetailJobs y useRepoDetailSync
-├── utils.ts           # formatJobPayload
-├── JobAnalysisModal.tsx    # Análisis de job incremental; si hay `projectId` Ariadne, usa `GET /projects/.../jobs/.../analysis`
-├── SkippedFilesModal.tsx   # Modal de archivos omitidos (fetch, parse, index) por job
-├── IndexedFilesModal.tsx   # Lista `payload.paths` de archivos indexados en el job (sync full; tope configurable en ingest)
+├── index.tsx # Orquestador: usa useRepoDetail, compone compound children
+├── useRepoDetail.ts # Hook: estado, side-effects, handlers; compone useRepoDetailJobs y useRepoDetailSync
+├── utils.ts # formatJobPayload
+├── JobAnalysisModal.tsx # Análisis de job incremental; si hay `projectId` Ariadne, usa `GET /projects/.../jobs/.../analysis`
+├── SkippedFilesModal.tsx # Modal de archivos omitidos (fetch, parse, index) por job
+├── IndexedFilesModal.tsx # Lista `payload.paths` de archivos indexados en el job (sync full; tope configurable en ingest)
 ├── RepoDetailLoading.tsx
 ├── RepoDetailError.tsx
 ├── RepoDetailNotFound.tsx
 ├── RepoDetailHeader.tsx
-├── RepoDetailRepoCard.tsx   # Card principal con info repo y botones
-└── RepoDetailJobsCard.tsx   # Tabla de jobs con selección múltiple + botón Analizar
+├── RepoDetailRepoCard.tsx # Card principal con info repo y botones
+└── RepoDetailJobsCard.tsx # Tabla de jobs con selección múltiple + botón Analizar
 ```
 
 ### Compound Components

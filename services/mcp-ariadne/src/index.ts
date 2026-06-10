@@ -42,46 +42,6 @@ const logger = createLogger('mcp-ariadne');
 type McpNestAuthStore = { clientBearerForNest?: string };
 const mcpNestAuthAls = new AsyncLocalStorage<McpNestAuthStore>();
 
-/** Markdown estructurado para la herramienta get_c4_model (respuesta API /api/graph/c4-model). */
-function formatC4Markdown(data: {
-  projectId: string;
-  systems: Array<{
-    repoId: string;
-    name: string;
-    containers: Array<{ key: string; name: string; c4Kind: string; technology?: string }>;
-    communicates: Array<{ sourceKey: string; targetKey: string; reason?: string }>;
-  }>;
-}): string {
-  const lines: string[] = [
-    "## Modelo C4 (contenedores)",
-    "",
-    `**projectId:** \`${data.projectId}\``,
-    "",
-  ];
-  if (data.systems.length === 0) {
-    lines.push("_Sin nodos :System en Falkor. Ejecuta sync del repositorio con el ingest actualizado._");
-    return lines.join("\n");
-  }
-  for (const sys of data.systems) {
-    lines.push(`### Sistema: ${sys.name}`, "", `**repoId:** \`${sys.repoId}\``, "");
-    lines.push("**Contenedores:**", "");
-    for (const c of sys.containers) {
-      const tech = c.technology ? ` — _${c.technology}_` : "";
-      lines.push(`- \`${c.key}\`: ${c.name} (${c.c4Kind})${tech}`);
-    }
-    lines.push("");
-    if (sys.communicates.length > 0) {
-      lines.push("**COMMUNICATES_WITH** (roll-up):", "");
-      for (const e of sys.communicates) {
-        const r = e.reason ? ` _(${e.reason})_` : "";
-        lines.push(`- \`${e.sourceKey}\` → \`${e.targetKey}\`${r}`);
-      }
-      lines.push("");
-    }
-  }
-  return lines.join("\n");
-}
-
 /** Base URL del API Nest (prefijo global `/api`). */
 function ariadneApiBase(): string {
   return (process.env.ARIADNE_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -435,7 +395,7 @@ const MCP_INSTRUCTIONS = `AriadneSpecs Oracle: herramientas de análisis de cód
 
 ## API Nest (paridad con el explorador)
 
-Las herramientas **get_component_graph**, **get_legacy_impact** y **get_c4_model** pueden llamar a \`ARIADNE_API_URL\` (default http://localhost:3000). El API Nest acepta JWT de sesión web o **Secret MCP** (\`ari_…\`) en \`Authorization: Bearer\`. Configura Cursor con el mismo Bearer (Perfil → Secret MCP, o JWT) en los headers HTTP del servidor MCP — el proceso lo reenvía al Nest sin variables de sesión extra. Sin Bearer válido, esas llamadas fallan y el MCP usa fallback Falkor (resultados pueden diferir del UI).
+Las herramientas **get_component_graph** y **get_legacy_impact** pueden llamar a \`ARIADNE_API_URL\` (default http://localhost:3000). El API Nest acepta JWT de sesión web o **Secret MCP** (\`ari_…\`) en \`Authorization: Bearer\`. Configura Cursor con el mismo Bearer (Perfil → Secret MCP, o JWT) en los headers HTTP del servidor MCP — el proceso lo reenvía al Nest sin variables de sesión extra. Sin Bearer válido, esas llamadas fallan y el MCP usa fallback Falkor (resultados pueden diferir del UI).
 
 ## projectId (OBLIGATORIO)
 
@@ -494,19 +454,6 @@ function createMcpServer(): Server {
           currentFilePath: { type: "string", description: "Ruta del archivo que el IDE está editando (opcional). Si no hay projectId, se infiere el proyecto." },
         },
         required: ["componentName"],
-        additionalProperties: false,
-      },
-    },
-    {
-      name: "get_c4_model",
-      description:
-        "Modelo C4 (sistemas, contenedores, COMMUNICATES_WITH) vía GET /api/graph/c4-model. Auth: mismo \`Authorization: Bearer\` hacia MCP (Secret MCP \`ari_…\` o JWT web), reenviado al Nest. Usar tras sync.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          projectId: { type: "string", description: "ID del proyecto Ariadne (obligatorio con sharding)." },
-        },
-        required: ["projectId"],
         additionalProperties: false,
       },
     },
@@ -1672,57 +1619,6 @@ async function fetchFileFromIngest(
     await cache.set(cacheKey, markdown, 120);
 
     return { content: [{ type: "text", text: markdown }] };
-  }
-
-  if (name === "get_c4_model") {
-    const projectId = String((args?.projectId as string) ?? "").trim();
-    if (!projectId) {
-      return {
-        content: [{ type: "text", text: "**Error:** `projectId` es obligatorio." }],
-        isError: true,
-      };
-    }
-    const base = ariadneApiBase();
-    try {
-      const res = await fetch(
-        `${base}/api/graph/c4-model?projectId=${encodeURIComponent(projectId)}`,
-        ariadneApiFetchInit({ signal: AbortSignal.timeout(15_000) }),
-      );
-      if (!res.ok) {
-        const t = await res.text();
-        return {
-          content: [
-            {
-              type: "text",
-              text: `**Error HTTP ${res.status}** al llamar a la API (${base}). ${t.slice(0, 500)}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-      const data = (await res.json()) as {
-        projectId: string;
-        systems: Array<{
-          repoId: string;
-          name: string;
-          containers: Array<{ key: string; name: string; c4Kind: string; technology?: string }>;
-          communicates: Array<{ sourceKey: string; targetKey: string; reason?: string }>;
-        }>;
-      };
-      return { content: [{ type: "text", text: formatC4Markdown(data) }] };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return {
-        content: [
-          {
-            type: "text",
-            text:
-              `**Error:** No se pudo obtener el modelo C4. Comprueba **ARIADNE_API_URL** y que Cursor envía \`Authorization: Bearer\` (Secret MCP \`ari_…\` o JWT de sesión): ${msg}`,
-          },
-        ],
-        isError: true,
-      };
-    }
   }
 
   if (name === "get_legacy_impact") {

@@ -6,8 +6,8 @@ Orquestación de agentes: flujos SDD (refactor) y **ask_codebase** (chat NL sobr
 
 - **Base:** `validate_impact` → `fetch_contracts` → **`contract_verifier`** (props grafo vs `proposedProps`).
 - **Completo (`POST /workflow/refactor/full`):** … → `weaver` → **`shadow_index`** → condicional:
-  - OK → `compare_graphs` → **`generate_tests`** → END.
-  - Fallo indexación (error API/Cypher/Falkor en body) → **`revise_code_llm`** → vuelve a `shadow_index` (hasta `maxRevisions`, default 3) si hay LLM configurado (`OPENROUTER_API_KEY`); si no, END.
+ - OK → `compare_graphs` → **`generate_tests`** → END.
+ - Fallo indexación (error API/Cypher/Falkor en body) → **`revise_code_llm`** → vuelve a `shadow_index` (hasta `maxRevisions`, default 3) si hay LLM configurado (`OPENROUTER_API_KEY`); si no, END.
 - **Shadow por sesión:** `shadow_index` guarda el `shadowSessionId` devuelto por la API/ingest y reutiliza el mismo id en reintentos; `compare_graphs` llama a `GET /graph/compare/:nodeId?shadowSessionId=…` contra el grafo `FalkorSpecsShadow:<sesión>` en FalkorDB (sin grafo shadow global compartido).
 
 ## Flujo LangGraph — ask_codebase (`codebase-chat`)

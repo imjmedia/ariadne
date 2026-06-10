@@ -57,14 +57,14 @@ Valores **iniciales** a refinar después de 1–2 semanas de histogram\_\* en pr
 ```yaml
 # Ejemplo: muchos chats sin contexto
 - alert: AriadneChatEmptyRetrievalHigh
-  expr: |
-    sum(rate(ariadne_chat_empty_retrieval_total[15m]))
-      / sum(rate(ariadne_chat_pipeline_duration_seconds_count[15m])) > 0.25
-  for: 30m
-  labels:
-    severity: warning
-  annotations:
-    summary: "Alto ratio de chat sin retrieval en Ariadne ingest"
+ expr: |
+ sum(rate(ariadne_chat_empty_retrieval_total[15m]))
+ / sum(rate(ariadne_chat_pipeline_duration_seconds_count[15m])) > 0.25
+ for: 30m
+ labels:
+ severity: warning
+ annotations:
+ summary: "Alto ratio de chat sin retrieval en Ariadne ingest"
 ```
 
 ## Referencias

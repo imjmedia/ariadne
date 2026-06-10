@@ -24,9 +24,9 @@ Cada servicio es una aplicación NestJS desplegable de forma independiente. Comu
 
 - **Fuente de verdad:** Repositorio remoto (Bitbucket o GitHub), no directorio local montado.
 - **Estrategia por capas:**
-  1. **Fase Mapping:** Escaneo del repo (árbol de directorios, detección de lenguajes).
-  2. **Fase Deps:** Lectura de `package.json`, `requirements.txt`, `go.mod` para contexto de librerías.
-  3. **Fase Chunking semántico:** Parser Tree-sitter por unidades lógicas (funciones, clases) con metadata `line_range` y `commit_sha`.
+ 1. **Fase Mapping:** Escaneo del repo (árbol de directorios, detección de lenguajes).
+ 2. **Fase Deps:** Lectura de `package.json`, `requirements.txt`, `go.mod` para contexto de librerías.
+ 3. **Fase Chunking semántico:** Parser Tree-sitter por unidades lógicas (funciones, clases) con metadata `line_range` y `commit_sha`.
 - **Cola de mensajes:** Redis/BullMQ. `POST /repositories/:id/sync` encola el job; un worker lo procesa de forma asíncrona.
 - **Full sync:** Shallow clone opcional (`git clone --depth 1`) o API (Bitbucket/GitHub). Se filtran `node_modules`, `dist`, `venv`, `.env`, `*.log`; pipeline: parse → producer Cypher → FalkorDB; estado en PostgreSQL (repos, sync_jobs, indexed_files).
 - **Alcance del índice por repositorio:** columna `repositories.index_include_rules` (JSONB). `null` = todo el repo (filtro global). Con `{ entries: [...] }` se restringe a prefijos/archivos + manifiestos en raíz; `PATCH /repositories/:id` y UI `/repos/:id/edit`. Ver `services/ingest/src/providers/index-include-rules.ts`.
@@ -45,9 +45,9 @@ Servicio NestJS que realiza el análisis estático a partir de repositorios remo
 - **Análisis:** `POST /repositories/:id/analyze` (`:id` = repo) — modos `diagnostico`, `duplicados`, `reingenieria`, `codigo_muerto`, `seguridad` (auditoría heurística de secretos/higiene en índice). **`POST /projects/:projectId/analyze`** — mismos modos de código con resolución de repo vía `AnalyticsService` (`idePath` / `repositoryId` en multi-root) o `agents` / `skill` para informes AGENTS.md / SKILL.md.
 - **Proyectos (multi-root):** Tabla `project_repositories` (repo_id, project_id). Un repo puede estar en varios proyectos. Sync escribe nodos para cada proyecto del repo (standalone + proyectos). Resync: `POST /repositories/:id/resync` (desde repo) o `POST /repositories/:id/resync-for-project` con `{ projectId }` (solo ese slice).
 - **Proceso de indexación (sin filesystem local):**
-  1. **Origen:** Repositorio remoto (Bitbucket/GitHub): listado y contenido vía REST API o clone. Credenciales desde `credentialsRef` (BD) o env.
-  2. **Parser (Tree-sitter):** Mismo pipeline que el Cartographer: genera AST, identifica imports, componentes, hooks, props.
-  3. **Graph Producer:** Transforma en Cypher y escribe en FalkorDB (path en grafo prefijado por repo para multi-repo).
+ 1. **Origen:** Repositorio remoto (Bitbucket/GitHub): listado y contenido vía REST API o clone. Credenciales desde `credentialsRef` (BD) o env.
+ 2. **Parser (Tree-sitter):** Mismo pipeline que el Cartographer: genera AST, identifica imports, componentes, hooks, props.
+ 3. **Graph Producer:** Transforma en Cypher y escribe en FalkorDB (path en grafo prefijado por repo para multi-repo).
 - **Frecuencia:** Full sync bajo demanda; incremental vía webhook en cada push.
 - **Cartographer legacy:** El servicio actual en `services/cartographer` que usa **chokidar** y **SCAN_PATH** está marcado como legacy. Puede mantenerse reducido a **shadow server** (solo `POST /shadow`) para el flujo SDD mientras el microservicio de ingesta asume full sync + webhook.
 
@@ -68,18 +68,18 @@ Servidor que implementa el **Model Context Protocol** para exponer las herramien
 
 ### D. Frontend (shell administrativo)
 
-Aplicación **Vite + React** (`frontend/`): autenticación JWT, layout con sidebar y grupos **Gobierno** (Dashboard `/dashboard`, Dominios, Proyectos), **Ingeniería** (Repositorios → `/repos`, Cola de Sync → `/jobs`, Nuevo Repo → `/repos/new`, C4 Viewer → `/c4`) y **Plataforma** (Grafo `/graph-explorer`, Credenciales, Ayuda). La ruta `/` redirige a `/dashboard`. El chat por repositorio vive en **`/repos/:id/chat`** (modos `responseMode` alineados con MCP `ask_codebase`; ver [mcp_server_specs.md](mcp_server_specs.md)).
+Aplicación **Vite + React** (`frontend/`): autenticación JWT, layout con sidebar y grupos **Gobierno** (Dashboard `/dashboard`, Dominios, Proyectos), **Ingeniería** (Repositorios → `/repos`, Cola de Sync → `/jobs`, Nuevo Repo → `/repos/new`) y **Plataforma** (Grafo `/graph-explorer`, Credenciales, Ayuda). La ruta `/` redirige a `/dashboard`. El chat por repositorio vive en **`/repos/:id/chat`** (modos `responseMode` alineados con MCP `ask_codebase`; ver [mcp_server_specs.md](mcp_server_specs.md)).
 
 ---
 
 ## 5. Flujo de Datos Detallado
 
 1. **Fase de Mapeo (Escritura):**
-   - Microservicio de Ingesta (o Cartographer legacy) → Tree-sitter (extrae imports, componentes, etc.) → FalkorDB (MERGE nodos y relaciones).
+ - Microservicio de Ingesta (o Cartographer legacy) → Tree-sitter (extrae imports, componentes, etc.) → FalkorDB (MERGE nodos y relaciones).
 2. **Fase de Razonamiento (Lectura):**
-   - `IA (Cursor/Claude)` -> `MCP Tool (get_legacy_impact)` -> `Oracle Server` -> `FalkorDB` (Query Cypher).
+ - `IA (Cursor/Claude)` -> `MCP Tool (get_legacy_impact)` -> `Oracle Server` -> `FalkorDB` (Query Cypher).
 3. **Fase de Validación (Ciclo SDD):**
-   - `IA` propone código → Orquestador ejecuta flujo (impacto, contratos, opcional weaver) → **Shadow Indexing**: Cartographer expone `POST /shadow` con `{ files: [{ path, content }] }` para indexar en grafo `AriadneSpecsShadow`; API expone `GET /graph/compare/:componentName` para comparar main vs shadow → `IA` recibe veredicto (approved, missingInShadow, extraInShadow) y confirma o corrige.
+ - `IA` propone código → Orquestador ejecuta flujo (impacto, contratos, opcional weaver) → **Shadow Indexing**: Cartographer expone `POST /shadow` con `{ files: [{ path, content }] }` para indexar en grafo `AriadneSpecsShadow`; API expone `GET /graph/compare/:componentName` para comparar main vs shadow → `IA` recibe veredicto (approved, missingInShadow, extraInShadow) y confirma o corrige.
 
 ---
 

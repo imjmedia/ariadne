@@ -1,5 +1,5 @@
 /**
- * @fileoverview REST dominios (gobierno C4).
+ * @fileoverview REST dominios (gobierno de arquitectura).
  */
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { DomainsService } from './domains.service';

@@ -1,6 +1,6 @@
 # Docs Ariadne
 
-Índice de documentación del proyecto Ariadne (análisis de código con grafo FalkorDB, ingesta Bitbucket/GitHub, chat NL, MCP Oracle, **gobierno de arquitectura** (dominios, C4, whitelist proyecto→dominio) y frontend de administración).
+Índice de documentación del proyecto Ariadne (análisis de código con grafo FalkorDB, ingesta Bitbucket/GitHub, chat NL, MCP Oracle, **gobierno de arquitectura** (dominios, whitelist proyecto→dominio) y frontend de administración).
 
 ## Instalación y uso
 
@@ -60,6 +60,6 @@
 | **constitution.md** | Principios y convenciones del proyecto. |
 | **Mejoras_Ariadne_Marzo.md** | Mejoras / roadmap. |
 
-**Shell frontend:** Gobierno (Dashboard, Dominios, Proyectos); Ingeniería (Repositorios, Cola de Sync, Nuevo Repo, C4 Viewer); Plataforma (Grafo, Credenciales, Ayuda). `/` → `/dashboard`.
+**Shell frontend:** Gobierno (Dashboard, Dominios, Proyectos); Ingeniería (Repositorios, Cola de Sync, Nuevo Repo); Plataforma (Grafo, Credenciales, Ayuda). `/` → `/dashboard`.
 
 En la raíz del repo: **AGENTS.md** — Protocolo para agentes (list_known_projects al inicio, preferencia projectId, flujos de diagnóstico y SDD).

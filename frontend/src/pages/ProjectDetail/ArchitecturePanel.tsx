@@ -1,5 +1,5 @@
 /**
- * @fileoverview Pestaña Arquitectura: dominio del proyecto, whitelist de dominios, preview C4.
+ * @fileoverview Pestaña Arquitectura: dominio del proyecto y whitelist de dominios.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -24,7 +24,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { C4Previewer } from '@/components/C4Previewer';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export function ArchitecturePanel({
@@ -44,10 +43,6 @@ export function ArchitecturePanel({
   const [connType, setConnType] = useState('REST');
   const [depDesc, setDepDesc] = useState('');
   const [adding, setAdding] = useState(false);
-
-  const [c4Level, setC4Level] = useState<1 | 2 | 3>(2);
-  const [shadowMode, setShadowMode] = useState(false);
-  const [sessionId, setSessionId] = useState('');
 
   const load = useCallback(() => {
     api
@@ -226,27 +221,6 @@ export function ArchitecturePanel({
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Diagrama C4 (PlantUML + Kroki)</CardTitle>
-          <CardDescription>
-            Niveles: contexto (dominios), contenedor (repos), componente (grafo). Shadow mode añade diff de
-            componentes respecto al grafo principal.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <C4Previewer
-            projectId={projectId}
-            level={c4Level}
-            onLevelChange={setC4Level}
-            shadowMode={shadowMode}
-            onShadowModeChange={setShadowMode}
-            sessionId={sessionId}
-            onSessionIdChange={setSessionId}
-          />
         </CardContent>
       </Card>
     </div>

@@ -24,16 +24,16 @@ Todas las llamadas tienen esta forma:
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": "<id-unico-por-llamada>",
-  "method": "tools/call",
-  "params": {
-    "name": "<nombre_de_la_herramienta_mcp>",
-    "arguments": {
-      "<arg1>": "<valor1>",
-      "<arg2>": "<valor2>"
-    }
-  }
+ "jsonrpc": "2.0",
+ "id": "<id-unico-por-llamada>",
+ "method": "tools/call",
+ "params": {
+ "name": "<nombre_de_la_herramienta_mcp>",
+ "arguments": {
+ "<arg1>": "<valor1>",
+ "<arg2>": "<valor2>"
+ }
+ }
 }
 ```
 
@@ -52,13 +52,13 @@ Se envía con `POST` a la URL del MCP; el body es el JSON anterior.
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": "list-projects-1",
-  "method": "tools/call",
-  "params": {
-    "name": "list_known_projects",
-    "arguments": {}
-  }
+ "jsonrpc": "2.0",
+ "id": "list-projects-1",
+ "method": "tools/call",
+ "params": {
+ "name": "list_known_projects",
+ "arguments": {}
+ }
 }
 ```
 
@@ -70,23 +70,23 @@ Se envía con `POST` a la URL del MCP; el body es el JSON anterior.
 
 - **Uso:** Flujo de cambio legacy: descripción del cambio + `projectId`. El ingest acepta UUID de **proyecto Ariadne** o **`roots[].id` del repositorio**; en multi-root conviene el del repo donde está el código.
 - **Argumentos:**
-  - `userDescription` (string): descripción en lenguaje natural del cambio.
-  - `projectId` (string): id de proyecto Ariadne **o** id de repo (`roots[].id`).
+ - `userDescription` (string): descripción en lenguaje natural del cambio.
+ - `projectId` (string): id de proyecto Ariadne **o** id de repo (`roots[].id`).
 
 **Petición de ejemplo:**
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": "get-modification-plan-1",
-  "method": "tools/call",
-  "params": {
-    "name": "get_modification_plan",
-    "arguments": {
-      "userDescription": "Añadir descuento máximo a nivel campaña en CampDetail...",
-      "projectId": "uuid-proyecto-ariadne-o-roots-id-repo"
-    }
-  }
+ "jsonrpc": "2.0",
+ "id": "get-modification-plan-1",
+ "method": "tools/call",
+ "params": {
+ "name": "get_modification_plan",
+ "arguments": {
+ "userDescription": "Añadir descuento máximo a nivel campaña en CampDetail...",
+ "projectId": "uuid-proyecto-ariadne-o-roots-id-repo"
+ }
+ }
 }
 ```
 
@@ -110,25 +110,25 @@ Si la herramienta no existe o falla, la aplicación puede hacer **fallback** con
 
 - **Uso:** Preguntas en lenguaje natural sobre el codebase indexado (flujo legacy: listar qué existe, contexto para MDD/Workshop). **The Forge:** SDD compacto → **`responseMode: evidence_first`** (**JSON MDD** 7 claves). Evidencia bruta + síntesis en el cliente → **`responseMode: raw_evidence`**: `text` es un **JSON** con `gatheredContext`, `collectedResults`, `cypher`, `deterministicRetriever` — hacer **`JSON.parse`** y sintetizar allí. **`deterministicRetriever: true`** (solo con `raw_evidence`) evita LLM en la fase de retrieval (secuencia fija de tools en ingest).
 - **Argumentos:**
-  - `question` (string): pregunta en lenguaje natural.
-  - `projectId` (string): id del proyecto en Ariadne (o id de repo; el MCP resuelve).
-  - Opcional: `scope`, `twoPhase`, **`responseMode`** (`default` \| `evidence_first` \| `raw_evidence`), **`deterministicRetriever`** (boolean, solo con `raw_evidence`).
+ - `question` (string): pregunta en lenguaje natural.
+ - `projectId` (string): id del proyecto en Ariadne (o id de repo; el MCP resuelve).
+ - Opcional: `scope`, `twoPhase`, **`responseMode`** (`default` \| `evidence_first` \| `raw_evidence`), **`deterministicRetriever`** (boolean, solo con `raw_evidence`).
 
 **Petición de ejemplo:**
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": "ask-codebase-1",
-  "method": "tools/call",
-  "params": {
-    "name": "ask_codebase",
-    "arguments": {
-      "question": "For this change: \"...\". List what ALREADY EXISTS in the codebase: data models/entities...",
-      "projectId": "uuid-proyecto-ariadne-o-roots-id-repo",
-      "responseMode": "evidence_first"
-    }
-  }
+ "jsonrpc": "2.0",
+ "id": "ask-codebase-1",
+ "method": "tools/call",
+ "params": {
+ "name": "ask_codebase",
+ "arguments": {
+ "question": "For this change: \"...\". List what ALREADY EXISTS in the codebase: data models/entities...",
+ "projectId": "uuid-proyecto-ariadne-o-roots-id-repo",
+ "responseMode": "evidence_first"
+ }
+ }
 }
 ```
 
@@ -155,8 +155,8 @@ Todas usan el mismo transporte JSON-RPC y el mismo parseo de `result.content[].t
 - Si el body de la respuesta HTTP empieza por `{`, tratarlo como JSON directo y parsearlo.
 - Si no, buscar líneas que empiecen por `data:` y cuyo contenido empiece por `{`; parsear ese JSON (soporte SSE).
 - Del objeto parseado:
-  - **`result.content`:** array de objetos con `type` y `text`. Buscar el elemento con `type === "text"` y usar su `text`.
-  - Si hay **`error`**, no usar `result`; registrar el error y devolver null/array vacío/string vacío según el caso.
+ - **`result.content`:** array de objetos con `type` y `text`. Buscar el elemento con `type === "text"` y usar su `text`.
+ - Si hay **`error`**, no usar `result`; registrar el error y devolver null/array vacío/string vacío según el caso.
 - Si el `text` contiene un bloque markdown ` ```json ... ``` `, extraer el contenido del bloque y parsearlo como JSON. Si el `text` ya es JSON (empieza por `[` o `{`), parsearlo directamente.
 
 ---

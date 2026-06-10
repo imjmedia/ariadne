@@ -1,5 +1,5 @@
 /**
- * @fileoverview Visibilidad dirigida entre dominios (C4 / shards Falkor: qué otros dominios se incluyen en el contexto).
+ * @fileoverview Visibilidad dirigida entre dominios (shards Falkor: qué otros dominios se incluyen en el contexto).
  */
 import {
   Entity,

@@ -37,7 +37,7 @@ export interface Project {
   id: string;
   name: string | null;
   description: string | null;
-  /** Dominio de gobierno (C4 / whitelist). */
+  /** Dominio de gobierno (whitelist / shards). */
   domainId?: string | null;
   domainName?: string | null;
   domainColor?: string | null;
@@ -69,7 +69,7 @@ export interface Domain {
   assignedProjectCount?: number;
 }
 
-/** Arista de visibilidad dominio → dominio (C4 / shards). Tabla `domain_domain_visibility`. */
+/** Arista de visibilidad dominio → dominio (shards). Tabla `domain_domain_visibility`. */
 export interface DomainVisibilityEdge {
   id: string;
   fromDomainId: string;
@@ -87,13 +87,6 @@ export interface ProjectDomainDependency {
   connectionType: string;
   description: string | null;
   createdAt: string;
-}
-
-export interface ArchitectureC4Response {
-  level: number;
-  dsl: string;
-  projectId: string;
-  shadowMode: boolean;
 }
 
 /** Tipo de job (full sync o incremental). */
@@ -308,21 +301,4 @@ export interface FullAuditResult {
     codigoMuerto: Array<{ path: string; category: string; exportsSummary?: string }>;
     duplicados: Array<{ a: string; b: string; score?: number }>;
   };
-}
-
-/** Modelo C4 (API GET /graph/c4-model): sistemas → contenedores + aristas abstractas. */
-export interface C4ModelResponse {
-  projectId: string;
-  systems: Array<{
-    repoId: string;
-    name: string;
-    containers: Array<{
-      key: string;
-      name: string;
-      repoId: string;
-      technology?: string;
-      c4Kind: string;
-    }>;
-    communicates: Array<{ sourceKey: string; targetKey: string; reason?: string }>;
-  }>;
 }

@@ -83,27 +83,26 @@ Si está vacío, se permite cualquier origen (adecuado para desarrollo).
 El MCP usa **Streamable HTTP** en el puerto 8080. FalkorDB e Ingest están en la red interna. **No hace falta túnel SSH.**
 
 1. **En Dokploy** (Domains / Rutas): añadir **dos rutas** para que Cursor funcione:
-   - Path **`/mcp`** (o prefix `/mcp`) → servicio **mcp-ariadne**, puerto **8080** — conexión MCP
-   - Path **`/.well-known`** (o prefix) → servicio **mcp-ariadne**, puerto **8080** — discovery OAuth (Cursor pide esto antes de conectar)
-   - Orden: rutas más específicas primero. Sin esto, `/mcp` devuelve HTML (SPA) → error "Unexpected token '<'"
-2. **Bearer por usuario**: en **Perfil** genera tu **Secret MCP** (`ari_…`). En Cursor (`mcp.json`) añade `headers.Authorization: Bearer <ari_…>` (o el **JWT de sesión** vigente tras login web). El proceso MCP valida vía ingest y reenvía el mismo Bearer al API Nest para grafos/C4 — **no** uses `ARIADNE_API_BEARER`/`ARIADNE_API_JWT` en Environment.
+ - Path **`/mcp`** (o prefix `/mcp`) → servicio **mcp-ariadne**, puerto **8080** — conexión MCP
+ - Path **`/.well-known`** (o prefix) → servicio **mcp-ariadne**, puerto **8080** — discovery OAuth (Cursor pide esto antes de conectar)
+ - Orden: rutas más específicas primero. Sin esto, `/mcp` devuelve HTML (SPA) → error "Unexpected token '<'"
+2. **Bearer por usuario**: en **Perfil** genera tu **Secret MCP** (`ari_…`). En Cursor (`mcp.json`) añade `headers.Authorization: Bearer <ari_…>` (o el **JWT de sesión** vigente tras login web). El proceso MCP valida vía ingest y reenvía el mismo Bearer al API Nest para herramientas de grafo — **no** uses `ARIADNE_API_BEARER`/`ARIADNE_API_JWT` en Environment.
 3. **Cursor** (`~/.cursor/mcp.json`) — ejemplo:
 
 ```json
 {
-  "mcpServers": {
-    "ariadnespecs": {
-      "url": "https://ariadne.kreoint.mx/mcp",
-      "headers": {
-        "Authorization": "Bearer <tu Secret MCP `ari_…` o JWT de sesión>"
-      }
-    }
-  }
+ "mcpServers": {
+ "ariadnespecs": {
+ "url": "https://ariadne.kreoint.mx/mcp",
+ "headers": {
+ "Authorization": "Bearer <tu Secret MCP `ari_…` o JWT de sesión>"
+ }
+ }
+ }
 }
 ```
 
 En **desarrollo** el compose puede activar `MCP_HTTP_ALLOW_UNAUTHENTICATED` (solo local; **no** en producción expuesta).
-
 
 El MCP tiene `FALKORDB_HOST=falkordb`, `INGEST_URL=http://ingest:3002` y escucha en `0.0.0.0:8080`.
 

@@ -16,6 +16,5 @@
 - **prisma-extract.ts** — `getDMMF` (`@prisma/internals`): nodos `Model`, `Enum`, relaciones `RELATES_TO` / `USES_ENUM`; propiedad `fieldSummary` (JSON de campos).
 - **schema-relational-rag-doc.ts** — Tras Prisma/OpenAPI en `runFullSync`, genera un `:MarkdownDoc` sintético en path reservado `graph-internal/relational-schema-rag-index.md` (virtual; no en `indexed_files`): prosa tipo «esquema relacional» (Prisma DMMF, entidades TypeORM, **Strapi content-types y routes**, lista de operaciones OpenAPI) para RAG. El path evita prefijos tratados como no-evidencia de código (`ariadne-internal/`, `docs/`, …) alineados con **`../chat/chat-evidence-path-filter.ts`**.
 - **project.ts**, **falkor.ts**, **domain-*** — Proyecto Falkor y dominio.
-- **c4-infrastructure.ts** / **c4-cypher.ts** — Tras indexar archivos, el sync infiere contenedores desde `docker-compose*`, manifiestos `kubernetes/`/`k8s/` y `workspaces` en `package.json`; escribe `:System`, `:Container`, `File-[:PART_OF]->Container` y roll-up `[:COMMUNICATES_WITH]` (imports/calls entre archivos de distintos contenedores).
 
 Shadow y sync comparten producer + resolución de imports; Prisma y tsconfig virtual se aplican también en `POST /shadow`.

@@ -146,45 +146,6 @@ export const api = {
       { method: 'DELETE' },
     ),
 
-  getProjectArchitectureC4: (projectId: string, opts?: { level?: number; sessionId?: string | null }) => {
-    const q = new URLSearchParams();
-    if (opts?.level != null) q.set('level', String(opts.level));
-    if (opts?.sessionId?.trim()) q.set('sessionId', opts.sessionId.trim());
-    const qs = q.toString();
-    return request<import('./types').ArchitectureC4Response>(
-      `/projects/${encodeURIComponent(projectId)}/architecture/c4${qs ? `?${qs}` : ''}`,
-    );
-  },
-
-  /** SVG desde Kroki vía ingest (evita CORS al llamar kroki.io desde el navegador). */
-  postProjectC4RenderSvg: async (projectId: string, dsl: string): Promise<Blob> => {
-    const res = await fetch(
-      `${BASE}/projects/${encodeURIComponent(projectId)}/architecture/c4/render-svg`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ dsl }),
-        headers: getAuthHeaders(),
-      },
-    );
-    if (res.status === 401) {
-      removeToken();
-      window.location.href = '/login';
-      throw new Error('Sesión expirada. Redirigiendo al login.');
-    }
-    if (!res.ok) {
-      const text = await res.text();
-      let msg = text || res.statusText;
-      try {
-        const json = JSON.parse(text) as { message?: string | string[] };
-        if (json?.message) msg = Array.isArray(json.message) ? json.message.join('; ') : json.message;
-      } catch {
-        /* use text as-is */
-      }
-      throw new Error(`${res.status}: ${msg}`);
-    }
-    return res.blob();
-  },
-
   listProjectDomainDependencies: (projectId: string) =>
     request<import('./types').ProjectDomainDependency[]>(
       `/projects/${encodeURIComponent(projectId)}/domain-dependencies`,
@@ -380,12 +341,6 @@ export const api = {
       graphHints?: { suggestResync?: boolean; messageEs?: string };
     }>(`/graph/component/${encodeURIComponent(name)}${qs ? `?${qs}` : ''}`);
   },
-
-  /** Vista C4: sistemas, contenedores y COMMUNICATES_WITH (roll-up desde imports/calls). */
-  getC4Model: (projectId: string) =>
-    request<import('./types').C4ModelResponse>(
-      `/graph/c4-model?projectId=${encodeURIComponent(projectId)}`,
-    ),
 
   /**
    * Cypher de solo lectura contra Falkor vía Nest (misma conexión que el resto del grafo).

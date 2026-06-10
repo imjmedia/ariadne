@@ -13,11 +13,11 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 ## Core workflow
 
 ```
-1. semantic_search("what you're looking for")   → find relevant code
-2. get_file_context(filePath) or get_file_content(path)  → read the file
-3. validate_before_edit(nodeName)                → check impact + contract
+1. semantic_search("what you're looking for") → find relevant code
+2. get_file_context(filePath) or get_file_content(path) → read the file
+3. validate_before_edit(nodeName) → check impact + contract
 4. Edit the code
-5. analyze_local_changes()                       → pre-commit blast radius check
+5. analyze_local_changes() → pre-commit blast radius check
 ```
 
 ## Tool catalog
@@ -38,14 +38,13 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 
 ### Graphs & architecture
 - **`get_component_graph`** — Dependency tree (RENDERS, IMPORTS, USES_HOOK). Uses Nest API with auth forwarding.
-- **`get_c4_model`** — C4 architecture model (systems, containers, relationships).
+- **`get_legacy_impact`** — Dependents of a node (who calls/renders it).
 - **`get_import_graph`** — What a file imports and exports.
 - **`generate_navigation_map`** — Full frontend route map with components, forms, and API endpoints. Supports diff mode.
 - **`extract_design_tokens`** — Parse Tailwind/CSS tokens into structured JSON.
 
 ### Impact analysis (before editing)
 - **`validate_before_edit`** — **MANDATORY** before touching any component/function. Returns dependents + prop contract.
-- **`get_legacy_impact`** — Who calls or renders a node. Uses Nest API, falls back to Falkor.
 - **`get_affected_scopes`** — Full blast radius: which files/nodes break if you modify X.
 - **`check_breaking_changes`** — Alerts if you're about to remove a parameter still in use.
 - **`get_contract_specs`** — Real prop names and types from the graph. Force the AI to use correct names.

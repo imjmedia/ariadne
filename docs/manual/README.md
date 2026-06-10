@@ -14,7 +14,7 @@ Este manual describe cómo poner en marcha, usar y validar el monorepo Ariadne (
 | **API** | REST OpenAPI: `/graph/*` (Falkor); **proxy** a ingest para `/api/projects`, `/api/repositories`, `/api/credentials`, `/api/domains`, … (prefijo `/api` → ingest). NestJS + FalkorDB + Redis (caché). |
 | **Orchestrator** | Flujos LangGraph: refactor por `nodeId`, validación con props propuestas, pipeline completo (shadow + compare). NestJS. |
 | **MCP AriadneSpecs** | Servidor MCP por Streamable HTTP (puerto 8080): herramientas de grafo para la IA (get_component_graph, get_legacy_impact, etc.). |
-| **Frontend** | UI: dashboard, **dominios** (CRUD), proyectos, detalle de proyecto (**Arquitectura**: dominio, whitelist, C4/Kroki), repos, cola de sync (`/jobs`), credenciales, **Chat**, **resync**, C4 viewer, explorador de grafo, ayuda. React + Vite. |
+| **Frontend** | UI: dashboard, **dominios** (CRUD), proyectos, detalle de proyecto (**Arquitectura**: dominio, whitelist, dominio y whitelist), repos, cola de sync (`/jobs`), credenciales, **Chat**, **resync**, explorador de grafo, ayuda. React + Vite. |
 | **Cartographer** | Legacy: vigilancia de directorio local y `POST /shadow`; el ingest asume full sync + webhook. |
 
 Diagrama y detalle en [architecture.md](../notebooklm/architecture.md).
@@ -79,8 +79,8 @@ Levantar FalkorDB, PostgreSQL y Redis por tu cuenta (binarios o contenedores sue
 
 ### Ingest (puerto 3002)
 
-- **Registrar repositorio:** `POST /repositories`  
-  Body: `{ "provider": "bitbucket"|"github", "projectKey": "<workspace|owner>", "repoSlug": "<repo>", "defaultBranch": "main", "credentialsRef": "<uuid>" }` (opcional).
+- **Registrar repositorio:** `POST /repositories` 
+ Body: `{ "provider": "bitbucket"|"github", "projectKey": "<workspace|owner>", "repoSlug": "<repo>", "defaultBranch": "main", "credentialsRef": "<uuid>" }` (opcional).
 - **Contenido de archivo:** `GET /repositories/:id/file?path=src/App.tsx&ref=main` — devuelve `{ content }` desde Bitbucket/GitHub.
 - **Embedding para RAG:** `GET /embed?text=` — devuelve `{ embedding }` (requiere EMBEDDING_PROVIDER + OPENAI_API_KEY o GOOGLE_API_KEY).
 - **Indexar embeddings:** `POST /repositories/:id/embed-index` — vectoriza **Function**, **Component**, **Document** (chunks legado), **StorybookDoc** y **MarkdownDoc** (FalkorDB 4.0+). Si cambias de proveedor (OpenAI ↔ Google), reejecuta este endpoint: las dimensiones son distintas (1536 vs 768).
@@ -99,7 +99,7 @@ Tras cada sync (normal o resync), se ejecuta automáticamente el indexado de emb
 - **Webhook Bitbucket:** `POST /webhooks/bitbucket`. Evento esperado: `repo:push`. Secret desde credencial en BD (kind=webhook_secret) o `BITBUCKET_WEBHOOK_SECRET`. Ver [bitbucket_webhook.md](../notebooklm/bitbucket_webhook.md).
 - **Shadow (índice en grafo shadow):** `POST /shadow` con body `{ "files": [ { "path": "ruta/archivo.ts", "content": "código..." } ] }`.
 - **Dominios (gobierno):** `GET|POST|PATCH|DELETE /domains` y `GET /domains/:id`. Depende de migración `DomainGovernance*`.
-- **Proyecto → arquitectura:** `GET /projects/:id/architecture/c4?level=1|2|3&sessionId=` — DSL PlantUML C4; `sessionId` opcional (diff vs grafo shadow). `GET /projects/:id/graph-routing` — `cypherShardContexts` para MCP/chat multi-grafo.
+- **Proyecto → arquitectura:** `GET /projects/:id/graph-routing` — `cypherShardContexts` para MCP/chat multi-grafo.
 - **Whitelist dominios:** `GET|POST|DELETE /projects/:id/domain-dependencies` — dependencias del proyecto hacia otros dominios (`connection_type`, `description`).
 
 ### API (puerto 3000)
@@ -138,7 +138,7 @@ Herramientas expuestas:
 
 En `frontend/`: `npm run dev` (puerto 5173 por defecto). `VITE_API_URL` recomendado: **API** `http://localhost:3000` (rutas `/api/...` proxificadas al ingest) o ingest directo `:3002` según despliegue.
 
-- **Rutas:** `/` redirige a **`/dashboard`**; `/projects` listado de proyectos; `/domains` dominios; `/projects/:id` detalle (General + **Arquitectura**); `/projects/:id/chat` chat multi-repo; `/repos` lista de repos; `/jobs` cola de sync; `/repos/new` alta; `/repos/:id` detalle, Sync, Resync; `/repos/:id/chat` chat por repo; `/c4` C4 viewer; `/graph-explorer` componentes; `/credentials` credenciales; `/ayuda` ayuda MCP/manual.
+- **Rutas:** `/` redirige a **`/dashboard`**; `/projects` listado de proyectos; `/domains` dominios; `/projects/:id` detalle (General + **Arquitectura**); `/projects/:id/chat` chat multi-repo; `/repos` lista de repos; `/jobs` cola de sync; `/repos/new` alta; `/repos/:id` detalle, Sync, Resync; `/repos/:id/chat` chat por repo; `/graph-explorer` componentes; `/credentials` credenciales; `/ayuda` ayuda MCP/manual.
 - **Build:** `npm run build`; **preview:** `npm run preview` para servir `dist/` localmente.
 
 ## 5. Validación

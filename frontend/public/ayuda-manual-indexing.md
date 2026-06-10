@@ -28,7 +28,7 @@ El Cartographer debe poblar los siguientes nodos y relaciones:
 - `(:Prop {name: string, componentName: string, projectId: string, required: boolean})`
 - `(:Function {path, name, projectId, startLine?, endLine?, loc?, complexity?, nestingDepth?, description?})` — funciones nombradas; `loc` = líneas de código; `complexity` = McCabe; `nestingDepth` = profundidad de bloques.
 - **NestJS (opcional):** `(:NestModule {path, name})`, `(:NestController {path, name, route?})`, `(:NestService {path, name})` — detectados por decoradores `@Module()`, `@Controller()`, `@Injectable()`.
-- **Strapi v4 (opcional):** `(:StrapiContentType {path, name})`, `(:StrapiController {path, name, apiName?})`, `(:StrapiService {path, name, apiName?})` — detectados por patrón de path `src/api/**/content-types/**/schema.*`, `**/controllers/*`, `**/services/*`.
+- **Strapi v4 (opcional):** `(:StrapiContentType)`, `(:StrapiController)`, `(:StrapiService)`, `(:StrapiRoute)` — paths `src/api/**` y **`src/extensions/**/content-types/**/schema.*`**, `**/routes/*.{json,js}`.
 
 ### Relaciones
 
@@ -50,9 +50,9 @@ El **pipeline** (parser + producer) se mantiene igual; la entrada es siempre una
 ### Fuente de archivos
 
 - **Full sync:** Cola Redis/BullMQ. Worker ejecuta:
-  1. **Fase Mapping:** `listFiles` (API Bitbucket/GitHub o shallow clone).
-  2. **Fase Deps:** Lectura de `package.json` → `manifestDeps` en nodo Project.
-  3. **Fase Chunking:** Parse Tree-sitter → `line_range` en Function, `commitSha` en File/Function.
+ 1. **Fase Mapping:** `listFiles` (API Bitbucket/GitHub o shallow clone).
+ 2. **Fase Deps:** Lectura de `package.json` → `manifestDeps` en nodo Project.
+ 3. **Fase Chunking:** Parse Tree-sitter → `line_range` en Function, `commitSha` en File/Function.
 - **Alcance opcional por repo:** Tras el mapping, si existe `repositories.index_include_rules`, se filtra la lista de paths con `index-include-rules.ts` (manifiestos en raíz + `path_prefix` / `file`). `null` = sin este paso adicional.
 - **Incremental:** Webhook Bitbucket. Diff por commit; archivos eliminados → `buildCypherDeleteFile` (orphan cleanup).
 - **Legacy:** Cartographer con chokidar está en desuso.

@@ -77,11 +77,6 @@ export class CacheService implements OnModuleDestroy {
       : `contract:${componentName}${tail}`;
   }
 
-  /** Modelo C4 (sistemas / contenedores) por proyecto. */
-  c4ModelKey(projectId: string): string {
-    return `c4:${projectId}`;
-  }
-
   readonly TTL = { impact: TTL_IMPACT, component: TTL_COMPONENT, contract: TTL_CONTRACT };
 
   async onModuleDestroy() {

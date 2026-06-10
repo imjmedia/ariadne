@@ -14,10 +14,10 @@ La base no sigue carpetas `domain/` / `application/` al estilo clásico; la **se
 
 | Adapter | Rol en el negocio |
 |--------|-------------------|
-| **REST API `ingest`** (`services/ingest`) | CRUD proyectos, repos, dominios, credenciales; sync/resync; webhooks Bitbucket/GitHub; chat NL→Cypher; análisis por modo; embed-index; C4 y graph-routing. |
+| **REST API `ingest`** (`services/ingest`) | CRUD proyectos, repos, dominios, credenciales; sync/resync; webhooks Bitbucket/GitHub; chat NL→Cypher; análisis por modo; embed-index; graph-routing. |
 | **REST API `api`** (`services/api`) | Grafo de impacto, componente, contrato, compare, shadow; proxy hacia ingest bajo prefijo `/api` en despliegue unificado. |
 | **MCP `mcp-ariadne`** | Herramientas para la IA (Cursor): grafo, búsqueda semántica, análisis de proyecto, validación antes de editar, etc. |
-| **Frontend** (`frontend/`) | Gobierno de arquitectura (dominios, C4, whitelist), operación de repos y jobs, ayuda estática. |
+| **Frontend** (`frontend/`) | Gobierno de arquitectura (dominios, whitelist), operación de repos y jobs, ayuda estática. |
 | **Webhooks remotos** | Push de Bitbucket/GitHub → ingest encola trabajo incremental. |
 | **Cola BullMQ (Redis)** | Workers de sync: procesan jobs sin bloquear la API HTTP. |
 
@@ -28,43 +28,43 @@ La base no sigue carpetas `domain/` / `application/` al estilo clásico; la **se
 | **PostgreSQL + TypeORM** | Fuente de verdad relacional: repositorios, proyectos, `project_repositories`, dominios, dependencias entre dominios, credenciales cifradas, jobs de sync, espacios de embedding, etc. |
 | **FalkorDB** | Grafo de código (nodos File/Component/Function/…, relaciones IMPORTS/RENDERS/CALLS/…). Particionado por `projectId` / repo; soporte **vector** (`vecf32`) para RAG si la versión de FalkorDB lo expone. |
 | **Redis** | Cola BullMQ, caché de análisis y estados de agente; no es fuente de verdad del dominio. |
-| **Proveedores remotos** | APIs Bitbucket/GitHub (listado de archivos, contenido, branches); Kroki (render PlantUML C4); LLM/embeddings (OpenAI/Google/Ollama según `EMBEDDING_*`). |
+| **Proveedores remotos** | APIs Bitbucket/GitHub (listado de archivos, contenido, branches); LLM/embeddings (OpenAI/Google/Ollama según `EMBEDDING_*`). |
 
 ### Flujo de datos (alto nivel)
 
 ```mermaid
 flowchart LR
-  subgraph driving [Driving]
-    UI[Frontend]
-    WH[Webhooks]
-    MCP[MCP Client]
-    API_IN[ingest REST]
-  end
-  subgraph core [Núcleo ingest]
-    SYNC[Sync pipeline]
-    CHAT[Chat + Cypher]
-    AN[Analytics / analyze]
-  end
-  subgraph driven [Driven]
-    PG[(PostgreSQL)]
-    FK[(FalkorDB)]
-    RD[(Redis)]
-    REM[Git remotes / LLM]
-  end
-  UI --> API_IN
-  WH --> API_IN
-  MCP --> API_IN
-  API_IN --> SYNC
-  API_IN --> CHAT
-  API_IN --> AN
-  SYNC --> PG
-  SYNC --> FK
-  SYNC --> RD
-  SYNC --> REM
-  CHAT --> FK
-  CHAT --> REM
-  AN --> FK
-  AN --> PG
+ subgraph driving [Driving]
+ UI[Frontend]
+ WH[Webhooks]
+ MCP[MCP Client]
+ API_IN[ingest REST]
+ end
+ subgraph core [Núcleo ingest]
+ SYNC[Sync pipeline]
+ CHAT[Chat + Cypher]
+ AN[Analytics / analyze]
+ end
+ subgraph driven [Driven]
+ PG[(PostgreSQL)]
+ FK[(FalkorDB)]
+ RD[(Redis)]
+ REM[Git remotes / LLM]
+ end
+ UI --> API_IN
+ WH --> API_IN
+ MCP --> API_IN
+ API_IN --> SYNC
+ API_IN --> CHAT
+ API_IN --> AN
+ SYNC --> PG
+ SYNC --> FK
+ SYNC --> RD
+ SYNC --> REM
+ CHAT --> FK
+ CHAT --> REM
+ AN --> FK
+ AN --> PG
 ```
 
 ---
@@ -75,7 +75,7 @@ flowchart LR
 
 - **Proyecto (multi-root):** Agrupa N repositorios; tiene `projectId` (UUID) usado por MCP y chat; puede asignarse a un **dominio de arquitectura** y declarar **dependencias a otros dominios** (whitelist para shards Cypher multi-grafo).
 - **Repositorio:** Conexión a un remoto (Bitbucket/GitHub), branch por defecto, estado de sync, `credentialsRef` opcional; puede participar en varios proyectos (`project_repositories` + rol para inferencia de alcance en chat).
-- **Dominio (arquitectura):** Entidad de gobierno (nombre, color, metadata); no es “dominio DDD” del código de negocio del cliente, sino **dominio de gobierno** para C4 y límites de grafo.
+- **Dominio (arquitectura):** Entidad de gobierno (nombre, color, metadata); no es “dominio DDD” del código de negocio del cliente, sino **dominio de gobierno** para límites de grafo y shards.
 - **Grafo Falkor:** Modelo de código indexado por el pipeline (parser → producer Cypher); nodos tipados; embeddings opcionales por nodo para duplicados semánticos y búsqueda.
 - **Job de sync:** Estado `queued` / `running` / …; full vs incremental; amarra la operación de ingesta a un repositorio.
 
@@ -84,7 +84,6 @@ flowchart LR
 - Sin **sync** reciente, el grafo y el chat no reflejan el estado del remoto.
 - **Chat** y **análisis** multi-root resuelven repo/proyecto vía `AnalyticsService`, `idePath`, `repositoryId` y roles — no asumir un único `repoId` por proyecto.
 - **Cypher multi-shard:** Con whitelist de dominios, el ingest expone `cypherShardContexts`; chat/MCP deben usar el `cypherProjectId` correcto por shard.
-- **C4:** DSL generado en ingest, diagrama vía Kroki en frontend; modo shadow opcional para SDD visual cuando hay sesión/shadow graph.
 
 ### Value objects / identificadores (implícitos en el modelo)
 
@@ -130,7 +129,7 @@ flowchart LR
 
 ## 5. Firmas críticas (referencia mínima, no código completo)
 
-- **Ingest:** `POST /repositories/:id/sync`, `POST /repositories/:id/resync`, `POST /repositories/:id/chat`, `POST /repositories/:id/analyze`, `POST /projects/:projectId/chat`, `POST /projects/:projectId/analyze`, `GET /projects/:id/architecture/c4`, `GET /projects/:id/graph-routing`.
+- **Ingest:** `POST /repositories/:id/sync`, `POST /repositories/:id/resync`, `POST /repositories/:id/chat`, `POST /repositories/:id/analyze`, `POST /projects/:projectId/chat`, `POST /projects/:projectId/analyze`, `GET /projects/:id/graph-routing`.
 - **MCP (ejemplos):** `list_known_projects`, `get_component_graph`, `get_project_analysis`, `semantic_search`, `validate_before_edit` — definición detallada en `docs/notebooklm/mcp_server_specs.md`.
 
 ---

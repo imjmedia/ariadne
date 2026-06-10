@@ -2,14 +2,13 @@
 
 Vistas principales de la aplicación Ariadne (shell SaaS: sidebar + header con breadcrumbs).
 
-## Dashboard y C4
+## Dashboard
 
-- **Dashboard.tsx** — KPIs desde API: número de proyectos, repositorios, dominios y **salud de ingesta** (% repos en `ready`). Accesos rápidos a C4, grafo y cola. Ruta: `/dashboard` (landing tras login; **`/` redirige aquí**).
-- **C4ViewerPage.tsx** — Visor C4 dedicado: selector de proyecto + **C4Previewer** en layout **split** (diagrama Kroki + panel DSL estilo editor). Misma API que la pestaña Arquitectura del proyecto. Ruta: `/c4`.
+- **Dashboard.tsx** — KPIs desde API: número de proyectos, repositorios, dominios y **salud de ingesta** (% repos en `ready`). Accesos rápidos a grafo y cola. Ruta: `/dashboard` (landing tras login; **`/` redirige aquí**).
 
 ## Proyectos (multi-root)
 
-- **DomainsList.tsx** — CRUD de **dominios** (nombre, color, descripción), columna **Proyectos asignados** (recuento + diálogo con enlaces), y diálogo **Visibilidad C4** (`domain_domain_visibility`). Los proyectos también asignan dominio en **ProjectDetail** (General o Arquitectura). Ruta: `/domains`.
+- **DomainsList.tsx** — CRUD de **dominios** (nombre, color, descripción), columna **Proyectos asignados** (recuento + diálogo con enlaces), y diálogo **Visibilidad entre dominios** (`domain_domain_visibility`). Los proyectos también asignan dominio en **ProjectDetail** (General o Arquitectura). Ruta: `/domains`.
 - **ProjectList.tsx** — Lista de proyectos en **cards** con barra de salud de ingesta (repos `ready`/total), badge de dominio si aplica, ID MCP. Títulos de página `text-4xl`. Ruta **`/projects`** (no `/`; la raíz redirige al dashboard). Botón **Dominios** → `/domains`.
 - **CreateProject.tsx** — Alta de proyecto (nombre y descripción opcionales). Tras crear redirige a `/projects/:id` donde se pueden añadir repos. Ruta: `/projects/new`.
 - **ProjectDetail.tsx** — Detalle de proyecto: nombre, descripción (editable), ID (MCP) con copiar y botón **Regenerar ID** (crea nuevo UUID sin perder datos), tabla de repos (columna **Rol (chat)** editable, persiste vía API para inferencia multi-root), acciones por repo.

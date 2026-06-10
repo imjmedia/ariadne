@@ -141,9 +141,9 @@ Documento que condensa la recomendación de priorización respecto a los cuatro 
 
 ```text
 F0 métricas → F1 CI PR → F2 vector + expansión grafo
-  → (F3 ingest por archivo si duele) → F4 replan en orchestrator
-  → (F5 dominio LLM piloto si hay negocio) → (F6 taint acotado si hay caso)
-  → (F7 multi-lang si hay demanda)
+ → (F3 ingest por archivo si duele) → F4 replan en orchestrator
+ → (F5 dominio LLM piloto si hay negocio) → (F6 taint acotado si hay caso)
+ → (F7 multi-lang si hay demanda)
 ```
 
 ---

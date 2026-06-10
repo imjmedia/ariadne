@@ -22,7 +22,6 @@
  * |------|-----|
  * | `list_known_projects` | Descubre `id` de proyecto y `roots[].id` de repo (multi-root). Origen: ingest o grafo. |
  * | `get_component_graph` | Subgrafo de componente (RENDERS, IMPORTS, hooks). Preferencia API Nest; fallback Falkor. |
- * | `get_c4_model` | Contenedores C4 + COMMUNICATES_WITH. API `GET /api/graph/c4-model`. |
  * | `get_legacy_impact` | Impacto inverso (quién llama/renderiza). API `GET /api/graph/impact` o Falkor. |
  * | `get_contract_specs` | Props y firmas desde scanner (contrato SDD). |
  * | `get_functions_in_file` | Nodos Function/Component por ruta de archivo (`CONTAINS`). |
