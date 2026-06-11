@@ -100,15 +100,24 @@ function groupRoutesByPath(
   return result;
 }
 
+function buildOpenApiSpecNotes(params: {
   openapiPath: string | null;
   swaggerDeps: boolean;
   swaggerRelatedPaths: string[];
   supplementaryDocs: string[];
   apiFromSwagger: number;
   apiFromAst: number;
+  apiFromStrapi: number;
 }): string | undefined {
-  const { openapiPath, swaggerDeps, swaggerRelatedPaths, supplementaryDocs, apiFromSwagger, apiFromAst } =
-    params;
+  const {
+    openapiPath,
+    swaggerDeps,
+    swaggerRelatedPaths,
+    supplementaryDocs,
+    apiFromSwagger,
+    apiFromAst,
+    apiFromStrapi,
+  } = params;
   if (openapiPath) return undefined;
   const parts: string[] = [];
   if (swaggerDeps) {
@@ -129,10 +138,11 @@ function groupRoutesByPath(
   if (
     apiFromSwagger === 0 &&
     apiFromAst === 0 &&
+    apiFromStrapi === 0 &&
     (swaggerDeps || swaggerRelatedPaths.length > 0 || supplementaryDocs.length > 0)
   ) {
     parts.push(
-      'Sin nodos OpenApiOperation ni NestController para este projectId: revisar sync del repo backend o ejecutar export OpenAPI y re-indexar el artefacto.',
+      'Sin nodos OpenApiOperation, StrapiRoute ni NestController para este projectId: revisar sync del repo backend o ejecutar export OpenAPI y re-indexar el artefacto.',
     );
   }
   return parts.length ? parts.join(' ') : undefined;
@@ -451,6 +461,7 @@ export async function buildMddEvidenceDocument(params: {
     supplementaryDocs: supplementaryDocPaths,
     apiFromSwagger: apiFromSwagger.length,
     apiFromAst: apiFromAst.length,
+    apiFromStrapi: apiFromStrapi.length,
   });
 
   return {
