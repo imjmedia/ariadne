@@ -3298,6 +3298,8 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     }
     return buildMddEvidenceDocument({
       projectId,
+      repositoryId,
+      repoIds: projectScope ? undefined : [repositoryId],
       message,
       gatheredContext: gc,
       collectedResults: cr,
@@ -3736,6 +3738,13 @@ ${SCHEMA}${EXAMPLES}
     if (evidenceFirst) {
       const mdd = await buildMddEvidenceDocument({
         projectId,
+        repositoryId,
+        repoIds:
+          options?.scope?.repoIds?.length
+            ? options.scope.repoIds
+            : options?.projectScope
+              ? undefined
+              : [repositoryId],
         message,
         gatheredContext: effectiveGathered,
         collectedResults: effectiveResults,
