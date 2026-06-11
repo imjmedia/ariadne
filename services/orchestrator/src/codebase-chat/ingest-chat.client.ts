@@ -131,7 +131,7 @@ export class IngestChatClient {
       gatheredContext: string;
       collectedResults: unknown[];
       projectScope: boolean;
-      projectId: string;
+      projectId?: string;
     },
   ): Promise<Record<string, unknown>> {
     const url = `${this.ingestBase()}/internal/repositories/${encodeURIComponent(repositoryId)}/mdd-evidence`;
