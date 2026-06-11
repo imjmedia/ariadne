@@ -3,6 +3,7 @@
  */
 import type { MddEvidenceDocument } from './mdd-document.types';
 import { getMddBuilderLimits } from './mdd-limits';
+import { inferStrapiMddFromEvidencePaths } from './mdd-strapi-path-fallback';
 
 function uniq(paths: string[]): string[] {
   return [...new Set(paths.filter((p) => typeof p === 'string' && p.length > 0))];
@@ -71,10 +72,20 @@ function inferSwaggerDependencies(depKeys: string[]): boolean {
 
 /** Inventarios / PRD que documentan endpoints aunque no haya OpenAPI indexado en el grafo. */
 function pickSupplementaryApiDocPaths(paths: string[]): string[] {
+  const hasStrapiBackendPaths = paths.some(
+    (p) => p.includes('/content-types/') || /\/api\/[^/]+\/routes\//i.test(p),
+  );
   const out: string[] = [];
   for (const p of paths) {
     const lower = p.toLowerCase();
     if (!lower.endsWith('.md') && !lower.endsWith('.mdx')) continue;
+    if (
+      !hasStrapiBackendPaths &&
+      lower.includes('inventario') &&
+      (lower.includes('erp') || lower.includes('endpoint'))
+    ) {
+      continue;
+    }
     if (
       (lower.includes('inventario') && lower.includes('endpoint')) ||
       lower.includes('inventario-endpoint') ||
@@ -427,7 +438,7 @@ export async function buildMddEvidenceDocument(params: {
   const envVars: string[] = envContent ? parseEnvExampleKeys(envContent) : [];
 
   // evidence paths from gathered context + collected results
-  const evidence_paths = pathsFromGathering(gatheredContext, collectedResults);
+  let evidence_paths = pathsFromGathering(gatheredContext, collectedResults);
 
   // physicalPriority files — reuse cached .env.example to avoid a second read
   const physicalPriority = [
@@ -447,14 +458,46 @@ export async function buildMddEvidenceDocument(params: {
   }
 
   const mergedEvidencePaths = uniq(evidence_paths);
+
+  let entitiesFinal = entities;
+  let apiFromStrapiFinal = apiFromStrapi;
+  let businessFinal = business;
+  let usedPathFallback = false;
+
+  const hasStrapiEvidencePaths = mergedEvidencePaths.some(
+    (p) => /\/content-types\/[^/]+\/schema\.json$/i.test(p) || /\/(?:api|extensions)\/[^/]+\/routes\//i.test(p),
+  );
+  if (
+    entitiesFromStrapi.length === 0 &&
+    apiFromStrapi.length === 0 &&
+    hasStrapiEvidencePaths
+  ) {
+    const fb = await inferStrapiMddFromEvidencePaths({
+      evidencePaths: mergedEvidencePaths,
+      getFileSnippet,
+      maxContentTypes: L.strapiContentTypes,
+      maxRoutes: L.strapiRoutes,
+    });
+    if (fb.usedFallback) {
+      usedPathFallback = true;
+      if (entitiesFinal.length === 0 && fb.entities.length > 0) entitiesFinal = fb.entities;
+      if (apiFromStrapiFinal.length === 0 && fb.api_contracts.length > 0) {
+        apiFromStrapiFinal = fb.api_contracts;
+      }
+      if (businessFinal.length === 0 && fb.business_logic.length > 0) {
+        businessFinal = fb.business_logic;
+      }
+    }
+  }
+
   const supplementaryDocPaths = pickSupplementaryApiDocPaths(mergedEvidencePaths);
   const swaggerDeps = inferSwaggerDependencies(manifestDepKeys);
 
   // Decide which API contracts to use: OpenAPI > Strapi routes > Nest AST
   const api_contracts = apiFromSwagger.length
     ? apiFromSwagger
-    : apiFromStrapi.length
-      ? apiFromStrapi
+    : apiFromStrapiFinal.length
+      ? apiFromStrapiFinal
       : apiFromAst;
 
   const trust: MddEvidenceDocument['openapi_spec']['trust_level'] =
@@ -464,8 +507,10 @@ export async function buildMddEvidenceDocument(params: {
     `Consulta: ${message.slice(0, L.summaryMessageChars)}`,
     `Evidencia anclada a ${mergedEvidencePaths.length} ruta(s) verificada(s) en el repositorio indexado.`,
     openapiPath ? `Contrato OpenAPI priorizado: \`${openapiPath}\`.` : 'Sin spec OpenAPI indexado; rutas vía AST si aplica.',
-    entities.length
-      ? `${entities.length} entidad(es) en grafo (${entitiesFromModels.length} ORM, ${entitiesFromStrapi.length} Strapi).`
+    entitiesFinal.length
+      ? usedPathFallback && entitiesFromStrapi.length === 0
+        ? `${entitiesFinal.length} entidad(es) Strapi inferida(s) desde schema.json en evidence_paths (grafo vacío).`
+        : `${entitiesFinal.length} entidad(es) en grafo (${entitiesFromModels.length} ORM, ${entitiesFromStrapi.length} Strapi).`
       : 'Sin nodos Model ni StrapiContentType en grafo para este alcance.',
   ];
   if (!openapiPath && (swaggerDeps || swaggerRelatedPaths.length > 0)) {
@@ -481,19 +526,23 @@ export async function buildMddEvidenceDocument(params: {
         .join(', ')}${supplementaryDocPaths.length > 5 ? '…' : ''}.`,
     );
   }
-  if (apiFromStrapi.length > 0 && apiFromSwagger.length === 0) {
-    summaryParts.push(`${apiFromStrapi.length} contrato(s) API desde StrapiRoute (routes.json / core router).`);
+  if (apiFromStrapiFinal.length > 0 && apiFromSwagger.length === 0) {
+    summaryParts.push(
+      usedPathFallback && apiFromStrapi.length === 0
+        ? `${apiFromStrapiFinal.length} contrato(s) API inferido(s) desde routes en evidence_paths (grafo vacío).`
+        : `${apiFromStrapiFinal.length} contrato(s) API desde StrapiRoute (routes.json / core router).`,
+    );
   }
   const summary = summaryParts.join(' ');
 
   const complexity = Math.min(
     100,
     Math.round(
-      entities.length * 2 +
+      entitiesFinal.length * 2 +
         apiFromSwagger.length +
-        apiFromStrapi.length +
+        apiFromStrapiFinal.length +
         apiFromAst.length +
-        business.length +
+        businessFinal.length +
         mergedEvidencePaths.length * 0.5,
     ),
   );
@@ -505,7 +554,7 @@ export async function buildMddEvidenceDocument(params: {
     supplementaryDocs: supplementaryDocPaths,
     apiFromSwagger: apiFromSwagger.length,
     apiFromAst: apiFromAst.length,
-    apiFromStrapi: apiFromStrapi.length,
+    apiFromStrapi: apiFromStrapiFinal.length,
   });
 
   return {
@@ -519,9 +568,9 @@ export async function buildMddEvidenceDocument(params: {
       ...(supplementaryDocPaths.length > 0 ? { supplementary_doc_paths: supplementaryDocPaths } : {}),
       ...(openApiNotes ? { notes: openApiNotes } : {}),
     },
-    entities,
+    entities: entitiesFinal,
     api_contracts,
-    business_logic: business,
+    business_logic: businessFinal,
     infrastructure: {
       orm: inferOrmFromDeps(manifestDepKeys),
       env_vars: envVars,
@@ -529,7 +578,7 @@ export async function buildMddEvidenceDocument(params: {
     risk_report: {
       complexity,
       anti_patterns:
-        apiFromSwagger.length === 0 && apiFromAst.length === 0 && apiFromStrapi.length > 200
+        apiFromSwagger.length === 0 && apiFromAst.length === 0 && apiFromStrapiFinal.length > 200
           ? ['strapi_route_large_surface']
           : apiFromSwagger.length === 0 && apiFromAst.length > 50
             ? ['ast_fallback_large_surface']

@@ -446,7 +446,6 @@ ${SCHEMA}${EXAMPLES}
           gatheredContext,
           collectedResults,
           projectScope: state.projectScope,
-          projectId: state.projectId,
         });
         const jsonAnswer = JSON.stringify(mdd, null, 2);
         return {

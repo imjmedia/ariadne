@@ -103,7 +103,8 @@ export class InternalChatToolsController {
     },
   ): Promise<MddEvidenceDocument> {
     await this.repos.findOne(repoId);
-    const projectId = body.projectId?.trim() || (await this.resolveProjectIdForRepo(repoId));
+    // Siempre workspace Falkor del repo; el orchestrator legacy enviaba repositoryId como projectId.
+    const projectId = await this.resolveProjectIdForRepo(repoId);
     return this.chat.buildMddEvidenceForRepository(
       repoId,
       projectId,
