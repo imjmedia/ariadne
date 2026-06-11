@@ -6,6 +6,9 @@ services:
     image: falkordb/falkordb:v4.16.5
     platform: linux/amd64
     container_name: ariadnespecs-db
+    # Evita MISCONF durante reindex pesado: BGSAVE falla si el grafo no está sincronizado (matrices GraphBLAS).
+    environment:
+      REDIS_ARGS: '--save "" --stop-writes-on-bgsave-error no'
     volumes:
       - falkordb_data:/data
     networks:
@@ -40,6 +43,12 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ariadnespecs-redis
+    # Cola BullMQ + caché MCP: sin RDB; estado de sync vive en Postgres.
+    command: >
+      redis-server
+      --save ""
+      --appendonly no
+      --stop-writes-on-bgsave-error no
     volumes:
       - redis_data:/data
     networks:
