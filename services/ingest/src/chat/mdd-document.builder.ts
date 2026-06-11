@@ -8,6 +8,21 @@ function uniq(paths: string[]): string[] {
   return [...new Set(paths.filter((p) => typeof p === 'string' && p.length > 0))];
 }
 
+/** Acota consultas MDD al `repoId` del scope (multi-root / generate_legacy_documentation por repo). */
+function cypherRepoScope(repoIds: string[] | undefined, nodeAlias: string): {
+  clause: string;
+  params: Record<string, unknown>;
+} {
+  if (!repoIds?.length) return { clause: '', params: {} };
+  return { clause: ` AND ${nodeAlias}.repoId IN $repoIds`, params: { repoIds } };
+}
+
+function resolveMddRepoIds(params: { repoIds?: string[]; repositoryId?: string }): string[] | undefined {
+  if (params.repoIds?.length) return [...new Set(params.repoIds.filter(Boolean))];
+  if (params.repositoryId?.trim()) return [params.repositoryId.trim()];
+  return undefined;
+}
+
 function pathsFromGathering(gatheredContext: string, collectedResults: unknown[]): string[] {
   const out: string[] = [];
   const blob = `${gatheredContext}\n${JSON.stringify(collectedResults)}`;
@@ -150,6 +165,9 @@ function buildOpenApiSpecNotes(params: {
 
 export async function buildMddEvidenceDocument(params: {
   projectId: string;
+  /** Acota nodos Falkor al repo del scope MCP (evita mezclar roots en multi-root). */
+  repoIds?: string[];
+  repositoryId?: string;
   message: string;
   gatheredContext: string;
   collectedResults: unknown[];
@@ -162,6 +180,7 @@ export async function buildMddEvidenceDocument(params: {
 }): Promise<MddEvidenceDocument> {
   const { projectId, message, gatheredContext, collectedResults, executeCypher, getFileSnippet } =
     params;
+  const scopedRepoIds = resolveMddRepoIds(params);
   const L = getMddBuilderLimits();
 
   // ── Phase 1: All independent Cypher queries + file reads in parallel ──────────
@@ -199,10 +218,11 @@ export async function buildMddEvidenceDocument(params: {
     // 2. openapiPath
     (async (): Promise<string | null> => {
       try {
+        const rs = cypherRepoScope(scopedRepoIds, 'f');
         const oa = (await executeCypher(
           projectId,
-          `MATCH (f:File {projectId: $projectId}) WHERE f.openApiTruth = true RETURN f.path AS path LIMIT ${L.openApiFileCandidates}`,
-          { projectId },
+          `MATCH (f:File {projectId: $projectId}) WHERE f.openApiTruth = true${rs.clause} RETURN f.path AS path LIMIT ${L.openApiFileCandidates}`,
+          { projectId, ...rs.params },
         )) as Array<{ path?: string }>;
         return oa[0]?.path ?? null;
       } catch {
@@ -214,13 +234,14 @@ export async function buildMddEvidenceDocument(params: {
     // 3. swaggerRelatedPaths
     (async (): Promise<string[]> => {
       try {
+        const rs = cypherRepoScope(scopedRepoIds, 'f');
         const sw = (await executeCypher(
           projectId,
           `MATCH (f:File {projectId: $projectId})
-           WHERE toLower(f.path) CONTAINS 'swagger'
-              OR toLower(f.path) CONTAINS 'openapi'
+           WHERE (toLower(f.path) CONTAINS 'swagger'
+              OR toLower(f.path) CONTAINS 'openapi')${rs.clause}
            RETURN f.path AS path LIMIT ${L.swaggerRelatedFiles}`,
-          { projectId },
+          { projectId, ...rs.params },
         )) as Array<{ path?: string }>;
         return uniq(
           sw.map((r) => r.path).filter((p): p is string => typeof p === 'string' && p.length > 0),
@@ -236,11 +257,12 @@ export async function buildMddEvidenceDocument(params: {
       Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' }>
     > => {
       try {
+        const rs = cypherRepoScope(scopedRepoIds, 'op');
         const ops = (await executeCypher(
           projectId,
-          `MATCH (op:OpenApiOperation {projectId: $projectId})
+          `MATCH (op:OpenApiOperation {projectId: $projectId})${rs.clause}
            RETURN op.pathTemplate AS route, op.method AS method LIMIT ${L.openApiOperations}`,
-          { projectId },
+          { projectId, ...rs.params },
         )) as Array<{ route?: string; method?: string }>;
         return groupRoutesByPath(ops).map((r) => ({ ...r, doc_source: 'swagger' as const }));
       } catch {
@@ -254,11 +276,12 @@ export async function buildMddEvidenceDocument(params: {
       Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' }>
     > => {
       try {
+        const rs = cypherRepoScope(scopedRepoIds, 'c');
         const ctr = (await executeCypher(
           projectId,
-          `MATCH (c:NestController {projectId: $projectId})
+          `MATCH (c:NestController {projectId: $projectId})${rs.clause}
            RETURN coalesce(c.route,'') AS prefix, c.name AS name LIMIT ${L.nestControllers}`,
-          { projectId },
+          { projectId, ...rs.params },
         )) as Array<{ prefix?: string | null; name?: string }>;
         const result: Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' }> = [];
         for (const row of ctr) {
@@ -278,11 +301,12 @@ export async function buildMddEvidenceDocument(params: {
       Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' | 'strapi' }>
     > => {
       try {
+        const rs = cypherRepoScope(scopedRepoIds, 'sr');
         const routes = (await executeCypher(
           projectId,
-          `MATCH (sr:StrapiRoute {projectId: $projectId})
+          `MATCH (sr:StrapiRoute {projectId: $projectId})${rs.clause}
            RETURN sr.routePath AS route, sr.method AS method LIMIT ${L.strapiRoutes}`,
-          { projectId },
+          { projectId, ...rs.params },
         )) as Array<{ route?: string; method?: string }>;
         return groupRoutesByPath(routes).map((r) => ({ ...r, doc_source: 'strapi' as const }));
       } catch {
@@ -294,11 +318,12 @@ export async function buildMddEvidenceDocument(params: {
     // 6. entitiesFromModels (Model nodes)
     (async (): Promise<MddEvidenceDocument['entities']> => {
       try {
+        const rs = cypherRepoScope(scopedRepoIds, 'm');
         const models = (await executeCypher(
           projectId,
-          `MATCH (m:Model {projectId: $projectId})
+          `MATCH (m:Model {projectId: $projectId})${rs.clause}
            RETURN m.name AS name, m.source AS source, m.fieldSummary AS fs LIMIT ${L.models}`,
-          { projectId },
+          { projectId, ...rs.params },
         )) as Array<{ name?: string; source?: string; fs?: string | null }>;
         const result: MddEvidenceDocument['entities'] = [];
         for (const row of models) {
@@ -325,11 +350,12 @@ export async function buildMddEvidenceDocument(params: {
     // 6b. entitiesFromStrapi (StrapiContentType nodes)
     (async (): Promise<MddEvidenceDocument['entities']> => {
       try {
+        const rs = cypherRepoScope(scopedRepoIds, 'ct');
         const rows = (await executeCypher(
           projectId,
-          `MATCH (ct:StrapiContentType {projectId: $projectId})
+          `MATCH (ct:StrapiContentType {projectId: $projectId})${rs.clause}
            RETURN ct.name AS name, ct.attributesSummary AS fs, ct.strapiUid AS uid LIMIT ${L.strapiContentTypes}`,
-          { projectId },
+          { projectId, ...rs.params },
         )) as Array<{ name?: string; fs?: string | null; uid?: string | null }>;
         const result: MddEvidenceDocument['entities'] = [];
         for (const row of rows) {
@@ -347,25 +373,40 @@ export async function buildMddEvidenceDocument(params: {
       return [];
     })(),
 
-    // 7. business (NestService nodes)
+    // 7. business (NestService + StrapiService nodes)
     (async (): Promise<MddEvidenceDocument['business_logic']> => {
+      const result: MddEvidenceDocument['business_logic'] = [];
       try {
+        const rs = cypherRepoScope(scopedRepoIds, 's');
         const svcs = (await executeCypher(
           projectId,
-          `MATCH (f:File)-[:CONTAINS]->(s:NestService {projectId: $projectId})
+          `MATCH (f:File)-[:CONTAINS]->(s:NestService {projectId: $projectId})${rs.clause}
            RETURN s.name AS service, f.path AS path LIMIT ${L.nestServices}`,
-          { projectId },
+          { projectId, ...rs.params },
         )) as Array<{ service?: string; path?: string }>;
-        const result: MddEvidenceDocument['business_logic'] = [];
         for (const row of svcs) {
           if (row.service)
             result.push({ service: row.service, dependencies: row.path ? [row.path] : [] });
         }
-        return result;
       } catch {
         /* ignore */
       }
-      return [];
+      try {
+        const rs = cypherRepoScope(scopedRepoIds, 's');
+        const strapiSvcs = (await executeCypher(
+          projectId,
+          `MATCH (f:File)-[:CONTAINS]->(s:StrapiService {projectId: $projectId})${rs.clause}
+           RETURN s.name AS service, f.path AS path LIMIT ${L.nestServices}`,
+          { projectId, ...rs.params },
+        )) as Array<{ service?: string; path?: string }>;
+        for (const row of strapiSvcs) {
+          if (row.service)
+            result.push({ service: `strapi:${row.service}`, dependencies: row.path ? [row.path] : [] });
+        }
+      } catch {
+        /* grafo sin StrapiService */
+      }
+      return result;
     })(),
 
     // 8. envContent — read once, shared between envVars extraction and physicalPriority
@@ -439,6 +480,9 @@ export async function buildMddEvidenceDocument(params: {
         .map((p) => `\`${p}\``)
         .join(', ')}${supplementaryDocPaths.length > 5 ? '…' : ''}.`,
     );
+  }
+  if (apiFromStrapi.length > 0 && apiFromSwagger.length === 0) {
+    summaryParts.push(`${apiFromStrapi.length} contrato(s) API desde StrapiRoute (routes.json / core router).`);
   }
   const summary = summaryParts.join(' ');
 
