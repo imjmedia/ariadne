@@ -76,7 +76,30 @@ function pickSupplementaryApiDocPaths(paths: string[]): string[] {
   return uniq(out);
 }
 
-function buildOpenApiSpecNotes(params: {
+function parseStrapiAttributesSummary(summary: string | null | undefined): string[] {
+  if (!summary?.trim()) return [];
+  return summary
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function groupRoutesByPath(
+  rows: Array<{ route?: string; method?: string }>,
+): Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' | 'strapi' }> {
+  const byRoute = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.route || !row.method) continue;
+    if (!byRoute.has(row.route)) byRoute.set(row.route, new Set());
+    byRoute.get(row.route)!.add(String(row.method).toUpperCase());
+  }
+  const result: Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' | 'strapi' }> = [];
+  for (const [route, methods] of byRoute) {
+    result.push({ route, methods: [...methods], doc_source: 'swagger' });
+  }
+  return result;
+}
+
   openapiPath: string | null;
   swaggerDeps: boolean;
   swaggerRelatedPaths: string[];
@@ -138,7 +161,9 @@ export async function buildMddEvidenceDocument(params: {
     swaggerRelatedPaths,
     apiFromSwagger,
     apiFromAst,
-    entities,
+    apiFromStrapi,
+    entitiesFromModels,
+    entitiesFromStrapi,
     business,
     envContent,
   ] = await Promise.all([
@@ -207,17 +232,7 @@ export async function buildMddEvidenceDocument(params: {
            RETURN op.pathTemplate AS route, op.method AS method LIMIT ${L.openApiOperations}`,
           { projectId },
         )) as Array<{ route?: string; method?: string }>;
-        const byRoute = new Map<string, Set<string>>();
-        for (const row of ops) {
-          if (!row.route || !row.method) continue;
-          if (!byRoute.has(row.route)) byRoute.set(row.route, new Set());
-          byRoute.get(row.route)!.add(String(row.method).toUpperCase());
-        }
-        const result: Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' }> = [];
-        for (const [route, methods] of byRoute) {
-          result.push({ route, methods: [...methods], doc_source: 'swagger' });
-        }
-        return result;
+        return groupRoutesByPath(ops).map((r) => ({ ...r, doc_source: 'swagger' as const }));
       } catch {
         /* grafo sin OpenApiOperation */
       }
@@ -248,7 +263,25 @@ export async function buildMddEvidenceDocument(params: {
       return [];
     })(),
 
-    // 6. entities (Model nodes)
+    // 5b. apiFromStrapi (StrapiRoute nodes)
+    (async (): Promise<
+      Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' | 'strapi' }>
+    > => {
+      try {
+        const routes = (await executeCypher(
+          projectId,
+          `MATCH (sr:StrapiRoute {projectId: $projectId})
+           RETURN sr.routePath AS route, sr.method AS method LIMIT ${L.strapiRoutes}`,
+          { projectId },
+        )) as Array<{ route?: string; method?: string }>;
+        return groupRoutesByPath(routes).map((r) => ({ ...r, doc_source: 'strapi' as const }));
+      } catch {
+        /* grafo sin StrapiRoute */
+      }
+      return [];
+    })(),
+
+    // 6. entitiesFromModels (Model nodes)
     (async (): Promise<MddEvidenceDocument['entities']> => {
       try {
         const models = (await executeCypher(
@@ -271,6 +304,31 @@ export async function buildMddEvidenceDocument(params: {
             }
           }
           result.push({ name: row.name, source, fields });
+        }
+        return result;
+      } catch {
+        /* ignore */
+      }
+      return [];
+    })(),
+
+    // 6b. entitiesFromStrapi (StrapiContentType nodes)
+    (async (): Promise<MddEvidenceDocument['entities']> => {
+      try {
+        const rows = (await executeCypher(
+          projectId,
+          `MATCH (ct:StrapiContentType {projectId: $projectId})
+           RETURN ct.name AS name, ct.attributesSummary AS fs, ct.strapiUid AS uid LIMIT ${L.strapiContentTypes}`,
+          { projectId },
+        )) as Array<{ name?: string; fs?: string | null; uid?: string | null }>;
+        const result: MddEvidenceDocument['entities'] = [];
+        for (const row of rows) {
+          if (!row.name) continue;
+          const fields = parseStrapiAttributesSummary(row.fs);
+          if (row.uid?.trim() && !fields.some((f) => f.startsWith('uid:'))) {
+            fields.unshift(`uid:${row.uid.trim()}`);
+          }
+          result.push({ name: row.name, source: 'strapi', fields });
         }
         return result;
       } catch {
@@ -312,6 +370,8 @@ export async function buildMddEvidenceDocument(params: {
 
   // ── Phase 2: Build the MDD object from parallel results ──────────────────────
 
+  const entities = [...entitiesFromModels, ...entitiesFromStrapi];
+
   // envVars from cached envContent
   const envVars: string[] = envContent ? parseEnvExampleKeys(envContent) : [];
 
@@ -339,8 +399,12 @@ export async function buildMddEvidenceDocument(params: {
   const supplementaryDocPaths = pickSupplementaryApiDocPaths(mergedEvidencePaths);
   const swaggerDeps = inferSwaggerDependencies(manifestDepKeys);
 
-  // Decide which API contracts to use: prefer swagger-derived, fall back to AST
-  const api_contracts = apiFromSwagger.length ? apiFromSwagger : apiFromAst;
+  // Decide which API contracts to use: OpenAPI > Strapi routes > Nest AST
+  const api_contracts = apiFromSwagger.length
+    ? apiFromSwagger
+    : apiFromStrapi.length
+      ? apiFromStrapi
+      : apiFromAst;
 
   const trust: MddEvidenceDocument['openapi_spec']['trust_level'] =
     openapiPath && apiFromSwagger.length ? 'high' : openapiPath ? 'medium' : 'low';
@@ -349,7 +413,9 @@ export async function buildMddEvidenceDocument(params: {
     `Consulta: ${message.slice(0, L.summaryMessageChars)}`,
     `Evidencia anclada a ${mergedEvidencePaths.length} ruta(s) verificada(s) en el repositorio indexado.`,
     openapiPath ? `Contrato OpenAPI priorizado: \`${openapiPath}\`.` : 'Sin spec OpenAPI indexado; rutas vía AST si aplica.',
-    entities.length ? `${entities.length} modelo(s) en grafo (Prisma/TypeORM).` : 'Sin nodos Model en grafo para este alcance.',
+    entities.length
+      ? `${entities.length} entidad(es) en grafo (${entitiesFromModels.length} ORM, ${entitiesFromStrapi.length} Strapi).`
+      : 'Sin nodos Model ni StrapiContentType en grafo para este alcance.',
   ];
   if (!openapiPath && (swaggerDeps || swaggerRelatedPaths.length > 0)) {
     summaryParts.push(
@@ -371,6 +437,7 @@ export async function buildMddEvidenceDocument(params: {
     Math.round(
       entities.length * 2 +
         apiFromSwagger.length +
+        apiFromStrapi.length +
         apiFromAst.length +
         business.length +
         mergedEvidencePaths.length * 0.5,
@@ -406,7 +473,12 @@ export async function buildMddEvidenceDocument(params: {
     },
     risk_report: {
       complexity,
-      anti_patterns: apiFromSwagger.length === 0 && apiFromAst.length > 50 ? ['ast_fallback_large_surface'] : [],
+      anti_patterns:
+        apiFromSwagger.length === 0 && apiFromAst.length === 0 && apiFromStrapi.length > 200
+          ? ['strapi_route_large_surface']
+          : apiFromSwagger.length === 0 && apiFromAst.length > 50
+            ? ['ast_fallback_large_surface']
+            : [],
     },
     evidence_paths: mergedEvidencePaths.slice(0, L.evidencePaths),
   };

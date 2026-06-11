@@ -14,6 +14,8 @@ export type MddBuilderLimits = {
   openApiOperations: number;
   nestControllers: number;
   models: number;
+  strapiContentTypes: number;
+  strapiRoutes: number;
   nestServices: number;
   evidencePaths: number;
   summaryMessageChars: number;
@@ -27,6 +29,8 @@ export function getMddBuilderLimits(): MddBuilderLimits {
     openApiOperations: intEnv('MDD_MAX_OPENAPI_OPERATIONS', 100_000, 1, 1_000_000),
     nestControllers: intEnv('MDD_MAX_NEST_CONTROLLERS', 10_000, 1, 100_000),
     models: intEnv('MDD_MAX_MODELS', 50_000, 1, 500_000),
+    strapiContentTypes: intEnv('MDD_MAX_STRAPI_CONTENT_TYPES', 50_000, 1, 500_000),
+    strapiRoutes: intEnv('MDD_MAX_STRAPI_ROUTES', 100_000, 1, 1_000_000),
     nestServices: intEnv('MDD_MAX_NEST_SERVICES', 20_000, 1, 200_000),
     evidencePaths: intEnv('MDD_MAX_EVIDENCE_PATHS', 50_000, 1, 500_000),
     summaryMessageChars: intEnv('MDD_SUMMARY_MESSAGE_CHARS', 16_000, 500, 200_000),

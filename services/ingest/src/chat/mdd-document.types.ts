@@ -16,8 +16,8 @@ export interface MddEvidenceDocument {
     /** Aclaración para consumidores (p. ej. spec generada en build y no commiteada). */
     notes?: string;
   };
-  entities: Array<{ name: string; source: 'prisma' | 'typeorm'; fields: string[] }>;
-  api_contracts: Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' }>;
+  entities: Array<{ name: string; source: 'prisma' | 'typeorm' | 'strapi'; fields: string[] }>;
+  api_contracts: Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' | 'strapi' }>;
   business_logic: Array<{ service: string; dependencies: string[] }>;
   infrastructure: { orm: string; env_vars: string[] };
   risk_report: { complexity: number; anti_patterns: string[] };
