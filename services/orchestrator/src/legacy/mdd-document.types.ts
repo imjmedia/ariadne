@@ -2,8 +2,8 @@
 export interface MddEvidenceDocument {
   summary: string;
   openapi_spec: { found: boolean; path: string | null; trust_level: 'high' | 'medium' | 'low' };
-  entities: Array<{ name: string; source: 'prisma' | 'typeorm'; fields: string[] }>;
-  api_contracts: Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' }>;
+  entities: Array<{ name: string; source: 'prisma' | 'typeorm' | 'strapi'; fields: string[] }>;
+  api_contracts: Array<{ route: string; methods: string[]; doc_source: 'swagger' | 'ast' | 'strapi' }>;
   business_logic: Array<{ service: string; dependencies: string[] }>;
   infrastructure: { orm: string; env_vars: string[] };
   risk_report: { complexity: number; anti_patterns: string[] };

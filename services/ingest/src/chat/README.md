@@ -108,7 +108,7 @@ Añade tus prefijos según la estructura de tu repo.
 
 ## MDD (`mdd-document.builder` / The Forge)
 
-Volcado **casi completo** por defecto (OpenAPI ops, Model, NestService, `evidence_paths`, texto de consulta en `summary`). Acota con env si Falkor o el payload JSON son demasiado grandes:
+Volcado **casi completo** por defecto (OpenAPI ops, Model, **StrapiContentType / StrapiRoute**, NestService, `evidence_paths`, texto de consulta en `summary`). Prioridad API: `OpenApiOperation` → `StrapiRoute` → `NestController` (AST). Entidades: `Model` (Prisma/TypeORM) + `StrapiContentType` (`source: strapi`). Acota con env si Falkor o el payload JSON son demasiado grandes:
 
 **`openapi_spec`:** además de `found` / `path` (`File.openApiTruth`) / `trust_level`, el builder puede rellenar **`swagger_dependencies`** (manifest agregado del proyecto incluye paquetes swagger/openapi), **`swagger_related_paths`** (nodos `File` cuyo path contiene `swagger` u `openapi`), **`supplementary_doc_paths`** (Markdown en `evidence_paths` que parecen inventario de endpoints, p. ej. `docs/inventario-endpoints-*.md`) y **`notes`** cuando hay Swagger en código pero no hay spec OpenAPI indexada o faltan nodos `OpenApiOperation`/`NestController`.
 
@@ -117,6 +117,8 @@ Volcado **casi completo** por defecto (OpenAPI ops, Model, NestService, `evidenc
 | `MDD_MAX_OPENAPI_OPERATIONS` | Límite Cypher `OpenApiOperation` (default 100000) |
 | `MDD_MAX_NEST_CONTROLLERS` | `NestController` fallback AST (default 10000) |
 | `MDD_MAX_MODELS` | Nodos `Model` (default 50000) |
+| `MDD_MAX_STRAPI_CONTENT_TYPES` | Nodos `StrapiContentType` (default 50000) |
+| `MDD_MAX_STRAPI_ROUTES` | Nodos `StrapiRoute` (default 100000) |
 | `MDD_MAX_NEST_SERVICES` | `NestService` en business_logic (default 20000) |
 | `MDD_MAX_EVIDENCE_PATHS` | Recorte final de `evidence_paths` (default 50000) |
 | `MDD_SUMMARY_MESSAGE_CHARS` | Prefijo de consulta en `summary` (default 16000) |
