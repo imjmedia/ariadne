@@ -40,4 +40,19 @@ describe('strapi-routes-extract', () => {
     expect(routes).toHaveLength(1);
     expect(routes[0]?.method).toBe('PUT');
   });
+
+  it('parseStrapiRoutesFromJsSource soporta config anidado en custom routes', () => {
+    const routes = parseStrapiRoutesFromJsSource(`module.exports = {
+      routes: [
+        {
+          method: 'GET',
+          path: '/listaCampania',
+          handler: 'campania.listaCampania',
+          config: { auth: false },
+        },
+      ],
+    };`);
+    expect(routes).toHaveLength(1);
+    expect(routes[0]?.path).toBe('/listaCampania');
+  });
 });

@@ -5,10 +5,26 @@
 import type { MddEvidenceDocument } from './mdd-document.types';
 import { parseStrapiSchemaJson } from '../pipeline/strapi-schema-extract';
 import { parseStrapiRoutesFile } from '../pipeline/strapi-routes-extract';
-import { matchStrapiSchemaJsonPath } from '../pipeline/strapi-path-patterns';
+import {
+  inferCoreRestRoutes,
+  parseCreateCoreRouterUid,
+  type StrapiUidMeta,
+} from '../pipeline/strapi-core-router-infer';
+import { matchStrapiRoutesJsPath, matchStrapiSchemaJsonPath } from '../pipeline/strapi-path-patterns';
 
 const SCHEMA_PATH_RE = /\/content-types\/[^/]+\/schema\.json$/i;
 const ROUTES_PATH_RE = /\/(?:api|extensions)\/[^/]+\/routes\/[^/]+\.(json|js)$/i;
+
+function addRouteToMap(
+  apiByRoute: Map<string, Set<string>>,
+  routePath: string,
+  method: string,
+): void {
+  if (!routePath || !method) return;
+  const m = method.toUpperCase();
+  if (!apiByRoute.has(routePath)) apiByRoute.set(routePath, new Set());
+  apiByRoute.get(routePath)!.add(m);
+}
 
 export async function inferStrapiMddFromEvidencePaths(params: {
   evidencePaths: string[];
@@ -24,6 +40,7 @@ export async function inferStrapiMddFromEvidencePaths(params: {
   const entities: MddEvidenceDocument['entities'] = [];
   const apiByRoute = new Map<string, Set<string>>();
   const services = new Set<string>();
+  const uidMeta = new Map<string, StrapiUidMeta>();
 
   for (const p of params.evidencePaths) {
     if (entities.length >= params.maxContentTypes) break;
@@ -49,6 +66,13 @@ export async function inferStrapiMddFromEvidencePaths(params: {
       fields.unshift(`uid:${parsed.strapiUid}`);
     }
     entities.push({ name: parsed.name, source: 'strapi', fields });
+    if (parsed.strapiUid && parsed.apiName) {
+      uidMeta.set(parsed.strapiUid, {
+        pluralName: parsed.pluralName ?? parsed.apiName,
+        apiName: parsed.apiName,
+        name: parsed.name,
+      });
+    }
   }
 
   for (const p of params.evidencePaths) {
@@ -56,12 +80,22 @@ export async function inferStrapiMddFromEvidencePaths(params: {
     if (!ROUTES_PATH_RE.test(p)) continue;
     const content = await params.getFileSnippet(p);
     if (!content?.trim()) continue;
+
+    const jsMatch = matchStrapiRoutesJsPath(p);
+    const coreUid = parseCreateCoreRouterUid(content);
+    if (coreUid && jsMatch) {
+      for (const rt of inferCoreRestRoutes(coreUid, uidMeta.get(coreUid), jsMatch.apiName)) {
+        addRouteToMap(apiByRoute, rt.path, rt.method);
+        if (apiByRoute.size >= params.maxRoutes) break;
+      }
+    }
+
     const parsed = parseStrapiRoutesFile(p, content);
     if (!parsed) continue;
     for (const rt of parsed.routes) {
       if (!rt.path || !rt.method) continue;
-      if (!apiByRoute.has(rt.path)) apiByRoute.set(rt.path, new Set());
-      apiByRoute.get(rt.path)!.add(rt.method.toUpperCase());
+      addRouteToMap(apiByRoute, rt.path, rt.method);
+      if (apiByRoute.size >= params.maxRoutes) break;
     }
   }
 
