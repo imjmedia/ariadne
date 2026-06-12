@@ -3,8 +3,12 @@
  */
 import type { MddEvidenceDocument } from './mdd-document.types';
 import { getMddBuilderLimits } from './mdd-limits';
-import { inferStrapiMddFromEvidencePaths } from './mdd-strapi-path-fallback';
-import { inferFrontendMddFromEvidencePaths, isFrontendEvidencePath } from './mdd-frontend-path-fallback';
+import { inferStrapiMddFromEvidencePaths, collectStrapiBusinessLogicFromEvidencePaths } from './mdd-strapi-path-fallback';
+import {
+  inferFrontendMddFromEvidencePaths,
+  isFrontendEvidencePath,
+  collectFrontendBusinessLogicFromEvidencePaths,
+} from './mdd-frontend-path-fallback';
 
 function uniq(paths: string[]): string[] {
   return [...new Set(paths.filter((p) => typeof p === 'string' && p.length > 0))];
@@ -552,6 +556,22 @@ export async function buildMddEvidenceDocument(params: {
     (p) => /\/content-types\/[^/]+\/schema\.json$/i.test(p) || /\/(?:api|extensions)\/[^/]+\/routes\//i.test(p),
   );
   const hasFrontendEvidencePaths = mergedEvidencePaths.some(isFrontendEvidencePath);
+
+  if (hasStrapiEvidencePaths && businessFinal.length === 0) {
+    const fromPaths = collectStrapiBusinessLogicFromEvidencePaths(
+      mergedEvidencePaths,
+      L.nestServices,
+    );
+    if (fromPaths.length > 0) businessFinal = fromPaths;
+  }
+
+  if (hasFrontendEvidencePaths && !hasStrapiEvidencePaths && businessFinal.length === 0) {
+    const fromPaths = collectFrontendBusinessLogicFromEvidencePaths(
+      mergedEvidencePaths,
+      L.nestServices,
+    );
+    if (fromPaths.length > 0) businessFinal = fromPaths;
+  }
 
   if (
     entitiesFromStrapiResolved.length === 0 &&

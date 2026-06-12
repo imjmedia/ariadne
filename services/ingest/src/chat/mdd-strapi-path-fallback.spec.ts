@@ -1,7 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { inferStrapiMddFromEvidencePaths } from './mdd-strapi-path-fallback';
+import {
+  collectStrapiBusinessLogicFromEvidencePaths,
+  inferStrapiMddFromEvidencePaths,
+} from './mdd-strapi-path-fallback';
 
 describe('mdd-strapi-path-fallback', () => {
+  it('collectStrapiBusinessLogicFromEvidencePaths incluye servicios anidados', () => {
+    const bl = collectStrapiBusinessLogicFromEvidencePaths(
+      [
+        'src/api/agencia/services/agencia.js',
+        'src/api/bitacora-cambio-medio/services/bitacora-medios/list-bitacora-medios.js',
+      ],
+      50,
+    );
+    expect(bl.some((b) => b.service === 'strapi:agencia')).toBe(true);
+    expect(bl.some((b) => b.service === 'strapi:list-bitacora-medios')).toBe(true);
+    expect(bl.find((b) => b.service === 'strapi:agencia')?.dependencies).toContain(
+      'src/api/agencia/services/agencia.js',
+    );
+  });
+
   it('infiere rutas core REST desde createCoreRouter y custom con config anidado', async () => {
     const files: Record<string, string> = {
       'src/api/campania/content-types/campania/schema.json': JSON.stringify({
