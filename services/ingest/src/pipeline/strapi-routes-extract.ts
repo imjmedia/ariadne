@@ -54,24 +54,55 @@ function parseRoutesArray(arr: unknown, ctx: StrapiRoutesPathMatch, routeSource:
   return out;
 }
 
+/** Objetos `{ ... }` de primer nivel (soporta `config: { auth: false }` en rutas custom). */
+function extractBalancedJsObjectLiterals(source: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] !== '{') continue;
+    let depth = 0;
+    let end = i;
+    for (; end < source.length; end++) {
+      const ch = source[end];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    if (depth === 0 && end > i) out.push(source.slice(i, end + 1));
+  }
+  return out;
+}
+
+function parseJsRouteObjectLiteral(block: string): StrapiRouteParsed | null {
+  if (!/method\s*:/.test(block) || !/path\s*:/.test(block)) return null;
+  // `module.exports = { routes: [...] }` — no es una ruta HTTP individual.
+  if (/\broutes\s*:\s*\[/.test(block)) return null;
+  const method = block.match(/method\s*:\s*['"](\w+)['"]/i)?.[1];
+  const routePath = block.match(/path\s*:\s*['"]([^'"]+)['"]/)?.[1];
+  if (!method || !routePath) return null;
+  const handler = block.match(/handler\s*:\s*['"]([^'"]+)['"]/)?.[1];
+  const description = block.match(/description\s*:\s*['"]([^'"]*)['"]/)?.[1];
+  return {
+    method: method.toUpperCase(),
+    path: routePath,
+    handler,
+    description,
+    routeSource: 'js',
+  };
+}
+
 /** Extrae bloques `{ method, path, ... }` de routers Strapi en JS sin ejecutar el módulo. */
 export function parseStrapiRoutesFromJsSource(source: string): StrapiRouteParsed[] {
   const routes: StrapiRouteParsed[] = [];
-  const blockRe = /\{[^{}]*\}/g;
-  for (const block of source.match(blockRe) ?? []) {
-    if (!/method\s*:/.test(block) || !/path\s*:/.test(block)) continue;
-    const method = block.match(/method\s*:\s*['"](\w+)['"]/i)?.[1];
-    const routePath = block.match(/path\s*:\s*['"]([^'"]+)['"]/)?.[1];
-    if (!method || !routePath) continue;
-    const handler = block.match(/handler\s*:\s*['"]([^'"]+)['"]/)?.[1];
-    const description = block.match(/description\s*:\s*['"]([^'"]*)['"]/)?.[1];
-    routes.push({
-      method: method.toUpperCase(),
-      path: routePath,
-      handler,
-      description,
-      routeSource: 'js',
-    });
+  const seen = new Set<string>();
+  for (const block of extractBalancedJsObjectLiterals(source)) {
+    const parsed = parseJsRouteObjectLiteral(block);
+    if (!parsed) continue;
+    const key = `${parsed.method}:${parsed.path}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    routes.push(parsed);
   }
   return routes;
 }
