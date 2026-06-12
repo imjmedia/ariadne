@@ -9,6 +9,7 @@ import {
   isFrontendEvidencePath,
   collectFrontendBusinessLogicFromEvidencePaths,
 } from './mdd-frontend-path-fallback';
+import { loadSupplementaryDocExcerpts } from './mdd-supplementary-docs.util.js';
 
 function uniq(paths: string[]): string[] {
   return [...new Set(paths.filter((p) => typeof p === 'string' && p.length > 0))];
@@ -618,6 +619,10 @@ export async function buildMddEvidenceDocument(params: {
   }
 
   const supplementaryDocPaths = pickSupplementaryApiDocPaths(mergedEvidencePaths);
+  const supplementaryDocs =
+    supplementaryDocPaths.length > 0
+      ? await loadSupplementaryDocExcerpts(supplementaryDocPaths, getFileSnippet)
+      : [];
   const swaggerDeps = inferSwaggerDependencies(manifestDepKeys);
 
   // Decide which API contracts to use: OpenAPI > Strapi routes > Nest AST
@@ -706,6 +711,7 @@ export async function buildMddEvidenceDocument(params: {
       ...(swaggerDeps ? { swagger_dependencies: true } : {}),
       ...(swaggerRelatedPaths.length > 0 ? { swagger_related_paths: swaggerRelatedPaths } : {}),
       ...(supplementaryDocPaths.length > 0 ? { supplementary_doc_paths: supplementaryDocPaths } : {}),
+      ...(supplementaryDocs.length > 0 ? { supplementary_docs: supplementaryDocs } : {}),
       ...(openApiNotes ? { notes: openApiNotes } : {}),
     },
     entities: entitiesFinal,

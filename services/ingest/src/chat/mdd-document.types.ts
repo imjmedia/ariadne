@@ -13,6 +13,13 @@ export interface MddEvidenceDocument {
     swagger_related_paths?: string[];
     /** Markdown u otros docs del alcance que parecen inventario/manual de API (evidencia textual). */
     supplementary_doc_paths?: string[];
+    /** Contenido legible (extracto) de supplementary_doc_paths vía getFileSnippet. */
+    supplementary_docs?: Array<{
+      path: string;
+      excerpt: string;
+      truncated: boolean;
+      total_chars: number;
+    }>;
     /** Aclaración para consumidores (p. ej. spec generada en build y no commiteada). */
     notes?: string;
   };
