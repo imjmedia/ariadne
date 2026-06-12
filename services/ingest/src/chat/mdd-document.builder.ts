@@ -4,6 +4,7 @@
 import type { MddEvidenceDocument } from './mdd-document.types';
 import { getMddBuilderLimits } from './mdd-limits';
 import { inferStrapiMddFromEvidencePaths } from './mdd-strapi-path-fallback';
+import { inferFrontendMddFromEvidencePaths, isFrontendEvidencePath } from './mdd-frontend-path-fallback';
 
 function uniq(paths: string[]): string[] {
   return [...new Set(paths.filter((p) => typeof p === 'string' && p.length > 0))];
@@ -48,6 +49,7 @@ function inferOrmFromDeps(depKeys: string[]): string {
   if (s.includes('typeorm')) return 'typeorm';
   if (s.includes('sequelize')) return 'sequelize';
   if (s.includes('mongoose')) return 'mongoose';
+  if (s.includes('@strapi/strapi') || (s.includes('strapi') && s.includes('@strapi/'))) return 'strapi';
   return depKeys.length ? 'unknown' : 'none';
 }
 
@@ -124,6 +126,63 @@ function groupRoutesByPath(
     result.push({ route, methods: [...methods], doc_source: 'swagger' });
   }
   return result;
+}
+
+type MddExecuteCypher = (
+  projectId: string,
+  cypher: string,
+  params?: Record<string, unknown>,
+) => Promise<unknown[]>;
+
+async function loadStrapiEntitiesViaFileLink(
+  executeCypher: MddExecuteCypher,
+  projectId: string,
+  scopedRepoIds: string[] | undefined,
+  limit: number,
+): Promise<MddEvidenceDocument['entities']> {
+  try {
+    const rs = cypherRepoScope(scopedRepoIds, 'f');
+    const rows = (await executeCypher(
+      projectId,
+      `MATCH (f:File {projectId: $projectId})-[:CONTAINS]->(ct:StrapiContentType)
+       WHERE ct.projectId = $projectId${rs.clause}
+       RETURN DISTINCT ct.name AS name, ct.attributesSummary AS fs, ct.strapiUid AS uid LIMIT ${limit}`,
+      { projectId, ...rs.params },
+    )) as Array<{ name?: string; fs?: string | null; uid?: string | null }>;
+    const result: MddEvidenceDocument['entities'] = [];
+    for (const row of rows) {
+      if (!row.name) continue;
+      const fields = parseStrapiAttributesSummary(row.fs);
+      if (row.uid?.trim() && !fields.some((f) => f.startsWith('uid:'))) {
+        fields.unshift(`uid:${row.uid.trim()}`);
+      }
+      result.push({ name: row.name, source: 'strapi', fields });
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+async function loadStrapiRoutesViaFileLink(
+  executeCypher: MddExecuteCypher,
+  projectId: string,
+  scopedRepoIds: string[] | undefined,
+  limit: number,
+): Promise<Array<{ route: string; methods: string[]; doc_source: 'strapi' }>> {
+  try {
+    const rs = cypherRepoScope(scopedRepoIds, 'f');
+    const routes = (await executeCypher(
+      projectId,
+      `MATCH (f:File {projectId: $projectId})-[:CONTAINS]->(sr:StrapiRoute)
+       WHERE sr.projectId = $projectId${rs.clause}
+       RETURN sr.routePath AS route, sr.method AS method LIMIT ${limit}`,
+      { projectId, ...rs.params },
+    )) as Array<{ route?: string; method?: string }>;
+    return groupRoutesByPath(routes).map((r) => ({ ...r, doc_source: 'strapi' as const }));
+  } catch {
+    return [];
+  }
 }
 
 function buildOpenApiSpecNotes(params: {
@@ -432,7 +491,26 @@ export async function buildMddEvidenceDocument(params: {
 
   // ── Phase 2: Build the MDD object from parallel results ──────────────────────
 
-  const entities = [...entitiesFromModels, ...entitiesFromStrapi];
+  let entitiesFromStrapiResolved = entitiesFromStrapi;
+  let apiFromStrapiResolved = apiFromStrapi;
+  if (entitiesFromStrapiResolved.length === 0) {
+    entitiesFromStrapiResolved = await loadStrapiEntitiesViaFileLink(
+      executeCypher,
+      projectId,
+      scopedRepoIds,
+      L.strapiContentTypes,
+    );
+  }
+  if (apiFromStrapiResolved.length === 0) {
+    apiFromStrapiResolved = await loadStrapiRoutesViaFileLink(
+      executeCypher,
+      projectId,
+      scopedRepoIds,
+      L.strapiRoutes,
+    );
+  }
+
+  const entities = [...entitiesFromModels, ...entitiesFromStrapiResolved];
 
   // envVars from cached envContent
   const envVars: string[] = envContent ? parseEnvExampleKeys(envContent) : [];
@@ -460,16 +538,24 @@ export async function buildMddEvidenceDocument(params: {
   const mergedEvidencePaths = uniq(evidence_paths);
 
   let entitiesFinal = entities;
-  let apiFromStrapiFinal = apiFromStrapi;
+  let apiFromStrapiFinal = apiFromStrapiResolved;
+  let apiFromFrontendFinal: MddEvidenceDocument['api_contracts'] = [];
   let businessFinal = business;
   let usedPathFallback = false;
+  let usedFrontendFallback = false;
+  let usedGraphViaFileLink =
+    entitiesFromStrapi.length === 0 &&
+    entitiesFromStrapiResolved.length > 0 &&
+    entitiesFromStrapiResolved.some((e) => e.source === 'strapi');
 
   const hasStrapiEvidencePaths = mergedEvidencePaths.some(
     (p) => /\/content-types\/[^/]+\/schema\.json$/i.test(p) || /\/(?:api|extensions)\/[^/]+\/routes\//i.test(p),
   );
+  const hasFrontendEvidencePaths = mergedEvidencePaths.some(isFrontendEvidencePath);
+
   if (
-    entitiesFromStrapi.length === 0 &&
-    apiFromStrapi.length === 0 &&
+    entitiesFromStrapiResolved.length === 0 &&
+    apiFromStrapiResolved.length === 0 &&
     hasStrapiEvidencePaths
   ) {
     const fb = await inferStrapiMddFromEvidencePaths({
@@ -490,6 +576,27 @@ export async function buildMddEvidenceDocument(params: {
     }
   }
 
+  if (
+    hasFrontendEvidencePaths &&
+    !hasStrapiEvidencePaths &&
+    (entitiesFinal.length === 0 || apiFromAst.length === 0 || businessFinal.length === 0)
+  ) {
+    const fb = await inferFrontendMddFromEvidencePaths({
+      evidencePaths: mergedEvidencePaths,
+      getFileSnippet,
+      maxEntities: L.models,
+      maxRoutes: L.nestControllers,
+    });
+    if (fb.usedFallback) {
+      usedFrontendFallback = true;
+      if (entitiesFinal.length === 0 && fb.entities.length > 0) entitiesFinal = fb.entities;
+      if (fb.api_contracts.length > 0) apiFromFrontendFinal = fb.api_contracts;
+      if (businessFinal.length === 0 && fb.business_logic.length > 0) {
+        businessFinal = fb.business_logic;
+      }
+    }
+  }
+
   const supplementaryDocPaths = pickSupplementaryApiDocPaths(mergedEvidencePaths);
   const swaggerDeps = inferSwaggerDependencies(manifestDepKeys);
 
@@ -498,7 +605,9 @@ export async function buildMddEvidenceDocument(params: {
     ? apiFromSwagger
     : apiFromStrapiFinal.length
       ? apiFromStrapiFinal
-      : apiFromAst;
+      : apiFromFrontendFinal.length
+        ? apiFromFrontendFinal
+        : apiFromAst;
 
   const trust: MddEvidenceDocument['openapi_spec']['trust_level'] =
     openapiPath && apiFromSwagger.length ? 'high' : openapiPath ? 'medium' : 'low';
@@ -508,9 +617,13 @@ export async function buildMddEvidenceDocument(params: {
     `Evidencia anclada a ${mergedEvidencePaths.length} ruta(s) verificada(s) en el repositorio indexado.`,
     openapiPath ? `Contrato OpenAPI priorizado: \`${openapiPath}\`.` : 'Sin spec OpenAPI indexado; rutas vía AST si aplica.',
     entitiesFinal.length
-      ? usedPathFallback && entitiesFromStrapi.length === 0
-        ? `${entitiesFinal.length} entidad(es) Strapi inferida(s) desde schema.json en evidence_paths (grafo vacío).`
-        : `${entitiesFinal.length} entidad(es) en grafo (${entitiesFromModels.length} ORM, ${entitiesFromStrapi.length} Strapi).`
+      ? usedFrontendFallback && entitiesFromModels.length === 0 && entitiesFromStrapiResolved.length === 0
+        ? `${entitiesFinal.length} entidad(es) frontend inferida(s) desde src/Models en evidence_paths.`
+        : usedPathFallback && entitiesFromStrapiResolved.length === 0
+          ? `${entitiesFinal.length} entidad(es) Strapi inferida(s) desde schema.json en evidence_paths (grafo vacío).`
+          : usedGraphViaFileLink
+            ? `${entitiesFinal.length} entidad(es) Strapi vía grafo (File→StrapiContentType).`
+            : `${entitiesFinal.length} entidad(es) en grafo (${entitiesFromModels.length} ORM, ${entitiesFromStrapiResolved.length} Strapi).`
       : 'Sin nodos Model ni StrapiContentType en grafo para este alcance.',
   ];
   if (!openapiPath && (swaggerDeps || swaggerRelatedPaths.length > 0)) {
@@ -528,9 +641,16 @@ export async function buildMddEvidenceDocument(params: {
   }
   if (apiFromStrapiFinal.length > 0 && apiFromSwagger.length === 0) {
     summaryParts.push(
-      usedPathFallback && apiFromStrapi.length === 0
+      usedPathFallback && apiFromStrapiResolved.length === 0
         ? `${apiFromStrapiFinal.length} contrato(s) API inferido(s) desde routes en evidence_paths (grafo vacío).`
-        : `${apiFromStrapiFinal.length} contrato(s) API desde StrapiRoute (routes.json / core router).`,
+        : usedGraphViaFileLink && apiFromStrapi.length === 0
+          ? `${apiFromStrapiFinal.length} contrato(s) API desde StrapiRoute vía File en grafo.`
+          : `${apiFromStrapiFinal.length} contrato(s) API desde StrapiRoute (routes.json / core router).`,
+    );
+  }
+  if (apiFromFrontendFinal.length > 0 && apiFromSwagger.length === 0 && apiFromStrapiFinal.length === 0) {
+    summaryParts.push(
+      `${apiFromFrontendFinal.length} contrato(s) API cliente inferido(s) desde apiDirection / src/api en evidence_paths.`,
     );
   }
   const summary = summaryParts.join(' ');
