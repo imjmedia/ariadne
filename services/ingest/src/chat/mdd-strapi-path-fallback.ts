@@ -14,6 +14,29 @@ import { matchStrapiRoutesJsPath, matchStrapiSchemaJsonPath } from '../pipeline/
 
 const SCHEMA_PATH_RE = /\/content-types\/[^/]+\/schema\.json$/i;
 const ROUTES_PATH_RE = /\/(?:api|extensions)\/[^/]+\/routes\/[^/]+\.(json|js)$/i;
+const STRAPI_SERVICE_PATH_RE = /\/api\/[^/]+\/services\/(?:[^/]+\/)*([^/]+)\.(js|ts)$/i;
+
+/** Servicios Strapi desde paths (sin leer disco); usable aunque entidades/rutas vengan del grafo. */
+export function collectStrapiBusinessLogicFromEvidencePaths(
+  evidencePaths: string[],
+  maxServices: number,
+): MddEvidenceDocument['business_logic'] {
+  const byService = new Map<string, string[]>();
+  for (const p of evidencePaths) {
+    if (byService.size >= maxServices) break;
+    const m = p.match(STRAPI_SERVICE_PATH_RE);
+    if (!m) continue;
+    const base = m[1]!.replace(/\.(js|ts)$/i, '');
+    const key = `strapi:${base}`;
+    const deps = byService.get(key) ?? [];
+    if (!deps.includes(p)) deps.push(p);
+    byService.set(key, deps);
+  }
+  return [...byService.entries()].slice(0, maxServices).map(([service, dependencies]) => ({
+    service,
+    dependencies,
+  }));
+}
 
 function addRouteToMap(
   apiByRoute: Map<string, Set<string>>,
@@ -39,7 +62,6 @@ export async function inferStrapiMddFromEvidencePaths(params: {
 }> {
   const entities: MddEvidenceDocument['entities'] = [];
   const apiByRoute = new Map<string, Set<string>>();
-  const services = new Set<string>();
   const uidMeta = new Map<string, StrapiUidMeta>();
 
   for (const p of params.evidencePaths) {
@@ -80,7 +102,6 @@ export async function inferStrapiMddFromEvidencePaths(params: {
     if (!ROUTES_PATH_RE.test(p)) continue;
     const content = await params.getFileSnippet(p);
     if (!content?.trim()) continue;
-
     const jsMatch = matchStrapiRoutesJsPath(p);
     const coreUid = parseCreateCoreRouterUid(content);
     if (coreUid && jsMatch) {
@@ -99,20 +120,15 @@ export async function inferStrapiMddFromEvidencePaths(params: {
     }
   }
 
-  for (const p of params.evidencePaths) {
-    const m = p.match(/\/api\/([^/]+)\/services\/([^/]+)\.(js|ts)$/i);
-    if (m) services.add(`strapi:${m[2]}`);
-  }
-
   const api_contracts: MddEvidenceDocument['api_contracts'] = [];
   for (const [route, methods] of apiByRoute) {
     api_contracts.push({ route, methods: [...methods], doc_source: 'strapi' });
   }
 
-  const business_logic = [...services].slice(0, 200).map((service) => ({
-    service,
-    dependencies: [] as string[],
-  }));
+  const business_logic = collectStrapiBusinessLogicFromEvidencePaths(
+    params.evidencePaths,
+    200,
+  );
 
   const usedFallback = entities.length > 0 || api_contracts.length > 0 || business_logic.length > 0;
   return { entities, api_contracts, business_logic, usedFallback };
