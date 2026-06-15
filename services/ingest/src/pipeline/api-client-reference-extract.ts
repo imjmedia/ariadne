@@ -10,6 +10,15 @@ const API_PATH_LITERAL_RE =
 
 const STANDALONE_API_LITERAL_RE = /['"`](api\/[a-zA-Z0-9_\-/.:{}]+)['"`]/g;
 
+/** Nest/front típico: `api.get('/api/foo')`, fetch('/api/bar') */
+const ABSOLUTE_API_LITERAL_RE =
+  /(?:\.(?:get|post|put|patch|delete)\s*\(\s*|fetch\s*\(\s*)['"`](\/api\/[a-zA-Z0-9_\-/.:{}]+)['"`]/g;
+
+const STANDALONE_SLASH_API_LITERAL_RE = /['"`](\/api\/[a-zA-Z0-9_\-/.:{}]+)['"`]/g;
+
+/** `const BASE = "/api/provider-instances"` — cubre al menos el path base */
+const CONST_BASE_API_RE = /const\s+[A-Z_][A-Z0-9_]*\s*=\s*['"`](\/api\/[a-zA-Z0-9_\-/.]+)['"`]/g;
+
 /** Prefijo dinámico: `'api/users/' + id`, axiosQuery('PUT', 'api/cotizadores/' + x) */
 const API_PATH_PREFIX_CONCAT_RE =
   /(?:apiDirection\s*=\s*|(?:axiosQuery|queryApi)\s*\([^)]*['"]|['"`])(api\/[a-zA-Z0-9_\-/.]+)\/\s*['"`]\s*\+/g;
@@ -60,13 +69,20 @@ function serviceFromHost(host: string): string {
   return h;
 }
 
+function normalizeRawApiPath(rawPath: string): string {
+  let p = rawPath.trim().replace(/\\/g, '/');
+  if (p.startsWith('/api/')) return `api/${p.slice(5)}`;
+  if (p.startsWith('/')) p = p.slice(1);
+  return p;
+}
+
 function pushApiRef(
   seen: Set<string>,
   out: ApiClientReferenceParsed[],
   rawPath: string,
   isDynamic = false,
 ): void {
-  const apiPath = rawPath.trim();
+  const apiPath = normalizeRawApiPath(rawPath);
   if (!apiPath || apiPath.length < 4 || !apiPath.startsWith('api/')) return;
   const key = `${apiPath}|${isDynamic ? 'd' : 's'}`;
   if (seen.has(key)) return;
@@ -93,6 +109,9 @@ export function extractApiClientReferences(source: string): ApiClientReferencePa
 
   collect(API_PATH_LITERAL_RE);
   collect(STANDALONE_API_LITERAL_RE);
+  collect(ABSOLUTE_API_LITERAL_RE);
+  collect(STANDALONE_SLASH_API_LITERAL_RE);
+  collect(CONST_BASE_API_RE);
   collect(API_PATH_PREFIX_CONCAT_RE, true);
   collect(API_PATH_PREFIX_NO_SLASH_RE, true);
   collect(API_PATH_TEMPLATE_RE, true);

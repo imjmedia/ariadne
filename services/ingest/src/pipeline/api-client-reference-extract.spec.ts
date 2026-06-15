@@ -12,16 +12,21 @@ describe('api-client-reference-extract', () => {
     expect(normalizeApiClientPath('api/users/${id}')).toBe('users');
   });
 
-  it('extrae literales api/ en TSX', () => {
+  it('extrae literales api/ y /api/ en TSX', () => {
     const src = `
       axiosQuery('GET', 'api/campanias');
       apiDirection="api/users-permissions/roles"
       fetch('/api/clientes');
+      api.get("/api/auth/ariadne-config");
+      const BASE = "/api/provider-instances";
     `;
     const refs = extractApiClientReferences(src);
     const paths = refs.map((r) => r.apiPath);
     expect(paths).toContain('api/campanias');
     expect(paths).toContain('api/users-permissions/roles');
+    expect(paths).toContain('api/clientes');
+    expect(paths).toContain('api/auth/ariadne-config');
+    expect(paths).toContain('api/provider-instances');
   });
 
   it('extrae prefijos dinámicos api/users/ + id', () => {
