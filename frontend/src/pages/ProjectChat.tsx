@@ -13,8 +13,10 @@ import { AnalyzeScopeFields } from '@/components/analyze/AnalyzeScopeFields';
 import { api } from '../api';
 import type { AnalyzeCodeMode, AnalyzeReportMeta, ChatPipelineMode, ChatScope, Project } from '../types';
 import { scopeFromAnalyzeForm } from '../utils/analyze-scope-form';
+import { buildChatHistoryForRequest, compactChatMessagesInMemory, formatMemoryCompactionNote } from '../utils/chat-history-payload';
 import { ingestOptionsFromChatPipelineMode } from '../utils/chat-pipeline-mode';
 import { ChatAssistantContent } from './RepoChat/ChatAssistantContent';
+import { ChatConversationToolbar } from './RepoChat/ChatConversationToolbar';
 import { ChatPipelineModeSelect } from './RepoChat/ChatPipelineModeSelect';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -47,7 +49,6 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   cypher?: string;
-  result?: unknown[];
 }
 
 const ANALYSIS_MODE_LABELS: Record<string, string> = {
@@ -99,6 +100,7 @@ export function ProjectChat() {
   const [includePrefixesText, setIncludePrefixesText] = useState('');
   const [excludeGlobsText, setExcludeGlobsText] = useState('');
   const [crossPackageDuplicates, setCrossPackageDuplicates] = useState(false);
+  const [memoryCompactionNote, setMemoryCompactionNote] = useState<string | null>(null);
   /** Multi-root: `false` → envía `strictChatScope: false` (chat sobre todos los roots sin exigir scope). */
   const [allowBroadProjectChat, setAllowBroadProjectChat] = useState(false);
   const [chatPipelineMode, setChatPipelineMode] = useState<ChatPipelineMode>('default');
@@ -179,22 +181,37 @@ export function ProjectChat() {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleNewConversation = useCallback(() => {
+    if (loading) return;
+    setMessages([]);
+    setError(null);
+    setMemoryCompactionNote(null);
+  }, [loading]);
+
   /** Envía mensaje al chat del proyecto (POST /projects/:id/chat) y actualiza mensajes. */
   const send = useCallback(() => {
     if (!projectId || !project || !input.trim() || loading) return;
     const msg = input.trim();
     setInput('');
-    setMessages((m) => [...m, { role: 'user', content: msg }]);
     setLoading(true);
     setError(null);
     setMobileTab('chat');
 
-    const history = messages.slice(-6).map((m) => ({
-      role: m.role,
-      content: m.content,
-      cypher: m.cypher,
-      result: m.result,
-    }));
+    const {
+      messages: prevForHistory,
+      compacted: prevCompacted,
+      droppedCount,
+    } = compactChatMessagesInMemory(messages);
+    const prevNote = formatMemoryCompactionNote({
+      messages: prevForHistory,
+      compacted: prevCompacted,
+      droppedCount,
+    });
+    if (prevNote) setMemoryCompactionNote(prevNote);
+
+    setMessages(() => [...prevForHistory, { role: 'user', content: msg }]);
+
+    const history = buildChatHistoryForRequest(prevForHistory);
 
     const fromForm = scopeFromAnalyzeForm(includePrefixesText, excludeGlobsText);
     let scope: ChatScope | undefined = fromForm;
@@ -221,15 +238,16 @@ export function ProjectChat() {
     api
       .chatProject(projectId, chatBody)
       .then((res) => {
-        setMessages((m) => [
-          ...m,
-          {
-            role: 'assistant',
-            content: res.answer,
-            cypher: res.cypher,
-            result: res.result,
-          },
-        ]);
+        setMessages((m) => {
+          const withNew: ChatMessage[] = [
+            ...m,
+            { role: 'assistant', content: res.answer, cypher: res.cypher },
+          ];
+          const compacted = compactChatMessagesInMemory(withNew);
+          const note = formatMemoryCompactionNote(compacted);
+          if (note) setMemoryCompactionNote(note);
+          return compacted.messages;
+        });
       })
       .catch((e) => {
         setError(e.message);
@@ -564,6 +582,12 @@ export function ProjectChat() {
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="shrink-0 space-y-3 border-b border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_6%,var(--card))] px-4 py-3 sm:px-5 sm:py-4">
+              <ChatConversationToolbar
+                messageCount={messages.length}
+                memoryNote={memoryCompactionNote}
+                onNewConversation={handleNewConversation}
+                loading={loading}
+              />
               <ChatPipelineModeSelect
                 value={chatPipelineMode}
                 onChange={setChatPipelineMode}
