@@ -21,7 +21,9 @@ const logger = createLogger('orchestrator');
 
 /** Inicia el servidor del Orchestrator. */
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const bodyLimit = process.env.BODY_LIMIT ?? '10mb';
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(express.json({ limit: bodyLimit }));
   // Correlation ID middleware (antes que cualquier middleware NestJS)
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const requestId = extractRequestId(req.headers);
