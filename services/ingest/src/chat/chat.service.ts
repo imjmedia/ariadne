@@ -35,6 +35,16 @@ import {
   wantsFullGenericIndexedInventory,
 } from './chat.constants';
 import {
+  wantsUnusedBackendApiEndpointsAnalysis,
+  unusedCustomStrapiRoutesCypher,
+  usedStrapiRoutesCypher,
+  usedStrapiRoutesHeuristicCypher,
+  internalStrapiRouteConsumersCypher,
+  externalStrapiRouteConsumersCypher,
+  publicStrapiRoutesCypher,
+  coreRouterStrapiRoutesCountCypher,
+} from './chat-unused-api-endpoints.util';
+import {
   computeRiskScore,
   groupDuplicates,
   formatDuplicatesSummary,
@@ -2918,6 +2928,139 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
   }
 
   /**
+   * Cruce `StrapiRoute` (back) vs `ApiClientReference` (front): rutas sin uso aparente en el índice.
+   */
+  private async buildUnusedBackendApiEndpointsResponse(
+    projectId: string,
+    scope?: ChatScope,
+  ): Promise<ChatResponse> {
+    const maxRows = Math.min(
+      Math.max(parseInt(process.env.CHAT_UNUSED_API_MAX ?? '5000', 10) || 5000, 1),
+      25_000,
+    );
+    const cypherUnused = unusedCustomStrapiRoutesCypher(maxRows);
+    const cypherUsedRel = usedStrapiRoutesCypher(maxRows);
+    const cypherUsedHeuristic = usedStrapiRoutesHeuristicCypher(maxRows);
+    const cypherInternal = internalStrapiRouteConsumersCypher(maxRows);
+    const cypherExternal = externalStrapiRouteConsumersCypher(maxRows);
+    const cypherPublic = publicStrapiRoutesCypher(maxRows);
+
+    const [rawUnused, rawUsedRel, rawUsedHeuristic, rawInternal, rawExternal, rawPublic, rawCoreCount] =
+      await Promise.all([
+        this.cypher.executeCypher(projectId, cypherUnused, {}),
+        this.cypher.executeCypher(projectId, cypherUsedRel, {}),
+        this.cypher.executeCypher(projectId, cypherUsedHeuristic, {}),
+        this.cypher.executeCypher(projectId, cypherInternal, {}),
+        this.cypher.executeCypher(projectId, cypherExternal, {}),
+        this.cypher.executeCypher(projectId, cypherPublic, {}),
+        this.cypher.executeCypher(projectId, coreRouterStrapiRoutesCountCypher(), {}),
+      ]);
+
+    const unused = filterCypherRowsByScope(rawUnused as Record<string, unknown>[], scope);
+    const usedRel = filterCypherRowsByScope(rawUsedRel as Record<string, unknown>[], scope);
+    const usedHeuristic = filterCypherRowsByScope(rawUsedHeuristic as Record<string, unknown>[], scope);
+    const internalConsumers = filterCypherRowsByScope(rawInternal as Record<string, unknown>[], scope);
+    const externalConsumers = filterCypherRowsByScope(rawExternal as Record<string, unknown>[], scope);
+    const publicRoutes = filterCypherRowsByScope(rawPublic as Record<string, unknown>[], scope);
+    const coreRouterCount = Number((rawCoreCount as Array<{ c?: number }>)[0]?.c ?? 0);
+
+    const totalStrapi = (await this.cypher.executeCypher(
+      projectId,
+      `MATCH (sr:StrapiRoute) WHERE sr.projectId = $projectId RETURN count(sr) AS c`,
+      {},
+    )) as Array<{ c?: number }>;
+    const strapiCount = Number(totalStrapi[0]?.c ?? 0);
+
+    if (strapiCount === 0) {
+      return {
+        answer:
+          'No hay nodos `StrapiRoute` en el grafo para este proyecto. Resincroniza el repo ERP/Strapi (`src/api/*/routes/*`) y, en multi-root, vuelve a ejecutar el sync del **proyecto** para enlazar front→back.',
+        cypher: cypherUnused,
+        result: [],
+      };
+    }
+
+    const usedCols = [
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+      { key: 'apiPath', label: 'api/… front', max: 120 },
+      { key: 'file', label: 'Archivo front', max: 180 },
+    ];
+    const internalCols = [
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+      { key: 'sourceFile', label: 'Archivo ERP', max: 180 },
+    ];
+    const externalCols = [
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'service', label: 'Servicio', max: 24 },
+      { key: 'apiPath', label: 'api/…', max: 120 },
+    ];
+    const routeCols = [
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+      { key: 'routeSource', label: 'Origen', max: 24 },
+    ];
+    const unusedCols = routeCols;
+
+    const usedMerged = [...usedRel, ...usedHeuristic];
+    const usedTable = this.cypher.formatGenericMarkdownTable(usedMerged, usedCols);
+    const internalTable = this.cypher.formatGenericMarkdownTable(internalConsumers, internalCols);
+    const externalTable = this.cypher.formatGenericMarkdownTable(externalConsumers, externalCols);
+    const publicTable = this.cypher.formatGenericMarkdownTable(publicRoutes, routeCols);
+    const unusedTable = this.cypher.formatGenericMarkdownTable(unused, unusedCols);
+
+    const needsResyncNote =
+      usedRel.length === 0 && usedHeuristic.length > 0
+        ? '\n\n_Nota: no hay relaciones `CALLS_STRAPI_ROUTE` en el grafo; «usadas en front» incluye coincidencia heurística (incl. prefijos dinámicos). Tras resync del proyecto se materializan enlaces persistentes._'
+        : usedRel.length === 0 &&
+            usedHeuristic.length === 0 &&
+            internalConsumers.length === 0 &&
+            externalConsumers.length === 0
+          ? '\n\n_Nota: si todo sale «sin uso», ejecuta **resync** de todos los repos del proyecto (post-sync: `CALLS_STRAPI_ROUTE`, `INVOKES_STRAPI_ROUTE`, external)._'
+          : '';
+
+    const answer = [
+      '## Endpoints Strapi vs consumidores (grafo)',
+      '',
+      `Rutas Strapi indexadas: **${strapiCount}**. Front (literal `api/…`): **${usedMerged.length}**. Internas (lifecycle/cron): **${internalConsumers.length}**. Externas (Tasks/SSO): **${externalConsumers.length}**. Públicas (`auth: false`): **${publicRoutes.length}**. CRUD core (admin): **${coreRouterCount}** (no candidatas a borrado). Custom sin consumidor: **${unused.length}**${unused.length >= maxRows ? ` (tope ${maxRows})` : ''}.`,
+      '',
+      '### Usadas en el frontend',
+      '',
+      usedTable,
+      '',
+      '### Consumidas en el ERP (lifecycle / strapi.service)',
+      '',
+      internalTable,
+      '',
+      '### Referenciadas por Tasks / SSO (ExternalApiReference)',
+      '',
+      externalTable,
+      '',
+      '### Rutas públicas (`auth: false`)',
+      '',
+      publicTable,
+      '',
+      '### Custom sin consumidor aparente',
+      '',
+      unusedTable,
+      '',
+      '_Cruce: `ApiClientReference` + prefijos dinámicos (`isDynamic`), `ExternalApiReference`, `INVOKES_STRAPI_ROUTE` (lifecycle/UID). Excluidas del bloque «sin consumidor»: `core_router` y rutas públicas. GraphQL y admin Strapi no se marcan como usadas por el front._',
+      needsResyncNote,
+    ].join('\n');
+
+    return {
+      answer,
+      cypher: cypherUnused,
+      result: unused,
+    };
+  }
+
+  /**
    * Inventario multi-etiqueta (Component, Hook, Function, DomainConcept) sin sintetizador.
    */
   private async buildFullIndexedInventoryResponse(projectId: string, scope?: ChatScope): Promise<ChatResponse> {
@@ -3397,6 +3540,29 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
 
     const q = message.trim().slice(0, 4000);
 
+    if (ps && wantsUnusedBackendApiEndpointsAnalysis(q)) {
+      const maxRows = Math.min(
+        Math.max(parseInt(process.env.CHAT_UNUSED_API_MAX ?? '5000', 10) || 5000, 1),
+        25_000,
+      );
+      await pushTool('unused_strapi_routes', {
+        projectScope: true,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: unusedCustomStrapiRoutesCypher(maxRows) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+      await pushTool('used_strapi_routes', {
+        projectScope: true,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: usedStrapiRoutesCypher(maxRows) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+    }
+
     /* Los 3 bloques (graph_summary, semantic_search, file_path_sample) son independientes → en paralelo */
     await Promise.all([
       pushTool('get_graph_summary', {
@@ -3536,6 +3702,9 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     }
     if (wantsFullGenericIndexedInventory(message)) {
       return this.buildFullIndexedInventoryResponse(projectId, scope);
+    }
+    if (wantsUnusedBackendApiEndpointsAnalysis(message)) {
+      return this.buildUnusedBackendApiEndpointsResponse(projectId, scope);
     }
     const rawEvidence = options?.responseMode === 'raw_evidence';
     const evidenceFirst = !rawEvidence && options?.responseMode === 'evidence_first';

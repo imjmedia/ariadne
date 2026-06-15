@@ -19,6 +19,7 @@ import type { StorybookDocumentationExtract } from './storybook-documentation';
 import { STORYBOOK_MAX_EMBED_CHARS } from './storybook-documentation';
 import { importInfosToStorybookBindings, isStorybookStoriesPath } from './storybook-csf-ast';
 import { isNonSourceEvidenceNoisePath } from '../chat/chat-evidence-path-filter';
+import { apiNameFromStrapiUid } from './strapi-uid-reference-extract';
 
 export type { GraphClient } from 'ariadne-common';
 
@@ -474,8 +475,9 @@ export function buildCypherForFile(
     const apiName = rt.apiName != null ? cypherSafe(rt.apiName) : 'null';
     const routeSource = cypherSafe(rt.routeSource);
     const description = rt.description != null ? cypherSafe(rt.description.slice(0, 500)) : 'null';
+    const publicRoute = rt.publicRoute ? 'true' : 'false';
     statements.push(
-      `MERGE (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description} ON MATCH SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}`,
+      `MERGE (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}, sr.publicRoute = ${publicRoute} ON MATCH SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}, sr.publicRoute = ${publicRoute}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(sr)`,
@@ -497,6 +499,16 @@ export function buildCypherForFile(
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ear:ExternalApiReference {baseUrl: ${cypherSafe(ext.baseUrl)}, apiPath: ${cypherSafe(ext.apiPath)}, normalizedPath: ${cypherSafe(ext.normalizedPath)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:REFERENCES_EXTERNAL_API]->(ear)`,
+    );
+  }
+
+  for (const uid of parsed.strapiUidReferences ?? []) {
+    const apiNameLit = cypherSafe(apiNameFromStrapiUid(uid) ?? '');
+    statements.push(
+      `MERGE (uid:StrapiUidReference {uid: ${cypherSafe(uid)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET uid.apiName = ${apiNameLit} ON MATCH SET uid.apiName = ${apiNameLit}`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (uid:StrapiUidReference {uid: ${cypherSafe(uid)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:REFERENCES_STRAPI_UID]->(uid)`,
     );
   }
 
@@ -704,6 +716,7 @@ const REPOID_BACKFILL_LABELS = [
   'StrapiController',
   'StrapiService',
   'StrapiRoute',
+  'StrapiUidReference',
   'ApiClientReference',
   'ExternalApiReference',
   'GraphQlQuery',

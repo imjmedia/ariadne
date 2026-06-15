@@ -11,9 +11,10 @@ Grafo FalkorDB (Cypher). Nodos:
 - OpenApiOperation {pathTemplate, method, specPath, projectId, repoId, docSource}
 - StrapiContentType {path, name, projectId, repoId, apiName, strapiUid, attributesSummary, displayName, collectionName}
 - StrapiController, StrapiService {path, name, projectId, repoId, apiName?}
-- StrapiRoute {path, method, routePath, projectId, repoId, handler?, apiName?, routeSource? (json|js|core_router)}
+- StrapiRoute {path, method, routePath, projectId, repoId, handler?, apiName?, routeSource? (json|js|core_router), publicRoute?}
+- StrapiUidReference {uid, filePath, projectId, repoId, apiName?} — lifecycles/cron con strapi.service/controller
 - ApiClientReference {apiPath, normalizedPath, filePath, projectId, repoId, isDynamic?}
-- ExternalApiReference {service, baseUrl, apiPath, normalizedPath, filePath, projectId, repoId} — SSO/tasks fuera del ERP
+- ExternalApiReference {service, baseUrl, apiPath, normalizedPath, filePath, projectId, repoId, isDynamic?} — SSO/tasks fuera del ERP
 - GraphQlQuery {path, name, operationKind (query|mutation), apiName, description?, resolverOf?}
 - Route {path, projectId, repoId, componentName} — React Router (front)
 - Hook {name, projectId, repoId}
@@ -26,7 +27,11 @@ Relaciones:
 - (File)-[:REFERENCES_API]->(ApiClientReference)
 - (File)-[:REFERENCES_EXTERNAL_API]->(ExternalApiReference)
 - (File)-[:CONTAINS]->(GraphQlQuery)
+- (File)-[:REFERENCES_STRAPI_UID]->(StrapiUidReference)
 - (ApiClientReference)-[:CALLS_API]->(OpenApiOperation) — multi-repo front→back
+- (ApiClientReference)-[:CALLS_STRAPI_ROUTE]->(StrapiRoute) — multi-repo front→Strapi custom/core routes
+- (ExternalApiReference)-[:CALLS_STRAPI_ROUTE]->(StrapiRoute) — Tasks/SSO→Strapi
+- (File)-[:INVOKES_STRAPI_ROUTE]->(StrapiRoute) — lifecycle/cron en ERP
 - (StrapiContentType)-[:RELATES_TO {attribute, relation}]->(StrapiContentType) — relaciones schema.json
 - (File)-[:LIFECYCLE_OF]->(StrapiContentType) — lifecycles.js del content-type
 - (File)-[:IMPORTS]->(File), (Component)-[:RENDERS]->(Component), (Function)-[:CALLS]->(Function)
@@ -175,6 +180,18 @@ Pregunta: "qué front llama a qué API", "referencias api/campanias en el códig
 \`\`\`cypher
 MATCH (f:File)-[:REFERENCES_API]->(ref:ApiClientReference)-[:CALLS_API]->(op:OpenApiOperation) WHERE f.projectId = $projectId RETURN f.path AS file, ref.apiPath AS apiPath, op.method AS method, op.pathTemplate AS pathTemplate LIMIT 50
 \`\`\`
+
+Pregunta: "endpoints del backend no usados en el front", "rutas Strapi sin uso en oohbp2", "qué rutas del back no consume el frontend"
+\`\`\`cypher
+MATCH (sr:StrapiRoute) WHERE sr.projectId = $projectId
+OPTIONAL MATCH (refLink:ApiClientReference)-[:CALLS_STRAPI_ROUTE]->(sr)
+OPTIONAL MATCH (ref:ApiClientReference) WHERE ref.projectId = $projectId AND ref.repoId <> sr.repoId AND (sr.routePath = '/' + ref.normalizedPath OR (sr.routePath STARTS WITH '/' AND ref.normalizedPath ENDS WITH substring(sr.routePath, 1)))
+WITH sr, count(refLink) AS relCount, count(ref) AS heuristicCount
+WHERE relCount = 0 AND heuristicCount = 0
+RETURN sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, sr.routeSource AS routeSource
+ORDER BY sr.routePath, sr.method
+\`\`\`
+(No uses solo MATCH (f:File) CONTAINS 'api/' ni un IN manual de rutas; cruza :StrapiRoute con :ApiClientReference.)
 
 Pregunta: "lifecycles de campania", "hooks beforeUpdate"
 \`\`\`cypher

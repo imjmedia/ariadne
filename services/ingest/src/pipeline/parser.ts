@@ -27,6 +27,7 @@ import {
   type ApiClientReferenceParsed,
   type ExternalApiReferenceParsed,
 } from './api-client-reference-extract';
+import { extractStrapiUidReferences } from './strapi-uid-reference-extract';
 import { parseStrapiGraphqlSchema, type GraphQlQueryInfo } from './strapi-graphql-extract';
 import {
   isStrapiConfigJsPath,
@@ -181,6 +182,7 @@ export interface StrapiRouteInfo {
   description?: string;
   apiName?: string;
   routeSource: 'json' | 'js' | 'core_router';
+  publicRoute?: boolean;
 }
 
 /** Referencia literal a `api/...` en código cliente (multi-root → OpenApiOperation). */
@@ -256,6 +258,8 @@ export interface ParsedFile {
   externalApiReferences: ExternalApiReferenceInfo[];
   /** Queries/mutations GraphQL custom Strapi (`schema.graphql`). */
   graphQlQueries: GraphQlQueryInfo[];
+  /** UIDs `api::…` en lifecycles/cron (strapi.service/controller/db.query). */
+  strapiUidReferences: string[];
   /** React Router Route definitions (path -> component). */
   routes: RouteInfo[];
   /** Modelos de datos (clases sin JSX, path Models/, nombre *Model). */
@@ -536,6 +540,7 @@ function tryParseTruncated(
       apiClientReferences: [],
       externalApiReferences: [],
       graphQlQueries: [],
+      strapiUidReferences: [],
       routes: [],
       models: [],
       domainConcepts: [],
@@ -629,6 +634,7 @@ export function parseSource(
   apiClientReferences: [],
   externalApiReferences: [],
   graphQlQueries: [],
+  strapiUidReferences: [],
   routes: [],
   models: [],
   domainConcepts: [],
@@ -937,6 +943,7 @@ export function parseSource(
   if (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'].includes(ext)) {
     result.apiClientReferences = extractApiClientReferences(source);
     result.externalApiReferences = extractExternalApiReferences(source);
+    result.strapiUidReferences = extractStrapiUidReferences(source);
   }
   return result;
 }

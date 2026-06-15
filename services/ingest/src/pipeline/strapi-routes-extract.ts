@@ -14,6 +14,8 @@ export interface StrapiRouteParsed {
   description?: string;
   apiName?: string;
   routeSource: 'json' | 'js' | 'core_router';
+  /** `config.auth: false` en custom routes (urbanos público, etc.). */
+  publicRoute?: boolean;
 }
 
 function normalizeMethod(raw: unknown): string | null {
@@ -24,6 +26,13 @@ function normalizeMethod(raw: unknown): string | null {
 function normalizeRoutePath(raw: unknown): string | null {
   if (typeof raw !== 'string' || !raw.trim()) return null;
   return raw.trim();
+}
+
+function isAuthFalseConfig(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object') return false;
+  const cfg = (raw as Record<string, unknown>).config;
+  if (!cfg || typeof cfg !== 'object') return false;
+  return (cfg as Record<string, unknown>).auth === false;
 }
 
 function parseRouteEntry(raw: unknown, ctx: StrapiRoutesPathMatch, routeSource: 'json' | 'js'): StrapiRouteParsed | null {
@@ -41,6 +50,7 @@ function parseRouteEntry(raw: unknown, ctx: StrapiRoutesPathMatch, routeSource: 
     description,
     apiName: ctx.apiName,
     routeSource,
+    publicRoute: isAuthFalseConfig(r) ? true : undefined,
   };
 }
 
@@ -83,12 +93,14 @@ function parseJsRouteObjectLiteral(block: string): StrapiRouteParsed | null {
   if (!method || !routePath) return null;
   const handler = block.match(/handler\s*:\s*['"]([^'"]+)['"]/)?.[1];
   const description = block.match(/description\s*:\s*['"]([^'"]*)['"]/)?.[1];
+  const publicRoute = /\bauth\s*:\s*false\b/.test(block);
   return {
     method: method.toUpperCase(),
     path: routePath,
     handler,
     description,
     routeSource: 'js',
+    publicRoute: publicRoute ? true : undefined,
   };
 }
 
