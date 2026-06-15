@@ -27,6 +27,12 @@ import {
   type ApiClientReferenceParsed,
   type ExternalApiReferenceParsed,
 } from './api-client-reference-extract';
+import { extractStrapiUidReferences } from './strapi-uid-reference-extract';
+import {
+  extractGraphQlClientReferences,
+  type GraphQlClientReferenceParsed,
+} from './graphql-client-reference-extract';
+import { isPublicEntryRoute } from './react-route-public-entry';
 import { parseStrapiGraphqlSchema, type GraphQlQueryInfo } from './strapi-graphql-extract';
 import {
   isStrapiConfigJsPath,
@@ -181,6 +187,7 @@ export interface StrapiRouteInfo {
   description?: string;
   apiName?: string;
   routeSource: 'json' | 'js' | 'core_router';
+  publicRoute?: boolean;
 }
 
 /** Referencia literal a `api/...` en código cliente (multi-root → OpenApiOperation). */
@@ -188,6 +195,8 @@ export type ApiClientReferenceInfo = ApiClientReferenceParsed;
 
 /** API externa (SSO/tasks) referenciada desde frontend. */
 export type ExternalApiReferenceInfo = ExternalApiReferenceParsed;
+
+export type GraphQlClientReferenceInfo = GraphQlClientReferenceParsed;
 
 export type { GraphQlQueryInfo };
 
@@ -197,6 +206,8 @@ export interface RouteInfo {
   componentName: string;
   /** Componente React que envuelve esta `<Route>` (subida por el AST). */
   enclosingComponent?: string;
+  /** Entry point público (urbanos/public, visualizacionCampania, login). */
+  isPublicEntry?: boolean;
 }
 
 /** Modelo de datos (clase con propiedades, sin JSX). */
@@ -256,6 +267,10 @@ export interface ParsedFile {
   externalApiReferences: ExternalApiReferenceInfo[];
   /** Queries/mutations GraphQL custom Strapi (`schema.graphql`). */
   graphQlQueries: GraphQlQueryInfo[];
+  /** UIDs `api::…` en lifecycles/cron (strapi.service/controller/db.query). */
+  strapiUidReferences: string[];
+  /** Operaciones GraphQL en front (`gql`/`graphql` templates). */
+  graphQlClientReferences: GraphQlClientReferenceInfo[];
   /** React Router Route definitions (path -> component). */
   routes: RouteInfo[];
   /** Modelos de datos (clases sin JSX, path Models/, nombre *Model). */
@@ -536,6 +551,8 @@ function tryParseTruncated(
       apiClientReferences: [],
       externalApiReferences: [],
       graphQlQueries: [],
+      strapiUidReferences: [],
+      graphQlClientReferences: [],
       routes: [],
       models: [],
       domainConcepts: [],
@@ -629,6 +646,8 @@ export function parseSource(
   apiClientReferences: [],
   externalApiReferences: [],
   graphQlQueries: [],
+  strapiUidReferences: [],
+  graphQlClientReferences: [],
   routes: [],
   models: [],
   domainConcepts: [],
@@ -937,6 +956,8 @@ export function parseSource(
   if (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'].includes(ext)) {
     result.apiClientReferences = extractApiClientReferences(source);
     result.externalApiReferences = extractExternalApiReferences(source);
+    result.strapiUidReferences = extractStrapiUidReferences(source);
+    result.graphQlClientReferences = extractGraphQlClientReferences(source);
   }
   return result;
 }
@@ -1106,7 +1127,12 @@ function collectRoutes(root: Parser.SyntaxNode, source: string, result: ParsedFi
     }
     if (componentName && isReactComponentName(componentName)) {
       const enclosingComponent = findEnclosingReactComponentName(node, source);
-      result.routes.push({ path, componentName, ...(enclosingComponent ? { enclosingComponent } : {}) });
+      result.routes.push({
+        path,
+        componentName,
+        ...(enclosingComponent ? { enclosingComponent } : {}),
+        ...(isPublicEntryRoute(path) ? { isPublicEntry: true } : {}),
+      });
     }
   }
 }

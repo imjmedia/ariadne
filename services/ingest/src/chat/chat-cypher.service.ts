@@ -461,6 +461,31 @@ export class ChatCypherService {
     return arr.map((r) => JSON.stringify(norm(r))).join('\n') + (rows.length > cap ? `\n\n_… y ${rows.length - cap} más_` : '');
   }
 
+  /** Tabla markdown genérica (listados de chat sin sintetizador). */
+  formatGenericMarkdownTable(
+    rows: Record<string, unknown>[],
+    columns: Array<{ key: string; label: string; max?: number }>,
+  ): string {
+    if (rows.length === 0) return '_Sin filas._';
+    const esc = (v: unknown, max = 220): string => {
+      const s = v === null || v === undefined ? '—' : String(v);
+      const t = s.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
+      return t.length > max ? `${t.slice(0, Math.max(0, max - 1))}…` : t;
+    };
+    const header = `| ${columns.map((c) => c.label).join(' | ')} |`;
+    const sep = `| ${columns.map(() => '---').join(' | ')} |`;
+    const body = rows.map((r) => {
+      const cells = columns.map((c) => {
+        const raw = esc(r[c.key], c.max ?? 220);
+        return c.key === 'routePath' || c.key === 'apiPath' || c.key === 'path' || c.key === 'file'
+          ? `\`${raw}\``
+          : raw;
+      });
+      return `| ${cells.join(' | ')} |`;
+    });
+    return [header, sep, ...body].join('\n');
+  }
+
   /** Tabla markdown de Component (listados completos; una fila por componente indexado). */
   formatComponentsMarkdownTable(rows: Record<string, unknown>[]): string {
     if (rows.length === 0) return '_Sin filas._';

@@ -34,7 +34,7 @@ import {
 } from '../pipeline/producer';
 import { buildCypherForPrismaSchema } from '../pipeline/prisma-extract';
 import { buildCypherForOpenApiSpec } from '../pipeline/openapi-spec-ingest';
-import { buildCrossRepoApiLinkCypher } from '../pipeline/cross-repo-api-link';
+import { buildCrossRepoApiAndStrapiLinkCypher } from '../pipeline/cross-repo-api-link';
 import { enrichParsedFilesWithCoreRouterRoutes } from '../pipeline/strapi-core-router-infer';
 import { buildStrapiContentTypeRelationCypher } from '../pipeline/strapi-content-type-relations';
 import { isOpenApiSpecSyncPath } from '../pipeline/strapi-path-patterns';
@@ -683,7 +683,7 @@ export class SyncService {
         }
 
         try {
-          const linkCy = buildCrossRepoApiLinkCypher(projectId);
+          const linkCy = buildCrossRepoApiAndStrapiLinkCypher(projectId);
           const linkGraph = await prepareGraph('cross-repo-api-link');
           await runCypherBatch(linkGraph, linkCy);
         } catch (linkErr) {

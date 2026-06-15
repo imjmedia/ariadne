@@ -19,6 +19,7 @@ import type { StorybookDocumentationExtract } from './storybook-documentation';
 import { STORYBOOK_MAX_EMBED_CHARS } from './storybook-documentation';
 import { importInfosToStorybookBindings, isStorybookStoriesPath } from './storybook-csf-ast';
 import { isNonSourceEvidenceNoisePath } from '../chat/chat-evidence-path-filter';
+import { apiNameFromStrapiUid } from './strapi-uid-reference-extract';
 
 export type { GraphClient } from 'ariadne-common';
 
@@ -269,11 +270,15 @@ export function buildCypherForFile(
   }
 
   for (const r of parsed.routes ?? []) {
+    const publicEntry = r.isPublicEntry ? 'true' : 'false';
     statements.push(
-      `MERGE (rt:Route {path: ${cypherSafe(r.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET rt.componentName = ${cypherSafe(r.componentName)} ON MATCH SET rt.componentName = ${cypherSafe(r.componentName)}`,
+      `MERGE (rt:Route {path: ${cypherSafe(r.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET rt.componentName = ${cypherSafe(r.componentName)}, rt.isPublicEntry = ${publicEntry} ON MATCH SET rt.componentName = ${cypherSafe(r.componentName)}, rt.isPublicEntry = ${publicEntry}`,
     );
     statements.push(
       `MATCH (p:Project {projectId: ${pid}}) MATCH (rt:Route {path: ${cypherSafe(r.path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (p)-[:HAS_ROUTE]->(rt)`,
+    );
+    statements.push(
+      `MATCH (rt:Route {path: ${cypherSafe(r.path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (comp:Component {name: ${cypherSafe(r.componentName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (rt)-[:ROUTE_TO_COMPONENT]->(comp)`,
     );
   }
 
@@ -474,8 +479,11 @@ export function buildCypherForFile(
     const apiName = rt.apiName != null ? cypherSafe(rt.apiName) : 'null';
     const routeSource = cypherSafe(rt.routeSource);
     const description = rt.description != null ? cypherSafe(rt.description.slice(0, 500)) : 'null';
+    const publicRoute = rt.publicRoute ? 'true' : 'false';
+    const implicitConsumer =
+      rt.routeSource === 'core_router' ? cypherSafe('strapi_admin') : 'null';
     statements.push(
-      `MERGE (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description} ON MATCH SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}`,
+      `MERGE (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}, sr.publicRoute = ${publicRoute}, sr.implicitConsumer = ${implicitConsumer} ON MATCH SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}, sr.publicRoute = ${publicRoute}, sr.implicitConsumer = ${implicitConsumer}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(sr)`,
@@ -500,11 +508,31 @@ export function buildCypherForFile(
     );
   }
 
+  for (const uid of parsed.strapiUidReferences ?? []) {
+    const apiNameLit = cypherSafe(apiNameFromStrapiUid(uid) ?? '');
+    statements.push(
+      `MERGE (uid:StrapiUidReference {uid: ${cypherSafe(uid)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET uid.apiName = ${apiNameLit} ON MATCH SET uid.apiName = ${apiNameLit}`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (uid:StrapiUidReference {uid: ${cypherSafe(uid)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:REFERENCES_STRAPI_UID]->(uid)`,
+    );
+  }
+
+  for (const gcr of parsed.graphQlClientReferences ?? []) {
+    statements.push(
+      `MERGE (gcr:GraphQlClientReference {operationName: ${cypherSafe(gcr.operationName)}, rootField: ${cypherSafe(gcr.rootField)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}})`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gcr:GraphQlClientReference {operationName: ${cypherSafe(gcr.operationName)}, rootField: ${cypherSafe(gcr.rootField)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:REFERENCES_GRAPHQL]->(gcr)`,
+    );
+  }
+
   for (const gq of parsed.graphQlQueries ?? []) {
     const desc = gq.description != null ? cypherSafe(gq.description) : 'null';
     const resolverOf = gq.resolverOf != null ? cypherSafe(gq.resolverOf) : 'null';
+    const resolverAction = gq.resolverAction != null ? cypherSafe(gq.resolverAction) : 'null';
     statements.push(
-      `MERGE (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf} ON MATCH SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}`,
+      `MERGE (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}, gq.resolverAction = ${resolverAction}, gq.implicitConsumer = null ON MATCH SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}, gq.resolverAction = ${resolverAction}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(gq)`,
@@ -704,8 +732,10 @@ const REPOID_BACKFILL_LABELS = [
   'StrapiController',
   'StrapiService',
   'StrapiRoute',
+  'StrapiUidReference',
   'ApiClientReference',
   'ExternalApiReference',
+  'GraphQlClientReference',
   'GraphQlQuery',
   'OpenApiOperation',
   'DomainConcept',

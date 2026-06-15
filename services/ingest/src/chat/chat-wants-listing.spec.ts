@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { wantsFullComponentListing, wantsFullGenericIndexedInventory } from './chat.constants';
+import { wantsUnusedBackendApiEndpointsAnalysis } from './chat-unused-api-endpoints.util';
 
 describe('wantsFullComponentListing', () => {
   it('detecta intención de listado completo de componentes', () => {
@@ -38,5 +39,12 @@ describe('wantsFullGenericIndexedInventory', () => {
   it('no dispara sin intención de totalidad', () => {
     expect(wantsFullGenericIndexedInventory('qué entidades hay en login')).toBe(false);
     expect(wantsFullGenericIndexedInventory('lista completa de rutas api')).toBe(false);
+  });
+});
+
+describe('wantsUnusedBackendApiEndpointsAnalysis', () => {
+  it('detecta cruce back/front sin uso', () => {
+    expect(wantsUnusedBackendApiEndpointsAnalysis('qué endpoints del back no se usan en el front')).toBe(true);
+    expect(wantsUnusedBackendApiEndpointsAnalysis('que rutas del backend no se usan en el front')).toBe(true);
   });
 });

@@ -35,6 +35,26 @@ import {
   wantsFullGenericIndexedInventory,
 } from './chat.constants';
 import {
+  wantsUnusedBackendApiEndpointsAnalysis,
+  unusedCustomStrapiRoutesCypher,
+  usedStrapiRoutesCypher,
+  usedStrapiRoutesHeuristicCypher,
+  usedStrapiRoutesViaOpenApiCypher,
+  internalStrapiRouteConsumersCypher,
+  externalStrapiRouteConsumersCypher,
+  graphQlFrontConsumersCypher,
+  graphQlRouteConsumersCypher,
+  graphQlFrontToRouteCypher,
+  publicStrapiRoutesCypher,
+  adminStrapiRoutesCypher,
+  coreRouterStrapiRoutesCountCypher,
+  openApiStrapiLinkCountCypher,
+  graphQlAdminOnlyQueriesCypher,
+  graphQlAdminOnlyCountCypher,
+  publicEntryRouteConsumersCypher,
+  publicEntryReachableApiCypher,
+} from './chat-unused-api-endpoints.util';
+import {
   computeRiskScore,
   groupDuplicates,
   formatDuplicatesSummary,
@@ -2918,6 +2938,267 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
   }
 
   /**
+   * Cruce `StrapiRoute` (back) vs `ApiClientReference` (front): rutas sin uso aparente en el índice.
+   */
+  private async buildUnusedBackendApiEndpointsResponse(
+    projectId: string,
+    scope?: ChatScope,
+  ): Promise<ChatResponse> {
+    const maxRows = Math.min(
+      Math.max(parseInt(process.env.CHAT_UNUSED_API_MAX ?? '5000', 10) || 5000, 1),
+      25_000,
+    );
+    const cypherUnused = unusedCustomStrapiRoutesCypher(maxRows);
+    const cypherUsedRel = usedStrapiRoutesCypher(maxRows);
+    const cypherUsedHeuristic = usedStrapiRoutesHeuristicCypher(maxRows);
+    const cypherInternal = internalStrapiRouteConsumersCypher(maxRows);
+    const cypherExternal = externalStrapiRouteConsumersCypher(maxRows);
+    const cypherPublic = publicStrapiRoutesCypher(maxRows);
+
+    const cypherUsedOpenApi = usedStrapiRoutesViaOpenApiCypher(maxRows);
+    const cypherGraphQlFront = graphQlFrontConsumersCypher(maxRows);
+    const cypherGraphQlRoute = graphQlRouteConsumersCypher(maxRows);
+    const cypherGraphQlFrontRoute = graphQlFrontToRouteCypher(maxRows);
+    const cypherAdmin = adminStrapiRoutesCypher(Math.min(maxRows, 200));
+
+    const cypherGraphQlAdmin = graphQlAdminOnlyQueriesCypher(maxRows);
+    const cypherPublicEntry = publicEntryRouteConsumersCypher(maxRows);
+    const cypherPublicReachable = publicEntryReachableApiCypher(maxRows);
+
+    const [
+      rawUnused,
+      rawUsedRel,
+      rawUsedHeuristic,
+      rawUsedOpenApi,
+      rawInternal,
+      rawExternal,
+      rawPublic,
+      rawGraphQlFront,
+      rawGraphQlRoute,
+      rawGraphQlFrontRoute,
+      rawGraphQlAdmin,
+      rawPublicEntry,
+      rawPublicReachable,
+      rawAdminSample,
+      rawCoreCount,
+      rawOpenApiLinkCount,
+      rawGraphQlAdminCount,
+    ] = await Promise.all([
+      this.cypher.executeCypher(projectId, cypherUnused, {}),
+      this.cypher.executeCypher(projectId, cypherUsedRel, {}),
+      this.cypher.executeCypher(projectId, cypherUsedHeuristic, {}),
+      this.cypher.executeCypher(projectId, cypherUsedOpenApi, {}),
+      this.cypher.executeCypher(projectId, cypherInternal, {}),
+      this.cypher.executeCypher(projectId, cypherExternal, {}),
+      this.cypher.executeCypher(projectId, cypherPublic, {}),
+      this.cypher.executeCypher(projectId, cypherGraphQlFront, {}),
+      this.cypher.executeCypher(projectId, cypherGraphQlRoute, {}),
+      this.cypher.executeCypher(projectId, cypherGraphQlFrontRoute, {}),
+      this.cypher.executeCypher(projectId, cypherGraphQlAdmin, {}),
+      this.cypher.executeCypher(projectId, cypherPublicEntry, {}),
+      this.cypher.executeCypher(projectId, cypherPublicReachable, {}),
+      this.cypher.executeCypher(projectId, cypherAdmin, {}),
+      this.cypher.executeCypher(projectId, coreRouterStrapiRoutesCountCypher(), {}),
+      this.cypher.executeCypher(projectId, openApiStrapiLinkCountCypher(), {}),
+      this.cypher.executeCypher(projectId, graphQlAdminOnlyCountCypher(), {}),
+    ]);
+
+    const unused = filterCypherRowsByScope(rawUnused as Record<string, unknown>[], scope);
+    const usedRel = filterCypherRowsByScope(rawUsedRel as Record<string, unknown>[], scope);
+    const usedHeuristic = filterCypherRowsByScope(rawUsedHeuristic as Record<string, unknown>[], scope);
+    const usedOpenApi = filterCypherRowsByScope(rawUsedOpenApi as Record<string, unknown>[], scope);
+    const internalConsumers = filterCypherRowsByScope(rawInternal as Record<string, unknown>[], scope);
+    const externalConsumers = filterCypherRowsByScope(rawExternal as Record<string, unknown>[], scope);
+    const publicRoutes = filterCypherRowsByScope(rawPublic as Record<string, unknown>[], scope);
+    const graphQlFront = filterCypherRowsByScope(rawGraphQlFront as Record<string, unknown>[], scope);
+    const graphQlRoute = filterCypherRowsByScope(rawGraphQlRoute as Record<string, unknown>[], scope);
+    const graphQlFrontRoute = filterCypherRowsByScope(rawGraphQlFrontRoute as Record<string, unknown>[], scope);
+    const graphQlAdminOnly = filterCypherRowsByScope(rawGraphQlAdmin as Record<string, unknown>[], scope);
+    const publicEntryConsumers = filterCypherRowsByScope(rawPublicEntry as Record<string, unknown>[], scope);
+    const publicReachable = filterCypherRowsByScope(rawPublicReachable as Record<string, unknown>[], scope);
+    const adminSample = filterCypherRowsByScope(rawAdminSample as Record<string, unknown>[], scope);
+    const coreRouterCount = Number((rawCoreCount as Array<{ c?: number }>)[0]?.c ?? 0);
+    const openApiLinkCount = Number((rawOpenApiLinkCount as Array<{ c?: number }>)[0]?.c ?? 0);
+    const graphQlAdminCount = Number((rawGraphQlAdminCount as Array<{ c?: number }>)[0]?.c ?? 0);
+
+    const totalStrapi = (await this.cypher.executeCypher(
+      projectId,
+      `MATCH (sr:StrapiRoute) WHERE sr.projectId = $projectId RETURN count(sr) AS c`,
+      {},
+    )) as Array<{ c?: number }>;
+    const strapiCount = Number(totalStrapi[0]?.c ?? 0);
+
+    if (strapiCount === 0) {
+      return {
+        answer:
+          'No hay nodos `StrapiRoute` en el grafo para este proyecto. Resincroniza el repo ERP/Strapi (`src/api/*/routes/*`) y, en multi-root, vuelve a ejecutar el sync del **proyecto** para enlazar front→back.',
+        cypher: cypherUnused,
+        result: [],
+      };
+    }
+
+    const usedCols = [
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+      { key: 'apiPath', label: 'api/… front', max: 120 },
+      { key: 'file', label: 'Archivo front', max: 180 },
+    ];
+    const internalCols = [
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+      { key: 'sourceFile', label: 'Archivo ERP', max: 180 },
+    ];
+    const externalCols = [
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'service', label: 'Servicio', max: 24 },
+      { key: 'apiPath', label: 'api/…', max: 120 },
+    ];
+    const routeCols = [
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+      { key: 'routeSource', label: 'Origen', max: 24 },
+    ];
+    const graphQlFrontCols = [
+      { key: 'file', label: 'Archivo front', max: 180 },
+      { key: 'operationName', label: 'Operación', max: 48 },
+      { key: 'rootField', label: 'Campo GQL', max: 48 },
+      { key: 'graphQlName', label: 'Query Strapi', max: 48 },
+      { key: 'apiName', label: 'API', max: 32 },
+    ];
+    const graphQlRouteCols = [
+      { key: 'graphQlName', label: 'Query Strapi', max: 48 },
+      { key: 'kind', label: 'Tipo', max: 12 },
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta REST', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+    ];
+    const graphQlAdminCols = [
+      { key: 'graphQlName', label: 'Query Strapi', max: 48 },
+      { key: 'kind', label: 'Tipo', max: 12 },
+      { key: 'apiName', label: 'API', max: 40 },
+      { key: 'resolverOf', label: 'resolverOf', max: 80 },
+    ];
+    const publicEntryCols = [
+      { key: 'reactPath', label: 'Ruta React', max: 80 },
+      { key: 'component', label: 'Componente', max: 48 },
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+    ];
+    const publicReachableCols = [
+      { key: 'reactPath', label: 'Ruta React', max: 80 },
+      { key: 'apiPath', label: 'api/…', max: 120 },
+      { key: 'file', label: 'Archivo', max: 180 },
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+    ];
+    const unusedCols = routeCols;
+
+    const usedMerged = [...usedRel, ...usedHeuristic, ...usedOpenApi];
+    const usedTable = this.cypher.formatGenericMarkdownTable(usedMerged, usedCols);
+    const internalTable = this.cypher.formatGenericMarkdownTable(internalConsumers, internalCols);
+    const externalTable = this.cypher.formatGenericMarkdownTable(externalConsumers, externalCols);
+    const publicTable = this.cypher.formatGenericMarkdownTable(publicRoutes, routeCols);
+    const graphQlFrontTable = this.cypher.formatGenericMarkdownTable(graphQlFront, graphQlFrontCols);
+    const graphQlRouteTable = this.cypher.formatGenericMarkdownTable(graphQlRoute, graphQlRouteCols);
+    const graphQlFrontRouteTable = this.cypher.formatGenericMarkdownTable(graphQlFrontRoute, usedCols);
+    const graphQlAdminTable = this.cypher.formatGenericMarkdownTable(graphQlAdminOnly, graphQlAdminCols);
+    const publicEntryTable = this.cypher.formatGenericMarkdownTable(publicEntryConsumers, publicEntryCols);
+    const publicReachableTable = this.cypher.formatGenericMarkdownTable(publicReachable, publicReachableCols);
+    const adminTable = this.cypher.formatGenericMarkdownTable(adminSample, routeCols);
+    const unusedTable = this.cypher.formatGenericMarkdownTable(unused, unusedCols);
+
+    const needsResyncNote =
+      usedRel.length === 0 && (usedHeuristic.length > 0 || usedOpenApi.length > 0)
+        ? '\n\n_Nota: no hay relaciones `CALLS_STRAPI_ROUTE` directas; «usadas en front» incluye heurística REST y/o enlace vía OpenAPI (`SAME_REST_AS`). Tras resync se materializan enlaces persistentes._'
+        : usedRel.length === 0 &&
+            usedHeuristic.length === 0 &&
+            usedOpenApi.length === 0 &&
+            internalConsumers.length === 0 &&
+            externalConsumers.length === 0 &&
+            graphQlFrontRoute.length === 0 &&
+            publicEntryConsumers.length === 0 &&
+            publicReachable.length === 0
+          ? '\n\n_Nota: si todo sale «sin uso», ejecuta **resync** del proyecto (post-sync: REST, OpenAPI, GraphQL, lifecycle, entry público)._'
+          : '';
+
+    const answer = [
+      '## Endpoints Strapi vs consumidores (grafo)',
+      '',
+      `Rutas Strapi: **${strapiCount}**. Front REST/OpenAPI: **${usedMerged.length}**. Entry público→Strapi: **${publicEntryConsumers.length}**. API alcanzable (urbanos/visualización): **${publicReachable.length}**. GraphQL admin-only: **${graphQlAdminCount}**. Internas ERP: **${internalConsumers.length}**. Custom sin consumidor: **${unused.length}**${unused.length >= maxRows ? ` (tope ${maxRows})` : ''}.`,
+      '',
+      '### Usadas en el frontend (REST / OpenAPI)',
+      '',
+      usedTable,
+      '',
+      '### Entry público React → Strapi (`auth: false`)',
+      '',
+      publicEntryTable,
+      '',
+      '### API alcanzable desde entry público (grafo RENDERS)',
+      '',
+      publicReachableTable,
+      '',
+      '### GraphQL en frontend → query Strapi',
+      '',
+      graphQlFrontTable,
+      '',
+      '### GraphQL Strapi → ruta REST (resolverOf)',
+      '',
+      graphQlRouteTable,
+      '',
+      '### GraphQL solo admin (sin REST custom)',
+      '',
+      graphQlAdminTable,
+      graphQlAdminCount > graphQlAdminOnly.length
+        ? `\n_Total queries GraphQL admin-only: ${graphQlAdminCount} (` +
+            'implicitConsumer=strapi_graphql_admin`). Consumo vía `/graphql` en admin Strapi._'
+        : '_Consumo vía endpoint `/graphql` en admin Strapi (`implicitConsumer=strapi_graphql_admin`)._',
+      '',
+      '### GraphQL front → ruta REST',
+      '',
+      graphQlFrontRouteTable,
+      '',
+      '### Consumidas en el ERP (lifecycle / strapi.service)',
+      '',
+      internalTable,
+      '',
+      '### Referenciadas por Tasks / SSO',
+      '',
+      externalTable,
+      '',
+      '### Rutas públicas Strapi (`auth: false`)',
+      '',
+      publicTable,
+      '',
+      '### Admin Strapi — CRUD core (muestra)',
+      '',
+      adminTable,
+      coreRouterCount > adminSample.length
+        ? `\n_Muestra de ${adminSample.length} rutas; total admin CRUD: ${coreRouterCount}. ` +
+            '`implicitConsumer=strapi_admin` — no candidatas a borrado._'
+        : '_`implicitConsumer=strapi_admin` — consumo vía panel Strapi._',
+      '',
+      '### Custom sin consumidor aparente',
+      '',
+      unusedTable,
+      '',
+      '_Cruce: REST dinámico, OpenAPI, GraphQL, lifecycle, `ENTRY_CONSUMES` / `ENTRY_REACHES_API` (urbanos/public, visualizacionCampania). Logs de acceso no incluidos._',
+      needsResyncNote,
+    ].join('\n');
+
+    return {
+      answer,
+      cypher: cypherUnused,
+      result: unused,
+    };
+  }
+
+  /**
    * Inventario multi-etiqueta (Component, Hook, Function, DomainConcept) sin sintetizador.
    */
   private async buildFullIndexedInventoryResponse(projectId: string, scope?: ChatScope): Promise<ChatResponse> {
@@ -3397,6 +3678,29 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
 
     const q = message.trim().slice(0, 4000);
 
+    if (ps && wantsUnusedBackendApiEndpointsAnalysis(q)) {
+      const maxRows = Math.min(
+        Math.max(parseInt(process.env.CHAT_UNUSED_API_MAX ?? '5000', 10) || 5000, 1),
+        25_000,
+      );
+      await pushTool('unused_strapi_routes', {
+        projectScope: true,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: unusedCustomStrapiRoutesCypher(maxRows) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+      await pushTool('used_strapi_routes', {
+        projectScope: true,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: usedStrapiRoutesCypher(maxRows) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+    }
+
     /* Los 3 bloques (graph_summary, semantic_search, file_path_sample) son independientes → en paralelo */
     await Promise.all([
       pushTool('get_graph_summary', {
@@ -3536,6 +3840,9 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     }
     if (wantsFullGenericIndexedInventory(message)) {
       return this.buildFullIndexedInventoryResponse(projectId, scope);
+    }
+    if (wantsUnusedBackendApiEndpointsAnalysis(message)) {
+      return this.buildUnusedBackendApiEndpointsResponse(projectId, scope);
     }
     const rawEvidence = options?.responseMode === 'raw_evidence';
     const evidenceFirst = !rawEvidence && options?.responseMode === 'evidence_first';

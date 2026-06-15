@@ -54,5 +54,6 @@ describe('strapi-routes-extract', () => {
     };`);
     expect(routes).toHaveLength(1);
     expect(routes[0]?.path).toBe('/listaCampania');
+    expect(routes[0]?.publicRoute).toBe(true);
   });
 });

@@ -10,6 +10,8 @@ export interface GraphQlQueryInfo {
   operationKind: GraphQlOperationKind;
   description?: string;
   resolverOf?: string;
+  /** Sufijo de handler Strapi tras el punto (`Medios.cercanos` → `cercanos`). */
+  resolverAction?: string;
 }
 
 const GRAPHQL_SCALAR = new Set(['String', 'Int', 'Float', 'Boolean', 'ID']);
@@ -42,7 +44,13 @@ function enrichFromResolverBlock(source: string, queries: GraphQlQueryInfo[]): v
     const descM = slice.match(/description\s*:\s*['"`]([^'"`]+)['"`]/);
     const resM = slice.match(/resolverOf\s*:\s*['"`]([^'"`]+)['"`]/);
     if (descM?.[1]) q.description = descM[1].slice(0, 500);
-    if (resM?.[1]) q.resolverOf = resM[1].slice(0, 200);
+    if (resM?.[1]) {
+      q.resolverOf = resM[1].slice(0, 200);
+      const dot = resM[1].indexOf('.');
+      if (dot >= 0 && dot < resM[1].length - 1) {
+        q.resolverAction = resM[1].slice(dot + 1).trim();
+      }
+    }
   }
 }
 
