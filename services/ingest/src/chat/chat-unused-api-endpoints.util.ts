@@ -27,11 +27,19 @@ export function wantsUnusedBackendApiEndpointsAnalysis(message: string): boolean
     /\bstrapi\s*rout/i.test(lower);
 
   const unusedIntent =
-    /\b(no\s+(se\s+)?us|sin\s+uso|no\s+usad|huérfan|huerfan|sin\s+referencia|no\s+consum)/i.test(lower) ||
+    /\b(no\s+(se\s+)?us|sin\s+uso|no\s+usad|no\s+utilizad|huérfan|huerfan|sin\s+referencia|no\s+consum)/i.test(lower) ||
     /\ben\s+el\s+front/i.test(lower) ||
-    /\bfront.*no\s+us/i.test(lower);
+    /\bfront.*no\s+us/i.test(lower) ||
+    /\bendpoints?\s+no\s+(utilizad|usad)/i.test(lower);
 
-  return backendApi && unusedIntent;
+  if (backendApi && unusedIntent) return true;
+
+  // Cobertura / cruce declarado vs consumido (sin exigir la palabra «front»).
+  const coverage =
+    /\b(endpoints?|rutas?)\b/i.test(t) &&
+    /\b(declarad|indexad|strapi|backend|back)\b/i.test(lower) &&
+    /\b(cruce|compar|cobertura|invocad|consum|referencia)/i.test(lower);
+  return coverage;
 }
 
 function frontRefHeuristicMatchCypher(refVar: string, srVar: string): string {

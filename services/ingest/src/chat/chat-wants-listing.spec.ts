@@ -47,4 +47,10 @@ describe('wantsUnusedBackendApiEndpointsAnalysis', () => {
     expect(wantsUnusedBackendApiEndpointsAnalysis('qué endpoints del back no se usan en el front')).toBe(true);
     expect(wantsUnusedBackendApiEndpointsAnalysis('que rutas del backend no se usan en el front')).toBe(true);
   });
+
+  it('detecta cobertura / cruce declarado vs consumido', () => {
+    expect(
+      wantsUnusedBackendApiEndpointsAnalysis('comparar rutas strapi declaradas con referencias del frontend'),
+    ).toBe(true);
+  });
 });
