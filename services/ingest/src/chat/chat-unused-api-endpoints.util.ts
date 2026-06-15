@@ -1,7 +1,8 @@
 /**
- * Detección y Cypher para cruce front (`ApiClientReference`) vs back (`StrapiRoute`).
+ * Detección y Cypher para cruce front (`ApiClientReference`) vs back (`StrapiRoute`, `NestRoute`).
  */
 import { strapiRouteMatchesNormalizedPathCypher } from '../pipeline/strapi-route-path-match';
+import { nestRouteMatchesNormalizedPathCypher } from '../pipeline/nest-route-path-match';
 
 export function wantsUnusedBackendApiEndpointsAnalysis(message: string): boolean {
   const t = message.trim();
@@ -23,8 +24,9 @@ export function wantsUnusedBackendApiEndpointsAnalysis(message: string): boolean
 
   const backendApi =
     (/\b(endpoints?|rutas?)\b/i.test(t) &&
-      /\b(back|backend|strapi|servidor|api\s+rest)\b/i.test(lower)) ||
-    /\bstrapi\s*rout/i.test(lower);
+      /\b(back|backend|strapi|nestjs|nest|servidor|api\s+rest)\b/i.test(lower)) ||
+    /\bstrapi\s*rout/i.test(lower) ||
+    /\bnest\s*(js)?\s*(route|controller|endpoint)/i.test(lower);
 
   const unusedIntent =
     /\b(no\s+(se\s+)?us|sin\s+uso|no\s+usad|no\s+utilizad|huérfan|huerfan|sin\s+referencia|no\s+consum)/i.test(lower) ||
@@ -189,4 +191,51 @@ export function graphQlAdminOnlyCountCypher(): string {
 
 export function openApiStrapiLinkCountCypher(): string {
   return `MATCH (op:OpenApiOperation)-[:SAME_REST_AS]->(sr:StrapiRoute) WHERE op.projectId = $projectId RETURN count(*) AS c`;
+}
+
+function frontRefNestHeuristicMatchCypher(refVar: string, nrVar: string): string {
+  return `(${refVar}.projectId = ${nrVar}.projectId AND ${refVar}.repoId <> ${nrVar}.repoId AND (${nestRouteMatchesNormalizedPathCypher(refVar, nrVar)}))`;
+}
+
+export function unusedNestRoutesCypher(limit: number): string {
+  const heuristic = frontRefNestHeuristicMatchCypher('ref', 'nr');
+  return `MATCH (nr:NestRoute)
+WHERE nr.projectId = $projectId
+AND NOT EXISTS { MATCH (:ApiClientReference)-[:CALLS_NEST_ROUTE]->(nr) }
+AND NOT EXISTS { MATCH (ref:ApiClientReference) WHERE ${heuristic} }
+RETURN nr.httpMethod AS method, nr.fullPath AS routePath, nr.controllerName AS controller, nr.handlerName AS handler
+ORDER BY nr.fullPath, nr.httpMethod
+LIMIT ${limit}`;
+}
+
+export function usedNestRoutesCypher(limit: number): string {
+  return `MATCH (ref:ApiClientReference)-[:CALLS_NEST_ROUTE]->(nr:NestRoute)
+WHERE ref.projectId = $projectId
+RETURN ref.filePath AS file, ref.apiPath AS apiPath, nr.httpMethod AS method, nr.fullPath AS routePath, nr.controllerName AS controller, 'front_rest' AS consumer
+ORDER BY nr.fullPath, nr.httpMethod
+LIMIT ${limit}`;
+}
+
+export function usedNestRoutesHeuristicCypher(limit: number): string {
+  const heuristic = frontRefNestHeuristicMatchCypher('ref', 'nr');
+  return `MATCH (nr:NestRoute), (ref:ApiClientReference)
+WHERE nr.projectId = $projectId AND ref.projectId = $projectId
+AND NOT (ref)-[:CALLS_NEST_ROUTE]->(nr)
+AND ${heuristic}
+RETURN DISTINCT ref.filePath AS file, ref.apiPath AS apiPath, nr.httpMethod AS method, nr.fullPath AS routePath, nr.controllerName AS controller, 'front_heuristic' AS consumer
+ORDER BY nr.fullPath, nr.httpMethod
+LIMIT ${limit}`;
+}
+
+export function usedNestRoutesViaOpenApiCypher(limit: number): string {
+  return `MATCH (ref:ApiClientReference)-[:CALLS_API]->(:OpenApiOperation)-[:SAME_REST_AS]->(nr:NestRoute)
+WHERE ref.projectId = $projectId AND ref.repoId <> nr.repoId
+AND NOT (ref)-[:CALLS_NEST_ROUTE]->(nr)
+RETURN DISTINCT ref.filePath AS file, ref.apiPath AS apiPath, nr.httpMethod AS method, nr.fullPath AS routePath, nr.controllerName AS controller, 'front_openapi' AS consumer
+ORDER BY nr.fullPath, nr.httpMethod
+LIMIT ${limit}`;
+}
+
+export function openApiNestLinkCountCypher(): string {
+  return `MATCH (op:OpenApiOperation)-[:SAME_REST_AS]->(nr:NestRoute) WHERE op.projectId = $projectId RETURN count(*) AS c`;
 }

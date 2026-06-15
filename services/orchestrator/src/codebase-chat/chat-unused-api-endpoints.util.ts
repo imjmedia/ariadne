@@ -21,8 +21,9 @@ export function wantsUnusedBackendApiEndpointsAnalysis(message: string): boolean
 
   const backendApi =
     (/\b(endpoints?|rutas?)\b/i.test(t) &&
-      /\b(back|backend|strapi|servidor|api\s+rest)\b/i.test(lower)) ||
-    /\bstrapi\s*rout/i.test(lower);
+      /\b(back|backend|strapi|nestjs|nest|servidor|api\s+rest)\b/i.test(lower)) ||
+    /\bstrapi\s*rout/i.test(lower) ||
+    /\bnest\s*(js)?\s*(route|controller|endpoint)/i.test(lower);
 
   const unusedIntent =
     /\b(no\s+(se\s+)?us|sin\s+uso|no\s+usad|no\s+utilizad|huérfan|huerfan|sin\s+referencia|no\s+consum)/i.test(lower) ||

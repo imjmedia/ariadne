@@ -3,9 +3,11 @@ import {
   buildCrossRepoApiAndStrapiLinkCypher,
   buildCrossRepoExternalStrapiRouteLinkCypher,
   buildCrossRepoGraphQlClientLinkCypher,
+  buildCrossRepoNestRouteLinkCypher,
   buildCrossRepoStrapiRouteLinkCypher,
   buildGraphQlResolvesToRouteLinkCypher,
   buildInternalStrapiRouteLinkCypher,
+  buildOpenApiNestRouteLinkCypher,
   buildOpenApiStrapiRouteLinkCypher,
 } from './cross-repo-api-link';
 
@@ -54,13 +56,27 @@ describe('cross-repo-api-link', () => {
     expect(stmts[1]).toContain('CALLS_STRAPI_ROUTE');
   });
 
+  it('buildOpenApiNestRouteLinkCypher links OpenAPI and front bridge to NestRoute', () => {
+    const stmts = buildOpenApiNestRouteLinkCypher(pid);
+    expect(stmts.length).toBe(2);
+    expect(stmts[0]).toContain('NestRoute');
+    expect(stmts[1]).toContain('CALLS_NEST_ROUTE');
+  });
+
+  it('buildCrossRepoNestRouteLinkCypher links ApiClientReference to NestRoute', () => {
+    const stmts = buildCrossRepoNestRouteLinkCypher(pid);
+    expect(stmts[0]).toContain('CALLS_NEST_ROUTE');
+    expect(stmts[0]).toContain('NestRoute');
+  });
+
   it('buildCrossRepoApiAndStrapiLinkCypher includes all link kinds', () => {
     const stmts = buildCrossRepoApiAndStrapiLinkCypher(pid);
-    expect(stmts.length).toBe(14);
+    expect(stmts.length).toBe(17);
     expect(stmts.some((s) => s.includes('OpenApiOperation'))).toBe(true);
     expect(stmts.some((s) => s.includes('ExternalApiReference'))).toBe(true);
     expect(stmts.some((s) => s.includes('INVOKES_STRAPI_ROUTE'))).toBe(true);
     expect(stmts.some((s) => s.includes('SAME_REST_AS'))).toBe(true);
     expect(stmts.some((s) => s.includes('RESOLVES_TO_ROUTE'))).toBe(true);
+    expect(stmts.some((s) => s.includes('CALLS_NEST_ROUTE'))).toBe(true);
   });
 });

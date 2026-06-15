@@ -5,6 +5,8 @@
 import { cypherSafe } from 'ariadne-common';
 import { strapiRouteMatchesNormalizedPathCypher } from './strapi-route-path-match';
 import { openApiPathMatchesStrapiRouteCypher } from './strapi-openapi-route-match';
+import { nestRouteMatchesNormalizedPathCypher } from './nest-route-path-match';
+import { openApiPathMatchesNestRouteCypher } from './nest-openapi-route-match';
 import { publicEntryApiNameMatchCypher } from './react-route-public-entry';
 
 /** MERGE (ApiClientReference)-[:CALLS_API]->(OpenApiOperation) por coincidencia de path. */
@@ -104,14 +106,35 @@ export function buildPublicEntryReachableApiLinkCypher(projectId: string): strin
   ];
 }
 
-/** OpenAPI + StrapiRoute cross-repo + consumidores internos (ejecutar tras indexar todos los repos del proyecto). */
+/** MERGE (OpenApiOperation)-[:SAME_REST_AS]->(NestRoute) y front vía OpenAPI cuando REST coincide. */
+export function buildOpenApiNestRouteLinkCypher(projectId: string): string[] {
+  const pid = cypherSafe(projectId);
+  const pathMatch = openApiPathMatchesNestRouteCypher('op', 'nr');
+  return [
+    `MATCH (op:OpenApiOperation {projectId: ${pid}}) MATCH (nr:NestRoute {projectId: ${pid}}) WHERE op.repoId = nr.repoId AND op.method = nr.httpMethod AND (${pathMatch}) MERGE (op)-[:SAME_REST_AS]->(nr)`,
+    `MATCH (ref:ApiClientReference {projectId: ${pid}})-[:CALLS_API]->(op:OpenApiOperation)-[:SAME_REST_AS]->(nr:NestRoute) WHERE ref.repoId <> nr.repoId MERGE (ref)-[:CALLS_NEST_ROUTE]->(nr)`,
+  ];
+}
+
+/** MERGE (ApiClientReference)-[:CALLS_NEST_ROUTE]->(NestRoute) por literal `api/…` o `/api/…` normalizado. */
+export function buildCrossRepoNestRouteLinkCypher(projectId: string): string[] {
+  const pid = cypherSafe(projectId);
+  const match = nestRouteMatchesNormalizedPathCypher('ref', 'nr');
+  return [
+    `MATCH (ref:ApiClientReference {projectId: ${pid}}) MATCH (nr:NestRoute {projectId: ${pid}}) WHERE ref.repoId <> nr.repoId AND (${match}) MERGE (ref)-[:CALLS_NEST_ROUTE]->(nr)`,
+  ];
+}
+
+/** OpenAPI + StrapiRoute + NestRoute cross-repo + consumidores internos (ejecutar tras indexar todos los repos del proyecto). */
 export function buildCrossRepoApiAndStrapiLinkCypher(projectId: string): string[] {
   return [
     ...buildCrossRepoApiLinkCypher(projectId),
     ...buildCrossRepoStrapiRouteLinkCypher(projectId),
+    ...buildCrossRepoNestRouteLinkCypher(projectId),
     ...buildCrossRepoExternalStrapiRouteLinkCypher(projectId),
     ...buildInternalStrapiRouteLinkCypher(projectId),
     ...buildOpenApiStrapiRouteLinkCypher(projectId),
+    ...buildOpenApiNestRouteLinkCypher(projectId),
     ...buildGraphQlResolvesToRouteLinkCypher(projectId),
     ...buildCrossRepoGraphQlClientLinkCypher(projectId),
     ...buildGraphQlAdminOnlyMarkCypher(projectId),

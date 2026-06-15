@@ -31,7 +31,9 @@ Relaciones:
 - (File)-[:REFERENCES_GRAPHQL]->(GraphQlClientReference)
 - (ApiClientReference)-[:CALLS_API]->(OpenApiOperation) — multi-repo front→back
 - (OpenApiOperation)-[:SAME_REST_AS]->(StrapiRoute) — OpenAPI spec ↔ rutas Strapi (mismo repo)
+- (OpenApiOperation)-[:SAME_REST_AS]->(NestRoute) — OpenAPI spec ↔ rutas Nest (mismo repo)
 - (ApiClientReference)-[:CALLS_STRAPI_ROUTE]->(StrapiRoute) — multi-repo front→Strapi custom/core routes
+- (ApiClientReference)-[:CALLS_NEST_ROUTE]->(NestRoute) — multi-repo front→Nest HTTP routes
 - (ExternalApiReference)-[:CALLS_STRAPI_ROUTE]->(StrapiRoute) — Tasks/SSO→Strapi
 - (File)-[:INVOKES_STRAPI_ROUTE]->(StrapiRoute) — lifecycle/cron en ERP
 - (File)-[:REFERENCES_STRAPI_UID]->(StrapiUidReference)

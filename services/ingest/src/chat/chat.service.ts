@@ -53,6 +53,11 @@ import {
   graphQlAdminOnlyCountCypher,
   publicEntryRouteConsumersCypher,
   publicEntryReachableApiCypher,
+  unusedNestRoutesCypher,
+  usedNestRoutesCypher,
+  usedNestRoutesHeuristicCypher,
+  usedNestRoutesViaOpenApiCypher,
+  openApiNestLinkCountCypher,
 } from './chat-unused-api-endpoints.util';
 import {
   computeRiskScore,
@@ -3039,173 +3044,257 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     )) as Array<{ c?: number }>;
     const strapiCount = Number(totalStrapi[0]?.c ?? 0);
 
-    if (strapiCount === 0) {
+    const totalNest = (await this.cypher.executeCypher(
+      projectId,
+      `MATCH (nr:NestRoute) WHERE nr.projectId = $projectId RETURN count(nr) AS c`,
+      {},
+    )) as Array<{ c?: number }>;
+    const nestCount = Number(totalNest[0]?.c ?? 0);
+
+    if (strapiCount === 0 && nestCount === 0) {
       return {
         answer:
-          'No hay nodos `StrapiRoute` en el grafo para este proyecto. Resincroniza el repo ERP/Strapi (`src/api/*/routes/*`) y, en multi-root, vuelve a ejecutar el sync del **proyecto** para enlazar front→back.',
+          'No hay nodos `StrapiRoute` ni `NestRoute` en el grafo para este proyecto. Resincroniza los repos backend (Strapi `src/api/*/routes/*` o Nest controladores) y, en multi-root, vuelve a ejecutar el sync del **proyecto** para enlazar front→back.',
         cypher: cypherUnused,
         result: [],
       };
     }
 
-    const usedCols = [
-      { key: 'method', label: 'Método', max: 12 },
-      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
-      { key: 'apiName', label: 'API', max: 40 },
-      { key: 'apiPath', label: 'api/… front', max: 120 },
-      { key: 'file', label: 'Archivo front', max: 180 },
-    ];
-    const internalCols = [
-      { key: 'method', label: 'Método', max: 12 },
-      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
-      { key: 'apiName', label: 'API', max: 40 },
-      { key: 'sourceFile', label: 'Archivo ERP', max: 180 },
-    ];
-    const externalCols = [
-      { key: 'method', label: 'Método', max: 12 },
-      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
-      { key: 'service', label: 'Servicio', max: 24 },
-      { key: 'apiPath', label: 'api/…', max: 120 },
-    ];
-    const routeCols = [
-      { key: 'method', label: 'Método', max: 12 },
-      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
-      { key: 'apiName', label: 'API', max: 40 },
-      { key: 'routeSource', label: 'Origen', max: 24 },
-    ];
-    const graphQlFrontCols = [
-      { key: 'file', label: 'Archivo front', max: 180 },
-      { key: 'operationName', label: 'Operación', max: 48 },
-      { key: 'rootField', label: 'Campo GQL', max: 48 },
-      { key: 'graphQlName', label: 'Query Strapi', max: 48 },
-      { key: 'apiName', label: 'API', max: 32 },
-    ];
-    const graphQlRouteCols = [
-      { key: 'graphQlName', label: 'Query Strapi', max: 48 },
-      { key: 'kind', label: 'Tipo', max: 12 },
-      { key: 'method', label: 'Método', max: 12 },
-      { key: 'routePath', label: 'Ruta REST', max: 120 },
-      { key: 'apiName', label: 'API', max: 40 },
-    ];
-    const graphQlAdminCols = [
-      { key: 'graphQlName', label: 'Query Strapi', max: 48 },
-      { key: 'kind', label: 'Tipo', max: 12 },
-      { key: 'apiName', label: 'API', max: 40 },
-      { key: 'resolverOf', label: 'resolverOf', max: 80 },
-    ];
-    const publicEntryCols = [
-      { key: 'reactPath', label: 'Ruta React', max: 80 },
-      { key: 'component', label: 'Componente', max: 48 },
-      { key: 'method', label: 'Método', max: 12 },
-      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
-      { key: 'apiName', label: 'API', max: 40 },
-    ];
-    const publicReachableCols = [
-      { key: 'reactPath', label: 'Ruta React', max: 80 },
-      { key: 'apiPath', label: 'api/…', max: 120 },
-      { key: 'file', label: 'Archivo', max: 180 },
-      { key: 'method', label: 'Método', max: 12 },
-      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
-    ];
-    const unusedCols = routeCols;
+    const answerParts: string[] = [];
+    let combinedUnused: Record<string, unknown>[] = [];
 
-    const usedMerged = [...usedRel, ...usedHeuristic, ...usedOpenApi];
-    const usedTable = this.cypher.formatGenericMarkdownTable(usedMerged, usedCols);
-    const internalTable = this.cypher.formatGenericMarkdownTable(internalConsumers, internalCols);
-    const externalTable = this.cypher.formatGenericMarkdownTable(externalConsumers, externalCols);
-    const publicTable = this.cypher.formatGenericMarkdownTable(publicRoutes, routeCols);
-    const graphQlFrontTable = this.cypher.formatGenericMarkdownTable(graphQlFront, graphQlFrontCols);
-    const graphQlRouteTable = this.cypher.formatGenericMarkdownTable(graphQlRoute, graphQlRouteCols);
-    const graphQlFrontRouteTable = this.cypher.formatGenericMarkdownTable(graphQlFrontRoute, usedCols);
-    const graphQlAdminTable = this.cypher.formatGenericMarkdownTable(graphQlAdminOnly, graphQlAdminCols);
-    const publicEntryTable = this.cypher.formatGenericMarkdownTable(publicEntryConsumers, publicEntryCols);
-    const publicReachableTable = this.cypher.formatGenericMarkdownTable(publicReachable, publicReachableCols);
-    const adminTable = this.cypher.formatGenericMarkdownTable(adminSample, routeCols);
-    const unusedTable = this.cypher.formatGenericMarkdownTable(unused, unusedCols);
+    if (strapiCount > 0) {
+      const usedCols = [
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+        { key: 'apiName', label: 'API', max: 40 },
+        { key: 'apiPath', label: 'api/… front', max: 120 },
+        { key: 'file', label: 'Archivo front', max: 180 },
+      ];
+      const internalCols = [
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+        { key: 'apiName', label: 'API', max: 40 },
+        { key: 'sourceFile', label: 'Archivo ERP', max: 180 },
+      ];
+      const externalCols = [
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+        { key: 'service', label: 'Servicio', max: 24 },
+        { key: 'apiPath', label: 'api/…', max: 120 },
+      ];
+      const routeCols = [
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+        { key: 'apiName', label: 'API', max: 40 },
+        { key: 'routeSource', label: 'Origen', max: 24 },
+      ];
+      const graphQlFrontCols = [
+        { key: 'file', label: 'Archivo front', max: 180 },
+        { key: 'operationName', label: 'Operación', max: 48 },
+        { key: 'rootField', label: 'Campo GQL', max: 48 },
+        { key: 'graphQlName', label: 'Query Strapi', max: 48 },
+        { key: 'apiName', label: 'API', max: 32 },
+      ];
+      const graphQlRouteCols = [
+        { key: 'graphQlName', label: 'Query Strapi', max: 48 },
+        { key: 'kind', label: 'Tipo', max: 12 },
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta REST', max: 120 },
+        { key: 'apiName', label: 'API', max: 40 },
+      ];
+      const graphQlAdminCols = [
+        { key: 'graphQlName', label: 'Query Strapi', max: 48 },
+        { key: 'kind', label: 'Tipo', max: 12 },
+        { key: 'apiName', label: 'API', max: 40 },
+        { key: 'resolverOf', label: 'resolverOf', max: 80 },
+      ];
+      const publicEntryCols = [
+        { key: 'reactPath', label: 'Ruta React', max: 80 },
+        { key: 'component', label: 'Componente', max: 48 },
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+        { key: 'apiName', label: 'API', max: 40 },
+      ];
+      const publicReachableCols = [
+        { key: 'reactPath', label: 'Ruta React', max: 80 },
+        { key: 'apiPath', label: 'api/…', max: 120 },
+        { key: 'file', label: 'Archivo', max: 180 },
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      ];
+      const unusedCols = routeCols;
 
-    const needsResyncNote =
-      usedRel.length === 0 && (usedHeuristic.length > 0 || usedOpenApi.length > 0)
-        ? '\n\n_Nota: no hay relaciones `CALLS_STRAPI_ROUTE` directas; «usadas en front» incluye heurística REST y/o enlace vía OpenAPI (`SAME_REST_AS`). Tras resync se materializan enlaces persistentes._'
-        : usedRel.length === 0 &&
-            usedHeuristic.length === 0 &&
-            usedOpenApi.length === 0 &&
-            internalConsumers.length === 0 &&
-            externalConsumers.length === 0 &&
-            graphQlFrontRoute.length === 0 &&
-            publicEntryConsumers.length === 0 &&
-            publicReachable.length === 0
-          ? '\n\n_Nota: si todo sale «sin uso», ejecuta **resync** del proyecto (post-sync: REST, OpenAPI, GraphQL, lifecycle, entry público)._'
-          : '';
+      const usedMerged = [...usedRel, ...usedHeuristic, ...usedOpenApi];
+      const usedTable = this.cypher.formatGenericMarkdownTable(usedMerged, usedCols);
+      const internalTable = this.cypher.formatGenericMarkdownTable(internalConsumers, internalCols);
+      const externalTable = this.cypher.formatGenericMarkdownTable(externalConsumers, externalCols);
+      const publicTable = this.cypher.formatGenericMarkdownTable(publicRoutes, routeCols);
+      const graphQlFrontTable = this.cypher.formatGenericMarkdownTable(graphQlFront, graphQlFrontCols);
+      const graphQlRouteTable = this.cypher.formatGenericMarkdownTable(graphQlRoute, graphQlRouteCols);
+      const graphQlFrontRouteTable = this.cypher.formatGenericMarkdownTable(graphQlFrontRoute, usedCols);
+      const graphQlAdminTable = this.cypher.formatGenericMarkdownTable(graphQlAdminOnly, graphQlAdminCols);
+      const publicEntryTable = this.cypher.formatGenericMarkdownTable(publicEntryConsumers, publicEntryCols);
+      const publicReachableTable = this.cypher.formatGenericMarkdownTable(publicReachable, publicReachableCols);
+      const adminTable = this.cypher.formatGenericMarkdownTable(adminSample, routeCols);
+      const unusedTable = this.cypher.formatGenericMarkdownTable(unused, unusedCols);
 
-    const answer = [
-      '## Endpoints Strapi vs consumidores (grafo)',
-      '',
-      `Rutas Strapi: **${strapiCount}**. Front REST/OpenAPI: **${usedMerged.length}**. Entry público→Strapi: **${publicEntryConsumers.length}**. API alcanzable (urbanos/visualización): **${publicReachable.length}**. GraphQL admin-only: **${graphQlAdminCount}**. Internas ERP: **${internalConsumers.length}**. Custom sin consumidor: **${unused.length}**${unused.length >= maxRows ? ` (tope ${maxRows})` : ''}.`,
-      '',
-      '### Usadas en el frontend (REST / OpenAPI)',
-      '',
-      usedTable,
-      '',
-      '### Entry público React → Strapi (`auth: false`)',
-      '',
-      publicEntryTable,
-      '',
-      '### API alcanzable desde entry público (grafo RENDERS)',
-      '',
-      publicReachableTable,
-      '',
-      '### GraphQL en frontend → query Strapi',
-      '',
-      graphQlFrontTable,
-      '',
-      '### GraphQL Strapi → ruta REST (resolverOf)',
-      '',
-      graphQlRouteTable,
-      '',
-      '### GraphQL solo admin (sin REST custom)',
-      '',
-      graphQlAdminTable,
-      graphQlAdminCount > graphQlAdminOnly.length
-        ? `\n_Total queries GraphQL admin-only: ${graphQlAdminCount} (` +
-            'implicitConsumer=strapi_graphql_admin`). Consumo vía `/graphql` en admin Strapi._'
-        : '_Consumo vía endpoint `/graphql` en admin Strapi (`implicitConsumer=strapi_graphql_admin`)._',
-      '',
-      '### GraphQL front → ruta REST',
-      '',
-      graphQlFrontRouteTable,
-      '',
-      '### Consumidas en el ERP (lifecycle / strapi.service)',
-      '',
-      internalTable,
-      '',
-      '### Referenciadas por Tasks / SSO',
-      '',
-      externalTable,
-      '',
-      '### Rutas públicas Strapi (`auth: false`)',
-      '',
-      publicTable,
-      '',
-      '### Admin Strapi — CRUD core (muestra)',
-      '',
-      adminTable,
-      coreRouterCount > adminSample.length
-        ? `\n_Muestra de ${adminSample.length} rutas; total admin CRUD: ${coreRouterCount}. ` +
-            '`implicitConsumer=strapi_admin` — no candidatas a borrado._'
-        : '_`implicitConsumer=strapi_admin` — consumo vía panel Strapi._',
-      '',
-      '### Custom sin consumidor aparente',
-      '',
-      unusedTable,
-      '',
-      '_Cruce: REST dinámico, OpenAPI, GraphQL, lifecycle, `ENTRY_CONSUMES` / `ENTRY_REACHES_API` (urbanos/public, visualizacionCampania). Logs de acceso no incluidos._',
-      needsResyncNote,
-    ].join('\n');
+      const needsResyncNote =
+        usedRel.length === 0 && (usedHeuristic.length > 0 || usedOpenApi.length > 0)
+          ? '\n\n_Nota: no hay relaciones `CALLS_STRAPI_ROUTE` directas; «usadas en front» incluye heurística REST y/o enlace vía OpenAPI (`SAME_REST_AS`). Tras resync se materializan enlaces persistentes._'
+          : usedRel.length === 0 &&
+              usedHeuristic.length === 0 &&
+              usedOpenApi.length === 0 &&
+              internalConsumers.length === 0 &&
+              externalConsumers.length === 0 &&
+              graphQlFrontRoute.length === 0 &&
+              publicEntryConsumers.length === 0 &&
+              publicReachable.length === 0
+            ? '\n\n_Nota: si todo sale «sin uso», ejecuta **resync** del proyecto (post-sync: REST, OpenAPI, GraphQL, lifecycle, entry público)._'
+            : '';
+
+      answerParts.push(
+        [
+          '## Endpoints Strapi vs consumidores (grafo)',
+          '',
+          `Rutas Strapi: **${strapiCount}**. Front REST/OpenAPI: **${usedMerged.length}**. Entry público→Strapi: **${publicEntryConsumers.length}**. API alcanzable (urbanos/visualización): **${publicReachable.length}**. GraphQL admin-only: **${graphQlAdminCount}**. Internas ERP: **${internalConsumers.length}**. Custom sin consumidor: **${unused.length}**${unused.length >= maxRows ? ` (tope ${maxRows})` : ''}.`,
+          '',
+          '### Usadas en el frontend (REST / OpenAPI)',
+          '',
+          usedTable,
+          '',
+          '### Entry público React → Strapi (`auth: false`)',
+          '',
+          publicEntryTable,
+          '',
+          '### API alcanzable desde entry público (grafo RENDERS)',
+          '',
+          publicReachableTable,
+          '',
+          '### GraphQL en frontend → query Strapi',
+          '',
+          graphQlFrontTable,
+          '',
+          '### GraphQL Strapi → ruta REST (resolverOf)',
+          '',
+          graphQlRouteTable,
+          '',
+          '### GraphQL solo admin (sin REST custom)',
+          '',
+          graphQlAdminTable,
+          graphQlAdminCount > graphQlAdminOnly.length
+            ? `\n_Total queries GraphQL admin-only: ${graphQlAdminCount} (` +
+                'implicitConsumer=strapi_graphql_admin`). Consumo vía `/graphql` en admin Strapi._'
+            : '_Consumo vía endpoint `/graphql` en admin Strapi (`implicitConsumer=strapi_graphql_admin`)._',
+          '',
+          '### GraphQL front → ruta REST',
+          '',
+          graphQlFrontRouteTable,
+          '',
+          '### Consumidas en el ERP (lifecycle / strapi.service)',
+          '',
+          internalTable,
+          '',
+          '### Referenciadas por Tasks / SSO',
+          '',
+          externalTable,
+          '',
+          '### Rutas públicas Strapi (`auth: false`)',
+          '',
+          publicTable,
+          '',
+          '### Admin Strapi — CRUD core (muestra)',
+          '',
+          adminTable,
+          coreRouterCount > adminSample.length
+            ? `\n_Muestra de ${adminSample.length} rutas; total admin CRUD: ${coreRouterCount}. ` +
+                '`implicitConsumer=strapi_admin` — no candidatas a borrado._'
+            : '_`implicitConsumer=strapi_admin` — consumo vía panel Strapi._',
+          '',
+          '### Custom sin consumidor aparente',
+          '',
+          unusedTable,
+          '',
+          '_Cruce: REST dinámico, OpenAPI, GraphQL, lifecycle, `ENTRY_CONSUMES` / `ENTRY_REACHES_API` (urbanos/public, visualizacionCampania). Logs de acceso no incluidos._',
+          needsResyncNote,
+        ].join('\n'),
+      );
+      combinedUnused = [...unused];
+    }
+
+    if (nestCount > 0) {
+      const cypherNestUnused = unusedNestRoutesCypher(maxRows);
+      const cypherNestUsedRel = usedNestRoutesCypher(maxRows);
+      const cypherNestUsedHeuristic = usedNestRoutesHeuristicCypher(maxRows);
+      const cypherNestUsedOpenApi = usedNestRoutesViaOpenApiCypher(maxRows);
+
+      const [rawNestUnused, rawNestUsedRel, rawNestUsedHeuristic, rawNestUsedOpenApi, rawNestOpenApiCount] =
+        await Promise.all([
+          this.cypher.executeCypher(projectId, cypherNestUnused, {}),
+          this.cypher.executeCypher(projectId, cypherNestUsedRel, {}),
+          this.cypher.executeCypher(projectId, cypherNestUsedHeuristic, {}),
+          this.cypher.executeCypher(projectId, cypherNestUsedOpenApi, {}),
+          this.cypher.executeCypher(projectId, openApiNestLinkCountCypher(), {}),
+        ]);
+
+      const nestUnused = filterCypherRowsByScope(rawNestUnused as Record<string, unknown>[], scope);
+      const nestUsedRel = filterCypherRowsByScope(rawNestUsedRel as Record<string, unknown>[], scope);
+      const nestUsedHeuristic = filterCypherRowsByScope(rawNestUsedHeuristic as Record<string, unknown>[], scope);
+      const nestUsedOpenApi = filterCypherRowsByScope(rawNestUsedOpenApi as Record<string, unknown>[], scope);
+      const nestOpenApiLinkCount = Number((rawNestOpenApiCount as Array<{ c?: number }>)[0]?.c ?? 0);
+
+      const nestUsedCols = [
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta Nest', max: 120 },
+        { key: 'controller', label: 'Controller', max: 48 },
+        { key: 'apiPath', label: 'Path front', max: 120 },
+        { key: 'file', label: 'Archivo front', max: 180 },
+      ];
+      const nestUnusedCols = [
+        { key: 'method', label: 'Método', max: 12 },
+        { key: 'routePath', label: 'Ruta Nest', max: 120 },
+        { key: 'controller', label: 'Controller', max: 48 },
+        { key: 'handler', label: 'Handler', max: 48 },
+      ];
+
+      const nestUsedMerged = [...nestUsedRel, ...nestUsedHeuristic, ...nestUsedOpenApi];
+      const nestUsedTable = this.cypher.formatGenericMarkdownTable(nestUsedMerged, nestUsedCols);
+      const nestUnusedTable = this.cypher.formatGenericMarkdownTable(nestUnused, nestUnusedCols);
+
+      const nestNeedsResyncNote =
+        nestUsedRel.length === 0 && (nestUsedHeuristic.length > 0 || nestUsedOpenApi.length > 0)
+          ? '\n\n_Nota Nest: no hay `CALLS_NEST_ROUTE` directas; «usadas» incluye heurística y/o OpenAPI (`SAME_REST_AS`). Tras resync del proyecto se materializan enlaces._'
+          : nestUsedRel.length === 0 &&
+              nestUsedMerged.length === 0 &&
+              nestUnused.length > 0
+            ? '\n\n_Nota Nest: si todo sale sin uso, resync del proyecto (post-sync: `CALLS_NEST_ROUTE`, OpenAPI)._'
+            : '';
+
+      answerParts.push(
+        [
+          '## Endpoints NestJS vs consumidores (grafo)',
+          '',
+          `Rutas Nest: **${nestCount}**. Front REST/OpenAPI: **${nestUsedMerged.length}**. OpenAPI↔Nest enlaces: **${nestOpenApiLinkCount}**. Sin consumidor aparente: **${nestUnused.length}**${nestUnused.length >= maxRows ? ` (tope ${maxRows})` : ''}.`,
+          '',
+          '### Usadas en el frontend (REST / OpenAPI)',
+          '',
+          nestUsedTable,
+          '',
+          '### Sin consumidor aparente',
+          '',
+          nestUnusedTable,
+          '',
+          '_Cruce estático: literales `api/…` y `/api/…` en front, OpenAPI (`SAME_REST_AS`), sin logs de tráfico. Paths vía `const BASE = "/api/…"` solo indexan el base; `${BASE}/suffix` requiere heurística o resync._',
+          nestNeedsResyncNote,
+        ].join('\n'),
+      );
+      combinedUnused = [...combinedUnused, ...nestUnused];
+    }
 
     return {
-      answer,
-      cypher: cypherUnused,
-      result: unused,
+      answer: answerParts.join('\n\n---\n\n'),
+      cypher: strapiCount > 0 ? cypherUnused : unusedNestRoutesCypher(maxRows),
+      result: combinedUnused,
     };
   }
 
