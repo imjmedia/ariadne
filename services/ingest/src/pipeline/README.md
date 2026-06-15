@@ -11,7 +11,9 @@
 - **strapi-content-type-relations.ts** — Post-sync: `(StrapiContentType)-[:RELATES_TO {attribute, relation}]->(StrapiContentType)` por `target` en attributes.
 - **api-client-reference-extract.ts** — Literales y prefijos dinámicos `api/...` en TS/JS → nodos **`ApiClientReference`**; **`ExternalApiReference`** para SSO/tasks (`tasks.imjmedia.com.mx`, `sso.imjmedia.com.mx`); enlace post-sync con **`OpenApiOperation`** de otros repos (`cross-repo-api-link.ts`, relación **`CALLS_API`**).
 - **strapi-graphql-extract.ts** — `src/api/{api}/config/schema.graphql`: nodos **`GraphQlQuery`** (query/mutation custom Strapi).
-- **cross-repo-api-link.ts** — Cypher post-sync multi-root: `CALLS_API`, `CALLS_STRAPI_ROUTE` (front + ExternalApiReference), `INVOKES_STRAPI_ROUTE` (lifecycle/UID); matching con prefijos dinámicos (`strapi-route-path-match.ts`).
+- **cross-repo-api-link.ts** — Cypher post-sync multi-root: `CALLS_API`, `CALLS_STRAPI_ROUTE` (front + ExternalApiReference), `INVOKES_STRAPI_ROUTE` (lifecycle/UID), `SAME_REST_AS` (OpenAPI↔StrapiRoute), `RESOLVES_TO_ROUTE` (GraphQL), `GraphQlClientReference`; matching dinámico (`strapi-route-path-match.ts`).
+- **graphql-client-reference-extract.ts** — `gql`/`graphql` templates en front → `GraphQlClientReference`.
+- **strapi-openapi-route-match.ts** — Coincidencia `OpenApiOperation.pathTemplate` ↔ `StrapiRoute.routePath`.
 - **strapi-uid-reference-extract.ts** — UIDs `api::…` en lifecycles/cron → `StrapiUidReference`.
 - **openapi-spec-ingest.ts** — `swagger.json`, `openapi.{yaml,yml,json}`, **`full_documentation.json`**, `src/**/documentation/**/*.json` (OpenAPI Strapi): `File.openApiTruth`, nodos `OpenApiOperation` (MERGE por `pathTemplate+method+projectId+repoId`, sin duplicar por `specPath`; preferencia `full_documentation.json`), relación `DEFINES_OP`.
 - **prisma-extract.ts** — `getDMMF` (`@prisma/internals`): nodos `Model`, `Enum`, relaciones `RELATES_TO` / `USES_ENUM`; propiedad `fieldSummary` (JSON de campos).

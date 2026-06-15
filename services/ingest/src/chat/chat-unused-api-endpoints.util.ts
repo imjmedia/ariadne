@@ -38,16 +38,19 @@ function frontRefHeuristicMatchCypher(refVar: string, srVar: string): string {
   return `(${refVar}.projectId = ${srVar}.projectId AND ${refVar}.repoId <> ${srVar}.repoId AND (${strapiRouteMatchesNormalizedPathCypher(refVar, srVar)}))`;
 }
 
-/** Rutas custom sin consumidor conocido (excluye core_router y auth:false). */
+/** Rutas custom sin consumidor conocido (excluye core_router, públicas, GraphQL, OpenAPI bridge). */
 export function unusedCustomStrapiRoutesCypher(limit: number): string {
   const heuristic = frontRefHeuristicMatchCypher('ref', 'sr');
   return `MATCH (sr:StrapiRoute)
 WHERE sr.projectId = $projectId
 AND sr.routeSource <> 'core_router'
 AND coalesce(sr.publicRoute, 'false') <> 'true'
+AND coalesce(sr.implicitConsumer, '') <> 'strapi_admin'
 AND NOT EXISTS { MATCH (:ApiClientReference)-[:CALLS_STRAPI_ROUTE]->(sr) }
 AND NOT EXISTS { MATCH (:ExternalApiReference)-[:CALLS_STRAPI_ROUTE]->(sr) }
+AND NOT EXISTS { MATCH (:GraphQlClientReference)-[:CALLS_STRAPI_ROUTE]->(sr) }
 AND NOT EXISTS { MATCH (:File)-[:INVOKES_STRAPI_ROUTE]->(sr) }
+AND NOT EXISTS { MATCH (:GraphQlQuery)-[:RESOLVES_TO_ROUTE]->(sr) }
 AND NOT EXISTS { MATCH (ref:ApiClientReference) WHERE ${heuristic} }
 RETURN sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, sr.routeSource AS routeSource
 ORDER BY sr.routePath, sr.method
@@ -62,7 +65,7 @@ export function unusedStrapiRoutesCypher(limit: number): string {
 export function usedStrapiRoutesCypher(limit: number): string {
   return `MATCH (ref:ApiClientReference)-[:CALLS_STRAPI_ROUTE]->(sr:StrapiRoute)
 WHERE ref.projectId = $projectId
-RETURN ref.filePath AS file, ref.apiPath AS apiPath, sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, 'front' AS consumer
+RETURN ref.filePath AS file, ref.apiPath AS apiPath, sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, 'front_rest' AS consumer
 ORDER BY sr.routePath, sr.method
 LIMIT ${limit}`;
 }
@@ -74,6 +77,15 @@ WHERE sr.projectId = $projectId AND ref.projectId = $projectId
 AND NOT (ref)-[:CALLS_STRAPI_ROUTE]->(sr)
 AND ${heuristic}
 RETURN DISTINCT ref.filePath AS file, ref.apiPath AS apiPath, sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, 'front_heuristic' AS consumer
+ORDER BY sr.routePath, sr.method
+LIMIT ${limit}`;
+}
+
+export function usedStrapiRoutesViaOpenApiCypher(limit: number): string {
+  return `MATCH (ref:ApiClientReference)-[:CALLS_API]->(:OpenApiOperation)-[:SAME_REST_AS]->(sr:StrapiRoute)
+WHERE ref.projectId = $projectId AND ref.repoId <> sr.repoId
+AND NOT (ref)-[:CALLS_STRAPI_ROUTE]->(sr)
+RETURN DISTINCT ref.filePath AS file, ref.apiPath AS apiPath, sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, 'front_openapi' AS consumer
 ORDER BY sr.routePath, sr.method
 LIMIT ${limit}`;
 }
@@ -94,6 +106,30 @@ ORDER BY sr.routePath, sr.method
 LIMIT ${limit}`;
 }
 
+export function graphQlFrontConsumersCypher(limit: number): string {
+  return `MATCH (gcr:GraphQlClientReference)-[:CALLS_GRAPHQL_QUERY]->(gq:GraphQlQuery)
+WHERE gcr.projectId = $projectId
+RETURN DISTINCT gcr.filePath AS file, gcr.operationName AS operationName, gcr.rootField AS rootField, gq.name AS graphQlName, gq.apiName AS apiName, 'graphql_front' AS consumer
+ORDER BY gq.name
+LIMIT ${limit}`;
+}
+
+export function graphQlRouteConsumersCypher(limit: number): string {
+  return `MATCH (gq:GraphQlQuery)-[:RESOLVES_TO_ROUTE]->(sr:StrapiRoute)
+WHERE sr.projectId = $projectId
+RETURN DISTINCT gq.name AS graphQlName, gq.operationKind AS kind, gq.apiName AS apiName, sr.method AS method, sr.routePath AS routePath, 'graphql_resolver' AS consumer
+ORDER BY sr.routePath, gq.name
+LIMIT ${limit}`;
+}
+
+export function graphQlFrontToRouteCypher(limit: number): string {
+  return `MATCH (gcr:GraphQlClientReference)-[:CALLS_STRAPI_ROUTE]->(sr:StrapiRoute)
+WHERE sr.projectId = $projectId
+RETURN DISTINCT gcr.filePath AS file, gcr.operationName AS operationName, sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, 'graphql_front_route' AS consumer
+ORDER BY sr.routePath, gcr.operationName
+LIMIT ${limit}`;
+}
+
 export function publicStrapiRoutesCypher(limit: number): string {
   return `MATCH (sr:StrapiRoute)
 WHERE sr.projectId = $projectId AND coalesce(sr.publicRoute, 'false') = 'true'
@@ -102,6 +138,18 @@ ORDER BY sr.routePath, sr.method
 LIMIT ${limit}`;
 }
 
+export function adminStrapiRoutesCypher(limit: number): string {
+  return `MATCH (sr:StrapiRoute)
+WHERE sr.projectId = $projectId AND coalesce(sr.implicitConsumer, '') = 'strapi_admin'
+RETURN sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, sr.routeSource AS routeSource
+ORDER BY sr.routePath, sr.method
+LIMIT ${limit}`;
+}
+
 export function coreRouterStrapiRoutesCountCypher(): string {
   return `MATCH (sr:StrapiRoute) WHERE sr.projectId = $projectId AND sr.routeSource = 'core_router' RETURN count(sr) AS c`;
+}
+
+export function openApiStrapiLinkCountCypher(): string {
+  return `MATCH (op:OpenApiOperation)-[:SAME_REST_AS]->(sr:StrapiRoute) WHERE op.projectId = $projectId RETURN count(*) AS c`;
 }

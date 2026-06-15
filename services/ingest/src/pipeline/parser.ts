@@ -28,6 +28,10 @@ import {
   type ExternalApiReferenceParsed,
 } from './api-client-reference-extract';
 import { extractStrapiUidReferences } from './strapi-uid-reference-extract';
+import {
+  extractGraphQlClientReferences,
+  type GraphQlClientReferenceParsed,
+} from './graphql-client-reference-extract';
 import { parseStrapiGraphqlSchema, type GraphQlQueryInfo } from './strapi-graphql-extract';
 import {
   isStrapiConfigJsPath,
@@ -191,6 +195,8 @@ export type ApiClientReferenceInfo = ApiClientReferenceParsed;
 /** API externa (SSO/tasks) referenciada desde frontend. */
 export type ExternalApiReferenceInfo = ExternalApiReferenceParsed;
 
+export type GraphQlClientReferenceInfo = GraphQlClientReferenceParsed;
+
 export type { GraphQlQueryInfo };
 
 /** React Router Route: path -> component. Para flujos de UI en manuales. */
@@ -260,6 +266,8 @@ export interface ParsedFile {
   graphQlQueries: GraphQlQueryInfo[];
   /** UIDs `api::…` en lifecycles/cron (strapi.service/controller/db.query). */
   strapiUidReferences: string[];
+  /** Operaciones GraphQL en front (`gql`/`graphql` templates). */
+  graphQlClientReferences: GraphQlClientReferenceInfo[];
   /** React Router Route definitions (path -> component). */
   routes: RouteInfo[];
   /** Modelos de datos (clases sin JSX, path Models/, nombre *Model). */
@@ -541,6 +549,7 @@ function tryParseTruncated(
       externalApiReferences: [],
       graphQlQueries: [],
       strapiUidReferences: [],
+      graphQlClientReferences: [],
       routes: [],
       models: [],
       domainConcepts: [],
@@ -635,6 +644,7 @@ export function parseSource(
   externalApiReferences: [],
   graphQlQueries: [],
   strapiUidReferences: [],
+  graphQlClientReferences: [],
   routes: [],
   models: [],
   domainConcepts: [],
@@ -944,6 +954,7 @@ export function parseSource(
     result.apiClientReferences = extractApiClientReferences(source);
     result.externalApiReferences = extractExternalApiReferences(source);
     result.strapiUidReferences = extractStrapiUidReferences(source);
+    result.graphQlClientReferences = extractGraphQlClientReferences(source);
   }
   return result;
 }

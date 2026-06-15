@@ -476,8 +476,10 @@ export function buildCypherForFile(
     const routeSource = cypherSafe(rt.routeSource);
     const description = rt.description != null ? cypherSafe(rt.description.slice(0, 500)) : 'null';
     const publicRoute = rt.publicRoute ? 'true' : 'false';
+    const implicitConsumer =
+      rt.routeSource === 'core_router' ? cypherSafe('strapi_admin') : 'null';
     statements.push(
-      `MERGE (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}, sr.publicRoute = ${publicRoute} ON MATCH SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}, sr.publicRoute = ${publicRoute}`,
+      `MERGE (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}, sr.publicRoute = ${publicRoute}, sr.implicitConsumer = ${implicitConsumer} ON MATCH SET sr.handler = ${handler}, sr.apiName = ${apiName}, sr.routeSource = ${routeSource}, sr.description = ${description}, sr.publicRoute = ${publicRoute}, sr.implicitConsumer = ${implicitConsumer}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (sr:StrapiRoute {path: ${cypherSafe(path)}, method: ${cypherSafe(rt.method)}, routePath: ${cypherSafe(rt.path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(sr)`,
@@ -512,11 +514,21 @@ export function buildCypherForFile(
     );
   }
 
+  for (const gcr of parsed.graphQlClientReferences ?? []) {
+    statements.push(
+      `MERGE (gcr:GraphQlClientReference {operationName: ${cypherSafe(gcr.operationName)}, rootField: ${cypherSafe(gcr.rootField)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}})`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gcr:GraphQlClientReference {operationName: ${cypherSafe(gcr.operationName)}, rootField: ${cypherSafe(gcr.rootField)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:REFERENCES_GRAPHQL]->(gcr)`,
+    );
+  }
+
   for (const gq of parsed.graphQlQueries ?? []) {
     const desc = gq.description != null ? cypherSafe(gq.description) : 'null';
     const resolverOf = gq.resolverOf != null ? cypherSafe(gq.resolverOf) : 'null';
+    const resolverAction = gq.resolverAction != null ? cypherSafe(gq.resolverAction) : 'null';
     statements.push(
-      `MERGE (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf} ON MATCH SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}`,
+      `MERGE (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}, gq.resolverAction = ${resolverAction} ON MATCH SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}, gq.resolverAction = ${resolverAction}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(gq)`,
@@ -719,6 +731,7 @@ const REPOID_BACKFILL_LABELS = [
   'StrapiUidReference',
   'ApiClientReference',
   'ExternalApiReference',
+  'GraphQlClientReference',
   'GraphQlQuery',
   'OpenApiOperation',
   'DomainConcept',

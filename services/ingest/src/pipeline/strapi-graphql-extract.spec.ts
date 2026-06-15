@@ -35,5 +35,6 @@ describe('strapi-graphql-extract', () => {
     const medios = ops.find((o) => o.name === 'mediosCercanos');
     expect(medios?.description).toContain('business nearby');
     expect(medios?.resolverOf).toBe('Medios.cercanos');
+    expect(medios?.resolverAction).toBe('cercanos');
   });
 });

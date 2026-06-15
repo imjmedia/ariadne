@@ -11,11 +11,12 @@ Grafo FalkorDB (Cypher). Nodos:
 - OpenApiOperation {pathTemplate, method, specPath, projectId, repoId, docSource}
 - StrapiContentType {path, name, projectId, repoId, apiName, strapiUid, attributesSummary, displayName, collectionName}
 - StrapiController, StrapiService {path, name, projectId, repoId, apiName?}
-- StrapiRoute {path, method, routePath, projectId, repoId, handler?, apiName?, routeSource? (json|js|core_router), publicRoute?}
+- StrapiRoute {path, method, routePath, projectId, repoId, handler?, apiName?, routeSource? (json|js|core_router), publicRoute?, implicitConsumer? (strapi_admin)}
 - StrapiUidReference {uid, filePath, projectId, repoId, apiName?} — lifecycles/cron con strapi.service/controller
 - ApiClientReference {apiPath, normalizedPath, filePath, projectId, repoId, isDynamic?}
 - ExternalApiReference {service, baseUrl, apiPath, normalizedPath, filePath, projectId, repoId, isDynamic?} — SSO/tasks fuera del ERP
-- GraphQlQuery {path, name, operationKind (query|mutation), apiName, description?, resolverOf?}
+- GraphQlClientReference {operationName, rootField, filePath, projectId, repoId} — gql/graphql en front
+- GraphQlQuery {path, name, operationKind (query|mutation), apiName, description?, resolverOf?, resolverAction?}
 - Route {path, projectId, repoId, componentName} — React Router (front)
 - Hook {name, projectId, repoId}
 - DomainConcept {name, projectId, repoId, category, sourcePath, options?, description?}
@@ -27,11 +28,16 @@ Relaciones:
 - (File)-[:REFERENCES_API]->(ApiClientReference)
 - (File)-[:REFERENCES_EXTERNAL_API]->(ExternalApiReference)
 - (File)-[:CONTAINS]->(GraphQlQuery)
-- (File)-[:REFERENCES_STRAPI_UID]->(StrapiUidReference)
+- (File)-[:REFERENCES_GRAPHQL]->(GraphQlClientReference)
 - (ApiClientReference)-[:CALLS_API]->(OpenApiOperation) — multi-repo front→back
+- (OpenApiOperation)-[:SAME_REST_AS]->(StrapiRoute) — OpenAPI spec ↔ rutas Strapi (mismo repo)
 - (ApiClientReference)-[:CALLS_STRAPI_ROUTE]->(StrapiRoute) — multi-repo front→Strapi custom/core routes
 - (ExternalApiReference)-[:CALLS_STRAPI_ROUTE]->(StrapiRoute) — Tasks/SSO→Strapi
 - (File)-[:INVOKES_STRAPI_ROUTE]->(StrapiRoute) — lifecycle/cron en ERP
+- (File)-[:REFERENCES_STRAPI_UID]->(StrapiUidReference)
+- (GraphQlQuery)-[:RESOLVES_TO_ROUTE]->(StrapiRoute) — GraphQL custom → handler REST
+- (GraphQlClientReference)-[:CALLS_GRAPHQL_QUERY]->(GraphQlQuery)
+- (GraphQlClientReference)-[:CALLS_STRAPI_ROUTE]->(StrapiRoute) — GraphQL front→REST
 - (StrapiContentType)-[:RELATES_TO {attribute, relation}]->(StrapiContentType) — relaciones schema.json
 - (File)-[:LIFECYCLE_OF]->(StrapiContentType) — lifecycles.js del content-type
 - (File)-[:IMPORTS]->(File), (Component)-[:RENDERS]->(Component), (Function)-[:CALLS]->(Function)

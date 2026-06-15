@@ -5,13 +5,12 @@ import {
 } from './chat-unused-api-endpoints.util';
 
 describe('chat-unused-api-endpoints cypher', () => {
-  it('unusedCustom excludes core_router and publicRoute', () => {
+  it('unusedCustom excludes core_router, graphql and admin', () => {
     const cypher = unusedCustomStrapiRoutesCypher(100);
     expect(cypher).toContain("sr.routeSource <> 'core_router'");
-    expect(cypher).toContain('publicRoute');
-    expect(cypher).toContain('INVOKES_STRAPI_ROUTE');
-    expect(cypher).toContain('ExternalApiReference');
-    expect(cypher).toContain('isDynamic');
+    expect(cypher).toContain('RESOLVES_TO_ROUTE');
+    expect(cypher).toContain('GraphQlClientReference');
+    expect(cypher).toContain('strapi_admin');
   });
 
   it('coreRouter count cypher', () => {
