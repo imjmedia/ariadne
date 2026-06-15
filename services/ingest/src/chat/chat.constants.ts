@@ -16,8 +16,8 @@ Grafo FalkorDB (Cypher). Nodos:
 - ApiClientReference {apiPath, normalizedPath, filePath, projectId, repoId, isDynamic?}
 - ExternalApiReference {service, baseUrl, apiPath, normalizedPath, filePath, projectId, repoId, isDynamic?} — SSO/tasks fuera del ERP
 - GraphQlClientReference {operationName, rootField, filePath, projectId, repoId} — gql/graphql en front
-- GraphQlQuery {path, name, operationKind (query|mutation), apiName, description?, resolverOf?, resolverAction?}
-- Route {path, projectId, repoId, componentName} — React Router (front)
+- GraphQlQuery {path, name, operationKind (query|mutation), apiName, description?, resolverOf?, resolverAction?, implicitConsumer? (strapi_graphql_admin)}
+- Route {path, projectId, repoId, componentName, isPublicEntry?} — React Router (front)
 - Hook {name, projectId, repoId}
 - DomainConcept {name, projectId, repoId, category, sourcePath, options?, description?}
 - NestController, NestService, NestModule, NestRoute, NestGuard {path, name, projectId, repoId}
@@ -37,6 +37,9 @@ Relaciones:
 - (File)-[:REFERENCES_STRAPI_UID]->(StrapiUidReference)
 - (GraphQlQuery)-[:RESOLVES_TO_ROUTE]->(StrapiRoute) — GraphQL custom → handler REST
 - (GraphQlClientReference)-[:CALLS_GRAPHQL_QUERY]->(GraphQlQuery)
+- (Route)-[:ROUTE_TO_COMPONENT]->(Component)
+- (Route)-[:ENTRY_CONSUMES]->(StrapiRoute) — entry público React → ruta Strapi auth:false
+- (Route)-[:ENTRY_REACHES_API]->(ApiClientReference) — API alcanzable vía RENDERS
 - (GraphQlClientReference)-[:CALLS_STRAPI_ROUTE]->(StrapiRoute) — GraphQL front→REST
 - (StrapiContentType)-[:RELATES_TO {attribute, relation}]->(StrapiContentType) — relaciones schema.json
 - (File)-[:LIFECYCLE_OF]->(StrapiContentType) — lifecycles.js del content-type

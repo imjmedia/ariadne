@@ -49,6 +49,10 @@ import {
   adminStrapiRoutesCypher,
   coreRouterStrapiRoutesCountCypher,
   openApiStrapiLinkCountCypher,
+  graphQlAdminOnlyQueriesCypher,
+  graphQlAdminOnlyCountCypher,
+  publicEntryRouteConsumersCypher,
+  publicEntryReachableApiCypher,
 } from './chat-unused-api-endpoints.util';
 import {
   computeRiskScore,
@@ -2957,6 +2961,10 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     const cypherGraphQlFrontRoute = graphQlFrontToRouteCypher(maxRows);
     const cypherAdmin = adminStrapiRoutesCypher(Math.min(maxRows, 200));
 
+    const cypherGraphQlAdmin = graphQlAdminOnlyQueriesCypher(maxRows);
+    const cypherPublicEntry = publicEntryRouteConsumersCypher(maxRows);
+    const cypherPublicReachable = publicEntryReachableApiCypher(maxRows);
+
     const [
       rawUnused,
       rawUsedRel,
@@ -2968,9 +2976,13 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       rawGraphQlFront,
       rawGraphQlRoute,
       rawGraphQlFrontRoute,
+      rawGraphQlAdmin,
+      rawPublicEntry,
+      rawPublicReachable,
       rawAdminSample,
       rawCoreCount,
       rawOpenApiLinkCount,
+      rawGraphQlAdminCount,
     ] = await Promise.all([
       this.cypher.executeCypher(projectId, cypherUnused, {}),
       this.cypher.executeCypher(projectId, cypherUsedRel, {}),
@@ -2982,9 +2994,13 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       this.cypher.executeCypher(projectId, cypherGraphQlFront, {}),
       this.cypher.executeCypher(projectId, cypherGraphQlRoute, {}),
       this.cypher.executeCypher(projectId, cypherGraphQlFrontRoute, {}),
+      this.cypher.executeCypher(projectId, cypherGraphQlAdmin, {}),
+      this.cypher.executeCypher(projectId, cypherPublicEntry, {}),
+      this.cypher.executeCypher(projectId, cypherPublicReachable, {}),
       this.cypher.executeCypher(projectId, cypherAdmin, {}),
       this.cypher.executeCypher(projectId, coreRouterStrapiRoutesCountCypher(), {}),
       this.cypher.executeCypher(projectId, openApiStrapiLinkCountCypher(), {}),
+      this.cypher.executeCypher(projectId, graphQlAdminOnlyCountCypher(), {}),
     ]);
 
     const unused = filterCypherRowsByScope(rawUnused as Record<string, unknown>[], scope);
@@ -2997,9 +3013,13 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     const graphQlFront = filterCypherRowsByScope(rawGraphQlFront as Record<string, unknown>[], scope);
     const graphQlRoute = filterCypherRowsByScope(rawGraphQlRoute as Record<string, unknown>[], scope);
     const graphQlFrontRoute = filterCypherRowsByScope(rawGraphQlFrontRoute as Record<string, unknown>[], scope);
+    const graphQlAdminOnly = filterCypherRowsByScope(rawGraphQlAdmin as Record<string, unknown>[], scope);
+    const publicEntryConsumers = filterCypherRowsByScope(rawPublicEntry as Record<string, unknown>[], scope);
+    const publicReachable = filterCypherRowsByScope(rawPublicReachable as Record<string, unknown>[], scope);
     const adminSample = filterCypherRowsByScope(rawAdminSample as Record<string, unknown>[], scope);
     const coreRouterCount = Number((rawCoreCount as Array<{ c?: number }>)[0]?.c ?? 0);
     const openApiLinkCount = Number((rawOpenApiLinkCount as Array<{ c?: number }>)[0]?.c ?? 0);
+    const graphQlAdminCount = Number((rawGraphQlAdminCount as Array<{ c?: number }>)[0]?.c ?? 0);
 
     const totalStrapi = (await this.cypher.executeCypher(
       projectId,
@@ -3056,6 +3076,26 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       { key: 'routePath', label: 'Ruta REST', max: 120 },
       { key: 'apiName', label: 'API', max: 40 },
     ];
+    const graphQlAdminCols = [
+      { key: 'graphQlName', label: 'Query Strapi', max: 48 },
+      { key: 'kind', label: 'Tipo', max: 12 },
+      { key: 'apiName', label: 'API', max: 40 },
+      { key: 'resolverOf', label: 'resolverOf', max: 80 },
+    ];
+    const publicEntryCols = [
+      { key: 'reactPath', label: 'Ruta React', max: 80 },
+      { key: 'component', label: 'Componente', max: 48 },
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+      { key: 'apiName', label: 'API', max: 40 },
+    ];
+    const publicReachableCols = [
+      { key: 'reactPath', label: 'Ruta React', max: 80 },
+      { key: 'apiPath', label: 'api/…', max: 120 },
+      { key: 'file', label: 'Archivo', max: 180 },
+      { key: 'method', label: 'Método', max: 12 },
+      { key: 'routePath', label: 'Ruta Strapi', max: 120 },
+    ];
     const unusedCols = routeCols;
 
     const usedMerged = [...usedRel, ...usedHeuristic, ...usedOpenApi];
@@ -3066,6 +3106,9 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     const graphQlFrontTable = this.cypher.formatGenericMarkdownTable(graphQlFront, graphQlFrontCols);
     const graphQlRouteTable = this.cypher.formatGenericMarkdownTable(graphQlRoute, graphQlRouteCols);
     const graphQlFrontRouteTable = this.cypher.formatGenericMarkdownTable(graphQlFrontRoute, usedCols);
+    const graphQlAdminTable = this.cypher.formatGenericMarkdownTable(graphQlAdminOnly, graphQlAdminCols);
+    const publicEntryTable = this.cypher.formatGenericMarkdownTable(publicEntryConsumers, publicEntryCols);
+    const publicReachableTable = this.cypher.formatGenericMarkdownTable(publicReachable, publicReachableCols);
     const adminTable = this.cypher.formatGenericMarkdownTable(adminSample, routeCols);
     const unusedTable = this.cypher.formatGenericMarkdownTable(unused, unusedCols);
 
@@ -3077,18 +3120,28 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
             usedOpenApi.length === 0 &&
             internalConsumers.length === 0 &&
             externalConsumers.length === 0 &&
-            graphQlFrontRoute.length === 0
-          ? '\n\n_Nota: si todo sale «sin uso», ejecuta **resync** del proyecto (post-sync: REST, OpenAPI, GraphQL, lifecycle)._'
+            graphQlFrontRoute.length === 0 &&
+            publicEntryConsumers.length === 0 &&
+            publicReachable.length === 0
+          ? '\n\n_Nota: si todo sale «sin uso», ejecuta **resync** del proyecto (post-sync: REST, OpenAPI, GraphQL, lifecycle, entry público)._'
           : '';
 
     const answer = [
       '## Endpoints Strapi vs consumidores (grafo)',
       '',
-      `Rutas Strapi: **${strapiCount}**. Front REST/OpenAPI: **${usedMerged.length}**. GraphQL front→route: **${graphQlFrontRoute.length}**. Internas ERP: **${internalConsumers.length}**. Externas: **${externalConsumers.length}**. Públicas: **${publicRoutes.length}**. Admin CRUD: **${coreRouterCount}**. OpenAPI↔Strapi enlaces: **${openApiLinkCount}**. Custom sin consumidor: **${unused.length}**${unused.length >= maxRows ? ` (tope ${maxRows})` : ''}.`,
+      `Rutas Strapi: **${strapiCount}**. Front REST/OpenAPI: **${usedMerged.length}**. Entry público→Strapi: **${publicEntryConsumers.length}**. API alcanzable (urbanos/visualización): **${publicReachable.length}**. GraphQL admin-only: **${graphQlAdminCount}**. Internas ERP: **${internalConsumers.length}**. Custom sin consumidor: **${unused.length}**${unused.length >= maxRows ? ` (tope ${maxRows})` : ''}.`,
       '',
       '### Usadas en el frontend (REST / OpenAPI)',
       '',
       usedTable,
+      '',
+      '### Entry público React → Strapi (`auth: false`)',
+      '',
+      publicEntryTable,
+      '',
+      '### API alcanzable desde entry público (grafo RENDERS)',
+      '',
+      publicReachableTable,
       '',
       '### GraphQL en frontend → query Strapi',
       '',
@@ -3097,6 +3150,14 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       '### GraphQL Strapi → ruta REST (resolverOf)',
       '',
       graphQlRouteTable,
+      '',
+      '### GraphQL solo admin (sin REST custom)',
+      '',
+      graphQlAdminTable,
+      graphQlAdminCount > graphQlAdminOnly.length
+        ? `\n_Total queries GraphQL admin-only: ${graphQlAdminCount} (` +
+            'implicitConsumer=strapi_graphql_admin`). Consumo vía `/graphql` en admin Strapi._'
+        : '_Consumo vía endpoint `/graphql` en admin Strapi (`implicitConsumer=strapi_graphql_admin`)._',
       '',
       '### GraphQL front → ruta REST',
       '',
@@ -3110,7 +3171,7 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       '',
       externalTable,
       '',
-      '### Rutas públicas (`auth: false`)',
+      '### Rutas públicas Strapi (`auth: false`)',
       '',
       publicTable,
       '',
@@ -3120,13 +3181,13 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       coreRouterCount > adminSample.length
         ? `\n_Muestra de ${adminSample.length} rutas; total admin CRUD: ${coreRouterCount}. ` +
             '`implicitConsumer=strapi_admin` — no candidatas a borrado._'
-        : '_`implicitConsumer=strapi_admin` — consumo vía panel Strapi, no front OBP._',
+        : '_`implicitConsumer=strapi_admin` — consumo vía panel Strapi._',
       '',
       '### Custom sin consumidor aparente',
       '',
       unusedTable,
       '',
-      '_Incluye matching dinámico REST, bridge OpenAPI (`SAME_REST_AS`), GraphQL (`RESOLVES_TO_ROUTE`), lifecycle/UID. GraphQL solo-admin sin REST custom puede quedar fuera de «usadas front»._',
+      '_Cruce: REST dinámico, OpenAPI, GraphQL, lifecycle, `ENTRY_CONSUMES` / `ENTRY_REACHES_API` (urbanos/public, visualizacionCampania). Logs de acceso no incluidos._',
       needsResyncNote,
     ].join('\n');
 

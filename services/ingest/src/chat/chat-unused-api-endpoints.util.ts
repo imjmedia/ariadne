@@ -51,6 +51,7 @@ AND NOT EXISTS { MATCH (:ExternalApiReference)-[:CALLS_STRAPI_ROUTE]->(sr) }
 AND NOT EXISTS { MATCH (:GraphQlClientReference)-[:CALLS_STRAPI_ROUTE]->(sr) }
 AND NOT EXISTS { MATCH (:File)-[:INVOKES_STRAPI_ROUTE]->(sr) }
 AND NOT EXISTS { MATCH (:GraphQlQuery)-[:RESOLVES_TO_ROUTE]->(sr) }
+AND NOT EXISTS { MATCH (:Route)-[:ENTRY_CONSUMES]->(sr) }
 AND NOT EXISTS { MATCH (ref:ApiClientReference) WHERE ${heuristic} }
 RETURN sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, sr.routeSource AS routeSource
 ORDER BY sr.routePath, sr.method
@@ -148,6 +149,34 @@ LIMIT ${limit}`;
 
 export function coreRouterStrapiRoutesCountCypher(): string {
   return `MATCH (sr:StrapiRoute) WHERE sr.projectId = $projectId AND sr.routeSource = 'core_router' RETURN count(sr) AS c`;
+}
+
+export function graphQlAdminOnlyQueriesCypher(limit: number): string {
+  return `MATCH (gq:GraphQlQuery)
+WHERE gq.projectId = $projectId AND coalesce(gq.implicitConsumer, '') = 'strapi_graphql_admin'
+RETURN gq.name AS graphQlName, gq.operationKind AS kind, gq.apiName AS apiName, gq.resolverOf AS resolverOf
+ORDER BY gq.apiName, gq.name
+LIMIT ${limit}`;
+}
+
+export function publicEntryRouteConsumersCypher(limit: number): string {
+  return `MATCH (rt:Route)-[:ENTRY_CONSUMES]->(sr:StrapiRoute)
+WHERE sr.projectId = $projectId
+RETURN DISTINCT rt.path AS reactPath, rt.componentName AS component, sr.method AS method, sr.routePath AS routePath, sr.apiName AS apiName, 'public_entry' AS consumer
+ORDER BY sr.routePath, rt.path
+LIMIT ${limit}`;
+}
+
+export function publicEntryReachableApiCypher(limit: number): string {
+  return `MATCH (rt:Route)-[:ENTRY_REACHES_API]->(acr:ApiClientReference)-[:CALLS_STRAPI_ROUTE]->(sr:StrapiRoute)
+WHERE sr.projectId = $projectId
+RETURN DISTINCT rt.path AS reactPath, acr.apiPath AS apiPath, acr.filePath AS file, sr.method AS method, sr.routePath AS routePath, 'public_reachable' AS consumer
+ORDER BY sr.routePath, rt.path
+LIMIT ${limit}`;
+}
+
+export function graphQlAdminOnlyCountCypher(): string {
+  return `MATCH (gq:GraphQlQuery) WHERE gq.projectId = $projectId AND coalesce(gq.implicitConsumer, '') = 'strapi_graphql_admin' RETURN count(gq) AS c`;
 }
 
 export function openApiStrapiLinkCountCypher(): string {

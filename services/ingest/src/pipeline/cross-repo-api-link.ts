@@ -5,6 +5,7 @@
 import { cypherSafe } from 'ariadne-common';
 import { strapiRouteMatchesNormalizedPathCypher } from './strapi-route-path-match';
 import { openApiPathMatchesStrapiRouteCypher } from './strapi-openapi-route-match';
+import { publicEntryApiNameMatchCypher } from './react-route-public-entry';
 
 /** MERGE (ApiClientReference)-[:CALLS_API]->(OpenApiOperation) por coincidencia de path. */
 export function buildCrossRepoApiLinkCypher(projectId: string): string[] {
@@ -74,6 +75,35 @@ export function buildCrossRepoGraphQlClientLinkCypher(projectId: string): string
   ];
 }
 
+/** GraphQL custom sin REST (`RESOLVES_TO_ROUTE`) → consumidor admin GraphQL. */
+export function buildGraphQlAdminOnlyMarkCypher(projectId: string): string[] {
+  const pid = cypherSafe(projectId);
+  return [
+    `MATCH (gq:GraphQlQuery {projectId: ${pid}}) WHERE NOT (gq)-[:RESOLVES_TO_ROUTE]->(:StrapiRoute) SET gq.implicitConsumer = 'strapi_graphql_admin'`,
+    `MATCH (gq:GraphQlQuery {projectId: ${pid}}) WHERE (gq)-[:RESOLVES_TO_ROUTE]->(:StrapiRoute) SET gq.implicitConsumer = null`,
+  ];
+}
+
+/** Rutas React públicas → StrapiRoute con `auth: false` (urbanos, visualización cliente). */
+export function buildPublicEntryRouteLinkCypher(projectId: string): string[] {
+  const pid = cypherSafe(projectId);
+  const apiMatch = publicEntryApiNameMatchCypher('rt', 'sr');
+  return [
+    `MATCH (rt:Route {projectId: ${pid}}) WHERE coalesce(rt.isPublicEntry, 'false') = 'true' MATCH (sr:StrapiRoute {projectId: ${pid}}) WHERE coalesce(sr.publicRoute, 'false') = 'true' AND rt.repoId <> sr.repoId AND (${apiMatch}) MERGE (rt)-[:ENTRY_CONSUMES]->(sr)`,
+  ];
+}
+
+/**
+ * Desde entry público, recorre `RENDERS` y enlaza `ApiClientReference` alcanzables con StrapiRoute públicas.
+ */
+export function buildPublicEntryReachableApiLinkCypher(projectId: string): string[] {
+  const pid = cypherSafe(projectId);
+  const match = strapiRouteMatchesNormalizedPathCypher('acr', 'sr');
+  return [
+    `MATCH (rt:Route {projectId: ${pid}}) WHERE coalesce(rt.isPublicEntry, 'false') = 'true' MATCH (rt)-[:ROUTE_TO_COMPONENT]->(root:Component) OPTIONAL MATCH (root)-[:RENDERS*1..12]->(desc:Component) WITH rt, collect(DISTINCT desc) + [root] AS comps UNWIND comps AS comp MATCH (f:File)-[:CONTAINS]->(comp) MATCH (f)-[:REFERENCES_API]->(acr:ApiClientReference) MATCH (sr:StrapiRoute {projectId: ${pid}}) WHERE acr.repoId <> sr.repoId AND coalesce(sr.publicRoute, 'false') = 'true' AND (${match}) MERGE (acr)-[:CALLS_STRAPI_ROUTE]->(sr) MERGE (rt)-[:ENTRY_REACHES_API]->(acr)`,
+  ];
+}
+
 /** OpenAPI + StrapiRoute cross-repo + consumidores internos (ejecutar tras indexar todos los repos del proyecto). */
 export function buildCrossRepoApiAndStrapiLinkCypher(projectId: string): string[] {
   return [
@@ -84,5 +114,8 @@ export function buildCrossRepoApiAndStrapiLinkCypher(projectId: string): string[
     ...buildOpenApiStrapiRouteLinkCypher(projectId),
     ...buildGraphQlResolvesToRouteLinkCypher(projectId),
     ...buildCrossRepoGraphQlClientLinkCypher(projectId),
+    ...buildGraphQlAdminOnlyMarkCypher(projectId),
+    ...buildPublicEntryRouteLinkCypher(projectId),
+    ...buildPublicEntryReachableApiLinkCypher(projectId),
   ];
 }

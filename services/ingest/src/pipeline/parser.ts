@@ -32,6 +32,7 @@ import {
   extractGraphQlClientReferences,
   type GraphQlClientReferenceParsed,
 } from './graphql-client-reference-extract';
+import { isPublicEntryRoute } from './react-route-public-entry';
 import { parseStrapiGraphqlSchema, type GraphQlQueryInfo } from './strapi-graphql-extract';
 import {
   isStrapiConfigJsPath,
@@ -205,6 +206,8 @@ export interface RouteInfo {
   componentName: string;
   /** Componente React que envuelve esta `<Route>` (subida por el AST). */
   enclosingComponent?: string;
+  /** Entry point público (urbanos/public, visualizacionCampania, login). */
+  isPublicEntry?: boolean;
 }
 
 /** Modelo de datos (clase con propiedades, sin JSX). */
@@ -1124,7 +1127,12 @@ function collectRoutes(root: Parser.SyntaxNode, source: string, result: ParsedFi
     }
     if (componentName && isReactComponentName(componentName)) {
       const enclosingComponent = findEnclosingReactComponentName(node, source);
-      result.routes.push({ path, componentName, ...(enclosingComponent ? { enclosingComponent } : {}) });
+      result.routes.push({
+        path,
+        componentName,
+        ...(enclosingComponent ? { enclosingComponent } : {}),
+        ...(isPublicEntryRoute(path) ? { isPublicEntry: true } : {}),
+      });
     }
   }
 }

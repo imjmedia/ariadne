@@ -270,11 +270,15 @@ export function buildCypherForFile(
   }
 
   for (const r of parsed.routes ?? []) {
+    const publicEntry = r.isPublicEntry ? 'true' : 'false';
     statements.push(
-      `MERGE (rt:Route {path: ${cypherSafe(r.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET rt.componentName = ${cypherSafe(r.componentName)} ON MATCH SET rt.componentName = ${cypherSafe(r.componentName)}`,
+      `MERGE (rt:Route {path: ${cypherSafe(r.path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET rt.componentName = ${cypherSafe(r.componentName)}, rt.isPublicEntry = ${publicEntry} ON MATCH SET rt.componentName = ${cypherSafe(r.componentName)}, rt.isPublicEntry = ${publicEntry}`,
     );
     statements.push(
       `MATCH (p:Project {projectId: ${pid}}) MATCH (rt:Route {path: ${cypherSafe(r.path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (p)-[:HAS_ROUTE]->(rt)`,
+    );
+    statements.push(
+      `MATCH (rt:Route {path: ${cypherSafe(r.path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (comp:Component {name: ${cypherSafe(r.componentName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (rt)-[:ROUTE_TO_COMPONENT]->(comp)`,
     );
   }
 
@@ -528,7 +532,7 @@ export function buildCypherForFile(
     const resolverOf = gq.resolverOf != null ? cypherSafe(gq.resolverOf) : 'null';
     const resolverAction = gq.resolverAction != null ? cypherSafe(gq.resolverAction) : 'null';
     statements.push(
-      `MERGE (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}, gq.resolverAction = ${resolverAction} ON MATCH SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}, gq.resolverAction = ${resolverAction}`,
+      `MERGE (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}, gq.resolverAction = ${resolverAction}, gq.implicitConsumer = null ON MATCH SET gq.apiName = ${cypherSafe(gq.apiName)}, gq.description = ${desc}, gq.resolverOf = ${resolverOf}, gq.resolverAction = ${resolverAction}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(gq)`,
