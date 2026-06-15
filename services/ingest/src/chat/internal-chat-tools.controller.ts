@@ -125,4 +125,15 @@ export class InternalChatToolsController {
     if (!desc) return { filesToModify: [] };
     return { filesToModify: await this.chat.getModificationPlanFilesOnly(repoId, desc, body.scope) };
   }
+
+  /** Resuelve projectId del repo y ejecuta cruce Strapi vs consumidores (multi-root). */
+  @Post(':repoId/unused-api-endpoints')
+  async unusedApiEndpoints(
+    @Param('repoId') repoId: string,
+    @Body() body: { scope?: ChatScope },
+  ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
+    await this.repos.findOne(repoId);
+    const projectId = await this.resolveProjectIdForRepo(repoId);
+    return this.chat.buildUnusedApiEndpointsAnalysis(projectId, body.scope);
+  }
 }

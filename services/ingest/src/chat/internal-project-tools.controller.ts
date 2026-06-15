@@ -36,4 +36,13 @@ export class InternalProjectToolsController {
       ),
     };
   }
+
+  /** Cruce endpoints Strapi vs consumidores (evita LangGraph cuando orchestrator delega aquí). */
+  @Post(':projectId/unused-api-endpoints')
+  async unusedApiEndpoints(
+    @Param('projectId') projectId: string,
+    @Body() body: { scope?: ChatScope },
+  ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
+    return this.chat.buildUnusedApiEndpointsAnalysis(projectId, body.scope);
+  }
 }

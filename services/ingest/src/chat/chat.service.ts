@@ -2938,6 +2938,17 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
   }
 
   /**
+   * Cruce StrapiRoute vs consumidores (front, external, GraphQL, lifecycle, entry público).
+   * Usado por chat ingest y POST internal/.../unused-api-endpoints (orchestrator).
+   */
+  async buildUnusedApiEndpointsAnalysis(
+    projectId: string,
+    scope?: ChatScope,
+  ): Promise<ChatResponse> {
+    return this.buildUnusedBackendApiEndpointsResponse(projectId, scope);
+  }
+
+  /**
    * Cruce `StrapiRoute` (back) vs `ApiClientReference` (front): rutas sin uso aparente en el índice.
    */
   private async buildUnusedBackendApiEndpointsResponse(

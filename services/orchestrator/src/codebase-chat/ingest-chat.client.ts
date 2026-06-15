@@ -165,4 +165,38 @@ export class IngestChatClient {
     const data = (await res.json()) as { filesToModify: ModificationPlanResult['filesToModify'] };
     return Array.isArray(data.filesToModify) ? data.filesToModify : [];
   }
+
+  async fetchUnusedApiEndpointsProject(
+    projectId: string,
+    scope?: ChatScope,
+  ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
+    const url = `${this.ingestBase()}/internal/projects/${encodeURIComponent(projectId)}/unused-api-endpoints`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`ingest unused-api-endpoints project ${res.status}: ${t}`);
+    }
+    return (await res.json()) as { answer: string; cypher?: string; result?: unknown[] };
+  }
+
+  async fetchUnusedApiEndpointsRepository(
+    repositoryId: string,
+    scope?: ChatScope,
+  ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
+    const url = `${this.ingestBase()}/internal/repositories/${encodeURIComponent(repositoryId)}/unused-api-endpoints`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`ingest unused-api-endpoints repo ${res.status}: ${t}`);
+    }
+    return (await res.json()) as { answer: string; cypher?: string; result?: unknown[] };
+  }
 }
