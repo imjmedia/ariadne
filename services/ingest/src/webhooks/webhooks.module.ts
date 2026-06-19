@@ -5,6 +5,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CredentialsModule } from '../credentials/credentials.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
+import { TheForgeModule } from '../theforge/theforge.module';
 import { RepositoryEntity } from '../repositories/entities/repository.entity';
 import { SyncJob } from '../repositories/entities/sync-job.entity';
 import { IndexedFile } from '../repositories/entities/indexed-file.entity';
@@ -15,6 +16,7 @@ import { WebhooksService } from './webhooks.service';
   imports: [
     CredentialsModule,
     RepositoriesModule,
+    TheForgeModule,
     TypeOrmModule.forFeature([RepositoryEntity, SyncJob, IndexedFile]),
   ],
   controllers: [WebhooksController],

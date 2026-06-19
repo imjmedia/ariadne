@@ -15,6 +15,7 @@ import { UpdateRepositoryDto } from './dto/update-repository.dto';
 import { encrypt, decrypt } from '../credentials/crypto.util';
 import { EmbeddingSpaceService } from '../embedding/embedding-space.service';
 import { parseIndexIncludeRulesFromDto } from '../providers/index-include-rules';
+import { normalizeTheForgeConvergeTriggerMode } from '../theforge/theforge-converge.service';
 import { SYNC_QUEUE } from '../constants';
 import { FalkorDB } from 'falkordb';
 import { getFalkorConfig, effectiveShardMode, listGraphNamesForProjectRouting } from '../pipeline/falkor';
@@ -43,6 +44,10 @@ export class RepositoriesService {
     } catch {
       return null;
     }
+  }
+
+  private encryptTheForgeServiceToken(value: string): string | null {
+    return this.encryptWebhookSecret(value);
   }
 
   /**
@@ -180,6 +185,11 @@ export class RepositoriesService {
       readEmbeddingSpaceId?: string | null;
       writeEmbeddingSpaceId?: string | null;
       indexIncludeRules?: ReturnType<typeof parseIndexIncludeRulesFromDto>;
+      theforgeProjectId?: string | null;
+      theforgeStageId?: string | null;
+      theforgeConvergePersist?: boolean;
+      theforgeConvergeTriggerMode?: string;
+      theforgeServiceTokenEncrypted?: string | null;
     } = {};
     if (dto.defaultBranch != null) updates.defaultBranch = dto.defaultBranch || 'main';
     if (dto.credentialsRef !== undefined) updates.credentialsRef = dto.credentialsRef ?? null;
@@ -201,6 +211,28 @@ export class RepositoriesService {
     }
     if (dto.indexIncludeRules !== undefined) {
       updates.indexIncludeRules = parseIndexIncludeRulesFromDto(dto.indexIncludeRules);
+    }
+    if (dto.theforgeProjectId !== undefined) {
+      const v = dto.theforgeProjectId?.trim();
+      updates.theforgeProjectId = v && v.length > 0 ? v : null;
+    }
+    if (dto.theforgeStageId !== undefined) {
+      const v = dto.theforgeStageId?.trim();
+      updates.theforgeStageId = v && v.length > 0 ? v : null;
+    }
+    if (dto.theforgeConvergePersist !== undefined) {
+      updates.theforgeConvergePersist = dto.theforgeConvergePersist === true;
+    }
+    if (dto.theforgeConvergeTriggerMode !== undefined) {
+      updates.theforgeConvergeTriggerMode = normalizeTheForgeConvergeTriggerMode(
+        dto.theforgeConvergeTriggerMode,
+      );
+    }
+    if (dto.theforgeServiceToken !== undefined) {
+      updates.theforgeServiceTokenEncrypted =
+        dto.theforgeServiceToken != null && dto.theforgeServiceToken.trim() !== ''
+          ? this.encryptTheForgeServiceToken(dto.theforgeServiceToken)
+          : null;
     }
     if (dto.projectId != null && dto.projectId.trim() !== '') await this.addRepoToProject(id, dto.projectId);
     if (Object.keys(updates).length > 0) await this.repo.update(id, updates);

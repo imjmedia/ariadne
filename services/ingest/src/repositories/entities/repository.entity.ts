@@ -98,4 +98,30 @@ export class RepositoryEntity {
 
   @OneToMany(() => IndexedFile, (file) => file.repository)
   indexedFiles!: IndexedFile[];
+
+  /** The Forge project UUID — POST /projects/:id/converge/trigger after successful index (brownfield). */
+  @Column({ name: 'theforge_project_id', type: 'varchar', length: 64, nullable: true })
+  theforgeProjectId!: string | null;
+
+  /** Optional The Forge stage UUID (?stageId= on converge/trigger). */
+  @Column({ name: 'theforge_stage_id', type: 'varchar', length: 64, nullable: true })
+  theforgeStageId!: string | null;
+
+  /** If true, converge/trigger body includes persist: true. */
+  @Column({ name: 'theforge_converge_persist', type: 'boolean', default: false })
+  theforgeConvergePersist!: boolean;
+
+  /** off | full | incremental | all — when to call The Forge after sync. */
+  @Column({ name: 'theforge_converge_trigger_mode', type: 'varchar', length: 16, default: 'off' })
+  theforgeConvergeTriggerMode!: string;
+
+  /** Bearer JWT for The Forge API. Encrypted with CREDENTIALS_ENCRYPTION_KEY. */
+  @Column({
+    name: 'theforge_service_token_encrypted',
+    type: 'varchar',
+    length: 1024,
+    nullable: true,
+    select: false,
+  })
+  theforgeServiceTokenEncrypted!: string | null;
 }

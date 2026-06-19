@@ -2,6 +2,7 @@
  * @fileoverview DTO para actualizar repositorio: campos opcionales defaultBranch, credentialsRef, webhookSecret.
  */
 import type { IndexIncludeRules } from '../../providers/index-include-rules';
+import type { TheForgeConvergeTriggerMode } from '../../theforge/theforge-converge.types';
 
 /** DTO para actualizar repositorio (defaultBranch?, credentialsRef?, webhookSecret?, projectId?). */
 export class UpdateRepositoryDto {
@@ -22,4 +23,12 @@ export class UpdateRepositoryDto {
    * Omitido = no modificar.
    */
   indexIncludeRules?: IndexIncludeRules | null;
+
+  /** The Forge project UUID for brownfield converge after reindex. Null clears. */
+  theforgeProjectId?: string | null;
+  theforgeStageId?: string | null;
+  theforgeConvergePersist?: boolean;
+  theforgeConvergeTriggerMode?: TheForgeConvergeTriggerMode;
+  /** Service JWT for The Forge API. Empty clears; undefined leaves unchanged. */
+  theforgeServiceToken?: string | null;
 }

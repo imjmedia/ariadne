@@ -40,6 +40,8 @@ Guía completa para configurar y usar el sistema: variables de entorno, credenci
 | `LLM_CHAT_MODEL` | Condicional | gpt-4o-mini | Modelo OpenAI para chat |
 | `GOOGLE_API_KEY` / `GEMINI_API_KEY` | Condicional | — | API key Google AI (si provider=google). Para `gemini-embedding-001` (768 dims). |
 | `NODE_ENV` | No | development | Si ≠ production, TypeORM usa synchronize |
+| `THEFORGE_API_URL` | Condicional | — | Base URL API The Forge. Requerida si el repo tiene brownfield converge activo. |
+| `THEFORGE_SERVICE_JWT` | Condicional | — | Bearer JWT servicio para `POST /projects/:id/converge/trigger`. Fallback si el repo no tiene token propio. |
 
 \* En Docker las variables vienen del compose; en local hay que definirlas.
 
