@@ -100,6 +100,8 @@ Tras cada sync (normal o resync), se ejecuta automáticamente `embed-index` si h
 
 **Embeddings:** Si cambias de modelo o dimensión (`OPENROUTER_EMBEDDING_MODEL` / `LLM_EMBEDDING_DIM`), reejecuta `POST /repositories/:id/embed-index`; FalkorDB no admite mezclar vectores de distinta dimensión en la misma propiedad.
 
+**Brownfield converge (The Forge):** por repo, tras sync exitoso, opcional `POST` a The Forge `converge/trigger`. Env: `THEFORGE_API_URL`, `THEFORGE_SERVICE_JWT`. Ver [src/theforge/README.md](./src/theforge/README.md) y [docs/notebooklm/BROWNFIELD-CONVERGE-THEFORGE.md](../../docs/notebooklm/BROWNFIELD-CONVERGE-THEFORGE.md).
+
 ## Desarrollo
 
 ```bash

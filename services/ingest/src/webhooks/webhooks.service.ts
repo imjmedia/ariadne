@@ -27,6 +27,7 @@ import { loadRepoTsconfigPaths } from '../pipeline/tsconfig-resolve';
 import { buildProjectMergeCypher } from '../pipeline/project';
 import type { ParsedFile } from '../pipeline/parser';
 import { shouldIndexPathWithRepoRules } from '../providers/index-include-rules';
+import { TheForgeConvergeService } from '../theforge/theforge-converge.service';
 
 interface PushPayload {
   repository?: { full_name?: string; name?: string };
@@ -50,6 +51,7 @@ export class WebhooksService {
     private readonly syncJobRepo: Repository<SyncJob>,
     @InjectRepository(IndexedFile)
     private readonly indexedFileRepo: Repository<IndexedFile>,
+    private readonly theforgeConverge: TheForgeConvergeService,
   ) {}
 
   /**
@@ -119,6 +121,7 @@ export class WebhooksService {
           payload: { ...job.payload, indexed: 0, deleted: 0 },
         });
         await this.repos.pruneOldJobs(repo.id, 5);
+        void this.theforgeConverge.triggerAfterSync(repo.id, 'incremental');
         return;
       }
 
@@ -311,6 +314,7 @@ export class WebhooksService {
         },
       });
       await this.repos.pruneOldJobs(repo.id, 5);
+      void this.theforgeConverge.triggerAfterSync(repo.id, 'incremental');
     } catch (err) {
       recordSyncJobFailed('webhook');
       await this.syncJobRepo.update(job.id, {

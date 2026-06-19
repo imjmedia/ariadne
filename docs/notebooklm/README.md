@@ -28,6 +28,7 @@
 |-----|-------------|
 | **CHAT_Y_ANALISIS.md** | Chat y análisis (esta carpeta). |
 | **bitbucket_webhook.md** | Webhook Bitbucket (esta carpeta). |
+| **BROWNFIELD-CONVERGE-THEFORGE.md** | Post-reindex → The Forge `converge/trigger` por repo. |
 
 ## Deployment y negocio
 

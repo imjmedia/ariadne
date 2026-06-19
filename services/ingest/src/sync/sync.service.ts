@@ -54,6 +54,7 @@ import {
   normalizeIndexPath,
   isMandatoryDefaultRootIndexPath,
 } from '../providers/index-include-rules';
+import { TheForgeConvergeService } from '../theforge/theforge-converge.service';
 
 /**
  * @fileoverview Servicio de sync: mapping, deps, chunking, FalkorDB, embed-index post-sync.
@@ -115,6 +116,7 @@ export class SyncService {
     private readonly repoRepo: Repository<RepositoryEntity>,
     @InjectRepository(ProjectEntity)
     private readonly projectEntityRepo: Repository<ProjectEntity>,
+    private readonly theforgeConverge: TheForgeConvergeService,
   ) {}
 
   /**
@@ -833,6 +835,7 @@ export class SyncService {
       });
 
       await this.repos.pruneOldJobs(repositoryId, 5);
+      void this.theforgeConverge.triggerAfterSync(repositoryId, 'full');
       return { jobId: job.id, indexed: indexedPaths.length };
     } catch (err) {
       recordSyncJobFailed('full_sync');

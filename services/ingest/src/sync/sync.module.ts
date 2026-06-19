@@ -19,6 +19,7 @@ import { SyncService } from './sync.service';
 import { SyncProcessor } from './sync.processor';
 import { SharedBullModule } from '../shared-bull/shared-bull.module';
 import { SYNC_QUEUE } from '../constants';
+import { TheForgeModule } from '../theforge/theforge.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SYNC_QUEUE } from '../constants';
     ProvidersModule,
     RepositoriesModule,
     CredentialsModule,
+    TheForgeModule,
     SharedBullModule,
     BullModule.registerQueue({ name: SYNC_QUEUE }),
   ],

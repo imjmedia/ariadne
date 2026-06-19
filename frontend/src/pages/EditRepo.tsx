@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
-import type { Credential, IndexIncludeEntry, Repository, UpdateRepositoryDto } from '../types';
+import type { Credential, IndexIncludeEntry, Repository, TheForgeConvergeTriggerMode, UpdateRepositoryDto } from '../types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,6 +37,13 @@ export function EditRepo() {
   /** full = columna null en servidor; scoped = indexIncludeRules */
   const [indexScopeMode, setIndexScopeMode] = useState<'full' | 'scoped'>('full');
   const [indexEntries, setIndexEntries] = useState<IndexIncludeEntry[]>([]);
+  const [theforgeProjectId, setTheforgeProjectId] = useState('');
+  const [theforgeStageId, setTheforgeStageId] = useState('');
+  const [theforgeConvergePersist, setTheforgeConvergePersist] = useState(false);
+  const [theforgeConvergeTriggerMode, setTheforgeConvergeTriggerMode] =
+    useState<TheForgeConvergeTriggerMode>('off');
+  const [theforgeServiceToken, setTheforgeServiceToken] = useState('');
+  const [theforgeServiceTokenTouched, setTheforgeServiceTokenTouched] = useState(false);
 
   const newEmptyEntry = (): IndexIncludeEntry => ({ kind: 'path_prefix', path: '' });
 
@@ -58,6 +65,10 @@ export function EditRepo() {
           setIndexScopeMode('full');
           setIndexEntries([]);
         }
+        setTheforgeProjectId(r.theforgeProjectId ?? '');
+        setTheforgeStageId(r.theforgeStageId ?? '');
+        setTheforgeConvergePersist(r.theforgeConvergePersist === true);
+        setTheforgeConvergeTriggerMode(r.theforgeConvergeTriggerMode ?? 'off');
         api.getCredentials(r.provider).then(setCredentials).catch(() => setCredentials([]));
       })
       .catch((e) => setError(e.message));
@@ -91,6 +102,15 @@ export function EditRepo() {
           }))
           .filter((e) => e.path.length > 0);
         payload.indexIncludeRules = { entries: cleaned };
+      }
+      payload.theforgeProjectId = theforgeProjectId.trim() ? theforgeProjectId.trim() : null;
+      payload.theforgeStageId = theforgeStageId.trim() ? theforgeStageId.trim() : null;
+      payload.theforgeConvergePersist = theforgeConvergePersist;
+      payload.theforgeConvergeTriggerMode = theforgeConvergeTriggerMode;
+      if (theforgeServiceTokenTouched) {
+        payload.theforgeServiceToken = theforgeServiceToken.trim()
+          ? theforgeServiceToken.trim()
+          : null;
       }
       await api.updateRepository(id, payload);
       navigate(`/repos/${id}`);
@@ -317,6 +337,80 @@ export function EditRepo() {
                 />
               </div>
             )}
+
+            <div className="space-y-3 rounded-md border p-4">
+              <div>
+                <Label className="text-base">Brownfield converge (The Forge)</Label>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                  Tras un sync exitoso, Ariadne puede llamar{' '}
+                  <span className="font-mono text-[11px]">POST /projects/:id/converge/trigger</span>{' '}
+                  en The Forge. Requiere{' '}
+                  <span className="font-mono text-[11px]">THEFORGE_API_URL</span> en el ingest y un
+                  JWT de servicio (env o por repo).
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>The Forge project ID</Label>
+                <Input
+                  value={theforgeProjectId}
+                  onChange={(e) => setTheforgeProjectId(e.target.value)}
+                  placeholder="UUID del proyecto legacy en The Forge"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Stage ID (opcional)</Label>
+                <Input
+                  value={theforgeStageId}
+                  onChange={(e) => setTheforgeStageId(e.target.value)}
+                  placeholder="UUID de etapa brownfield (query stageId)"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cuándo disparar converge</Label>
+                <Select
+                  value={theforgeConvergeTriggerMode}
+                  onValueChange={(v) =>
+                    setTheforgeConvergeTriggerMode(v as TheForgeConvergeTriggerMode)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="off">Desactivado</SelectItem>
+                    <SelectItem value="incremental">Tras webhook / incremental</SelectItem>
+                    <SelectItem value="full">Tras resync / full sync</SelectItem>
+                    <SelectItem value="all">Tras cualquier sync exitoso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={theforgeConvergePersist}
+                  onChange={(e) => setTheforgeConvergePersist(e.target.checked)}
+                  className="rounded border"
+                />
+                Persistir tareas converge en The Forge (<span className="font-mono text-xs">persist: true</span>)
+              </label>
+              <div className="space-y-2">
+                <Label>JWT de servicio The Forge (opcional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Si está vacío en el servidor, se usa{' '}
+                  <span className="font-mono text-[11px]">THEFORGE_SERVICE_JWT</span>. No modificar
+                  para mantener el token actual.
+                </p>
+                <Input
+                  type="password"
+                  value={theforgeServiceToken}
+                  onChange={(e) => {
+                    setTheforgeServiceToken(e.target.value);
+                    setTheforgeServiceTokenTouched(true);
+                  }}
+                  placeholder="Bearer token largo plazo"
+                />
+              </div>
+            </div>
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={submitting}>

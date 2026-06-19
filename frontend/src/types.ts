@@ -28,9 +28,16 @@ export interface Repository {
   projectIds?: string[];
   /** Null = indexar todo el repo (filtro global). Si existe, ver documentación en edición de repo. */
   indexIncludeRules?: IndexIncludeRules | null;
+  /** The Forge project UUID — converge after reindex (brownfield). */
+  theforgeProjectId?: string | null;
+  theforgeStageId?: string | null;
+  theforgeConvergePersist?: boolean;
+  theforgeConvergeTriggerMode?: TheForgeConvergeTriggerMode;
   createdAt: string;
   updatedAt: string;
 }
+
+export type TheForgeConvergeTriggerMode = 'off' | 'full' | 'incremental' | 'all';
 
 /** Proyecto multi-root: agrupa N repositorios. */
 export interface Project {
@@ -165,6 +172,12 @@ export interface UpdateRepositoryDto {
   writeEmbeddingSpaceId?: string | null;
   /** Null = indexado completo; objeto = reglas por repo. */
   indexIncludeRules?: IndexIncludeRules | null;
+  theforgeProjectId?: string | null;
+  theforgeStageId?: string | null;
+  theforgeConvergePersist?: boolean;
+  theforgeConvergeTriggerMode?: TheForgeConvergeTriggerMode;
+  /** Service JWT The Forge. Vacío borra; omitido no cambia. */
+  theforgeServiceToken?: string | null;
 }
 
 /** Entidad credencial (token, app_password, webhook_secret). */
