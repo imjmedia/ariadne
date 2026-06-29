@@ -44,6 +44,7 @@
 | Doc | Descripción |
 |-----|-------------|
 | **TESTING.md** | Vitest ingest/frontend, Playwright, CI. |
+| **TESTING_CAMINO_D.md** | Guía de pruebas Camino D (CBM parity): `query_graph`, `detect_changes`, Ollama, graph artifact, benchmark CALLS (fases 1–4). |
 | **MONOREPO_Y_LIMITACIONES_INDEXADO.md** | Alcance de índice y filtros. |
 | **OBSERVABILIDAD_FASE0.md** | Observabilidad fase 0. |
 | **metricas-alcance-chat.md** | Métricas de chat. |

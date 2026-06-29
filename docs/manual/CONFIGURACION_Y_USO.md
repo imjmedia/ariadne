@@ -312,7 +312,7 @@ curl -X POST http://localhost:3002/repositories \
    -d '{"tier":"best"}'
  ```
 
- Genera `.ariadne/graph-<repoId>.jsonl.zst` y `.ariadne/manifest.json` (SHA-256). **No se commitea por defecto**; opcional compartir en git (`.gitattributes` añade `merge=ours` para `*.zst`). En un entorno nuevo, si el artifact está en el clone y Falkor está vacío para ese repo, el sync **importa** el artifact y omite re-escritura del grafo cuando el `commitSha` coincide. Ver [PLAN_CBM_PARITY_CAMINO_D.md](../notebooklm/PLAN_CBM_PARITY_CAMINO_D.md).
+ Genera `.ariadne/graph-<repoId>.jsonl.zst` y `.ariadne/manifest.json` (SHA-256). **No se commitea por defecto**; opcional compartir en git (`.gitattributes` añade `merge=ours` para `*.zst`). En un entorno nuevo, si el artifact está en el clone y Falkor está vacío para ese repo, el sync **importa** el artifact y omite re-escritura del grafo cuando el `commitSha` coincide. Ver [PLAN_CBM_PARITY_CAMINO_D.md](../notebooklm/PLAN_CBM_PARITY_CAMINO_D.md). Checklist de validación: [TESTING_CAMINO_D.md](../notebooklm/TESTING_CAMINO_D.md).
 
 ---
 
