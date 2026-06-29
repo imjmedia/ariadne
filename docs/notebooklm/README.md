@@ -60,6 +60,7 @@
 | **cursor-rule-relic-project.mdc** | Regla de Cursor: usar `projectId` de `.ariadne-project` en llamadas al MCP. |
 | **constitution.md** | Principios y convenciones del proyecto. |
 | **Mejoras_Ariadne_Marzo.md** | Mejoras / roadmap. |
+| **PLAN_CBM_PARITY_CAMINO_D.md** | Plan paridad estructural vs codebase-memory-mcp (sin integrar binario CBM). |
 
 **Shell frontend:** Gobierno (Dashboard, Dominios, Proyectos); Ingeniería (Repositorios, Cola de Sync, Nuevo Repo); Plataforma (Grafo, Credenciales, Ayuda). `/` → `/dashboard`.
 
