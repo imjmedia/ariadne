@@ -330,7 +330,7 @@ Estas variables controlan cómo se particionan los datos entre grafos FalkorDB.
 
 | Variable | Default | Qué hace |
 |---|---|---|
-| `VITE_API_URL` | `http://localhost:3002` (dev) / `https://ariadne.kreoint.mx` (prod) | URL base del backend (API/Ingest). Sin trailing slash. |
+| `VITE_API_URL` | `http://localhost:3000` (dev) / `https://ariadne.kreoint.mx` (prod) | URL base del backend (API/Ingest). Sin trailing slash. |
 | `VITE_SSO_BASE_URL` | — | URL base del SSO (opcional; si no se define, la app funciona sin auth) |
 | `VITE_SSO_APPLICATION_ID` | — | UUID de la aplicación en SSO (opcional) |
 | `VITE_SSO_FRONTEND_URL` | — | URL del frontend SSO para redirección (opcional) |

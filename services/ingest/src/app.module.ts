@@ -32,6 +32,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { ReviewModule } from './review/review.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { SharedBullModule } from './shared-bull/shared-bull.module';
+import { AnalysisModule } from './analysis/analysis.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { SharedBullModule } from './shared-bull/shared-bull.module';
     UsersModule,
     WebhooksModule,
     ReviewModule,
+    AnalysisModule,
   ],
 })
 /** Módulo principal del microservicio Ingest. */

@@ -20,6 +20,7 @@ import { SyncProcessor } from './sync.processor';
 import { SharedBullModule } from '../shared-bull/shared-bull.module';
 import { SYNC_QUEUE } from '../constants';
 import { TheForgeModule } from '../theforge/theforge.module';
+import { ArtifactModule } from '../artifact/artifact.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { TheForgeModule } from '../theforge/theforge.module';
     RepositoriesModule,
     CredentialsModule,
     TheForgeModule,
+    ArtifactModule,
     SharedBullModule,
     BullModule.registerQueue({ name: SYNC_QUEUE }),
   ],

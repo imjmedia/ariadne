@@ -10,6 +10,33 @@
 
 export { escapeCypherString, cypherSafe } from './cypher.js';
 export {
+  BLOCKED_CYPHER_CLAUSES,
+  CypherGuardError,
+  appendLimitIfMissing,
+  guardCypherQuery,
+  injectProjectScope,
+  queryHasLimit,
+  queryReferencesProjectId,
+  validateReadOnlyCypher,
+  type BlockedCypherClause,
+  type CypherGuardResult,
+  type GuardCypherOptions,
+} from './cypher-guard.js';
+export {
+  buildDetectChangesResult,
+  classifySymbolImpact,
+  gitDiffCommand,
+  parseChangedFilesFromDiff,
+  parseDiffMode,
+  parseDiffSymbols,
+  type DetectChangesResult,
+  type DetectChangesSummary,
+  type DiffMode,
+  type ParsedDiffSymbols,
+  type SymbolChangeKind,
+  type SymbolImpactRow,
+} from './diff-impact.js';
+export {
   GRAPH_NAME,
   SHADOW_GRAPH_NAME,
   shadowGraphNameForSession,

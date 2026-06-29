@@ -15,11 +15,10 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { execSync } from "node:child_process";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { createLogger, isProjectShardingEnabled } from "ariadne-common";
+import { createLogger, isProjectShardingEnabled, guardCypherQuery, CypherGuardError } from "ariadne-common";
 import { getGraph, closeFalkor, forEachProjectShardGraph } from "./falkor.js";
 import { getMcpToolCache, closeRedis } from "./redis.js";
 import { loadAriadneProjectConfig, loadAriadneProjectConfigNearFile, resolveAbsolutePath } from "./utils.js";
@@ -33,6 +32,13 @@ import {
 import { mcpLimits } from "./mcp-tool-limits.js";
 import { resolveGraphScopeFromProjectOrRepoId, whereProjectRepo } from "./resolve-graph-scope.js";
 import { invokeIngestLegacyDocumentation, type LegacyDocumentationScope } from "./legacy-documentation.js";
+import {
+  analyzeDiffImpact,
+  emptyDiffMessage,
+  formatDetectChangesMarkdown,
+  resolveDetectChangesDiff,
+  type GraphClient,
+} from "./detect-changes-handler.js";
 
 const MCP_PATH = "/mcp";
 
@@ -568,6 +574,25 @@ function createMcpServer(): Server {
       },
     },
     {
+      name: "query_graph",
+      description:
+        "Ejecuta Cypher read-only contra FalkorDB (sin LLM). Rechaza MERGE/CREATE/DELETE/SET/REMOVE/DROP/CALL {. Con sharding activo, `projectId` es obligatorio. Añade LIMIT si falta (default 50).",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          query: { type: "string", description: "Consulta Cypher read-only (MATCH/RETURN)" },
+          projectId: {
+            type: "string",
+            description: "UUID de proyecto o repo (`roots[].id`). Obligatorio con FALKOR_SHARD_BY_PROJECT.",
+          },
+          limit: { type: "number", description: "Máximo de filas (default 50)" },
+          currentFilePath: { type: "string", description: "Ruta del IDE para inferir projectId (opcional)" },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "get_project_analysis",
       description:
         "Obtiene diagnóstico de deuda técnica, código duplicado, recomendaciones de reingeniería o auditoría heurística de seguridad (secretos). Requiere INGEST_URL. Duplicados requiere embed-index previo. `projectId` puede ser el id del proyecto Ariadne o `roots[].id` (repo); si es proyecto multi-root, usa `currentFilePath` para resolver el repo o pasa el id del repo.",
@@ -877,15 +902,38 @@ function createMcpServer(): Server {
     },
     // --- Pre-flight check (revisión quirúrgica preventiva) ---
     {
+      name: "detect_changes",
+      description:
+        "Blast radius de cambios locales contra el grafo FalkorDB. Modos: staged (default, git diff --cached), unstaged (git diff), all (git diff HEAD). Devuelve JSON: changedFiles, affectedSymbols[], summary { high, medium, low }. Requiere workspaceRoot o diff/stagedDiff.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: { type: "string", description: "ID del proyecto (list_known_projects)" },
+          mode: {
+            type: "string",
+            description: "staged | unstaged | all (default: staged)",
+          },
+          workspaceRoot: { type: "string", description: "Ruta del repo donde ejecutar git diff" },
+          diff: { type: "string", description: "Salida cruda de git diff (alternativa remota)" },
+          stagedDiff: { type: "string", description: "Alias de diff para compatibilidad con analyze_local_changes" },
+          currentFilePath: { type: "string", description: "Ruta del archivo (opcional, inferir projectId)" },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "analyze_local_changes",
       description:
-        "Pre-flight check: revisa los cambios en stage (git diff --cached) contra el grafo FalkorDB. Identifica funciones/componentes editados, eliminados o agregados y proyecta el radio de explosión (quién depende de ellos). Devuelve un resumen de impacto estructurado (tipo, elemento, impacto, riesgo) para evitar código spaghetti o dependencias rotas antes del commit. Requiere workspaceRoot (donde ejecutar git) o stagedDiff (salida cruda de git diff --cached).",
+        "[Deprecated — usar detect_changes] Pre-flight check: revisa cambios en stage contra FalkorDB. Equivalente a detect_changes con mode=staged; devuelve Markdown.",
       inputSchema: {
         type: "object" as const,
         properties: {
           projectId: { type: "string", description: "ID del proyecto en Ariadne (list_known_projects). Necesario para el grafo si no se pasa currentFilePath." },
-          workspaceRoot: { type: "string", description: "Ruta absoluta o relativa al directorio raíz del repo. Si se pasa, el MCP ejecuta git diff --cached aquí." },
+          mode: { type: "string", description: "staged | unstaged | all (default: staged)" },
+          workspaceRoot: { type: "string", description: "Ruta absoluta o relativa al directorio raíz del repo. Si se pasa, el MCP ejecuta git diff aquí." },
           stagedDiff: { type: "string", description: "Salida cruda de git diff --cached (alternativa cuando el MCP no tiene acceso al filesystem del repo, ej. MCP remoto)." },
+          diff: { type: "string", description: "Salida cruda de git diff (alias de stagedDiff con mode explícito)" },
           currentFilePath: { type: "string", description: "Ruta del archivo que el IDE está editando (opcional, para inferir projectId)." },
         },
         required: [],
@@ -1087,67 +1135,44 @@ function asObjRows(data: unknown): Array<Record<string, unknown>> {
   return (data ?? []) as unknown as Array<Record<string, unknown>>;
 }
 
-/** Regex para extraer nombres de funciones/componentes/clases de una línea de código. */
-const SYMBOL_PATTERNS = [
-  /(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(/g,
-  /(?:export\s+)?const\s+(\w+)\s*=\s*(?:\(|function|async)/g,
-  /(?:export\s+)?(?:default\s+)?class\s+(\w+)\b/g,
-  /<([A-Z][a-zA-Z0-9]*)[\s\/>]/g, // JSX component
-  /(?:export\s+)?(?:function|const)\s+(\w+)\s*\(/g,
-];
-
-function extractSymbolsFromLine(line: string): string[] {
-  const symbols: string[] = [];
-  for (const re of SYMBOL_PATTERNS) {
-    re.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(line)) !== null) {
-      const name = m[1];
-      if (name && !symbols.includes(name)) symbols.push(name);
-    }
+async function handleDetectChangesTool(
+  args: Record<string, unknown> | undefined,
+  format: "json" | "markdown",
+): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+  const projectId = (args?.projectId as string) ?? "";
+  let resolvedProjectId = projectId;
+  if (!resolvedProjectId && (args?.currentFilePath as string)) {
+    resolvedProjectId = (await applyShardingInference(undefined, (args?.currentFilePath as string) ?? "")) ?? "";
   }
-  return symbols;
-}
-
-/** Parsea un unified diff y devuelve símbolos removidos, agregados y editados (por nombre). */
-function parseStagedDiff(diff: string): { removed: string[]; added: string[]; edited: string[] } {
-  const inMinus = new Set<string>();
-  const inPlus = new Set<string>();
-  const lines = diff.split(/\r?\n/);
-
-  for (const line of lines) {
-    if (line.startsWith("-") && !line.startsWith("---")) {
-      for (const s of extractSymbolsFromLine(line.slice(1))) inMinus.add(s);
-    } else if (line.startsWith("+") && !line.startsWith("+++")) {
-      for (const s of extractSymbolsFromLine(line.slice(1))) inPlus.add(s);
-    }
+  if (!resolvedProjectId) {
+    return {
+      content: [{ type: "text", text: "**Error:** Se requiere `projectId` o `currentFilePath` para consultar el grafo. Usa `list_known_projects` para IDs." }],
+      isError: true,
+    };
   }
 
-  const removed: string[] = [];
-  const added: string[] = [];
-  const edited: string[] = [];
-  for (const s of inMinus) {
-    if (inPlus.has(s)) edited.push(s);
-    else removed.push(s);
+  const diffResolved = await resolveDetectChangesDiff({
+    projectId,
+    workspaceRoot: args?.workspaceRoot as string | undefined,
+    stagedDiff: args?.stagedDiff as string | undefined,
+    diff: args?.diff as string | undefined,
+    mode: args?.mode as string | undefined,
+    currentFilePath: args?.currentFilePath as string | undefined,
+  });
+  if ("error" in diffResolved) {
+    return { content: [{ type: "text", text: diffResolved.error }], isError: true };
   }
-  for (const s of inPlus) {
-    if (!inMinus.has(s)) added.push(s);
-  }
-  return { removed, added, edited };
-}
 
-function getStagedDiff(workspaceRoot: string): string {
-  try {
-    const out = execSync("git diff --cached", {
-      encoding: "utf-8",
-      cwd: workspaceRoot,
-      maxBuffer: 2 * 1024 * 1024,
-    });
-    return out ?? "";
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`No se pudo ejecutar git diff --cached en ${workspaceRoot}: ${msg}`);
+  const { rawDiff, mode } = diffResolved;
+  if (!rawDiff) {
+    return { content: [{ type: "text", text: emptyDiffMessage(mode) }] };
   }
+
+  const graph = await getGraph(resolvedProjectId);
+  const result = await analyzeDiffImpact(graph as unknown as GraphClient, resolvedProjectId, rawDiff, mode);
+  const text =
+    format === "markdown" ? formatDetectChangesMarkdown(result) : JSON.stringify(result, null, 2);
+  return { content: [{ type: "text", text }] };
 }
 
 async function inferProjectIdFromPath(graph: GraphType, currentFilePath: string): Promise<string | null> {
@@ -3896,115 +3921,87 @@ async function fetchFileFromIngest(
     };
   }
 
-  if (name === "analyze_local_changes") {
-    const projectId = (args?.projectId as string) ?? "";
-    const workspaceRoot = (args?.workspaceRoot as string) ?? "";
-    const stagedDiff = (args?.stagedDiff as string) ?? "";
-    let resolvedProjectId = projectId;
+  if (name === "query_graph") {
+    const rawQuery = ((args?.query as string) ?? "").trim();
+    const projectId = args?.projectId as string | undefined;
+    const limit = Math.min(500, Math.max(1, (args?.limit as number) ?? 50));
+    if (!rawQuery) {
+      return {
+        content: [{ type: "text", text: "**Error:** El parámetro `query` es requerido." }],
+        isError: true,
+      };
+    }
+    let resolvedProjectId = projectId ?? "";
     if (!resolvedProjectId && (args?.currentFilePath as string)) {
       resolvedProjectId = (await applyShardingInference(undefined, (args?.currentFilePath as string) ?? "")) ?? "";
     }
-    if (!resolvedProjectId) {
+    if (isProjectShardingEnabled() && !resolvedProjectId) {
       return {
-        content: [{ type: "text", text: "**Error:** Se requiere `projectId` o `currentFilePath` para consultar el grafo. Usa `list_known_projects` para IDs." }],
-        isError: true,
-      };
-    }
-    graph = await getGraph(resolvedProjectId);
-
-    let rawDiff: string;
-    if (workspaceRoot.trim()) {
-      try {
-        rawDiff = getStagedDiff(workspaceRoot.trim());
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return {
-          content: [{ type: "text", text: `**Error obteniendo diff:** ${msg}\n\nAlternativa: ejecuta \`git diff --cached\` en tu repo y pasa el resultado en \`stagedDiff\` (útil cuando el MCP corre en remoto).` }],
-          isError: true,
-        };
-      }
-    } else if (stagedDiff.trim()) {
-      rawDiff = stagedDiff.trim();
-    } else {
-      return {
-        content: [{ type: "text", text: "**Error:** Indica `workspaceRoot` (ruta del repo donde ejecutar `git diff --cached`) o `stagedDiff` (salida cruda del comando)." }],
+        content: [{
+          type: "text",
+          text: "**Error:** Con `FALKOR_SHARD_BY_PROJECT` activo debes pasar `projectId` en query_graph.",
+        }],
         isError: true,
       };
     }
 
-    if (!rawDiff) {
-      return {
-        content: [{ type: "text", text: "No hay cambios en stage. Ejecuta `git add` en los archivos que quieras incluir y vuelve a llamar a esta herramienta antes del commit." }],
+    const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002";
+    let cypherProjectId = resolvedProjectId;
+    if (resolvedProjectId) {
+      const scope = await resolveGraphScopeFromProjectOrRepoId(ingestUrl, resolvedProjectId);
+      cypherProjectId = scope.cypherProjectId;
+    }
+
+    let guarded;
+    try {
+      guarded = guardCypherQuery(rawQuery, {
+        projectId: cypherProjectId || undefined,
+        limit,
+      });
+    } catch (e) {
+      const msg = e instanceof CypherGuardError ? e.message : String(e);
+      return { content: [{ type: "text", text: `**Error Cypher guard:** ${msg}` }], isError: true };
+    }
+
+    const rows: Array<Record<string, unknown>> = [];
+    await runOnProjectGraphs(resolvedProjectId || undefined, async (g) => {
+      if (rows.length >= limit) return;
+      const res = (await g.query(guarded.query, {
+        params: guarded.params as Record<string, string>,
+      })) as {
+        data?: Array<Record<string, unknown>>;
       };
-    }
-
-    const { removed, added, edited } = parseStagedDiff(rawDiff);
-    const allSymbols = [
-      ...removed.map((s) => ({ name: s, kind: "Eliminación" as const })),
-      ...edited.map((s) => ({ name: s, kind: "Modificación" as const })),
-      ...added.map((s) => ({ name: s, kind: "Nuevo" as const })),
-    ];
-
-    const whereParts = [
-      "(n.projectId = $projectId OR n.projectId IS NULL)",
-      "(dep.projectId = $projectId OR dep.projectId IS NULL)",
-    ];
-    const where = ` WHERE ${whereParts.join(" AND ")}`;
-    const countQ = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*]-(dep)${where} RETURN count(dep) AS cnt`;
-
-    const rows: { tipo: string; elemento: string; impacto: string; riesgo: string }[] = [];
-    for (const { name: symbolName, kind } of allSymbols) {
-      let cnt = 0;
-      try {
-        const countRes = (await graph.query(countQ, { params: { nodeName: symbolName, projectId: resolvedProjectId } })) as { data?: Array<Record<string, unknown>> };
-        const first = (countRes.data ?? [])[0] as Record<string, unknown> | undefined;
-        const val = first?.cnt;
-        cnt = typeof val === "number" ? val : parseInt(String(val ?? "0"), 10) || 0;
-      } catch {
-        cnt = 0;
+      for (const row of asObjRows(res.data)) {
+        rows.push(row);
+        if (rows.length >= limit) break;
       }
+    });
 
-      let impacto: string;
-      let riesgo: string;
-      if (kind === "Eliminación") {
-        if (cnt > 0) {
-          impacto = `${cnt} componente(s) o función(es) quedaron huérfanos (aún dependen de este símbolo).`;
-          riesgo = "ALTO";
-        } else {
-          impacto = "No aparece en el grafo o sin dependientes (código muerto o no indexado).";
-          riesgo = "BAJO";
-        }
-      } else if (kind === "Modificación") {
-        if (cnt > 0) {
-          impacto = `${cnt} pantalla(s) o función(es) verán el cambio.`;
-          riesgo = cnt >= 10 ? "ALTO" : "MEDIO";
-        } else {
-          impacto = "Sin dependientes directos en el grafo.";
-          riesgo = "BAJO";
-        }
-      } else {
-        impacto = "Sin dependencias entrantes aún.";
-        riesgo = "BAJO";
-      }
-      rows.push({ tipo: kind, elemento: symbolName, impacto, riesgo });
-    }
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify(
+          {
+            query: guarded.query,
+            rowCount: rows.length,
+            limit,
+            injectedProjectScope: guarded.injectedProjectScope,
+            appendedLimit: guarded.appendedLimit,
+            rows,
+          },
+          null,
+          2,
+        ),
+      }],
+    };
+  }
 
-    const tableHeader = "| Tipo de Cambio | Elemento | Impacto en el Sistema | Riesgo |\n|----------------|----------|------------------------|--------|";
-    const tableRows = rows.map((r) => `| ${r.tipo} | ${r.elemento} | ${r.impacto} | ${r.riesgo} |`).join("\n");
-    const summary = [
-      "## Resumen de impacto (pre-flight check)",
-      "",
-      "Revisión de cambios en stage contra el grafo FalkorDB. Si hay **ALTO** riesgo, valora deshacer el stage o actualizar dependientes antes del commit.",
-      "",
-      tableHeader,
-      tableRows,
-      "",
-      ...(rows.some((r) => r.riesgo === "ALTO")
-        ? ["**Recomendación:** Revisa los elementos en riesgo ALTO antes de hacer push. Podrías romper el build en master."]
-        : []),
-    ].join("\n");
+  if (name === "detect_changes") {
+    return handleDetectChangesTool(args, "json");
+  }
 
-    return { content: [{ type: "text", text: summary }] };
+  if (name === "analyze_local_changes") {
+    return handleDetectChangesTool(args, "markdown");
   }
 
   // --- review_diff ---
