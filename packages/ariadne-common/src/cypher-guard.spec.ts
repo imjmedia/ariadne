@@ -72,6 +72,20 @@ describe('injectProjectScope', () => {
     assert.equal(injected, true);
     assert.match(query, /WHERE \(n\.projectId = \$projectId\) AND n\.name = \$name/);
   });
+
+  it('uses MATCH alias and keeps space before RETURN/ORDER', () => {
+    const { query, injected } = injectProjectScope(
+      'MATCH (f:Function) RETURN f.name AS name, f.path AS path LIMIT 5',
+      'p1',
+    );
+    assert.equal(injected, true);
+    assert.match(query, /WHERE f\.projectId = \$projectId RETURN/);
+    assert.doesNotMatch(query, /projectIdRETURN/);
+
+    const ordered = injectProjectScope('MATCH (f:Function) ORDER BY f.name RETURN f', 'p1');
+    assert.match(ordered.query, /WHERE f\.projectId = \$projectId ORDER BY/);
+    assert.doesNotMatch(ordered.query, /projectIdORDER/);
+  });
 });
 
 describe('appendLimitIfMissing', () => {

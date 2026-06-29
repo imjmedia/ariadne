@@ -76,8 +76,26 @@ export function queryReferencesProjectId(query: string): boolean {
   return /\$?\bprojectId\b/i.test(query);
 }
 
+/** First variable alias in a graph pattern, e.g. `f` from `(f:Function)`. */
+function extractFirstMatchAlias(matchPattern: string): string {
+  const aliasRe = /\(\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*[:({]/;
+  const m = aliasRe.exec(matchPattern);
+  return m?.[1] ?? 'n';
+}
+
+/** Alias from the first MATCH clause in a query. */
+function extractMatchAliasFromQuery(query: string): string {
+  const matchRe = /\bMATCH\b/i;
+  const match = matchRe.exec(query);
+  if (!match) return 'n';
+  const afterMatch = match.index + match[0].length;
+  const rest = query.slice(afterMatch);
+  const clauseEnd = findClauseBoundary(rest);
+  return extractFirstMatchAlias(rest.slice(0, clauseEnd));
+}
+
 /**
- * Injects `AND n.projectId = $projectId` after the first MATCH/WHERE block when scope is missing.
+ * Injects `AND alias.projectId = $projectId` after the first MATCH/WHERE block when scope is missing.
  * Returns the original query unchanged when `projectId` is already referenced.
  */
 export function injectProjectScope(
@@ -88,10 +106,10 @@ export function injectProjectScope(
     return { query, injected: false };
   }
 
-  const scopeClause = 'n.projectId = $projectId';
   const upper = query.toUpperCase();
   const whereIdx = upper.indexOf(' WHERE ');
   if (whereIdx >= 0) {
+    const scopeClause = `${extractMatchAliasFromQuery(query)}.projectId = $projectId`;
     const insertAt = whereIdx + ' WHERE '.length;
     return {
       query: `${query.slice(0, insertAt)}(${scopeClause}) AND ${query.slice(insertAt)}`,
@@ -105,10 +123,12 @@ export function injectProjectScope(
     const afterMatch = match.index + match[0].length;
     const rest = query.slice(afterMatch);
     const clauseEnd = findClauseBoundary(rest);
+    const alias = extractFirstMatchAlias(rest.slice(0, clauseEnd));
+    const scopeClause = `${alias}.projectId = $projectId`;
     const before = query.slice(0, afterMatch + clauseEnd);
     const after = query.slice(afterMatch + clauseEnd);
     return {
-      query: `${before} WHERE ${scopeClause}${after}`,
+      query: `${before} WHERE ${scopeClause} ${after.trimStart()}`,
       injected: true,
     };
   }
