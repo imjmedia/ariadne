@@ -21,6 +21,15 @@ function chatUrl(): string {
   return `${resolveLlmBaseUrl().replace(/\/$/, '')}/chat/completions`;
 }
 
+/**
+ * Control de reasoning (OpenRouter). Modelos reasoning (deepseek-v4-flash, etc.) generan
+ * tokens de pensamiento por defecto → latencia. Se desactiva donde no aporta (retriever) y
+ * se usa esfuerzo bajo donde sí (sintetizador).
+ */
+export type ReasoningOption =
+  | { enabled: false }
+  | { effort: 'low' | 'medium' | 'high' };
+
 function authHeaders(): Record<string, string> {
   const key = resolveLlmApiKey();
   if (!key) {
@@ -39,6 +48,7 @@ export class ChatLlmService {
   async callLlm(
     messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
     maxTokens = 1024,
+    reasoning?: ReasoningOption,
   ): Promise<string> {
     const res = await fetch(chatUrl(), {
       method: 'POST',
@@ -48,6 +58,7 @@ export class ChatLlmService {
         messages,
         temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.1') || 0.1,
         max_tokens: maxTokens,
+        ...(reasoning ? { reasoning } : {}),
       }),
     });
 
@@ -87,6 +98,8 @@ export class ChatLlmService {
         tool_choice: 'auto',
         temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.1') || 0.1,
         max_tokens: maxTokens,
+        // Retriever solo decide tool_calls; reasoning aquí = latencia sin valor.
+        reasoning: { enabled: false },
       }),
     });
 

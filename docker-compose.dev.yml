@@ -1,27 +1,36 @@
 # Dev local: expone puertos de DB y API para conectar desde el host
 # Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 # Producción: solo docker-compose.yml (sin este archivo)
+#
+# Host ports (evitar choque con OBP :3000 y costos-api :3001 / Redis :6380):
+# - Frontend: 5174 → contenedor 80 (5173 suele estar ocupado por The Forge / Vite)
+# - API Nest: 4000 → contenedor 3000
+# - Orquestador: 4001 → contenedor 3001
+# - Redis auxiliar Ariadne: 6381 → 6379 (costos-api suele usar 6380)
 services:
   falkordb:
     ports:
-      - "6379:6379"
+      # Host 6379 often collides with other FalkorDB stacks (e.g. theforge); use 6382 for Ariadne dev.
+      - "6382:6379"
 
   postgres:
     ports:
       - "5432:5432"
 
   redis:
+    # Host 6380 often collides with costos-api (REDIS_PUBLISH_PORT); use 6381 for AriadneSpecs dev.
     ports:
-      - "6380:6379"
+      - "6381:6379"
 
   api:
     ports:
-      - "3000:3000"
+      - "4000:3000"
     # Sin OTP_DEV_MODE en .env el compose base inyecta cadena vacía; aquí default true para OTP local sin SMTP.
     environment:
       - OTP_DEV_MODE=${OTP_DEV_MODE:-true}
-      # Si no defines CORS_ORIGIN en .env, permite localhost y 127.0.0.1 (evita "Failed to fetch" por CORS).
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173,http://127.0.0.1:5173}
+      # CORS (dev) — incluir origen del frontend y Vite/OBP en :3000 si aplica
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5174,http://127.0.0.1:5174,http://localhost:3000,http://127.0.0.1:3000}
+      - GRAPH_EXPLORER_DEBUG=${GRAPH_EXPLORER_DEBUG:-1}
 
   ingest:
     ports:
@@ -32,7 +41,7 @@ services:
 
   orchestrator:
     ports:
-      - "3001:3001"
+      - "4001:3001"
 
   # MCP Streamable HTTP: host 9888 → contenedor 8080 (8080 suele estar ocupado por Apache/u otros).
   # Cursor: http://127.0.0.1:9888/mcp
@@ -45,8 +54,8 @@ services:
 
   frontend:
     ports:
-      - "5173:80"
+      - "5174:80"
     build:
       args:
-        # Navegador en el host: el API expuesto es :3000 (no uses http://api:3000 aquí).
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        # Navegador en el host: API dev publicado en :4000 (ver comentario al inicio de este archivo).
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}

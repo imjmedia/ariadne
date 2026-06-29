@@ -6,6 +6,7 @@ services:
     image: falkordb/falkordb:v4.16.5
     platform: linux/amd64
     container_name: ariadnespecs-db
+    restart: unless-stopped
     # Evita MISCONF durante reindex pesado: BGSAVE falla si el grafo no está sincronizado (matrices GraphBLAS).
     environment:
       REDIS_ARGS: '--save "" --stop-writes-on-bgsave-error no'
@@ -24,6 +25,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: ariadnespecs-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: falkorspecs
       POSTGRES_PASSWORD: falkorspecs
@@ -43,6 +45,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ariadnespecs-redis
+    restart: unless-stopped
     # Cola BullMQ + caché MCP: sin RDB; estado de sync vive en Postgres.
     command: >
       redis-server
@@ -62,6 +65,7 @@ services:
   # Frontend — UI admin del ingest (repos, sync, jobs)
   # Dokploy Domains UI: ariadne.kreoint.mx path / → 80
   frontend:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: frontend/Dockerfile
@@ -78,6 +82,7 @@ services:
   # Dokploy Domains UI: ariadne.kreoint.mx path /api → 3000
   # Auth OTP: definir en Dokploy Environment o en .env del proyecto
   api:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: ./services/api/Dockerfile
@@ -90,6 +95,8 @@ services:
       - FALKOR_GRAPH_NODE_SOFT_LIMIT=${FALKOR_GRAPH_NODE_SOFT_LIMIT:-100000}
       # UI graph-explorer: POST /api/graph/falkor-debug-query (definir en .env o Dokploy: FALKOR_DEBUG_CYPHER=1)
       - FALKOR_DEBUG_CYPHER=${FALKOR_DEBUG_CYPHER:-}
+      # Explorador /graph/component: trazas Nest (`[GraphExplorer:api]`). Desactivar: GRAPH_EXPLORER_DEBUG=0
+      - GRAPH_EXPLORER_DEBUG=${GRAPH_EXPLORER_DEBUG:-1}
       - PORT=3000
       - REDIS_URL=redis://redis:6379
       - INGEST_URL=http://ingest:3002
@@ -119,6 +126,7 @@ services:
   # Microservicio de Ingesta (repos + full sync + webhook Bitbucket)
   # Sin puerto expuesto: el frontend usa la API (proxy) como puerta de entrada
   ingest:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: ./services/ingest/Dockerfile
@@ -174,6 +182,7 @@ services:
   # Orquestador NestJS + LangGraph (constitution §2.C)
   # Sin puerto expuesto: proxy enruta por orchestrator:3001
   orchestrator:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: ./services/orchestrator/Dockerfile
@@ -201,6 +210,7 @@ services:
   # Servidor MCP (El Oráculo). Streamable HTTP para producción (Dokploy).
   # Cursor/IA por URL Streamable MCP. Bearer a `/mcp`: Secret MCP `ari_*` del usuario (validado vía ingest), reenvío al Nest.
   mcp-ariadne:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: ./services/mcp-ariadne/Dockerfile

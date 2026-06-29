@@ -4253,6 +4253,7 @@ Sintetiza una respuesta clara. Si no hay datos útiles, di explícitamente **sin
           { role: 'user', content: synthesizerUser },
         ],
         evidenceFirst ? 3072 : 2048,
+        { effort: 'low' },
       );
     } else {
       answer = buildEmptyRetrieverAnswerCopy({
