@@ -17,13 +17,14 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 2. get_file_context(filePath) or get_file_content(path) → read the file
 3. validate_before_edit(nodeName) → check impact + contract
 4. Edit the code
-5. analyze_local_changes() → pre-commit blast radius check
+5. detect_changes() → pre-commit blast radius check
 ```
 
 ## Tool catalog
 
 ### Discovery (find things)
 - **`semantic_search`** — Hybrid vector+keyword search. Most common entry point. Pass `query` + optional `projectId`/`limit`.
+- **`query_graph`** — Read-only Cypher against FalkorDB (no LLM). Fast structural queries (dead code, CALLS, IMPORTS). Blocks writes; auto-scopes by `projectId` when sharding.
 - **`find_similar_implementations`** — Before writing a new function, check if something similar already exists.
 - **`ask_codebase`** — Natural language Q&A over the codebase. Requires `question`. Pass `responseMode: "raw_evidence"` for structured JSON. **Route to cheaper tools** (get_file_content, get_definitions) when you already know the path/symbol.
 - **`list_known_projects`** — All indexed projects with IDs and branches.
@@ -58,7 +59,8 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 
 ### Planning & review
 - **`get_modification_plan`** — Returns `filesToModify` + business questions. Multi-root: pass `roots[].id`.
-- **`analyze_local_changes`** — Pre-commit: runs `git diff --cached` against the knowledge graph. Returns impact score per change.
+- **`detect_changes`** — Pre-commit blast radius: `mode` staged|unstaged|all, returns JSON (`changedFiles`, `affectedSymbols`, risk summary).
+- **`analyze_local_changes`** — Deprecated alias of `detect_changes` (Markdown output, default `mode=staged`).
 - **`review_diff`** — Review any diff or PR URL with legacy context enrichment.
 - **`get_sync_status`** — Is the graph up to date? Check before trusting results.
 - **`get_project_standards`** — Prettier, ESLint, tsconfig snippets. Make new code indistinguishable.
@@ -70,5 +72,5 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 3. **Multi-root projects** — Pass `roots[].id` (repo ID) as `projectId`, not the project UUID. Use `currentFilePath` to let the server resolve it.
 4. **Route to cheap tools** — If you know the symbol/path, use `get_file_content`/`get_definitions`/`get_references` instead of `ask_codebase`. Less latency, fewer tokens.
 5. **Check for duplicates before writing** — `find_similar_implementations` before implementing anything new.
-6. **Pre-commit review** — `analyze_local_changes()` before every commit to catch broken dependencies.
+6. **Pre-commit review** — `detect_changes()` (or legacy `analyze_local_changes()`) before every commit to catch broken dependencies.
 7. **Graph freshness** — If results look stale, `get_sync_status` to check when the project was last indexed.
