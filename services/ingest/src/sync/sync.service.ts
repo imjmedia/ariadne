@@ -994,10 +994,10 @@ export class SyncService {
       throw new Error('Provider missing getFileContent (phaseDependencyAnalysis)');
     }
     const manifestPaths = ['package.json', 'requirements.txt', 'go.mod'];
-    const getSafe =
-      provider.getFileContentSafe ??
-      ((o: string, r: string, re: string, p: string, cr?: string | null) =>
-        provider.getFileContent(o, r, re, p, cr).catch(() => null));
+    const getSafe = provider.getFileContentSafe
+      ? provider.getFileContentSafe.bind(provider)
+      : (o: string, r: string, re: string, p: string, cr?: string | null) =>
+          provider.getFileContent(o, r, re, p, cr).catch(() => null);
     for (const manifestPath of manifestPaths) {
       const content = await getSafe(owner, repoSlug, ref, manifestPath, credentialsRef);
       if (content && manifestPath === 'package.json') {
