@@ -1,0 +1,32 @@
+[
+  {
+    "callerFile": "src/App.jsx",
+    "callerFn": "App",
+    "calleeName": "checkAndInitSentry",
+    "expectedCalleeFile": "src/utils/sentryLazyLoader.ts"
+  },
+  {
+    "callerFile": "src/components/CardsVisualiza/cardVisualizaPauta.tsx",
+    "callerFn": "ImgToShow",
+    "calleeName": "getImgByType",
+    "expectedCalleeFile": "src/components/CardsVisualiza/cardVisualizaPauta.tsx"
+  },
+  {
+    "callerFile": "src/components/CardsVisualiza/components/CardVisualizaClient.tsx",
+    "callerFn": "CardVisualizaClient",
+    "calleeName": "usePermissions",
+    "expectedCalleeFile": "src/modules/system/auth/PermissionsContext.ts"
+  },
+  {
+    "callerFile": "src/components/CardsVisualiza/components/CardVisualizaClient.tsx",
+    "callerFn": "CardVisualizaClient",
+    "calleeName": "getPeriodPrice",
+    "expectedCalleeFile": "src/components/CardsVisualiza/components/CardVisualizaClient.tsx"
+  },
+  {
+    "callerFile": "scripts/migrate-to-obp-tailwind.mjs",
+    "callerFn": "rewriteClassString",
+    "calleeName": "prefixToken",
+    "expectedCalleeFile": "scripts/migrate-to-obp-tailwind.mjs"
+  }
+]

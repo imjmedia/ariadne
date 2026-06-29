@@ -21,7 +21,7 @@ services:
     environment:
       - OTP_DEV_MODE=${OTP_DEV_MODE:-true}
       # Si no defines CORS_ORIGIN en .env, permite localhost y 127.0.0.1 (evita "Failed to fetch" por CORS).
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173,http://127.0.0.1:5173}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174}
 
   ingest:
     ports:
@@ -50,3 +50,15 @@ services:
       args:
         # Navegador en el host: el API expuesto es :3000 (no uses http://api:3000 aquí).
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+
+  # Perfil opcional: docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile embed-local up -d ollama
+  ollama:
+    profiles: [embed-local]
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  ollama_data:

@@ -18,6 +18,26 @@ interface GhCommit {
   files?: Array<{ filename?: string; status?: string }>;
 }
 
+/** Mensaje accionable para errores GitHub (rate limit, auth). */
+export function formatGitHubApiError(status: number, body: string): string {
+  const lower = body.toLowerCase();
+  if (
+    status === 403 &&
+    (lower.includes('rate limit') || lower.includes('api rate limit exceeded'))
+  ) {
+    return (
+      'GitHub API 403: límite de tasa superado (~60 req/h sin token; ~5000 req/h con PAT). ' +
+      'Añade GITHUB_TOKEN al ingest, crea credencial en /credentials (provider=github) ' +
+      'y asígnala al repo (credentialsRef), o usa shallow clone con token.'
+    );
+  }
+  if (status === 401) {
+    return 'GitHub API 401: token inválido o expirado. Revisa credentialsRef o GITHUB_TOKEN.';
+  }
+  const trimmed = body.length > 500 ? `${body.slice(0, 500)}…` : body;
+  return `GitHub API ${status}: ${trimmed}`;
+}
+
 /**
  * Servicio para GitHub REST API: listar owners, repos, ramas, archivos y contenido; opciones para clone.
  */
@@ -43,7 +63,7 @@ export class GitHubService {
     const headers = await this.getHeaders(credentialsRef);
     const res = await fetch(url, { headers });
     if (!res.ok) {
-      throw new Error(`GitHub API ${res.status}: ${await res.text()}`);
+      throw new Error(formatGitHubApiError(res.status, await res.text()));
     }
     return res.json() as Promise<T>;
   }
@@ -212,7 +232,7 @@ export class GitHubService {
     };
     const res = await fetch(url, { headers });
     if (!res.ok) {
-      throw new Error(`GitHub API ${res.status}: ${await res.text()}`);
+      throw new Error(formatGitHubApiError(res.status, await res.text()));
     }
     return res.text();
   }

@@ -210,6 +210,7 @@ Para que la IA no rompa código al refactorizar, el MCP implementa operaciones s
 | `get_affected_scopes` | Si modificas A, devuelve B,C,D afectados + archivos de tests. |
 | `check_breaking_changes` | Compara firma antes/después; alerta si eliminas params usados en N sitios. |
 | `find_similar_implementations` | Búsqueda semántica antes de escribir código nuevo (ej. "¿ya tenemos validación de email?"). |
+| `query_graph` | Cypher read-only directo contra FalkorDB (sin LLM). Dead code, CALLS, IMPORTS. |
 | `get_project_standards` | Recupera Prettier, ESLint, tsconfig para que el código sea indistinguible del existente. |
 | `get_file_context` | Combina contenido + imports + exports. Paso 2 del flujo: search → get_file_context → validate → apply. |
 
@@ -217,15 +218,38 @@ Para que la IA no rompa código al refactorizar, el MCP implementa operaciones s
 
 **Resumen ingest:** `get_file_content` / `get_file_context` / `get_project_standards`: intentan `GET /repositories/:id/file` y si 404 `GET /projects/:id/file`. `ask_codebase`: intenta `POST /projects/:id/chat` y si 404 `POST /repositories/:id/chat` (body opcional: `scope`, `twoPhase`, `responseMode`, `deterministicRetriever`). Interno orchestrator: **`POST /internal/repositories/:repoId/mdd-evidence`** (MDD) y **`POST /internal/repositories/:repoId/raw-evidence-deterministic`** (retrieve sin LLM con `raw_evidence`+`deterministicRetriever`). `get_modification_plan`: `POST /projects/:projectId/modification-plan` (body opcional: `scope`). `get_project_analysis`: `POST /projects/:id/analyze` (proyecto; body `mode` + opcional `idePath` / `repositoryId` en multi-root) o `POST /repositories/:id/analyze` (repo = `roots[].id`).
 
-### Tool: `analyze_local_changes` (Pre-flight check)
+### Tool: `query_graph` (Cypher read-only)
 
-- **Descripción:** Revisión quirúrgica preventiva antes del commit. Lee el diff en stage (`git diff --cached`), identifica funciones/componentes **editados**, **eliminados** o **agregados**, y proyecta en el grafo FalkorDB el radio de explosión (quién depende de esos símbolos). Devuelve un **Resumen de Impacto** estructurado en Markdown.
-- **Argumentos:** `projectId` o `currentFilePath` (para inferir proyecto); `workspaceRoot` (ruta del repo donde ejecutar `git diff --cached`) **o** `stagedDiff` (salida cruda del comando, para MCP remoto sin acceso al filesystem).
-- **Flujo:**
- - **Paso A:** Obtener diff en stage: `git diff --name-only --cached` y `git diff --cached` desde `workspaceRoot`, o usar `stagedDiff` si se proporciona.
- - **Paso B:** Parsear el unified diff y extraer símbolos (funciones, clases, componentes JSX) de líneas `-` y `+`. Clasificar en: eliminados (solo en `-`), agregados (solo en `+`), editados (aparecen en ambos).
- - **Paso C:** Para cada símbolo, consulta Cypher de radio de explosión: `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*]-(dep) WHERE ... RETURN count(dep) AS cnt`.
-- **Salida:** Tabla Markdown: **Tipo de Cambio** | **Elemento** | **Impacto en el Sistema** | **Riesgo** (ALTO/MEDIO/BAJO). Ejemplo: eliminación con dependientes → ALTO; modificación con muchos dependientes → MEDIO; nuevo sin dependencias → BAJO. Si hay riesgo ALTO, se añade recomendación: revisar antes de push para no romper el build.
+- **Descripción:** Ejecuta consultas Cypher **solo lectura** contra FalkorDB sin pasar por LLM. Ideal para dead code, inbound CALLS, IMPORTS, conteos estructurales.
+- **Argumentos:** `query` (requerido); `projectId` (obligatorio con `FALKOR_SHARD_BY_PROJECT`); `limit` (default 50); `currentFilePath` (opcional, inferir proyecto).
+- **Guard:** Rechaza `MERGE`, `CREATE`, `DELETE`, `SET`, `REMOVE`, `DROP`, `CALL {`. Si la query no filtra por `projectId`, inyecta `WHERE n.projectId = $projectId`. Añade `LIMIT` si falta.
+- **Salida:** JSON `{ query, rowCount, limit, injectedProjectScope, appendedLimit, rows[] }`.
+
+**Ejemplos:**
+
+```cypher
+MATCH (f:Function) WHERE NOT EXISTS { (f)<-[:CALLS]-() } RETURN f.name
+MATCH (caller)-[:CALLS]->(callee:Function {name: $name}) RETURN caller.name, caller.path LIMIT 20
+```
+
+### Tool: `detect_changes` (Pre-flight check)
+
+- **Descripción:** Blast radius de cambios locales contra FalkorDB. Soporta **staged**, **unstaged** y **all** (`git diff HEAD`). Devuelve JSON estructurado.
+- **Argumentos:** `projectId` o `currentFilePath`; `mode` (`staged` | `unstaged` | `all`, default `staged`); `workspaceRoot` **o** `diff` / `stagedDiff`.
+- **Salida JSON:** `changedFiles[]`, `affectedSymbols[]` (name, changeType, impact, risk, dependentCount), `summary: { high, medium, low }`.
+- **Endpoint ingest (MCP remoto):** `POST /repositories/:id/detect-changes` body `{ mode, diff }` (diff unificado requerido).
+
+### Tool: `analyze_local_changes` (deprecated)
+
+- **Descripción:** Alias de `detect_changes` con salida Markdown. Preferir `detect_changes` para JSON estructurado.
+- **Argumentos:** Igual que `detect_changes` (incluye `mode`).
+
+**Flujo legacy Markdown:**
+
+- **Paso A:** Obtener diff según `mode` desde `workspaceRoot`, o usar `diff`/`stagedDiff`.
+- **Paso B:** Parsear unified diff → símbolos eliminados/agregados/editados.
+- **Paso C:** Cypher blast radius: `MATCH (n {name})<-[:CALLS|RENDERS*]-(dep) … RETURN count(dep)`.
+- **Salida Markdown:** Tabla Tipo | Elemento | Impacto | Riesgo (ALTO/MEDIO/BAJO).
 
 ---
 
