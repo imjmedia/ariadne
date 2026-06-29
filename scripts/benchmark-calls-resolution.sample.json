@@ -1,0 +1,8 @@
+[
+  {
+    "callerFile": "packages/ariadne-common/src/graph-utils.ts",
+    "callerFn": "resolveCrossFileCalls",
+    "calleeName": "buildExportsMap",
+    "expectedCalleeFile": "packages/ariadne-common/src/graph-utils.ts"
+  }
+]

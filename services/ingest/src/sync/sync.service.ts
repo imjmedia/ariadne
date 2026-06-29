@@ -55,6 +55,8 @@ import {
   isMandatoryDefaultRootIndexPath,
 } from '../providers/index-include-rules';
 import { TheForgeConvergeService } from '../theforge/theforge-converge.service';
+import { GraphExportService } from '../artifact/graph-export.service';
+import { GraphImportService } from '../artifact/graph-import.service';
 
 /**
  * @fileoverview Servicio de sync: mapping, deps, chunking, FalkorDB, embed-index post-sync.
@@ -117,6 +119,8 @@ export class SyncService {
     @InjectRepository(ProjectEntity)
     private readonly projectEntityRepo: Repository<ProjectEntity>,
     private readonly theforgeConverge: TheForgeConvergeService,
+    private readonly graphExport: GraphExportService,
+    private readonly graphImport: GraphImportService,
   ) {}
 
   /**
@@ -394,6 +398,40 @@ export class SyncService {
 
       await this.updateJobProgress(job.id, { phase: 'mapping_done', filesFound: paths.length });
 
+      let skipGraphWrite = false;
+      let artifactBootstrapPayload: Record<string, unknown> | undefined;
+      if (cloneResult) {
+        const bootstrap = await this.graphImport.tryBootstrapFromClone({
+          workDir: cloneResult.workDir,
+          projectIds,
+          repoId,
+          getLatestCommitSha: cloneResult.getLatestCommitSha,
+        });
+        if (bootstrap.imported) {
+          artifactBootstrapPayload = {
+            graphArtifact: {
+              imported: true,
+              nodeCount: bootstrap.nodeCount,
+              edgeCount: bootstrap.edgeCount,
+              skipGraphWrite: bootstrap.skipGraphWrite === true,
+              exportedAt: bootstrap.manifest?.exportedAt,
+              commitSha: bootstrap.manifest?.commitSha,
+            },
+          };
+          if (bootstrap.skipGraphWrite) {
+            skipGraphWrite = true;
+            await this.updateJobProgress(job.id, {
+              phase: 'artifact_bootstrap',
+              message: 'graph imported from .ariadne artifact — skipping graph write',
+            });
+          }
+        } else if (bootstrap.reason && bootstrap.reason !== 'artifact_not_found') {
+          artifactBootstrapPayload = {
+            graphArtifact: { imported: false, reason: bootstrap.reason },
+          };
+        }
+      }
+
       let manifestDeps: string | null = null;
       if (cloneResult) {
         const pkgContent = await getContent('package.json');
@@ -424,7 +462,10 @@ export class SyncService {
       const projectName = `${repo.projectKey}/${repo.repoSlug}`;
       const rootPath = repoSlug;
 
-      await this.updateJobProgress(job.id, { phase: 'indexing', total: paths.length });
+      await this.updateJobProgress(job.id, {
+        phase: skipGraphWrite ? 'artifact_bootstrap_done' : 'indexing',
+        total: paths.length,
+      });
       const parsedByPath = new Map<string, ParsedFile>();
       const prismaFiles: { path: string; content: string }[] = [];
       const isFirstSync = repo.domainConfig == null;
@@ -432,7 +473,7 @@ export class SyncService {
       const withAst: Array<{ parsed: ParsedFile; root: import('tree-sitter').SyntaxNode; source: string }> = [];
       const skipped: { fetch: string[]; parse: string[] } = { fetch: [], parse: [] };
 
-      for (const relPath of paths) {
+      if (!skipGraphWrite) for (const relPath of paths) {
         try {
           const content = await getContent(relPath);
           fetchedCount++;
@@ -484,12 +525,14 @@ export class SyncService {
 
       const openApiPathCount = paths.filter((p) => isOpenApiSpecSyncPath(p)).length;
       /** En cuanto termina el barrido de rutas: si no, la UI se queda en "Indexando N/N" durante deps/tsconfig (puede tardar mucho). */
-      await this.updateJobProgress(job.id, {
-        phase: 'writing_graph',
-        graphBatchTotal: parsedByPath.size + prismaFiles.length + openApiPathCount,
-      });
+      if (!skipGraphWrite) {
+        await this.updateJobProgress(job.id, {
+          phase: 'writing_graph',
+          graphBatchTotal: parsedByPath.size + prismaFiles.length + openApiPathCount,
+        });
+      }
 
-      if (isFirstSync && withAst.length > 0) {
+      if (!skipGraphWrite && isFirstSync && withAst.length > 0) {
         const inferred = inferDomainConfig(withAst);
         await this.repoRepo.update(repositoryId, { domainConfig: inferred });
         for (const { parsed, root, source } of withAst) {
@@ -524,14 +567,16 @@ export class SyncService {
       const commitSha = await getLatestCommitSha();
       const chunkingContext = commitSha ? { commitSha } : undefined;
 
-      const indexedPaths: string[] = [];
+      const indexedPaths: string[] = skipGraphWrite ? [...paths] : [];
       const skippedIndex: string[] = [];
-      const previouslyIndexed = await this.indexedFileRepo.find({
-        where: { repositoryId },
-        select: ['path'],
-      });
+      const previouslyIndexed = skipGraphWrite
+        ? []
+        : await this.indexedFileRepo.find({
+            where: { repositoryId },
+            select: ['path'],
+          });
 
-      for (const projectId of projectIds) {
+      if (!skipGraphWrite) for (const projectId of projectIds) {
         const projRow = await this.projectEntityRepo.findOne({ where: { id: projectId } });
         // Sin proyecto: ignorar FALKOR_SHARD_BY_DOMAIN, usar modo 'project'
         const shardMode = projRow ? effectiveShardMode(projRow.falkorShardMode) : 'project';
@@ -831,10 +876,25 @@ export class SyncService {
           },
           ...(commitSha != null && { commitSha }),
           ...embedIndexPayload,
+          ...(artifactBootstrapPayload ?? {}),
         } as object,
       });
 
       await this.repos.pruneOldJobs(repositoryId, 5);
+      if (cloneResult) {
+        try {
+          await this.graphExport.exportAfterSync(
+            repositoryId,
+            projectIds,
+            cloneResult.workDir,
+            commitSha ?? null,
+            'full',
+          );
+        } catch (exportErr) {
+          const msg = exportErr instanceof Error ? exportErr.message : String(exportErr);
+          this.logger.warn(`Graph artifact post-sync export failed: ${msg}`);
+        }
+      }
       void this.theforgeConverge.triggerAfterSync(repositoryId, 'full');
       return { jobId: job.id, indexed: indexedPaths.length };
     } catch (err) {

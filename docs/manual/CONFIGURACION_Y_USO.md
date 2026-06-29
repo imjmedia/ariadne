@@ -42,6 +42,8 @@ Guía completa para configurar y usar el sistema: variables de entorno, credenci
 | `NODE_ENV` | No | development | Si ≠ production, TypeORM usa synchronize |
 | `THEFORGE_API_URL` | Condicional | — | Base URL API The Forge. Requerida si el repo tiene brownfield converge activo. |
 | `THEFORGE_SERVICE_JWT` | Condicional | — | Bearer JWT servicio para `POST /projects/:id/converge/trigger`. Fallback si el repo no tiene token propio. |
+| `GRAPH_ARTIFACT_EXPORT_ON_SYNC` | No | — | `1` / `true`: tras un full sync con clone, escribe `.ariadne/graph-<repoId>.jsonl.zst` en el workdir del clone (tier `best`). |
+| `GRAPH_ARTIFACT_FORCE_IMPORT` | No | — | `1` / `true`: en bootstrap de sync, importa artifact aunque Falkor ya tenga nodos del repo. |
 
 \* En Docker las variables vienen del compose; en local hay que definirlas.
 
@@ -301,6 +303,16 @@ curl -X POST http://localhost:3002/repositories \
  ```
 
 5. **Alcance del índice (opcional):** `PATCH /repositories/<UUID>` con `indexIncludeRules`: `null` restaura indexado completo; `{ "entries": [ { "kind": "path_prefix"|"file", "path": "…" } ] }` restringe (manifiestos en raíz siempre). UI: `/repos/<UUID>/edit`. Tras cambiar, **resync**. Detalle: [MONOREPO_Y_LIMITACIONES_INDEXADO.md](../notebooklm/MONOREPO_Y_LIMITACIONES_INDEXADO.md).
+
+6. **Graph artifact (opcional, bootstrap de equipo):** Tras indexar, exportar subgrafo comprimido al clone:
+
+ ```bash
+ curl -X POST http://localhost:3002/repositories/<UUID>/export-graph-artifact \
+   -H 'Content-Type: application/json' \
+   -d '{"tier":"best"}'
+ ```
+
+ Genera `.ariadne/graph-<repoId>.jsonl.zst` y `.ariadne/manifest.json` (SHA-256). **No se commitea por defecto**; opcional compartir en git (`.gitattributes` añade `merge=ours` para `*.zst`). En un entorno nuevo, si el artifact está en el clone y Falkor está vacío para ese repo, el sync **importa** el artifact y omite re-escritura del grafo cuando el `commitSha` coincide. Ver [PLAN_CBM_PARITY_CAMINO_D.md](../notebooklm/PLAN_CBM_PARITY_CAMINO_D.md).
 
 ---
 
