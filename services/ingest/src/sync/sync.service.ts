@@ -323,18 +323,16 @@ export class SyncService {
       triggeredByUserId: options?.triggeredByUserId,
     });
 
-    const hasCreds =
-      credentialsRef ||
-      (repo.provider === 'bitbucket' && (process.env.BITBUCKET_TOKEN || process.env.BITBUCKET_APP_PASSWORD)) ||
-      (repo.provider === 'github' && (process.env.GITHUB_TOKEN || process.env.GH_TOKEN));
-
     let cloneResult: Awaited<ReturnType<typeof runShallowClone>> | null = null;
-    if (hasCreds && (repo.provider === 'bitbucket' || repo.provider === 'github')) {
+    if (repo.provider === 'bitbucket' || repo.provider === 'github') {
       const cloneOpts =
         repo.provider === 'bitbucket'
           ? await this.bitbucket.getCloneOpts(owner, repoSlug, ref, credentialsRef)
           : await this.github.getCloneOpts(owner, repoSlug, ref, credentialsRef);
-      if (cloneOpts?.token) {
+      // GitHub: clone público sin token evita rate limit de API (~60/h). Bitbucket requiere token.
+      const shouldTryClone =
+        cloneOpts && (Boolean(cloneOpts.token) || repo.provider === 'github');
+      if (shouldTryClone) {
         try {
           await this.updateJobProgress(job.id, { phase: 'mapping', message: 'cloning' });
           cloneResult = await runShallowClone({
