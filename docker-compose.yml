@@ -227,6 +227,20 @@ services:
     expose:
       - "8080"
 
+  # Servidor MCP de documentación estructurada (docs_mcp/). Complementa mcp-ariadne (grafo).
+  mcp-docs:
+    build:
+      context: .
+      dockerfile: ./services/mcp-docs/Dockerfile
+    container_name: ariadne-docs-mcp
+    environment:
+      - PORT=8081
+      - DOCS_MCP_DIR=/docs_mcp
+    networks:
+      - dokploy-network
+    expose:
+      - "8081"
+
 networks:
   falkor-net:
     driver: bridge
