@@ -315,3 +315,74 @@ export interface FullAuditResult {
     duplicados: Array<{ a: string; b: string; score?: number }>;
   };
 }
+
+/** Proveedores LLM soportados (catálogo ingest). */
+export type LlmProviderId =
+  | 'openrouter'
+  | 'openai'
+  | 'anthropic'
+  | 'gemini'
+  | 'groq'
+  | 'cloudflare';
+
+export interface LlmProviderCatalogEntry {
+  id: LlmProviderId;
+  label: string;
+  apiKeyHelpUrl?: string;
+  defaultChatModel: string;
+  chatModels?: string[];
+  defaultEmbeddingModel: string | null;
+  embeddingModels?: string[];
+  defaultEmbeddingDimension: number | null;
+  defaultBaseUrl: string;
+  baseUrlEditable?: boolean;
+  extraFields?: Array<{
+    key: string;
+    label: string;
+    required: boolean;
+    placeholder?: string;
+    helpText?: string;
+  }>;
+  supportsEmbeddings: boolean;
+}
+
+export interface LlmSettingsMasked {
+  provider: LlmProviderId;
+  apiKeyHint: string | null;
+  hasApiKey: boolean;
+  baseUrl: string;
+  chatModel: string;
+  orchestratorChatModel: string | null;
+  temperature: number;
+  embeddingProvider: LlmProviderId | null;
+  embeddingModel: string | null;
+  embeddingDimension: number;
+  extras: Record<string, unknown>;
+  httpReferer: string | null;
+  appTitle: string | null;
+  source: 'db' | 'env';
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface UpdateLlmSettingsDto {
+  provider?: LlmProviderId;
+  apiKey?: string;
+  baseUrl?: string;
+  chatModel?: string;
+  orchestratorChatModel?: string | null;
+  temperature?: number;
+  embeddingProvider?: LlmProviderId | null;
+  embeddingModel?: string | null;
+  embeddingDimension?: number;
+  extras?: Record<string, unknown>;
+  httpReferer?: string | null;
+  appTitle?: string | null;
+}
+
+export interface LlmTestConnectionResult {
+  ok: boolean;
+  statusCode?: number;
+  message: string;
+  model?: string;
+}

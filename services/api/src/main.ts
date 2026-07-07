@@ -62,6 +62,7 @@ async function bootstrap() {
       pathname.startsWith('/api/providers') ||
       pathname.startsWith('/api/webhooks') ||
       pathname.startsWith('/api/users') ||
+      pathname.startsWith('/api/llm-settings') ||
       pathname.startsWith('/api/internal'),
     target: ingestUrl,
     changeOrigin: true,

@@ -3,7 +3,9 @@ import {
   llmDefaultHeaders,
   resolveLlmApiKey,
   resolveLlmBaseUrl,
+  resolveLlmTemperature,
 } from './llm-config';
+import { LlmAuthError } from './llm-auth.error';
 
 export type LlmMessage =
   | { role: 'user' | 'assistant' | 'system'; content: string }
@@ -55,13 +57,19 @@ export async function callLlm(
     body: JSON.stringify({
       model: orchestratorLlmModel(),
       messages,
-      temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.1') || 0.1,
+      temperature: resolveLlmTemperature(),
       max_tokens: maxTokens,
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      throw new LlmAuthError(
+        res.status,
+        `LLM auth failed (${res.status}): revisa la API key en Ajustes → Proveedores IA. ${err.slice(0, 300)}`,
+      );
+    }
     throw new Error(`OpenRouter API ${res.status}: ${err}`);
   }
 
@@ -87,12 +95,21 @@ export async function callLlmWithTools(
       messages: stripReasoningFromMessages(messages),
       tools,
       tool_choice: 'auto',
-      temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.1') || 0.1,
+      temperature: resolveLlmTemperature(),
       max_tokens: maxTokens,
     }),
   });
 
-  if (!res.ok) throw new Error(`OpenRouter API ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      throw new LlmAuthError(
+        res.status,
+        `LLM auth failed (${res.status}): revisa la API key en Ajustes → Proveedores IA. ${errText.slice(0, 300)}`,
+      );
+    }
+    throw new Error(`OpenRouter API ${res.status}: ${errText}`);
+  }
 
   const data = (await res.json()) as {
     choices?: Array<{

@@ -3420,6 +3420,12 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
         429,
       );
     }
+    if (status === 401 || status === 403) {
+      throw new HttpException(
+        { code: 'ORCHESTRATOR_LLM_AUTH', message: msg, upstream: 'orchestrator' },
+        status,
+      );
+    }
     if (status === 503) {
       throw new HttpException(
         { code: 'ORCHESTRATOR_UPSTREAM_UNAVAILABLE', message: msg, upstream: 'orchestrator' },

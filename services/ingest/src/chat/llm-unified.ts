@@ -1,12 +1,15 @@
 /**
- * Ingest: LLM vía LLM_PROVIDER env (openrouter por defecto).
+ * Ingest: LLM vía activeLlmConfig (Ajustes) o LLM_PROVIDER env (openrouter por defecto).
  * @see ../llm/llm-config.ts
  */
+import { getActiveLlmConfig } from '../llm-settings/active-llm-config';
 import { resolveLlmApiKey, resolveLlmChatModel, LLM_DEFAULT_CHAT_MODEL } from '../llm/llm-config';
 
 export type IngestLlmId = string;
 
 export function resolveIngestLlmProvider(): IngestLlmId {
+  const active = getActiveLlmConfig();
+  if (active?.provider) return active.provider;
   return process.env.LLM_PROVIDER?.trim() || 'openrouter';
 }
 

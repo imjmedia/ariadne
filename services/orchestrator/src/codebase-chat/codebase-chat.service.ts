@@ -10,6 +10,7 @@ import { wantsUnusedBackendApiEndpointsAnalysis } from './chat-unused-api-endpoi
 import { OrchestratorLlmService } from './orchestrator-llm.service';
 import type { LlmMessage } from '../llm/orchestrator-llm.facade';
 import { isMoonshotRateLimitError } from '../llm/moonshot-rate-limit.error';
+import { isLlmAuthError } from '../llm/llm-auth.error';
 import { RedisStateService } from '../redis-state/redis-state.service';
 import type { RetrieverToolName } from './ingest-types';
 
@@ -266,6 +267,16 @@ export class CodebaseChatService {
             message: err.message,
           },
           HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      if (isLlmAuthError(err)) {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.UNAUTHORIZED,
+            error: 'LlmAuthError',
+            message: err.message,
+          },
+          HttpStatus.UNAUTHORIZED,
         );
       }
       throw err;
