@@ -1,7 +1,8 @@
 /**
  * API client para el servicio Ingest (repos, sync, chat, análisis, credenciales).
  * Usa VITE_API_URL + /api. Incluye Bearer token JWT (OTP) en todas las peticiones.
- * En 401 redirige a /login.
+ * En 401 de sesión (JWT) redirige a /login; un 401 del proveedor LLM/upstream
+ * (p. ej. API key de OpenRouter inválida) se propaga como error normal, sin cerrar sesión.
  * @module api
  */
 import { getToken, removeToken } from './utils/auth';
@@ -19,28 +20,61 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+/** Códigos/errores que identifican un 401 de auth del proveedor LLM/upstream (no de sesión). */
+const UPSTREAM_AUTH_CODES = new Set(['ORCHESTRATOR_LLM_AUTH', 'LlmAuthError']);
+
+/**
+ * Normaliza el cuerpo de error de la API. Extrae `message`, `code` y `error`, y
+ * desanida una capa cuando `message` viene como JSON (upstream → ingest → api).
+ */
+function parseApiError(text: string): { message: string; code?: string; error?: string } {
+  let message = text || '';
+  let code: string | undefined;
+  let error: string | undefined;
+  try {
+    const json = JSON.parse(text) as { message?: string | string[]; code?: string; error?: string };
+    code = json.code;
+    error = json.error;
+    if (json.message != null) {
+      message = Array.isArray(json.message) ? json.message.join('; ') : String(json.message);
+    }
+    try {
+      const inner = JSON.parse(message) as { message?: string; error?: string };
+      if (inner?.message) message = inner.message;
+      if (!error && inner?.error) error = inner.error;
+    } catch {
+      /* message ya es texto plano */
+    }
+  } catch {
+    /* usar text tal cual */
+  }
+  return { message, code, error };
+}
+
+/** true si el 401 proviene de auth del proveedor LLM/upstream (no debe cerrar la sesión web). */
+function isUpstreamAuthError(code?: string, error?: string): boolean {
+  return (code != null && UPSTREAM_AUTH_CODES.has(code)) || (error != null && UPSTREAM_AUTH_CODES.has(error));
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: { ...getAuthHeaders(), ...options?.headers },
   });
 
-  if (res.status === 401) {
-    removeToken();
-    window.location.href = '/login';
-    throw new Error('Sesión expirada. Redirigiendo al login.');
-  }
-
   if (!res.ok) {
     const text = await res.text();
-    let msg = text || res.statusText;
-    try {
-      const json = JSON.parse(text) as { message?: string | string[] };
-      if (json?.message) msg = Array.isArray(json.message) ? json.message.join('; ') : json.message;
-    } catch {
-      /* use text as-is */
+    const { message, code, error } = parseApiError(text);
+
+    // Solo cerrar sesión ante un 401 de sesión (JWT/token). Un 401 del LLM/upstream
+    // (p. ej. API key de OpenRouter inválida) se muestra como error normal en la UI.
+    if (res.status === 401 && !isUpstreamAuthError(code, error)) {
+      removeToken();
+      window.location.href = '/login';
+      throw new Error('Sesión expirada. Redirigiendo al login.');
     }
-    throw new Error(`${res.status}: ${msg}`);
+
+    throw new Error(`${res.status}: ${message || res.statusText}`);
   }
   if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;
   return res.json();
