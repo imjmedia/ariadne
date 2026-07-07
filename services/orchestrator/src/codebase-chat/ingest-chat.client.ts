@@ -199,4 +199,38 @@ export class IngestChatClient {
     }
     return (await res.json()) as { answer: string; cypher?: string; result?: unknown[] };
   }
+
+  async fetchSchemaDatabaseProject(
+    projectId: string,
+    scope?: ChatScope,
+  ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
+    const url = `${this.ingestBase()}/internal/projects/${encodeURIComponent(projectId)}/schema-database`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`ingest schema-database project ${res.status}: ${t}`);
+    }
+    return (await res.json()) as { answer: string; cypher?: string; result?: unknown[] };
+  }
+
+  async fetchSchemaDatabaseRepository(
+    repositoryId: string,
+    scope?: ChatScope,
+  ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
+    const url = `${this.ingestBase()}/internal/repositories/${encodeURIComponent(repositoryId)}/schema-database`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`ingest schema-database repo ${res.status}: ${t}`);
+    }
+    return (await res.json()) as { answer: string; cypher?: string; result?: unknown[] };
+  }
 }

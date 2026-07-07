@@ -7,6 +7,7 @@ import { EXAMPLES, EXPLORER_TOOLS_ALL, SCHEMA } from './chat.constants';
 import type { ChatScope } from './chat-scope.util';
 import { IngestChatClient } from './ingest-chat.client';
 import { wantsUnusedBackendApiEndpointsAnalysis } from './chat-unused-api-endpoints.util';
+import { wantsSchemaDatabaseQuestion } from './chat-schema-question.util';
 import { OrchestratorLlmService } from './orchestrator-llm.service';
 import type { LlmMessage } from '../llm/orchestrator-llm.facade';
 import { isMoonshotRateLimitError } from '../llm/moonshot-rate-limit.error';
@@ -145,6 +146,9 @@ export class CodebaseChatService {
     if (wantsUnusedBackendApiEndpointsAnalysis(req.message)) {
       return this.ingest.fetchUnusedApiEndpointsRepository(repositoryId, req.scope);
     }
+    if (wantsSchemaDatabaseQuestion(req.message)) {
+      return this.ingest.fetchSchemaDatabaseRepository(repositoryId, req.scope);
+    }
     const historyContent = (req.history ?? [])
       .slice(-8)
       .map((m) => `${m.role}: ${m.content}`)
@@ -191,6 +195,9 @@ export class CodebaseChatService {
   async chatProject(projectId: string, req: ChatRequest): Promise<ChatResponse> {
     if (wantsUnusedBackendApiEndpointsAnalysis(req.message)) {
       return this.ingest.fetchUnusedApiEndpointsProject(projectId, req.scope);
+    }
+    if (wantsSchemaDatabaseQuestion(req.message)) {
+      return this.ingest.fetchSchemaDatabaseProject(projectId, req.scope);
     }
     let repos = await this.ingest.listRepositories(projectId);
     if (repos.length === 0) {

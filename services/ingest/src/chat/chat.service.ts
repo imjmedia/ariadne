@@ -60,6 +60,14 @@ import {
   openApiNestLinkCountCypher,
 } from './chat-unused-api-endpoints.util';
 import {
+  wantsSchemaDatabaseQuestion,
+  schemaOrmModelsCypher,
+  schemaOrmModelRelationsCypher,
+  schemaEnumsCypher,
+  schemaStrapiContentTypesCypher,
+  schemaStrapiRelationsCypher,
+} from './chat-schema-question.util';
+import {
   computeRiskScore,
   groupDuplicates,
   formatDuplicatesSummary,
@@ -2954,6 +2962,174 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
   }
 
   /**
+   * Esquema/diagrama de base de datos por proyecto. Usado por chat ingest y
+   * `POST /internal/.../schema-database` (orchestrator early-return).
+   */
+  async buildSchemaDatabaseAnalysis(
+    projectId: string,
+    scope?: ChatScope,
+  ): Promise<ChatResponse> {
+    return this.buildSchemaDatabaseResponse(projectId, scope);
+  }
+
+  /**
+   * Respuesta determinista para preguntas de esquema/diagrama de base de datos.
+   * Recupera el esquema real indexado (`:Model` Prisma/TypeORM, `:Enum`, `:StrapiContentType` +
+   * relaciones `RELATES_TO`), ignorando DTOs heurísticos del frontend. Genera tabla + Mermaid
+   * `erDiagram`. Si no hay esquema en el índice para el alcance, responde con honestidad.
+   */
+  private async buildSchemaDatabaseResponse(
+    projectId: string,
+    scope?: ChatScope,
+  ): Promise<ChatResponse> {
+    const maxRows = Math.min(
+      Math.max(parseInt(process.env.CHAT_SCHEMA_MAX ?? '5000', 10) || 5000, 1),
+      25_000,
+    );
+    const cypherModels = schemaOrmModelsCypher(maxRows);
+    const cypherModelRel = schemaOrmModelRelationsCypher(maxRows);
+    const cypherEnums = schemaEnumsCypher(maxRows);
+    const cypherCt = schemaStrapiContentTypesCypher(maxRows);
+    const cypherCtRel = schemaStrapiRelationsCypher(maxRows);
+
+    const [rawModels, rawModelRel, rawEnums, rawCt, rawCtRel] = await Promise.all([
+      this.cypher.executeCypher(projectId, cypherModels, {}),
+      this.cypher.executeCypher(projectId, cypherModelRel, {}),
+      this.cypher.executeCypher(projectId, cypherEnums, {}),
+      this.cypher.executeCypher(projectId, cypherCt, {}),
+      this.cypher.executeCypher(projectId, cypherCtRel, {}),
+    ]);
+
+    const models = filterCypherRowsByScope(rawModels as Record<string, unknown>[], scope);
+    const modelRel = filterCypherRowsByScope(rawModelRel as Record<string, unknown>[], scope);
+    const enums = filterCypherRowsByScope(rawEnums as Record<string, unknown>[], scope);
+    const contentTypes = filterCypherRowsByScope(rawCt as Record<string, unknown>[], scope);
+    const ctRel = filterCypherRowsByScope(rawCtRel as Record<string, unknown>[], scope);
+
+    const totalEntities = models.length + contentTypes.length;
+    if (totalEntities === 0) {
+      const rawTotal =
+        (rawModels as unknown[]).length + (rawCt as unknown[]).length;
+      const emptyMsg =
+        rawTotal === 0
+          ? [
+              'Sin datos de esquema de base de datos en el índice para este alcance.',
+              '',
+              'No hay nodos `:Model` (Prisma/TypeORM) ni `:StrapiContentType` indexados. Los modelos del frontend (`src/Models/*`) **no** son esquema de persistencia y se excluyen a propósito.',
+              '',
+              'Sugerencias:',
+              '- Verifica que el repo backend (Strapi/Prisma/TypeORM) esté indexado y con sync/resync reciente.',
+              '- En proyectos multi-repo, acota al repo backend con `scope.repoIds` o usa chat amplio citando «backend»/«Strapi»/«ERP».',
+              '- Fuentes esperadas: `schema.prisma`, `**/entities/*.entity.ts`, `**/content-types/**/schema.json`.',
+            ].join('\n')
+          : `0 entidades de esquema tras aplicar el alcance (scope): ${rawTotal} en crudo omitidas por repoIds/prefijos/exclusiones. Ajusta el alcance al repo backend.`;
+      return { answer: emptyMsg, cypher: cypherCt, result: [] };
+    }
+
+    const asStr = (v: unknown): string => (v == null ? '' : String(v));
+    const lines: string[] = [];
+    lines.push(`## Esquema de base de datos (${totalEntities} entidades)`);
+    lines.push('');
+
+    if (contentTypes.length > 0) {
+      lines.push(`### Strapi content types (${contentTypes.length})`);
+      lines.push('');
+      lines.push('| Content type | UID | Tipo | Atributos |');
+      lines.push('| --- | --- | --- | --- |');
+      for (const r of contentTypes) {
+        const attrs = asStr(r.attributesSummary).replace(/\n/g, ' ').slice(0, 200);
+        lines.push(
+          `| ${asStr(r.name)} | ${asStr(r.strapiUid)} | ${asStr(r.kind)} | ${attrs} |`,
+        );
+      }
+      lines.push('');
+    }
+
+    if (models.length > 0) {
+      lines.push(`### Modelos ORM (${models.length})`);
+      lines.push('');
+      lines.push('| Modelo | Origen | Campos | Path |');
+      lines.push('| --- | --- | --- | --- |');
+      for (const r of models) {
+        const fields = asStr(r.fieldSummary).replace(/\n/g, ' ').slice(0, 200);
+        lines.push(
+          `| ${asStr(r.name)} | ${asStr(r.source)} | ${fields} | ${asStr(r.path)} |`,
+        );
+      }
+      lines.push('');
+    }
+
+    if (enums.length > 0) {
+      lines.push(`### Enums (${enums.length})`);
+      lines.push('');
+      lines.push(enums.map((r) => `- \`${asStr(r.name)}\``).join('\n'));
+      lines.push('');
+    }
+
+    const mermaid = this.buildErDiagramMermaid(contentTypes, ctRel, models, modelRel);
+    if (mermaid) {
+      lines.push('### Diagrama entidad-relación (Mermaid)');
+      lines.push('');
+      lines.push('```mermaid');
+      lines.push(mermaid);
+      lines.push('```');
+      lines.push('');
+    }
+
+    lines.push(
+      '_Datos: grafo FalkorDB (`:Model` con `source` prisma/typeorm, `:StrapiContentType`, `RELATES_TO`). Los DTOs del frontend se excluyen._',
+    );
+
+    return {
+      answer: lines.join('\n'),
+      cypher: cypherCt,
+      result: [...contentTypes, ...models],
+    };
+  }
+
+  /** Nombre de entidad seguro para Mermaid (alfanumérico/underscore). */
+  private sanitizeMermaidEntity(name: string): string {
+    const cleaned = (name ?? '').replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '');
+    return cleaned || 'Entity';
+  }
+
+  /**
+   * Genera un bloque `erDiagram` de Mermaid a partir de relaciones indexadas.
+   * Conservador: solo emite si hay al menos una relación (Mermaid exige relaciones o bloques válidos).
+   */
+  private buildErDiagramMermaid(
+    contentTypes: Record<string, unknown>[],
+    ctRel: Record<string, unknown>[],
+    models: Record<string, unknown>[],
+    modelRel: Record<string, unknown>[],
+  ): string | null {
+    const rels: string[] = [];
+    const seen = new Set<string>();
+    const pushRel = (from: unknown, to: unknown, label: string) => {
+      const a = this.sanitizeMermaidEntity(String(from ?? ''));
+      const b = this.sanitizeMermaidEntity(String(to ?? ''));
+      if (!a || !b) return;
+      const lbl = (label || 'rel').replace(/[^A-Za-z0-9_ -]/g, '').trim().slice(0, 40) || 'rel';
+      const line = `  ${a} ||--o{ ${b} : "${lbl}"`;
+      if (seen.has(line)) return;
+      seen.add(line);
+      rels.push(line);
+    };
+
+    for (const r of ctRel) {
+      pushRel(r.fromEntity, r.toEntity, String(r.relation || r.attribute || 'rel'));
+    }
+    for (const r of modelRel) {
+      pushRel(r.fromEntity, r.toEntity, String(r.field || 'rel'));
+    }
+
+    if (rels.length === 0) return null;
+
+    const maxRel = 200;
+    return ['erDiagram', ...rels.slice(0, maxRel)].join('\n');
+  }
+
+  /**
    * Cruce `StrapiRoute` (back) vs `ApiClientReference` (front): rutas sin uso aparente en el índice.
    */
   private async buildUnusedBackendApiEndpointsResponse(
@@ -3807,6 +3983,53 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       });
     }
 
+    if (wantsSchemaDatabaseQuestion(q)) {
+      const schemaMax = Math.min(
+        Math.max(parseInt(process.env.CHAT_SCHEMA_MAX ?? '5000', 10) || 5000, 1),
+        25_000,
+      );
+      await pushTool('schema_strapi_content_types', {
+        projectScope: ps,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: schemaStrapiContentTypesCypher(schemaMax) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+      await pushTool('schema_strapi_relations', {
+        projectScope: ps,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: schemaStrapiRelationsCypher(schemaMax) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+      await pushTool('schema_orm_models', {
+        projectScope: ps,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: schemaOrmModelsCypher(schemaMax) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+      await pushTool('schema_orm_relations', {
+        projectScope: ps,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: schemaOrmModelRelationsCypher(schemaMax) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+      await pushTool('schema_enums', {
+        projectScope: ps,
+        scope,
+        tool: 'execute_cypher',
+        arguments: { cypher: schemaEnumsCypher(schemaMax) },
+        fallbackMessage: message,
+        evidenceVerbosity,
+      });
+    }
+
     /* Los 3 bloques (graph_summary, semantic_search, file_path_sample) son independientes → en paralelo */
     await Promise.all([
       pushTool('get_graph_summary', {
@@ -3861,6 +4084,8 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
   OR ${p} CONTAINS '/entities/'
   OR ${p} ENDS WITH 'datasource.ts'
   OR ${p} CONTAINS '/migrations/' OR ${p} CONTAINS '/migration/'
+  OR (${p} CONTAINS '/content-types/' AND ${p} ENDS WITH '/schema.json')
+  OR ${p} CONTAINS '/database/'
   OR f.path = ${cypherSafe(SCHEMA_RELATIONAL_RAG_SOURCE_PATH)}
 )`;
         const matchFile = ps
@@ -3949,6 +4174,9 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     }
     if (wantsUnusedBackendApiEndpointsAnalysis(message)) {
       return this.buildUnusedBackendApiEndpointsResponse(projectId, scope);
+    }
+    if (wantsSchemaDatabaseQuestion(message)) {
+      return this.buildSchemaDatabaseResponse(projectId, scope);
     }
     const rawEvidence = options?.responseMode === 'raw_evidence';
     const evidenceFirst = !rawEvidence && options?.responseMode === 'evidence_first';
