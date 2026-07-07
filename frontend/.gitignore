@@ -28,3 +28,20 @@ dist-ssr
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Generated help docs — copied from docs/ by scripts/copy-docs.sh (predev/prebuild).
+# Source of truth lives in docs/; do not commit these build artifacts.
+# Note: only the files copy-docs.sh produces; other public/*.md are hand-maintained.
+/public/ayuda-mcp.md
+/public/ayuda-skills.md
+/public/ayuda-manual.md
+/public/ayuda-manual-configuracion.md
+/public/ayuda-manual-indice.md
+/public/ayuda-manual-architecture.md
+/public/ayuda-manual-bitbucket.md
+/public/ayuda-manual-db-schema.md
+/public/ayuda-manual-indexing.md
+/public/ayuda-manual-ingestion.md
+/public/ayuda-manual-chat.md
+/public/ayuda-manual-mcp-instalacion.md
+/public/mcp_server_specs.md
