@@ -395,4 +395,18 @@ export const api = {
     }),
   deleteUser: (id: string) =>
     request<void>(`/users/${id}`, { method: 'DELETE' }),
+
+  // ─── LLM Settings (admin) ───
+  getLlmCatalog: () => request<import('./types').LlmProviderCatalogEntry[]>('/llm-settings/catalog'),
+  getLlmSettings: () => request<import('./types').LlmSettingsMasked>('/llm-settings'),
+  updateLlmSettings: (dto: import('./types').UpdateLlmSettingsDto) =>
+    request<import('./types').LlmSettingsMasked>('/llm-settings', {
+      method: 'PUT',
+      body: JSON.stringify(dto),
+    }),
+  testLlmSettings: (dto?: import('./types').UpdateLlmSettingsDto) =>
+    request<import('./types').LlmTestConnectionResult>('/llm-settings/test', {
+      method: 'POST',
+      body: JSON.stringify(dto ?? {}),
+    }),
 };

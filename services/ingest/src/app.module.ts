@@ -33,6 +33,8 @@ import { ReviewModule } from './review/review.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { SharedBullModule } from './shared-bull/shared-bull.module';
 import { AnalysisModule } from './analysis/analysis.module';
+import { LlmSettingsModule } from './llm-settings/llm-settings.module';
+import { LlmSettingsEntity } from './llm-settings/entities/llm-settings.entity';
 
 @Module({
   imports: [
@@ -57,6 +59,7 @@ import { AnalysisModule } from './analysis/analysis.module';
         ProjectDomainDependencyEntity,
         DomainDomainVisibilityEntity,
         UserEntity,
+        LlmSettingsEntity,
       ],
       synchronize: true,
       logging: process.env.NODE_ENV === 'development',
@@ -74,6 +77,7 @@ import { AnalysisModule } from './analysis/analysis.module';
     WebhooksModule,
     ReviewModule,
     AnalysisModule,
+    LlmSettingsModule,
   ],
 })
 /** Módulo principal del microservicio Ingest. */

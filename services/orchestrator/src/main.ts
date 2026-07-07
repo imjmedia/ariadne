@@ -13,6 +13,7 @@ import { AppModule } from './app.module';
 import * as express from 'express';
 import { createLogger, extractRequestId } from 'ariadne-common';
 import { register, collectDefaultMetrics } from 'prom-client';
+import { prefetchOrchestratorLlmRuntime } from './llm/llm-settings.client';
 
 // Activar métricas por defecto (CPU, memoria, etc.)
 collectDefaultMetrics();
@@ -45,6 +46,7 @@ async function bootstrap() {
     }
   });
   const port = parseInt(process.env.PORT ?? '3001', 10);
+  prefetchOrchestratorLlmRuntime();
   await app.listen(port);
   logger.info(`Orchestrator (NestJS + LangGraph) listening on port ${port}`);
 }

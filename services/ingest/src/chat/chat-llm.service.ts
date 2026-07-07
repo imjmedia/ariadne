@@ -7,6 +7,7 @@ import {
   llmDefaultHeaders,
   resolveLlmApiKey,
   resolveLlmBaseUrl,
+  resolveLlmTemperature,
 } from '../llm/llm-config';
 
 /** Límite de salida en fase retriever (tool_calls + argumentos JSON pueden ser largos). */
@@ -46,7 +47,7 @@ export class ChatLlmService {
       body: JSON.stringify({
         model: ingestChatLlmModel(),
         messages,
-        temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.1') || 0.1,
+        temperature: resolveLlmTemperature(),
         max_tokens: maxTokens,
       }),
     });
@@ -85,7 +86,7 @@ export class ChatLlmService {
         messages,
         tools,
         tool_choice: 'auto',
-        temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.1') || 0.1,
+        temperature: resolveLlmTemperature(),
         max_tokens: maxTokens,
       }),
     });
