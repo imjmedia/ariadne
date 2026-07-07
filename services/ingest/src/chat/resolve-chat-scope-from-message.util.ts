@@ -97,9 +97,20 @@ function messageBuckets(rawMessage: string): Set<RepoScopeBucket> {
     m.includes('componentes compartidos') ||
     m.includes('componentes reutiliz');
 
+  // Esquema/diagrama de base de datos → backend: la persistencia (Prisma/TypeORM/Strapi
+  // content-types) vive en el repo backend, no en el SPA. Señales de alta precisión para no
+  // confundir con "esquema de colores" u otros usos de "esquema".
+  const dbSchemaHints =
+    m.includes('base de datos') ||
+    /\b(prisma|typeorm)\b/.test(m) ||
+    m.includes('content type') ||
+    m.includes('modelo de datos') ||
+    /\bmigracion(es)?\b/.test(m) ||
+    /\bdiagrama\b[\s\S]*\b(bd|base de datos)\b/.test(m);
+
   if (libraryHints) out.add('library');
   if (frontendHints) out.add('frontend');
-  if (backendHints) out.add('backend');
+  if (backendHints || dbSchemaHints) out.add('backend');
   return out;
 }
 

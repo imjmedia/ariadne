@@ -136,4 +136,15 @@ export class InternalChatToolsController {
     const projectId = await this.resolveProjectIdForRepo(repoId);
     return this.chat.buildUnusedApiEndpointsAnalysis(projectId, body.scope);
   }
+
+  /** Resuelve projectId del repo y devuelve el esquema/diagrama de BD (multi-root). */
+  @Post(':repoId/schema-database')
+  async schemaDatabase(
+    @Param('repoId') repoId: string,
+    @Body() body: { scope?: ChatScope },
+  ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
+    await this.repos.findOne(repoId);
+    const projectId = await this.resolveProjectIdForRepo(repoId);
+    return this.chat.buildSchemaDatabaseAnalysis(projectId, body.scope);
+  }
 }

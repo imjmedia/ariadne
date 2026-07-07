@@ -671,6 +671,7 @@ const FALKOR_INDEXES = [
   'CREATE INDEX FOR (m:Model) ON (m.projectId)',
   'CREATE INDEX FOR (m:Model) ON (m.projectId, m.repoId)',
   'CREATE INDEX FOR (m:Model) ON (m.name)',
+  'CREATE INDEX FOR (m:Model) ON (m.source)',
   'CREATE INDEX FOR (e:Enum) ON (e.projectId)',
   'CREATE INDEX FOR (e:Enum) ON (e.projectId, e.repoId)',
   'CREATE INDEX FOR (e:Enum) ON (e.name)',
@@ -695,6 +696,9 @@ const FALKOR_INDEXES = [
   'CREATE INDEX FOR (ng:NestGuard) ON (ng.projectId)',
   'CREATE INDEX FOR (ng:NestGuard) ON (ng.projectId, ng.repoId)',
   'CREATE INDEX FOR (ng:NestGuard) ON (ng.name)',
+  'CREATE INDEX FOR (ct:StrapiContentType) ON (ct.projectId)',
+  'CREATE INDEX FOR (ct:StrapiContentType) ON (ct.projectId, ct.repoId)',
+  'CREATE INDEX FOR (ct:StrapiContentType) ON (ct.name)',
 ];
 
 /**

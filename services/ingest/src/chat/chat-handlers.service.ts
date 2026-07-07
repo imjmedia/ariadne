@@ -227,6 +227,11 @@ export class ChatHandlersService {
         `MATCH (n:Enum) WHERE n.projectId = $projectId${repoClause} AND n.${vProp} IS NOT NULL RETURN count(n) as c`,
         countExtra,
       );
+      const countCt = await this.cypher.executeCypher(
+        graphProjectId,
+        `MATCH (n:StrapiContentType) WHERE n.projectId = $projectId${repoClause} AND n.${vProp} IS NOT NULL RETURN count(n) as c`,
+        countExtra,
+      );
       const hasFn = (countFn as Array<{ c?: number }>)?.[0]?.c ?? 0;
       const hasComp = (countComp as Array<{ c?: number }>)?.[0]?.c ?? 0;
       const hasDoc = (countDoc as Array<{ c?: number }>)?.[0]?.c ?? 0;
@@ -234,7 +239,17 @@ export class ChatHandlersService {
       const hasMd = (countMd as Array<{ c?: number }>)?.[0]?.c ?? 0;
       const hasModel = (countModel as Array<{ c?: number }>)?.[0]?.c ?? 0;
       const hasEnum = (countEnum as Array<{ c?: number }>)?.[0]?.c ?? 0;
-      if (hasFn === 0 && hasComp === 0 && hasDoc === 0 && hasSb === 0 && hasMd === 0 && hasModel === 0 && hasEnum === 0)
+      const hasCt = (countCt as Array<{ c?: number }>)?.[0]?.c ?? 0;
+      if (
+        hasFn === 0 &&
+        hasComp === 0 &&
+        hasDoc === 0 &&
+        hasSb === 0 &&
+        hasMd === 0 &&
+        hasModel === 0 &&
+        hasEnum === 0 &&
+        hasCt === 0
+      )
         return { cypher: '', result: [] };
 
       const vec = await embed.embed(query.trim());
@@ -248,8 +263,9 @@ export class ChatHandlersService {
       const mdDocVecQ = `CALL db.idx.vector.queryNodes('MarkdownDoc', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.title AS name, node.sourcePath AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
       const modelVecQ = `CALL db.idx.vector.queryNodes('Model', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
       const enumVecQ = `CALL db.idx.vector.queryNodes('Enum', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
+      const ctVecQ = `CALL db.idx.vector.queryNodes('StrapiContentType', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
 
-      const [fRes, cRes, dRes, sbRes, mdDocRes, modelVecRes, enumVecRes] = await Promise.all([
+      const [fRes, cRes, dRes, sbRes, mdDocRes, modelVecRes, enumVecRes, ctVecRes] = await Promise.all([
         hasFn > 0 ? this.cypher.executeCypherRaw(funcVecQ, graphProjectId) : Promise.resolve([]),
         hasComp > 0 ? this.cypher.executeCypherRaw(compVecQ, graphProjectId) : Promise.resolve([]),
         hasDoc > 0 ? this.cypher.executeCypherRaw(docVecQ, graphProjectId) : Promise.resolve([]),
@@ -257,6 +273,7 @@ export class ChatHandlersService {
         hasMd > 0 ? this.cypher.executeCypherRaw(mdDocVecQ, graphProjectId) : Promise.resolve([]),
         hasModel > 0 ? this.cypher.executeCypherRaw(modelVecQ, graphProjectId) : Promise.resolve([]),
         hasEnum > 0 ? this.cypher.executeCypherRaw(enumVecQ, graphProjectId) : Promise.resolve([]),
+        hasCt > 0 ? this.cypher.executeCypherRaw(ctVecQ, graphProjectId) : Promise.resolve([]),
       ]);
 
       const fData = (Array.isArray(fRes) ? fRes : []) as Array<unknown>;
@@ -266,6 +283,7 @@ export class ChatHandlersService {
       const mdDocData = (Array.isArray(mdDocRes) ? mdDocRes : []) as Array<unknown>;
       const modelVecData = (Array.isArray(modelVecRes) ? modelVecRes : []) as Array<unknown>;
       const enumVecData = (Array.isArray(enumVecRes) ? enumVecRes : []) as Array<unknown>;
+      const ctVecData = (Array.isArray(ctVecRes) ? ctVecRes : []) as Array<unknown>;
 
       const results: Array<{ tipo: string; path: string; name: string; repoId?: string }> = [];
       const seen = new Set<string>();
@@ -425,6 +443,24 @@ export class ChatHandlersService {
         if (skipNoisePath(pathStr)) continue;
         const out: { tipo: string; path: string; name: string; repoId?: string } = {
           tipo: 'Enum',
+          path: pathStr,
+          name: pathStr ? `${nameStr} — ${pathStr}` : nameStr,
+        };
+        if (repoId != null && String(repoId)) out.repoId = String(repoId);
+        results.push(out);
+      }
+      for (const row of ctVecData) {
+        if (results.length >= limit) break;
+        const { name, path, projectId: pid, repoId } = toRow(row);
+        if (pid !== graphProjectId || !passesRepo(repoId)) continue;
+        const pathStr = String(path ?? '');
+        const nameStr = String(name ?? '');
+        const key = `StrapiContentType:${nameStr}:${pathStr}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (skipNoisePath(pathStr)) continue;
+        const out: { tipo: string; path: string; name: string; repoId?: string } = {
+          tipo: 'StrapiContentType',
           path: pathStr,
           name: pathStr ? `${nameStr} — ${pathStr}` : nameStr,
         };

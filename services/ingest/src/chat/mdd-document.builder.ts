@@ -3,6 +3,7 @@
  */
 import type { MddEvidenceDocument } from './mdd-document.types';
 import { getMddBuilderLimits } from './mdd-limits';
+import { wantsSchemaDatabaseQuestion } from './chat-schema-question.util';
 import { inferStrapiMddFromEvidencePaths, collectStrapiBusinessLogicFromEvidencePaths } from './mdd-strapi-path-fallback';
 import {
   inferFrontendMddFromEvidencePaths,
@@ -610,7 +611,13 @@ export async function buildMddEvidenceDocument(params: {
     });
     if (fb.usedFallback) {
       usedFrontendFallback = true;
-      if (entitiesFinal.length === 0 && fb.entities.length > 0) entitiesFinal = fb.entities;
+      // Para preguntas de esquema/diagrama de BD, NO tratar DTOs del frontend (`src/Models/*`)
+      // como entidades: no son tablas de persistencia. Se prefiere responder sin entidades
+      // (honesto) antes que inventar un esquema desde interfaces del SPA.
+      const allowFrontendEntities = !wantsSchemaDatabaseQuestion(message);
+      if (allowFrontendEntities && entitiesFinal.length === 0 && fb.entities.length > 0) {
+        entitiesFinal = fb.entities;
+      }
       if (fb.api_contracts.length > 0) apiFromFrontendFinal = fb.api_contracts;
       if (businessFinal.length === 0 && fb.business_logic.length > 0) {
         businessFinal = fb.business_logic;

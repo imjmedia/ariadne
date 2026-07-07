@@ -187,6 +187,16 @@ Pregunta: "relaciones entre entidades Strapi", "qué modelos enlaza campania"
 MATCH (src:StrapiContentType)-[r:RELATES_TO]->(tgt:StrapiContentType) WHERE src.projectId = $projectId AND tgt.projectId = $projectId RETURN src.strapiUid AS from, r.attribute AS attribute, r.relation AS relation, tgt.strapiUid AS to
 \`\`\`
 
+Pregunta: "diagrama de base de datos", "esquema completo", "ERD", "diagrama entidad-relación"
+→ Combina esquema de persistencia REAL. **Excluye modelos del frontend** (nodos :Model con m.source distinto de 'prisma'/'typeorm', p. ej. DTOs en src/Models/*): NO son tablas. Entidades:
+\`\`\`cypher
+MATCH (ct:StrapiContentType) WHERE ct.projectId = $projectId RETURN ct.name AS name, ct.strapiUid AS strapiUid, ct.kind AS kind, ct.attributesSummary AS attributesSummary
+\`\`\`
+\`\`\`cypher
+MATCH (m:Model) WHERE m.projectId = $projectId AND m.source IN ['prisma','typeorm'] RETURN m.name AS name, m.source AS source, m.fieldSummary AS fieldSummary
+\`\`\`
+Relaciones (para el diagrama): RELATES_TO entre StrapiContentType (arriba) y/o entre Model Prisma. En multi-repo, el esquema suele vivir en el repo backend (Strapi/ERP), no en el SPA.
+
 Pregunta: "qué front llama a qué API", "referencias api/campanias en el código"
 \`\`\`cypher
 MATCH (f:File)-[:REFERENCES_API]->(ref:ApiClientReference)-[:CALLS_API]->(op:OpenApiOperation) WHERE f.projectId = $projectId RETURN f.path AS file, ref.apiPath AS apiPath, op.method AS method, op.pathTemplate AS pathTemplate LIMIT 50

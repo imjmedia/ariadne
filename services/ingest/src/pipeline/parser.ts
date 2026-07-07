@@ -215,10 +215,20 @@ export interface ModelInfo {
   name: string;
   /** JSDoc/TSDoc si existe */
   description?: string;
-  /** Origen explícito (p. ej. TypeORM @Entity); Prisma usa ingest prisma-extract. */
-  source?: 'heuristic' | 'typeorm';
+  /**
+   * Origen del modelo. Solo `typeorm` (y `prisma` vía prisma-extract) representan esquema de
+   * persistencia real. `frontend` (DTOs en `src/Models/*`) y `heuristic` (clase PascalCase sin
+   * JSX) se etiquetan para poder excluirlos de respuestas de esquema/diagrama de BD.
+   */
+  source?: 'heuristic' | 'typeorm' | 'frontend';
   /** Propiedades de columna detectadas en entidades TypeORM. */
   entityFields?: string[];
+}
+
+/** Heurística: ¿el path corresponde a un DTO/modelo de frontend (no esquema de BD)? */
+function isFrontendModelPath(filePath: string, hasJsx: boolean): boolean {
+  const norm = filePath.replace(/\\/g, '/').toLowerCase();
+  return hasJsx || norm.endsWith('.tsx') || /\/models\//.test(norm);
 }
 
 /** Rol de archivo de configuración indexado (alias, env). */
@@ -820,7 +830,8 @@ export function parseSource(
     }
     const description = getPrecedingJSDoc(source, node.startIndex);
     if (isDataModelClass(name, path, hasJsx, extendsReact)) {
-      result.models.push({ name, description });
+      const modelSource = isFrontendModelPath(path, hasJsx) ? 'frontend' : 'heuristic';
+      result.models.push({ name, description, source: modelSource });
     } else if (isReactComponentName(name)) {
       const allowClassAsReactComponent = hasJsx || normPath.endsWith('.tsx') || extendsReact;
       if (allowClassAsReactComponent) {

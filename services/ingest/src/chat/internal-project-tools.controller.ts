@@ -45,4 +45,13 @@ export class InternalProjectToolsController {
   ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
     return this.chat.buildUnusedApiEndpointsAnalysis(projectId, body.scope);
   }
+
+  /** Esquema/diagrama de BD (Model prisma/typeorm, StrapiContentType, RELATES_TO) sin LangGraph. */
+  @Post(':projectId/schema-database')
+  async schemaDatabase(
+    @Param('projectId') projectId: string,
+    @Body() body: { scope?: ChatScope },
+  ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
+    return this.chat.buildSchemaDatabaseAnalysis(projectId, body.scope);
+  }
 }
