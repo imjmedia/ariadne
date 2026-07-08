@@ -1,4 +1,4 @@
-import { orchestratorLlmModel } from './orchestrator-llm-config';
+import { orchestratorLlmModel, orchestratorLlmRouterModel, orchestratorLlmWorkerModel } from './orchestrator-llm-config';
 import {
   llmDefaultHeaders,
   resolveLlmApiKey,
@@ -50,12 +50,13 @@ function buildAuthHeaders(): Record<string, string> {
 export async function callLlm(
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
   maxTokens: number,
+  modelOverride?: string,
 ): Promise<string> {
   const res = await fetch(chatCompletionsUrl(), {
     method: 'POST',
     headers: buildAuthHeaders(),
     body: JSON.stringify({
-      model: orchestratorLlmModel(),
+      model: modelOverride?.trim() || orchestratorLlmModel(),
       messages,
       temperature: resolveLlmTemperature(),
       max_tokens: maxTokens,
@@ -82,6 +83,7 @@ export async function callLlmWithTools(
   messages: LlmMessage[],
   tools: unknown[],
   maxTokens: number,
+  modelOverride?: string,
 ): Promise<{
   content?: string;
   reasoning_content?: string | null;
@@ -91,7 +93,7 @@ export async function callLlmWithTools(
     method: 'POST',
     headers: buildAuthHeaders(),
     body: JSON.stringify({
-      model: orchestratorLlmModel(),
+      model: modelOverride?.trim() || orchestratorLlmModel(),
       messages: stripReasoningFromMessages(messages),
       tools,
       tool_choice: 'auto',
@@ -140,14 +142,18 @@ export async function callLlmWithTools(
 }
 
 /** Chat simple system+user (workflow SDD). */
-export async function chatSimple(system: string, user: string): Promise<string> {
+export async function chatSimple(
+  system: string,
+  user: string,
+  modelOverride?: string,
+): Promise<string> {
   const key = resolveLlmApiKey();
   if (!key) return '';
   const res = await fetch(chatCompletionsUrl(), {
     method: 'POST',
     headers: buildAuthHeaders(),
     body: JSON.stringify({
-      model: orchestratorLlmModel(),
+      model: modelOverride?.trim() || orchestratorLlmModel(),
       temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.2') || 0.2,
       messages: [
         { role: 'system', content: system },

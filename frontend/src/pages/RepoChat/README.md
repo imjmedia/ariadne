@@ -27,7 +27,8 @@ Panel **Alcance opcional**: prefijos de ruta y globs de exclusión (una línea p
 
 ## Componentes de chat
 
-- **ChatAssistantContent.tsx** — Detecta JSON MDD / raw_evidence o Markdown.
+- **ChatAssistantContent.tsx** — Detecta JSON MDD / raw_evidence o Markdown (incl. bloques **Mermaid** vía `MermaidDiagram`).
+- **ChatPromptChips** — Plantillas rápidas (reingeniería, ERD, impacto) en chat proyecto y repo.
 - **ChatConversationToolbar.tsx** — «Nueva conversación» + aviso de memoria compactada.
 - **ChatPipelineModeSelect.tsx** — Radios de modo pipeline.
 

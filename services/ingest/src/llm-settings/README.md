@@ -16,7 +16,7 @@ Proxied to the browser via API gateway: `/api/llm-settings/*`.
 
 ## Persistence
 
-- Table: `llm_settings` (TypeORM `synchronize: true` or migration if added later).
+- Table: `llm_settings` — migration `1746600000000-LlmSettingsChatAgents` adds `orchestrator_router_model`, `orchestrator_worker_model`, `chat_intent_router_enabled`.
 - API key: AES-256-GCM via [`credentials/crypto.util.ts`](../credentials/crypto.util.ts) + `CREDENTIALS_ENCRYPTION_KEY`.
 
 ## Runtime resolution
@@ -25,7 +25,17 @@ Priority: **DB (Ajustes)** → **`LLM_*` env vars**.
 
 - Ingest: [`active-llm-config.ts`](./active-llm-config.ts) hydrated on module init and after each `PUT`.
 - [`llm/llm-config.ts`](../llm/llm-config.ts) reads the active singleton synchronously for chat and embeddings.
-- Orchestrator: fetches `GET /internal/llm-runtime` with TTL cache ([`orchestrator/src/llm/llm-settings.client.ts`](../../../orchestrator/src/llm/llm-settings.client.ts)).
+- Orchestrator: fetches `GET /internal/llm-runtime` with TTL cache — includes `orchestratorRouterModel`, `orchestratorWorkerModel`, `chatIntentRouterEnabled` for the multi-agent chat pipeline.
+
+## Chat multi-agente (Ajustes UI)
+
+| Campo BD | Rol |
+|----------|-----|
+| `orchestrator_router_model` | Clasificación de intención + auditoría de reingeniería |
+| `orchestrator_worker_model` | Retrieve con tools + síntesis Q&A |
+| `chat_intent_router_enabled` | Si `false`, solo heurística por keywords |
+
+Vacío en router/worker → mismo que `orchestrator_chat_model` (o `chat_model` ingest).
 
 ## Providers
 

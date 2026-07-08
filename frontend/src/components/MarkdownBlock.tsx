@@ -1,15 +1,16 @@
 /**
- * @fileoverview Renderiza markdown con ReactMarkdown + remarkGfm. Usado para diagnósticos y reingeniería.
+ * @fileoverview Renderiza markdown con ReactMarkdown + remarkGfm. Soporta bloques Mermaid.
  */
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { MermaidDiagram } from './MermaidDiagram';
 
 interface MarkdownBlockProps {
   content: string;
   className?: string;
 }
 
-/** Renderiza markdown con soporte GFM (tablas, listas, encabezados). Estilos vía className del padre. */
+/** Renderiza markdown con soporte GFM (tablas, listas, encabezados) y diagramas Mermaid. */
 export function MarkdownBlock({ content, className = '' }: MarkdownBlockProps) {
   const raw = typeof content === 'string' ? content : String(content ?? '');
   return (
@@ -17,6 +18,23 @@ export function MarkdownBlock({ content, className = '' }: MarkdownBlockProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          code: ({ className: codeClass, children, ...props }) => {
+            const lang = codeClass?.replace('language-', '') ?? '';
+            const text = String(children).replace(/\n$/, '');
+            if (lang === 'mermaid') {
+              return <MermaidDiagram chart={text} />;
+            }
+            const isBlock = Boolean(codeClass);
+            return isBlock ? (
+              <pre className="my-2 rounded bg-muted p-2 text-xs font-mono overflow-x-auto">
+                <code {...props}>{children}</code>
+              </pre>
+            ) : (
+              <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono" {...props}>
+                {children}
+              </code>
+            );
+          },
           table: ({ children }) => (
             <div className="overflow-x-auto my-2">
               <table className="w-full text-sm border-collapse">{children}</table>

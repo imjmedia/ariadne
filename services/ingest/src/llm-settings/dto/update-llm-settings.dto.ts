@@ -7,6 +7,9 @@ export class UpdateLlmSettingsBodyDto implements UpdateLlmSettingsDto {
   baseUrl?: string;
   chatModel?: string;
   orchestratorChatModel?: string | null;
+  orchestratorRouterModel?: string | null;
+  orchestratorWorkerModel?: string | null;
+  chatIntentRouterEnabled?: boolean;
   temperature?: number;
   embeddingProvider?: ProviderId | null;
   embeddingModel?: string | null;

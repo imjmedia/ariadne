@@ -7,6 +7,8 @@ import { CodebaseChatService } from './codebase-chat.service';
 import { CodebaseModificationPlanController } from './codebase-modification-plan.controller';
 import { CodebaseModificationPlanService } from './codebase-modification-plan.service';
 import { IngestChatClient } from './ingest-chat.client';
+import { ChatIntentRouterAgent } from './agents/chat-intent-router.agent';
+import { ChatReengineeringAgent } from './agents/chat-reengineering.agent';
 import { OrchestratorLlmService } from './orchestrator-llm.service';
 
 @Module({
@@ -19,6 +21,8 @@ import { OrchestratorLlmService } from './orchestrator-llm.service';
   providers: [
     IngestChatClient,
     OrchestratorLlmService,
+    ChatIntentRouterAgent,
+    ChatReengineeringAgent,
     CodebaseChatService,
     CodebaseAnalyzeService,
     CodebaseModificationPlanService,

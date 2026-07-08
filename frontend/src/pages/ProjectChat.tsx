@@ -31,6 +31,8 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { ChatPromptChips } from '@/components/ChatPromptChips';
+import type { ChatPromptTemplate } from '@/utils/chat-prompt-templates';
 import { ChatMobileTabs, type ChatMobileTabId } from './chat/ChatMobileTabs';
 import {
   chatAnalysisBtnClass,
@@ -724,6 +726,11 @@ export function ProjectChat() {
               </div>
 
               <div className="shrink-0 border-t border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_8%,var(--card))] px-2 pb-2 pt-3 sm:px-3 sm:pb-3 sm:pt-4">
+                <ChatPromptChips
+                  disabled={loading}
+                  className="mb-2 px-1"
+                  onSelect={(t: ChatPromptTemplate) => setInput(t.message)}
+                />
                 <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-2 shadow-sm sm:flex-row sm:items-end sm:gap-3 sm:p-3">
                   <Textarea
                     value={input}

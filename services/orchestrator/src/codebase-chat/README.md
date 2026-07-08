@@ -1,5 +1,22 @@
 # Codebase chat / análisis / modification-plan
 
+## Arquitectura multi-agente (LangGraph)
+
+Flujo por defecto cuando `responseMode` es `default`:
+
+```
+START → route_intent (modelo router en Ajustes)
+  → schema_database     → handle_schema (determinista ingest)
+  → unused_api_endpoints → handle_unused_api (determinista ingest)
+  → reengineering       → retrieve (WORKER) → reengineering_audit (ROUTER)
+  → codebase_qa         → retrieve (WORKER) → synthesize (WORKER)
+```
+
+- **`CHAT_INTENT_ROUTER`** — obsoleto: usar **Ajustes → Chat multi-agente → Router de intención con LLM**.
+- **`ORCHESTRATOR_LLM_ROUTER_MODEL`** / **`ORCHESTRATOR_LLM_WORKER_MODEL`** — obsoletos: configurar en **Ajustes** (`orchestratorRouterModel`, `orchestratorWorkerModel`).
+
+`evidence_first` y `raw_evidence` omiten el router y van directo a retrieve → synthesize.
+
 - **`POST /codebase/chat/repository/:repositoryId`** — ask_codebase (LangGraph: retrieve → synthesize). Body: `message`, `history?`, `scope?`, `twoPhase?`, **`responseMode?`** (`default` \| `evidence_first` \| `raw_evidence`), **`deterministicRetriever?`** (solo efecto con `raw_evidence`), `threadId?`. Con **`evidence_first`**, la respuesta **`answer`** es **JSON string** del MDD (7 claves); **`mddDocument`** se rellena parseando ese JSON cuando aplica. Con **`raw_evidence`**, **`answer`** es JSON `{ mode, deterministicRetriever, gatheredContext, collectedResults, cypher }` sin LLM de síntesis ni **mdd-evidence**; The Forge debe parsear y sintetizar. Si **`deterministicRetriever: true`**, el nodo retrieve llama a ingest **`raw-evidence-deterministic`** (sin LLM ReAct); si no, retrieve con tools y **`evidenceVerbosity: full`** vía **retriever-tool**.
 - **`POST /codebase/chat/project/:projectId`** — Igual, alcance proyecto multi-repo. Preguntas de **endpoints Strapi no usados** → early-return a ingest **`POST /internal/projects/:projectId/unused-api-endpoints`** (sin LangGraph). El ingest, en **`execute_cypher`**, usa los **cypherShardContexts** del proyecto (whitelist de dominios) para unir resultados de varios grafos Falkor con el `projectId` correcto por nodo.
 - **`POST /codebase/analyze/repository/:repositoryId`** — Body `{ mode }`. Llama a ingest `internal/.../analyze-prep` (sin LLM en ingest salvo recopilar datos) y ejecuta la síntesis LLM aquí si `kind === 'llm'`.

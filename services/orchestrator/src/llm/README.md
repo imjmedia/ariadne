@@ -9,7 +9,8 @@ Todo el tráfico sale por **OpenRouter** (API compatible OpenAI), alineado con *
 | `LLM_API_KEY` | Clave (obligatoria). |
 | `LLM_BASE_URL` | Default `https://openrouter.ai/api/v1`. |
 | `LLM_CHAT_MODEL` | Modelo global. Default `google/gemini-2.0-flash-001`. |
-| `ORCHESTRATOR_LLM_MODEL` | Modelo específico para el orquestador (prioridad sobre `LLM_CHAT_MODEL`). |
+| `ORCHESTRATOR_LLM_MODEL` | Modelo por defecto del orquestador (fallback de router/worker si Ajustes vacíos). |
+| **Ajustes (BD)** | `orchestratorRouterModel`, `orchestratorWorkerModel`, `chatIntentRouterEnabled` — ver pantalla **Ajustes → Chat multi-agente**. |
 | `LLM_HTTP_REFERER` / `LLM_APP_TITLE` | Cabeceras opcionales de OpenRouter. |
 | `LLM_TEMPERATURE` | Temperatura (default 0.1). |
 | `LLM_MAX_CONCURRENT` | Máximo de llamadas LLM concurrentes (default 1). |

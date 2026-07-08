@@ -1,9 +1,10 @@
 /**
- * Renderiza respuestas del asistente: MDD JSON (evidence_first), JSON raw_evidence o Markdown.
+ * Renderiza respuestas del asistente: MDD JSON (evidence_first), JSON raw_evidence o Markdown (+ Mermaid).
  */
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
+import { MermaidDiagram } from '@/components/MermaidDiagram';
 
 function tryParseJsonObject(s: string): Record<string, unknown> | null {
   const t = s.trim();
@@ -71,6 +72,11 @@ export function ChatAssistantContent({ content }: { content: string }) {
           ),
           td: ({ children }) => <td className="px-2 py-1 border">{children}</td>,
           code: ({ className, children, ...props }) => {
+            const lang = className?.replace('language-', '') ?? '';
+            const text = String(children).replace(/\n$/, '');
+            if (lang === 'mermaid') {
+              return <MermaidDiagram chart={text} />;
+            }
             const isBlock = className?.includes('language-');
             return isBlock ? (
               <pre className="my-2 rounded bg-muted p-2 text-xs font-mono overflow-x-auto">

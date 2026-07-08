@@ -17,9 +17,15 @@ describe('wantsSchemaDatabaseQuestion', () => {
     expect(wantsSchemaDatabaseQuestion('estructura de la base de datos')).toBe(true);
   });
 
-  it('empareja sustantivo de BD con término de esquema', () => {
+  it('empareja sustantivo de BD con término de esquema explícito', () => {
     expect(wantsSchemaDatabaseQuestion('entidades en prisma')).toBe(true);
     expect(wantsSchemaDatabaseQuestion('migraciones de la base de datos')).toBe(true);
+  });
+
+  it('no dispara en preguntas de arquitectura de dominio (acoplamiento medios)', () => {
+    const msg =
+      'tenemos acoplada la creación de medios, incluso a nivel de una entidad de bd por medio, necesitamos desacoplar';
+    expect(wantsSchemaDatabaseQuestion(msg)).toBe(false);
   });
 
   it('no dispara con preguntas no relacionadas a esquema de BD', () => {
