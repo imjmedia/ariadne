@@ -1,11 +1,13 @@
 /**
- * Reengineering agent — analyze prep + modification-plan files + retrieve + router-tier audit.
+ * Reengineering agent — modification-plan files + retrieve context + router-tier audit.
+ * Skips full analyze-prep (diagnostico + duplicados/embeddings) — that path is for the Analyze UI
+ * and often exceeds ingest timeouts on large repos.
  */
 import { Injectable } from '@nestjs/common';
-import type { ChatScope } from '../chat-scope.util';
 import { IngestChatClient } from '../ingest-chat.client';
 import { OrchestratorLlmService } from '../orchestrator-llm.service';
 import type { CodebaseChatState } from '../codebase-chat.service';
+import type { ModificationPlanResult } from '../ingest-types';
 
 const AUDIT_SYSTEM = `<rol>Arquitecto senior que propone reingeniería brownfield basada SOLO en evidencia del índice.</rol>
 
@@ -37,27 +39,10 @@ export class ChatReengineeringAgent {
     const message = state.message;
     const gatheredContext = state.gatheredContext ?? '';
 
-    const [analyzePrep, filesToModify] = await Promise.all([
-      this.ingest.fetchAnalyzePrepRepository(repositoryId, 'reingenieria'),
-      state.projectScope
-        ? this.ingest.fetchModificationPlanFilesProject(projectId, message, scope)
-        : this.ingest.fetchModificationPlanFilesRepository(repositoryId, message, scope),
-    ]);
+    const filesToModify = await this.fetchModificationPlanFiles(state, repositoryId, projectId, message, scope);
+    const filesBlock = this.formatFilesBlock(filesToModify);
 
-    const analyzeBlock =
-      analyzePrep.kind === 'llm'
-        ? `### Datos de análisis (reingeniería)\n${analyzePrep.userPrompt.slice(0, 12000)}`
-        : `### Análisis completo\n${analyzePrep.result.summary?.slice(0, 8000) ?? ''}`;
-
-    const filesBlock =
-      filesToModify.length > 0
-        ? `### Archivos sugeridos (${filesToModify.length})\n${filesToModify
-            .slice(0, 80)
-            .map((f) => `- \`${f.path}\`${f.repoId ? ` (repo: ${f.repoId})` : ''}`)
-            .join('\n')}`
-        : '### Archivos sugeridos\n(sin rutas en el plan para este alcance)';
-
-    const userPrompt = `Pregunta del usuario:\n"${message}"\n\n${analyzeBlock}\n\n${filesBlock}\n\n### Contexto del retrieve\n${gatheredContext.slice(0, 14000) || '(vacío — indicar alcance/repo)'}`;
+    const userPrompt = `Pregunta del usuario:\n"${message}"\n\n${filesBlock}\n\n### Contexto del retrieve\n${gatheredContext.slice(0, 14000) || '(vacío — indicar alcance/repo)'}`;
 
     const answer = await this.llm.callRouterLlm(
       [
@@ -69,5 +54,33 @@ export class ChatReengineeringAgent {
 
     const header = `> **Agente:** reingeniería (router) · ${filesToModify.length} archivos en plan · intent: arquitectura de dominio\n\n`;
     return { answer: header + answer.trim() };
+  }
+
+  private async fetchModificationPlanFiles(
+    state: CodebaseChatState,
+    repositoryId: string,
+    projectId: string,
+    message: string,
+    scope: CodebaseChatState['scope'],
+  ): Promise<ModificationPlanResult['filesToModify']> {
+    try {
+      return state.projectScope
+        ? await this.ingest.fetchModificationPlanFilesProject(projectId, message, scope)
+        : await this.ingest.fetchModificationPlanFilesRepository(repositoryId, message, scope);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      return [{ path: `(plan no disponible: ${detail})`, repoId: '' }];
+    }
+  }
+
+  private formatFilesBlock(filesToModify: ModificationPlanResult['filesToModify']): string {
+    if (filesToModify.length === 0) {
+      return '### Archivos sugeridos\n(sin rutas en el plan para este alcance)';
+    }
+    const lines = filesToModify
+      .slice(0, 80)
+      .map((f) => `- \`${f.path}\`${f.repoId ? ` (repo: ${f.repoId})` : ''}`)
+      .join('\n');
+    return `### Archivos sugeridos (${filesToModify.length})\n${lines}`;
   }
 }
