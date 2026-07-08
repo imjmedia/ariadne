@@ -75,3 +75,11 @@ export {
 } from './graph-labels.js';
 export { createLogger, extractRequestId } from './logger.js';
 export type { Logger } from 'pino';
+export type { ChatIntent, ChatIntentRouteResult } from './chat-intent.types.js';
+export { CHAT_INTENTS } from './chat-intent.types.js';
+export {
+  SCHEMA_MODEL_SOURCES,
+  wantsArchitectureDomainQuestion,
+  wantsReengineeringQuestion,
+  wantsSchemaDatabaseQuestion,
+} from './chat-schema-question.util.js';

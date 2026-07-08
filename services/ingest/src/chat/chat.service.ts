@@ -60,6 +60,7 @@ import {
   openApiNestLinkCountCypher,
 } from './chat-unused-api-endpoints.util';
 import {
+  wantsReengineeringQuestion,
   wantsSchemaDatabaseQuestion,
   schemaOrmModelsCypher,
   schemaOrmModelRelationsCypher,
@@ -3087,6 +3088,31 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     };
   }
 
+  /**
+   * Legacy ingest path (sin orchestrator): reingeniería + archivos del modification-plan.
+   */
+  private async buildReengineeringChatResponse(
+    repositoryId: string,
+    message: string,
+    scope?: ChatScope,
+  ): Promise<ChatResponse> {
+    const [analysis, filesToModify] = await Promise.all([
+      this.analyzeReingenieria(repositoryId, { scope }),
+      this.getModificationPlanFilesOnly(repositoryId, message, scope),
+    ]);
+    const filesBlock =
+      filesToModify.length > 0
+        ? `\n\n## Archivos sugeridos (${filesToModify.length})\n${filesToModify
+            .slice(0, 80)
+            .map((f) => `- \`${f.path}\`${f.repoId ? ` (${f.repoId})` : ''}`)
+            .join('\n')}`
+        : '\n\n## Archivos sugeridos\n(sin rutas en el plan para este alcance)';
+    const header = `> **Modo:** reingeniería · ingest legacy (activa \`ORCHESTRATOR_URL\` para router multi-agente)\n\n`;
+    return {
+      answer: `${header}**Pregunta:** ${message.trim()}\n\n${analysis.summary}${filesBlock}`,
+    };
+  }
+
   /** Nombre de entidad seguro para Mermaid (alfanumérico/underscore). */
   private sanitizeMermaidEntity(name: string): string {
     const cleaned = (name ?? '').replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '');
@@ -4174,6 +4200,9 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     }
     if (wantsUnusedBackendApiEndpointsAnalysis(message)) {
       return this.buildUnusedBackendApiEndpointsResponse(projectId, scope);
+    }
+    if (wantsReengineeringQuestion(message) && !process.env.ORCHESTRATOR_URL?.trim()) {
+      return this.buildReengineeringChatResponse(repositoryId, message, scope);
     }
     if (wantsSchemaDatabaseQuestion(message)) {
       return this.buildSchemaDatabaseResponse(projectId, scope);

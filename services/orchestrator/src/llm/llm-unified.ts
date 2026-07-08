@@ -25,6 +25,18 @@ export function resolveLlmModel(_provider: UnifiedLlmProvider): string {
   );
 }
 
+/** Reasoning / audit / intent routing — from Ajustes (router model). */
+export function resolveLlmRouterModel(): string {
+  const rt = getOrchestratorLlmRuntimeSync();
+  return rt.orchestratorRouterModel || rt.orchestratorChatModel || LLM_DEFAULT_CHAT_MODEL;
+}
+
+/** Retrieve + synthesize Q&A — from Ajustes (worker model). */
+export function resolveLlmWorkerModel(): string {
+  const rt = getOrchestratorLlmRuntimeSync();
+  return rt.orchestratorWorkerModel || rt.orchestratorChatModel || LLM_DEFAULT_CHAT_MODEL;
+}
+
 export function hasLlmCredentials(_provider: UnifiedLlmProvider): boolean {
   return Boolean(resolveLlmApiKey());
 }

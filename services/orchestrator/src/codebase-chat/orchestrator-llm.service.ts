@@ -1,5 +1,5 @@
 /**
- * LLM del orchestrator (OpenAI o Google Gemini) — ask_codebase y síntesis.
+ * LLM del orchestrator — tiered models (router vs worker).
  */
 import { Injectable } from '@nestjs/common';
 import {
@@ -17,13 +17,16 @@ function toolCallMaxTokensFromEnv(): number {
 
 @Injectable()
 export class OrchestratorLlmService {
+  /** Default tier (worker) — synthesis, modification-plan questions. */
   async callLlm(
     messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
     maxTokens = 1024,
+    tier: 'default' | 'router' | 'worker' = 'worker',
   ): Promise<string> {
-    return callOrchestratorLlm(messages, maxTokens);
+    return callOrchestratorLlm(messages, maxTokens, tier);
   }
 
+  /** Worker tier — ReAct retrieve with tools. */
   async callLlmWithTools(
     messages: LlmMessage[],
     tools: unknown[],
@@ -33,6 +36,14 @@ export class OrchestratorLlmService {
     reasoning_content?: string | null;
     tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
   }> {
-    return callOrchestratorLlmWithTools(messages, tools, maxTokens);
+    return callOrchestratorLlmWithTools(messages, tools, maxTokens, 'worker');
+  }
+
+  /** Router tier — intent classification and architecture audit. */
+  async callRouterLlm(
+    messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
+    maxTokens = 1024,
+  ): Promise<string> {
+    return callOrchestratorLlm(messages, maxTokens, 'router');
   }
 }

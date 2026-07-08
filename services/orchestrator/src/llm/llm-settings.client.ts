@@ -8,6 +8,9 @@ export interface OrchestratorLlmRuntime {
   baseUrl: string;
   chatModel: string;
   orchestratorChatModel: string;
+  orchestratorRouterModel: string;
+  orchestratorWorkerModel: string;
+  chatIntentRouterEnabled: boolean;
   temperature: number;
   embeddingProvider: string | null;
   embeddingModel: string | null;
@@ -31,6 +34,7 @@ function buildFromEnv(): OrchestratorLlmRuntime {
     process.env.ORCHESTRATOR_LLM_MODEL?.trim() ||
     process.env.LLM_CHAT_MODEL?.trim() ||
     'google/gemini-2.0-flash-001';
+  const orchestratorChatModel = chatModel;
   const embeddingModel = process.env.LLM_EMBEDDING_MODEL?.trim() || 'openai/text-embedding-3-small';
   const embeddingDimRaw = process.env.LLM_EMBEDDING_DIM?.trim();
   const embeddingDimension = embeddingDimRaw ? parseInt(embeddingDimRaw, 10) : 1536;
@@ -41,7 +45,10 @@ function buildFromEnv(): OrchestratorLlmRuntime {
     apiKey: process.env.LLM_API_KEY?.trim() ?? '',
     baseUrl: process.env.LLM_BASE_URL?.trim() || 'https://openrouter.ai/api/v1',
     chatModel,
-    orchestratorChatModel: chatModel,
+    orchestratorChatModel,
+    orchestratorRouterModel: orchestratorChatModel,
+    orchestratorWorkerModel: orchestratorChatModel,
+    chatIntentRouterEnabled: true,
     temperature: Number.isFinite(temperature) ? temperature : 0.1,
     embeddingProvider: process.env.LLM_PROVIDER?.trim() || 'openrouter',
     embeddingModel,

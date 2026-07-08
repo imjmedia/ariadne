@@ -1,48 +1,29 @@
 /**
- * ask_codebase / chat NL: LangGraph (retrieve → synthesize) + llamadas al ingest solo para datos (Cypher, archivos, RAG).
+ * ask_codebase / chat NL: LangGraph multi-agente (route → specialist → synthesize).
  */
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { START, END, StateGraph, Annotation } from '@langchain/langgraph';
+import type { ChatIntent } from 'ariadne-common';
 import { EXAMPLES, EXPLORER_TOOLS_ALL, SCHEMA } from './chat.constants';
 import type { ChatScope } from './chat-scope.util';
 import { IngestChatClient } from './ingest-chat.client';
-import { wantsUnusedBackendApiEndpointsAnalysis } from './chat-unused-api-endpoints.util';
-import { wantsSchemaDatabaseQuestion } from './chat-schema-question.util';
 import { OrchestratorLlmService } from './orchestrator-llm.service';
 import type { LlmMessage } from '../llm/orchestrator-llm.facade';
 import { isMoonshotRateLimitError } from '../llm/moonshot-rate-limit.error';
 import { isLlmAuthError } from '../llm/llm-auth.error';
 import { RedisStateService } from '../redis-state/redis-state.service';
 import type { RetrieverToolName } from './ingest-types';
+import { ChatIntentRouterAgent } from './agents/chat-intent-router.agent';
+import { ChatReengineeringAgent } from './agents/chat-reengineering.agent';
+import type {
+  ChatMessage,
+  ChatRequest,
+  ChatResponse,
+} from './codebase-chat.state';
+
+export type { ChatMessage, ChatRequest, ChatResponse } from './codebase-chat.state';
 
 const lastValue = <T>(x: T, y: T) => (y !== undefined && y !== null ? y : x);
-
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  cypher?: string;
-  result?: unknown[];
-}
-
-export interface ChatRequest {
-  message: string;
-  history?: ChatMessage[];
-  scope?: ChatScope;
-  twoPhase?: boolean;
-  responseMode?: 'default' | 'evidence_first' | 'raw_evidence';
-  /** Solo con `responseMode: raw_evidence`: retrieval fijo en ingest sin LLM ReAct (orchestrator delega vía internal). */
-  deterministicRetriever?: boolean;
-  /** Opcional: observabilidad / reanudación en Redis (codebase:chat:{threadId}). */
-  threadId?: string;
-}
-
-export interface ChatResponse {
-  answer: string;
-  cypher?: string;
-  result?: unknown[];
-  /** JSON MDD (evidence_first) — LegacyCoordinator. */
-  mddDocument?: Record<string, unknown>;
-}
 
 function defaultTwoPhaseFromEnv(): boolean {
   const v = process.env.CHAT_TWO_PHASE?.trim().toLowerCase();
@@ -98,6 +79,12 @@ const CodebaseChatStateAnnotation = Annotation.Root({
   gatheredContext: Annotation<string>({ value: lastValue, default: () => '' }),
   answer: Annotation<string | undefined>({ value: lastValue, default: () => undefined }),
   resultOut: Annotation<unknown[] | undefined>({ value: lastValue, default: () => undefined }),
+  skipIntentRouter: Annotation<boolean>({ value: lastValue, default: () => false }),
+  chatIntent: Annotation<ChatIntent | undefined>({ value: lastValue, default: () => undefined }),
+  intentRoute: Annotation<import('ariadne-common').ChatIntentRouteResult | undefined>({
+    value: lastValue,
+    default: () => undefined,
+  }),
 });
 
 export type CodebaseChatState = typeof CodebaseChatStateAnnotation.State;
@@ -131,6 +118,42 @@ function emptyRetrieverUserMessage(state: CodebaseChatState): string {
   return lines.join('\n');
 }
 
+function initialStateFromRequest(
+  repositoryId: string,
+  projectId: string,
+  projectScope: boolean,
+  req: ChatRequest,
+): CodebaseChatState {
+  const historyContent = (req.history ?? [])
+    .slice(-8)
+    .map((m) => `${m.role}: ${m.content}`)
+    .join('\n');
+  const rawEvidence = req.responseMode === 'raw_evidence';
+  const evidenceFirst = !rawEvidence && req.responseMode === 'evidence_first';
+  const useTwoPhase = rawEvidence || evidenceFirst ? true : (req.twoPhase ?? defaultTwoPhaseFromEnv());
+  return {
+    repositoryId,
+    projectId,
+    message: req.message,
+    historyContent,
+    projectScope,
+    scope: req.scope,
+    useTwoPhase,
+    evidenceFirst,
+    rawEvidence,
+    deterministicRetriever: Boolean(req.deterministicRetriever) && rawEvidence,
+    threadId: req.threadId,
+    lastCypher: undefined,
+    collectedResults: [],
+    gatheredContext: '',
+    answer: undefined,
+    resultOut: undefined,
+    skipIntentRouter: rawEvidence || evidenceFirst,
+    chatIntent: undefined,
+    intentRoute: undefined,
+  };
+}
+
 @Injectable()
 export class CodebaseChatService {
   private readonly logger = new Logger(CodebaseChatService.name);
@@ -140,65 +163,15 @@ export class CodebaseChatService {
     private readonly llm: OrchestratorLlmService,
     private readonly ingest: IngestChatClient,
     private readonly redis: RedisStateService,
+    private readonly intentRouter: ChatIntentRouterAgent,
+    private readonly reengineeringAgent: ChatReengineeringAgent,
   ) {}
 
   async chatRepository(repositoryId: string, req: ChatRequest): Promise<ChatResponse> {
-    if (wantsUnusedBackendApiEndpointsAnalysis(req.message)) {
-      return this.ingest.fetchUnusedApiEndpointsRepository(repositoryId, req.scope);
-    }
-    if (wantsSchemaDatabaseQuestion(req.message)) {
-      return this.ingest.fetchSchemaDatabaseRepository(repositoryId, req.scope);
-    }
-    const historyContent = (req.history ?? [])
-      .slice(-8)
-      .map((m) => `${m.role}: ${m.content}`)
-      .join('\n');
-    const rawEvidence = req.responseMode === 'raw_evidence';
-    const evidenceFirst = !rawEvidence && req.responseMode === 'evidence_first';
-    const useTwoPhase = rawEvidence || evidenceFirst ? true : (req.twoPhase ?? defaultTwoPhaseFromEnv());
-    const initial: CodebaseChatState = {
-      repositoryId,
-      projectId: repositoryId,
-      message: req.message,
-      historyContent,
-      projectScope: false,
-      scope: req.scope,
-      useTwoPhase,
-      evidenceFirst,
-      rawEvidence,
-      deterministicRetriever: Boolean(req.deterministicRetriever) && rawEvidence,
-      threadId: req.threadId,
-      lastCypher: undefined,
-      collectedResults: [],
-      gatheredContext: '',
-      answer: undefined,
-      resultOut: undefined,
-    };
-    const out = await this.invokeCodebaseGraph(initial);
-    const answer = (out.answer ?? '').trim();
-    let mddDocument: Record<string, unknown> | undefined;
-    if (evidenceFirst && answer.startsWith('{')) {
-      try {
-        mddDocument = JSON.parse(answer) as Record<string, unknown>;
-      } catch {
-        mddDocument = undefined;
-      }
-    }
-    return {
-      answer,
-      cypher: out.lastCypher || undefined,
-      result: out.resultOut && out.resultOut.length > 0 ? out.resultOut : undefined,
-      mddDocument,
-    };
+    return this.runChat(initialStateFromRequest(repositoryId, repositoryId, false, req));
   }
 
   async chatProject(projectId: string, req: ChatRequest): Promise<ChatResponse> {
-    if (wantsUnusedBackendApiEndpointsAnalysis(req.message)) {
-      return this.ingest.fetchUnusedApiEndpointsProject(projectId, req.scope);
-    }
-    if (wantsSchemaDatabaseQuestion(req.message)) {
-      return this.ingest.fetchSchemaDatabaseProject(projectId, req.scope);
-    }
     let repos = await this.ingest.listRepositories(projectId);
     if (repos.length === 0) {
       const maybe = await this.ingest.getRepository(projectId);
@@ -207,8 +180,6 @@ export class CodebaseChatService {
       }
       return { answer: 'Este proyecto no tiene repositorios indexados. Añade al menos un repo y haz sync.' };
     }
-    // Un único `repoIds` en scope (p. ej. MDD / ask_codebase solo caldav en OralTrack multi-root):
-    // NO usar `repos[0]` + `projectScope: true` — mezcla grafo, openapi y `mdd-evidence` del repo equivocado.
     const scopeRepoIds = Array.from(
       new Set((req.scope?.repoIds ?? []).map((x) => String(x).trim()).filter(Boolean)),
     );
@@ -219,35 +190,14 @@ export class CodebaseChatService {
       }
     }
     const firstRepoId = repos[0].id;
-    const historyContent = (req.history ?? [])
-      .slice(-8)
-      .map((m) => `${m.role}: ${m.content}`)
-      .join('\n');
-    const rawEvidence = req.responseMode === 'raw_evidence';
-    const evidenceFirst = !rawEvidence && req.responseMode === 'evidence_first';
-    const useTwoPhase = rawEvidence || evidenceFirst ? true : (req.twoPhase ?? defaultTwoPhaseFromEnv());
-    const initial: CodebaseChatState = {
-      repositoryId: firstRepoId,
-      projectId,
-      message: req.message,
-      historyContent,
-      projectScope: true,
-      scope: req.scope,
-      useTwoPhase,
-      evidenceFirst,
-      rawEvidence,
-      deterministicRetriever: Boolean(req.deterministicRetriever) && rawEvidence,
-      threadId: req.threadId,
-      lastCypher: undefined,
-      collectedResults: [],
-      gatheredContext: '',
-      answer: undefined,
-      resultOut: undefined,
-    };
+    return this.runChat(initialStateFromRequest(firstRepoId, projectId, true, req));
+  }
+
+  private async runChat(initial: CodebaseChatState): Promise<ChatResponse> {
     const out = await this.invokeCodebaseGraph(initial);
     const answer = (out.answer ?? '').trim();
     let mddDocument: Record<string, unknown> | undefined;
-    if (evidenceFirst && answer.startsWith('{')) {
+    if (out.evidenceFirst && answer.startsWith('{')) {
       try {
         mddDocument = JSON.parse(answer) as Record<string, unknown>;
       } catch {
@@ -259,6 +209,7 @@ export class CodebaseChatService {
       cypher: out.lastCypher || undefined,
       result: out.resultOut && out.resultOut.length > 0 ? out.resultOut : undefined,
       mddDocument,
+      intentRoute: out.intentRoute,
     };
   }
 
@@ -298,12 +249,75 @@ export class CodebaseChatService {
   private buildGraph(): { invoke: (s: CodebaseChatState) => Promise<CodebaseChatState> } {
     const svc = this;
     const workflow = new StateGraph(CodebaseChatStateAnnotation)
+      .addNode('route_intent', (s) => svc.nodeRouteIntent(s))
+      .addNode('handle_schema', (s) => svc.nodeHandleSchema(s))
+      .addNode('handle_unused_api', (s) => svc.nodeHandleUnusedApi(s))
       .addNode('retrieve', (s) => svc.nodeRetrieve(s))
+      .addNode('reengineering_audit', (s) => svc.nodeReengineeringAudit(s))
       .addNode('synthesize', (s) => svc.nodeSynthesize(s))
-      .addEdge(START, 'retrieve')
-      .addEdge('retrieve', 'synthesize')
+      .addEdge(START, 'route_intent')
+      .addConditionalEdges('route_intent', (s) => svc.routeAfterIntent(s), {
+        handle_schema: 'handle_schema',
+        handle_unused_api: 'handle_unused_api',
+        retrieve: 'retrieve',
+      })
+      .addEdge('handle_schema', END)
+      .addEdge('handle_unused_api', END)
+      .addConditionalEdges('retrieve', (s) =>
+        s.chatIntent === 'reengineering' ? 'reengineering_audit' : 'synthesize',
+      )
+      .addEdge('reengineering_audit', END)
       .addEdge('synthesize', END);
     return workflow.compile();
+  }
+
+  private routeAfterIntent(state: CodebaseChatState): 'handle_schema' | 'handle_unused_api' | 'retrieve' {
+    switch (state.chatIntent) {
+      case 'schema_database':
+        return 'handle_schema';
+      case 'unused_api_endpoints':
+        return 'handle_unused_api';
+      default:
+        return 'retrieve';
+    }
+  }
+
+  private async nodeRouteIntent(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {
+    if (state.skipIntentRouter || state.rawEvidence || state.evidenceFirst) {
+      return { chatIntent: 'codebase_qa' };
+    }
+    const route = await this.intentRouter.classify(state.message, state.historyContent);
+    return { chatIntent: route.intent, intentRoute: route };
+  }
+
+  private async nodeHandleSchema(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {
+    const res = state.projectScope
+      ? await this.ingest.fetchSchemaDatabaseProject(state.projectId, state.scope)
+      : await this.ingest.fetchSchemaDatabaseRepository(state.repositoryId, state.scope);
+    return {
+      answer: res.answer,
+      lastCypher: res.cypher,
+      resultOut: res.result,
+    };
+  }
+
+  private async nodeHandleUnusedApi(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {
+    const res = state.projectScope
+      ? await this.ingest.fetchUnusedApiEndpointsProject(state.projectId, state.scope)
+      : await this.ingest.fetchUnusedApiEndpointsRepository(state.repositoryId, state.scope);
+    return {
+      answer: res.answer,
+      lastCypher: res.cypher,
+      resultOut: res.result,
+    };
+  }
+
+  private async nodeReengineeringAudit(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {
+    const { answer } = await this.reengineeringAgent.runAudit(state);
+    return {
+      answer,
+      resultOut: state.collectedResults.length > 0 ? state.collectedResults : undefined,
+    };
   }
 
   private async nodeRetrieve(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {

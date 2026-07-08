@@ -28,6 +28,18 @@ export class LlmSettingsEntity {
   @Column({ name: 'orchestrator_chat_model', type: 'varchar', length: 256, nullable: true })
   orchestratorChatModel!: string | null;
 
+  /** Modelo de razonamiento: router de intención + auditoría de reingeniería. Vacío → orchestratorChatModel. */
+  @Column({ name: 'orchestrator_router_model', type: 'varchar', length: 256, nullable: true })
+  orchestratorRouterModel!: string | null;
+
+  /** Modelo económico: retrieve con tools + síntesis Q&A. Vacío → orchestratorChatModel. */
+  @Column({ name: 'orchestrator_worker_model', type: 'varchar', length: 256, nullable: true })
+  orchestratorWorkerModel!: string | null;
+
+  /** Si false, el chat usa solo heurística de keywords (sin LLM router). */
+  @Column({ name: 'chat_intent_router_enabled', type: 'boolean', default: true })
+  chatIntentRouterEnabled!: boolean;
+
   @Column({ type: 'float', nullable: true })
   temperature!: number | null;
 

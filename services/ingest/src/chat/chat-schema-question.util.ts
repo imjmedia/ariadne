@@ -1,64 +1,12 @@
 /**
- * Detección de intención "esquema/diagrama de base de datos" y Cypher determinista para
- * recuperar el esquema real indexado (Prisma/TypeORM `:Model` con `source`, `:Enum`,
- * `:StrapiContentType` + relaciones `RELATES_TO`).
- *
- * Motivación: preguntas como "diagrama de base de datos que debería quedar" recuperaban
- * DTOs del frontend (`src/Models/*.tsx`) en vez del esquema de persistencia. Este módulo
- * provee un fast-path que va directo a los nodos de esquema, ignorando modelos heurísticos
- * del frontend (`m.source` fuera de `prisma`/`typeorm`).
+ * Detección de intención de esquema (ariadne-common) + Cypher determinista para FalkorDB.
  */
-
-/** Fuentes de `:Model` que representan esquema de persistencia real (no DTOs del frontend). */
-export const SCHEMA_MODEL_SOURCES = ['prisma', 'typeorm'] as const;
-
-/**
- * true si el mensaje pide el esquema/diagrama/estructura de la base de datos.
- * Diseñado para minimizar falsos positivos: exige emparejar un sustantivo de BD
- * con un término de esquema/diagrama, o una frase fuerte explícita.
- */
-export function wantsSchemaDatabaseQuestion(message: string): boolean {
-  const t = (message ?? '').trim();
-  if (!t) return false;
-  const m = t
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-
-  // Frases fuertes: por sí solas bastan.
-  const strongPhrase =
-    /\bdiagrama\s+(de\s+)?(base\s+de\s+datos|bd|entidad(?:es)?[- ]relacion|er\b|e-?r\b)/.test(m) ||
-    /\b(esquema|estructura|modelo)\s+(de\s+)?(la\s+)?(base\s+de\s+datos|bd)\b/.test(m) ||
-    /\bmodelo\s+de\s+datos\b/.test(m) ||
-    /\bmodelo\s+entidad[- ]relacion\b/.test(m) ||
-    /\b(database|db)\s+(schema|diagram|model|erd?)\b/.test(m) ||
-    /\bentity[- ]relationship\b/.test(m) ||
-    /\berd\b/.test(m) ||
-    /\bcontent[- ]?types?\b/.test(m);
-
-  if (strongPhrase) return true;
-
-  // Emparejamiento: sustantivo de BD + término de esquema/estructura.
-  const dbNoun =
-    /\bbase\s+de\s+datos\b/.test(m) ||
-    /\bbd\b/.test(m) ||
-    /\bdatabase\b/.test(m) ||
-    /\bprisma\b/.test(m) ||
-    /\btypeorm\b/.test(m) ||
-    /\bstrapi\b/.test(m);
-
-  const schemaTerm =
-    /\besquema\b/.test(m) ||
-    /\bdiagrama\b/.test(m) ||
-    /\bestructura\b/.test(m) ||
-    /\bentidad(es)?\b/.test(m) ||
-    /\btabla(s)?\b/.test(m) ||
-    /\brelacion(es)?\b/.test(m) ||
-    /\bschema\b/.test(m) ||
-    /\bmigracion(es)?\b/.test(m);
-
-  return dbNoun && schemaTerm;
-}
+export {
+  SCHEMA_MODEL_SOURCES,
+  wantsArchitectureDomainQuestion,
+  wantsReengineeringQuestion,
+  wantsSchemaDatabaseQuestion,
+} from 'ariadne-common';
 
 /** `:Model` de esquema real (Prisma/TypeORM), excluye DTOs heurísticos del frontend. */
 export function schemaOrmModelsCypher(limit: number): string {
@@ -70,7 +18,6 @@ ORDER BY m.source, m.name
 LIMIT ${limit}`;
 }
 
-/** Relaciones entre modelos Prisma (`RELATES_TO {field}`). */
 export function schemaOrmModelRelationsCypher(limit: number): string {
   return `MATCH (a:Model)-[r:RELATES_TO]->(b:Model)
 WHERE a.projectId = $projectId AND b.projectId = $projectId AND a.source IN ['prisma', 'typeorm']
@@ -79,7 +26,6 @@ ORDER BY a.name, b.name
 LIMIT ${limit}`;
 }
 
-/** Enums Prisma. */
 export function schemaEnumsCypher(limit: number): string {
   return `MATCH (e:Enum)
 WHERE e.projectId = $projectId
@@ -88,7 +34,6 @@ ORDER BY e.name
 LIMIT ${limit}`;
 }
 
-/** Content types Strapi (esquema de persistencia del backend Strapi). */
 export function schemaStrapiContentTypesCypher(limit: number): string {
   return `MATCH (ct:StrapiContentType)
 WHERE ct.projectId = $projectId
@@ -97,7 +42,6 @@ ORDER BY ct.name
 LIMIT ${limit}`;
 }
 
-/** Relaciones entre content types Strapi (`RELATES_TO {attribute, relation}`). */
 export function schemaStrapiRelationsCypher(limit: number): string {
   return `MATCH (a:StrapiContentType)-[r:RELATES_TO]->(b:StrapiContentType)
 WHERE a.projectId = $projectId AND b.projectId = $projectId

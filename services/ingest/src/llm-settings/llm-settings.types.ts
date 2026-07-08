@@ -7,6 +7,11 @@ export interface LlmRuntimeConfig {
   baseUrl: string;
   chatModel: string;
   orchestratorChatModel: string;
+  /** Resuelto: router model o fallback orchestrator/chat. */
+  orchestratorRouterModel: string;
+  /** Resuelto: worker model o fallback orchestrator/chat. */
+  orchestratorWorkerModel: string;
+  chatIntentRouterEnabled: boolean;
   temperature: number;
   embeddingProvider: ProviderId | null;
   embeddingModel: string | null;
@@ -25,6 +30,10 @@ export interface LlmSettingsMasked {
   baseUrl: string;
   chatModel: string;
   orchestratorChatModel: string | null;
+  /** Vacío en UI = mismo que modelo orchestrator. */
+  orchestratorRouterModel: string | null;
+  orchestratorWorkerModel: string | null;
+  chatIntentRouterEnabled: boolean;
   temperature: number;
   embeddingProvider: ProviderId | null;
   embeddingModel: string | null;
@@ -43,6 +52,9 @@ export interface UpdateLlmSettingsDto {
   baseUrl?: string;
   chatModel?: string;
   orchestratorChatModel?: string | null;
+  orchestratorRouterModel?: string | null;
+  orchestratorWorkerModel?: string | null;
+  chatIntentRouterEnabled?: boolean;
   temperature?: number;
   embeddingProvider?: ProviderId | null;
   embeddingModel?: string | null;

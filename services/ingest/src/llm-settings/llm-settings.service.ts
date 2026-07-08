@@ -35,6 +35,33 @@ import {
   LLM_DEFAULT_EMBEDDING_MODEL,
 } from '../llm/llm-config';
 
+function resolveOrchestratorTierModels(input: {
+  chatModel: string;
+  orchestratorChatModel: string | null | undefined;
+  orchestratorRouterModel?: string | null | undefined;
+  orchestratorWorkerModel?: string | null | undefined;
+  chatIntentRouterEnabled?: boolean | null;
+}): {
+  orchestratorChatModel: string;
+  orchestratorRouterModel: string;
+  orchestratorWorkerModel: string;
+  chatIntentRouterEnabled: boolean;
+} {
+  const orchestratorChatModel =
+    input.orchestratorChatModel?.trim() || input.chatModel.trim();
+  const orchestratorRouterModel =
+    input.orchestratorRouterModel?.trim() || orchestratorChatModel;
+  const orchestratorWorkerModel =
+    input.orchestratorWorkerModel?.trim() || orchestratorChatModel;
+  const chatIntentRouterEnabled = input.chatIntentRouterEnabled !== false;
+  return {
+    orchestratorChatModel,
+    orchestratorRouterModel,
+    orchestratorWorkerModel,
+    chatIntentRouterEnabled,
+  };
+}
+
 @Injectable()
 export class LlmSettingsService implements OnModuleInit {
   private readonly logger = new Logger(LlmSettingsService.name);
@@ -123,6 +150,18 @@ export class LlmSettingsService implements OnModuleInit {
       dto.orchestratorChatModel !== undefined
         ? dto.orchestratorChatModel?.trim() || null
         : (existing?.orchestratorChatModel ?? null);
+    const orchestratorRouterModel =
+      dto.orchestratorRouterModel !== undefined
+        ? dto.orchestratorRouterModel?.trim() || null
+        : (existing?.orchestratorRouterModel ?? null);
+    const orchestratorWorkerModel =
+      dto.orchestratorWorkerModel !== undefined
+        ? dto.orchestratorWorkerModel?.trim() || null
+        : (existing?.orchestratorWorkerModel ?? null);
+    const chatIntentRouterEnabled =
+      dto.chatIntentRouterEnabled !== undefined
+        ? dto.chatIntentRouterEnabled
+        : (existing?.chatIntentRouterEnabled ?? true);
     const temperature =
       dto.temperature !== undefined
         ? dto.temperature
@@ -155,6 +194,9 @@ export class LlmSettingsService implements OnModuleInit {
       baseUrl,
       chatModel,
       orchestratorChatModel,
+      orchestratorRouterModel,
+      orchestratorWorkerModel,
+      chatIntentRouterEnabled,
       temperature,
       embeddingProvider,
       embeddingModel,
@@ -278,6 +320,18 @@ export class LlmSettingsService implements OnModuleInit {
       dto.orchestratorChatModel !== undefined
         ? dto.orchestratorChatModel?.trim() || chatModel
         : (existing?.orchestratorChatModel?.trim() || chatModel);
+    const orchestratorRouterModel =
+      dto.orchestratorRouterModel !== undefined
+        ? dto.orchestratorRouterModel?.trim() || orchestratorChatModel
+        : (existing?.orchestratorRouterModel?.trim() || orchestratorChatModel);
+    const orchestratorWorkerModel =
+      dto.orchestratorWorkerModel !== undefined
+        ? dto.orchestratorWorkerModel?.trim() || orchestratorChatModel
+        : (existing?.orchestratorWorkerModel?.trim() || orchestratorChatModel);
+    const chatIntentRouterEnabled =
+      dto.chatIntentRouterEnabled !== undefined
+        ? dto.chatIntentRouterEnabled
+        : (existing?.chatIntentRouterEnabled ?? true);
     const temperature =
       dto.temperature !== undefined
         ? dto.temperature
@@ -301,12 +355,20 @@ export class LlmSettingsService implements OnModuleInit {
           )
         : 1536);
 
+    const tiers = resolveOrchestratorTierModels({
+      chatModel,
+      orchestratorChatModel,
+      orchestratorRouterModel,
+      orchestratorWorkerModel,
+      chatIntentRouterEnabled,
+    });
+
     return {
       provider,
       apiKey,
       baseUrl,
       chatModel,
-      orchestratorChatModel,
+      ...tiers,
       temperature,
       embeddingProvider,
       embeddingModel,
@@ -348,7 +410,13 @@ export class LlmSettingsService implements OnModuleInit {
       baseUrl = buildCloudflareBaseUrl(accountId);
     }
     const chatModel = row.chatModel?.trim() || catalog.defaultChatModel;
-    const orchestratorChatModel = row.orchestratorChatModel?.trim() || chatModel;
+    const tiers = resolveOrchestratorTierModels({
+      chatModel,
+      orchestratorChatModel: row.orchestratorChatModel,
+      orchestratorRouterModel: row.orchestratorRouterModel,
+      orchestratorWorkerModel: row.orchestratorWorkerModel,
+      chatIntentRouterEnabled: row.chatIntentRouterEnabled,
+    });
     const embeddingModel = row.embeddingModel ?? catalog.defaultEmbeddingModel;
     const embeddingDimension =
       row.embeddingDimension ??
@@ -364,7 +432,7 @@ export class LlmSettingsService implements OnModuleInit {
       apiKey,
       baseUrl,
       chatModel,
-      orchestratorChatModel,
+      ...tiers,
       temperature: row.temperature ?? this.envTemperature(),
       embeddingProvider: (row.embeddingProvider as ProviderId | null) ?? null,
       embeddingModel,
@@ -388,6 +456,13 @@ export class LlmSettingsService implements OnModuleInit {
       process.env.ORCHESTRATOR_LLM_MODEL?.trim() ||
       process.env.LLM_CHAT_MODEL?.trim() ||
       chatModel;
+    const tiers = resolveOrchestratorTierModels({
+      chatModel,
+      orchestratorChatModel,
+      orchestratorRouterModel: null,
+      orchestratorWorkerModel: null,
+      chatIntentRouterEnabled: true,
+    });
     const embeddingModel =
       process.env.LLM_EMBEDDING_MODEL?.trim() ||
       catalog.defaultEmbeddingModel ||
@@ -407,7 +482,7 @@ export class LlmSettingsService implements OnModuleInit {
       apiKey: process.env.LLM_API_KEY?.trim() ?? '',
       baseUrl: process.env.LLM_BASE_URL?.trim() || catalog.defaultBaseUrl || LLM_DEFAULT_BASE,
       chatModel,
-      orchestratorChatModel,
+      ...tiers,
       temperature: this.envTemperature(),
       embeddingProvider: catalog.supportsEmbeddings ? provider : null,
       embeddingModel,
@@ -433,6 +508,7 @@ export class LlmSettingsService implements OnModuleInit {
     runtime: LlmRuntimeConfig,
     row: LlmSettingsEntity | null,
   ): LlmSettingsMasked {
+    const orchDefault = runtime.orchestratorChatModel;
     return {
       provider: runtime.provider,
       apiKeyHint: maskApiKeyHint(runtime.apiKey),
@@ -443,6 +519,17 @@ export class LlmSettingsService implements OnModuleInit {
         runtime.orchestratorChatModel !== runtime.chatModel
           ? runtime.orchestratorChatModel
           : null,
+      orchestratorRouterModel:
+        row?.orchestratorRouterModel?.trim() &&
+        runtime.orchestratorRouterModel !== orchDefault
+          ? row.orchestratorRouterModel.trim()
+          : null,
+      orchestratorWorkerModel:
+        row?.orchestratorWorkerModel?.trim() &&
+        runtime.orchestratorWorkerModel !== orchDefault
+          ? row.orchestratorWorkerModel.trim()
+          : null,
+      chatIntentRouterEnabled: runtime.chatIntentRouterEnabled,
       temperature: runtime.temperature,
       embeddingProvider: runtime.embeddingProvider,
       embeddingModel: runtime.embeddingModel,

@@ -5,6 +5,8 @@ import {
   hasLlmCredentials,
   resolveLlmModel,
   resolveLlmProvider,
+  resolveLlmRouterModel,
+  resolveLlmWorkerModel,
   type UnifiedLlmProvider,
 } from './llm-unified';
 
@@ -16,6 +18,14 @@ export function resolveOrchestratorLlmProvider(): OrchestratorLlmProvider {
 
 export function orchestratorLlmModel(): string {
   return resolveLlmModel(resolveLlmProvider());
+}
+
+export function orchestratorLlmRouterModel(): string {
+  return resolveLlmRouterModel();
+}
+
+export function orchestratorLlmWorkerModel(): string {
+  return resolveLlmWorkerModel();
 }
 
 export function hasOrchestratorLlmConfigured(): boolean {

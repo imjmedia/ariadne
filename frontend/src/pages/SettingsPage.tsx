@@ -30,6 +30,9 @@ interface FormState {
   baseUrl: string;
   chatModel: string;
   orchestratorChatModel: string;
+  orchestratorRouterModel: string;
+  orchestratorWorkerModel: string;
+  chatIntentRouterEnabled: boolean;
   temperature: string;
   embeddingProvider: string;
   embeddingModel: string;
@@ -49,6 +52,9 @@ function defaultForm(catalog: LlmProviderCatalogEntry[], settings?: LlmSettingsM
     baseUrl: settings?.baseUrl ?? entry?.defaultBaseUrl ?? '',
     chatModel: settings?.chatModel ?? entry?.defaultChatModel ?? '',
     orchestratorChatModel: settings?.orchestratorChatModel ?? '',
+    orchestratorRouterModel: settings?.orchestratorRouterModel ?? '',
+    orchestratorWorkerModel: settings?.orchestratorWorkerModel ?? '',
+    chatIntentRouterEnabled: settings?.chatIntentRouterEnabled ?? true,
     temperature: String(settings?.temperature ?? 0.1),
     embeddingProvider: settings?.embeddingProvider ?? provider,
     embeddingModel: settings?.embeddingModel ?? entry?.defaultEmbeddingModel ?? '',
@@ -127,6 +133,9 @@ export function SettingsPage() {
       baseUrl: form.baseUrl.trim() || undefined,
       chatModel: form.chatModel.trim() || undefined,
       orchestratorChatModel: form.orchestratorChatModel.trim() || null,
+      orchestratorRouterModel: form.orchestratorRouterModel.trim() || null,
+      orchestratorWorkerModel: form.orchestratorWorkerModel.trim() || null,
+      chatIntentRouterEnabled: form.chatIntentRouterEnabled,
       temperature: parseFloat(form.temperature) || 0.1,
       embeddingProvider: (form.embeddingProvider || null) as LlmProviderId | null,
       embeddingModel: form.embeddingModel.trim() || null,
@@ -336,6 +345,54 @@ export function SettingsPage() {
                 placeholder="Vacío = mismo que ingest"
               />
             </div>
+          </div>
+
+          <div className="space-y-4 rounded-lg border border-[var(--border)] p-4">
+            <div>
+              <p className="text-sm font-medium">Chat multi-agente</p>
+              <p className="text-xs text-[var(--foreground-muted)]">
+                Router (intención + auditoría de reingeniería) y worker (retrieve + síntesis). Vacío =
+                mismo que modelo orchestrator.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="routerModel">Modelo router (razonamiento)</Label>
+                <Input
+                  id="routerModel"
+                  value={form.orchestratorRouterModel}
+                  onChange={(e) => setForm({ ...form, orchestratorRouterModel: e.target.value })}
+                  placeholder="ej. anthropic/claude-sonnet-4"
+                  list="chat-models"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="workerModel">Modelo worker (económico)</Label>
+                <Input
+                  id="workerModel"
+                  value={form.orchestratorWorkerModel}
+                  onChange={(e) => setForm({ ...form, orchestratorWorkerModel: e.target.value })}
+                  placeholder="ej. google/gemini-2.0-flash-001"
+                  list="chat-models"
+                />
+              </div>
+            </div>
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={form.chatIntentRouterEnabled}
+                onChange={(e) =>
+                  setForm({ ...form, chatIntentRouterEnabled: e.target.checked })
+                }
+              />
+              <span>
+                Router de intención con LLM
+                <span className="mt-0.5 block text-xs text-[var(--foreground-muted)]">
+                  Desactivado: solo heurística por keywords (más rápido, menos preciso).
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="space-y-2">
