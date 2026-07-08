@@ -313,11 +313,18 @@ export class CodebaseChatService {
   }
 
   private async nodeReengineeringAudit(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {
-    const { answer } = await this.reengineeringAgent.runAudit(state);
-    return {
-      answer,
-      resultOut: state.collectedResults.length > 0 ? state.collectedResults : undefined,
-    };
+    try {
+      const { answer } = await this.reengineeringAgent.runAudit(state);
+      return {
+        answer,
+        resultOut: state.collectedResults.length > 0 ? state.collectedResults : undefined,
+      };
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      return {
+        answer: `No pude completar el análisis de reingeniería: ${detail}. Revisa que el servicio ingest esté disponible y vuelve a intentar con un alcance más acotado (prefijo de carpeta).`,
+      };
+    }
   }
 
   private async nodeRetrieve(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {

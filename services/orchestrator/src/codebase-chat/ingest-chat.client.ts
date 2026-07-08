@@ -4,6 +4,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ChatScope } from './chat-scope.util';
 import type { AnalyzeMode, AnalyzeOrchestratorPrepDto, ModificationPlanResult } from './ingest-types';
+import { fetchIngestJson } from './ingest-http.util';
 export interface RetrieverToolHttpResult {
   toolResult: string;
   lastCypher?: string;
@@ -79,30 +80,20 @@ export class IngestChatClient {
 
   async fetchAnalyzePrepRepository(repositoryId: string, mode: AnalyzeMode): Promise<AnalyzeOrchestratorPrepDto> {
     const url = `${this.ingestBase()}/internal/repositories/${encodeURIComponent(repositoryId)}/analyze-prep`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode }),
+    return fetchIngestJson<AnalyzeOrchestratorPrepDto>(url, {
+      body: { mode },
+      timeoutMs: 180_000,
+      label: 'analyze-prep',
     });
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`ingest analyze-prep ${res.status}: ${t}`);
-    }
-    return (await res.json()) as AnalyzeOrchestratorPrepDto;
   }
 
   async fetchAnalyzePrepProject(projectId: string, mode: 'agents' | 'skill'): Promise<AnalyzeOrchestratorPrepDto> {
     const url = `${this.ingestBase()}/internal/projects/${encodeURIComponent(projectId)}/analyze-prep`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode }),
+    return fetchIngestJson<AnalyzeOrchestratorPrepDto>(url, {
+      body: { mode },
+      timeoutMs: 180_000,
+      label: 'analyze-prep',
     });
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`ingest analyze-prep project ${res.status}: ${t}`);
-    }
-    return (await res.json()) as AnalyzeOrchestratorPrepDto;
   }
 
   async fetchModificationPlanFilesRepository(
@@ -111,16 +102,11 @@ export class IngestChatClient {
     scope?: ChatScope,
   ): Promise<ModificationPlanResult['filesToModify']> {
     const url = `${this.ingestBase()}/internal/repositories/${encodeURIComponent(repositoryId)}/modification-plan-files`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userDescription, scope }),
+    const data = await fetchIngestJson<{ filesToModify: ModificationPlanResult['filesToModify'] }>(url, {
+      body: { userDescription, scope },
+      timeoutMs: 90_000,
+      label: 'modification-plan-files',
     });
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`ingest modification-plan-files ${res.status}: ${t}`);
-    }
-    const data = (await res.json()) as { filesToModify: ModificationPlanResult['filesToModify'] };
     return Array.isArray(data.filesToModify) ? data.filesToModify : [];
   }
 
@@ -153,16 +139,11 @@ export class IngestChatClient {
     scope?: ChatScope,
   ): Promise<ModificationPlanResult['filesToModify']> {
     const url = `${this.ingestBase()}/internal/projects/${encodeURIComponent(projectId)}/modification-plan-files`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userDescription, scope }),
+    const data = await fetchIngestJson<{ filesToModify: ModificationPlanResult['filesToModify'] }>(url, {
+      body: { userDescription, scope },
+      timeoutMs: 90_000,
+      label: 'modification-plan-files',
     });
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`ingest modification-plan-files project ${res.status}: ${t}`);
-    }
-    const data = (await res.json()) as { filesToModify: ModificationPlanResult['filesToModify'] };
     return Array.isArray(data.filesToModify) ? data.filesToModify : [];
   }
 
