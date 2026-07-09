@@ -743,6 +743,44 @@ function createMcpServer(): Server {
         additionalProperties: false,
       },
     },
+    {
+      name: "validate_change_plan",
+      description:
+        "Gate 2: audita un plan de cambio estructurado (ChangePlan JSON) contra el grafo indexado. Devuelve veredicto APPROVED | APPROVED_WITH_WARNINGS | BLOCKED, checks deterministas (archivos, símbolos, overlap con modification-plan, cobertura tasks). Usar tras generar tasks/MDD en The Forge o antes de editar en Cursor.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: {
+            type: "string",
+            description:
+              "ID de proyecto Ariadne o roots[].id (multi-root). Preferir roots[].id del repo objetivo.",
+          },
+          schemaVersion: { type: "string", enum: ["1.0"] },
+          source: { type: "string", enum: ["theforge", "cursor", "ci", "mcp"] },
+          changeDescription: { type: "string" },
+          changeScope: { type: "object" },
+          files: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                path: { type: "string" },
+                repoId: { type: "string" },
+                changeType: { type: "string", enum: ["add", "modify", "delete", "unknown"] },
+                symbols: { type: "array", items: { type: "string" } },
+              },
+              required: ["path"],
+            },
+          },
+          apiChanges: { type: "array" },
+          tasks: { type: "array" },
+          referencePlan: { type: "object" },
+          scope: { type: "object" },
+        },
+        required: ["projectId", "files"],
+        additionalProperties: true,
+      },
+    },
     // --- Refactorización segura (árbol de llamadas) ---
     {
       name: "get_definitions",
@@ -2796,6 +2834,65 @@ async function fetchFileFromIngest(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `**Error:** No se pudo conectar al ingest. ¿INGEST_URL configurado? ${msg}` }], isError: true };
+    }
+  }
+
+  if (name === "validate_change_plan") {
+    let projectId = args?.projectId as string | undefined;
+    const currentFilePath = args?.currentFilePath as string | undefined;
+    const files = args?.files;
+    if (!Array.isArray(files) || files.length === 0) {
+      return {
+        content: [{ type: "text", text: "**Error:** Se requiere `files` (array no vacío con al menos `path` por ítem)." }],
+        isError: true,
+      };
+    }
+    if (!projectId && currentFilePath) {
+      projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
+    }
+    if (!projectId) {
+      return {
+        content: [{
+          type: "text",
+          text: "**Error:** Se requiere `projectId` o `currentFilePath`. Usa list_known_projects.",
+        }],
+        isError: true,
+      };
+    }
+    const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002";
+    const url = `${ingestUrl.replace(/\/$/, "")}/projects/${encodeURIComponent(projectId)}/validate-change-plan`;
+    const body = {
+      schemaVersion: "1.0",
+      projectId,
+      source: (args?.source as string) ?? "mcp",
+      changeDescription: args?.changeDescription,
+      changeScope: args?.changeScope,
+      files,
+      apiChanges: args?.apiChanges,
+      tasks: args?.tasks,
+      referencePlan: args?.referencePlan,
+      scope: args?.scope,
+    };
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        return { content: [{ type: "text", text: `**Error ${res.status}:** ${msg || res.statusText}` }], isError: true };
+      }
+      const data = await res.json();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(data, null, 2),
+        }],
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `**Error:** validate_change_plan: ${msg}` }], isError: true };
     }
   }
 

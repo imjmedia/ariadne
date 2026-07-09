@@ -16,6 +16,7 @@ import { ChatHandlersService } from './chat-handlers.service';
 import { ChatRetrieverToolsService } from './chat-retriever-tools.service';
 import { InternalChatToolsController } from './internal-chat-tools.controller';
 import { InternalProjectToolsController } from './internal-project-tools.controller';
+import { ChangePlanValidationService } from '../plan-validation/change-plan-validation.service';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { ProjectsModule } from '../projects/projects.module';
@@ -37,6 +38,7 @@ import { ProjectsModule } from '../projects/projects.module';
     AnalyzeDistributedCacheService,
     ChatService,
     AnalyticsService,
+    ChangePlanValidationService,
   ],
 })
 /** Módulo del chat con grafo FalkorDB (preguntas en NL, Cypher, análisis). */
