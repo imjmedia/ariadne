@@ -5,6 +5,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-07-09
+
 ### Added
 
 - **validate_change_plan (Gate 2):** tool MCP + `POST /projects/:id/validate-change-plan` en ingest. Audita `ChangePlan` JSON contra FalkorDB (archivos, símbolos, overlap modification-plan, cobertura tasks). Veredicto `APPROVED` | `APPROVED_WITH_WARNINGS` | `BLOCKED`. Contrato: `docs/contracts/change-plan-validation-v1.md`.
