@@ -7,6 +7,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ### Added
 
+- **validate_change_plan (Gate 2):** tool MCP + `POST /projects/:id/validate-change-plan` en ingest. Audita `ChangePlan` JSON contra FalkorDB (archivos, símbolos, overlap modification-plan, cobertura tasks). Veredicto `APPROVED` | `APPROVED_WITH_WARNINGS` | `BLOCKED`. Contrato: `docs/contracts/change-plan-validation-v1.md`.
+
 - **Docs MCP Server (`services/mcp-docs`):** nuevo servidor MCP con el SDK oficial que sirve la documentación estructurada de `docs_mcp/` a agentes de IA (filosofía atómica). **Recursos:** `docs://manifest` (JSON índice/jerarquía) y `docs://<section>/<topic>` (Markdown limpio). **Herramientas:** `search_docs(query)` y `get_component_api(componentName)`. Transporte **stdio** + **HTTP streamable** (`--http`, `/health`, puerto 8081). Servicio Docker `mcp-docs` en `docker-compose.yml` + `build:back`. Entrada `.cursor/mcp.json` (`ariadne-docs`). Smoke: `services/mcp-docs/scripts/smoke.mjs`. Complementa `mcp-ariadne` (grafo FalkorDB).
 - **Corpus `docs_mcp/` (9 páginas):** plantilla + **arquitectura** (`services-layout`, `mcp-ariadne-overview` vs `docs-mcp-server`, `ingest-y-sharding` con proyecto↔repo y `FALKOR_SHARD_BY_PROJECT`, `navigation-map`) y **guías** (`agent-workflow`, `consumir-docs-mcp`, `graph-tools-catalog` con routing de costo de tools, `refactor-seguro` SDD `validate_before_edit`→`analyze_local_changes`).
 

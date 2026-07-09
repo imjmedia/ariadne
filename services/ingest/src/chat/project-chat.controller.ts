@@ -22,12 +22,16 @@ import {
   type AnalyzeResult,
 } from './chat.service';
 import { AnalyticsService } from './analytics.service';
+import { ChangePlanValidationService } from '../plan-validation/change-plan-validation.service';
+import type { ChangePlan } from '../plan-validation/change-plan-validation.types';
+import type { PlanValidationReport } from '../plan-validation/change-plan-validation.types';
 
 @Controller('projects')
 export class ProjectChatController {
   constructor(
     private readonly chatService: ChatService,
     private readonly analyticsService: AnalyticsService,
+    private readonly planValidation: ChangePlanValidationService,
   ) {}
 
   /**
@@ -121,5 +125,16 @@ export class ProjectChatController {
       body?.currentFilePath?.trim() || null,
       body?.questionsMode,
     );
+  }
+
+  /**
+   * Gate 2: validates a structured ChangePlan (The Forge / Cursor) against FalkorDB.
+   */
+  @Post(':projectId/validate-change-plan')
+  async validateChangePlan(
+    @Param('projectId') projectId: string,
+    @Body() body: ChangePlan,
+  ): Promise<PlanValidationReport> {
+    return this.planValidation.validate(projectId, body);
   }
 }

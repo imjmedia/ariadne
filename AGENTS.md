@@ -59,6 +59,7 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 
 ### Planning & review
 - **`get_modification_plan`** — Returns `filesToModify` + business questions. Multi-root: pass `roots[].id`.
+- **`validate_change_plan`** — Gate 2: audit structured ChangePlan JSON; returns `APPROVED` | `APPROVED_WITH_WARNINGS` | `BLOCKED`.
 - **`detect_changes`** — Pre-commit blast radius: `mode` staged|unstaged|all, returns JSON (`changedFiles`, `affectedSymbols`, risk summary).
 - **`analyze_local_changes`** — Deprecated alias of `detect_changes` (Markdown output, default `mode=staged`).
 - **`review_diff`** — Review any diff or PR URL with legacy context enrichment.
