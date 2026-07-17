@@ -7,6 +7,7 @@ import { ChatCypherService } from '../chat/chat-cypher.service';
 import { ChatService } from '../chat/chat.service';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { ProjectsService } from '../projects/projects.service';
+import { SyncStatusService } from '../projects/sync-status.service';
 import type { ChatScope } from '../chat/chat-scope.util';
 import {
   CHANGE_PLAN_SCHEMA_VERSION,
@@ -20,6 +21,7 @@ import {
 
 const MAX_FILES = 50;
 const MAX_SYMBOLS_PER_FILE = 8;
+const RECOMPUTE_GAP_FAIL_MIN = 3;
 
 function normalizePath(p: string): string {
   return p.replace(/\\/g, '/').replace(/^\/+/, '').trim();
@@ -43,6 +45,7 @@ export class ChangePlanValidationService {
     private readonly chat: ChatService,
     private readonly repos: RepositoriesService,
     private readonly projects: ProjectsService,
+    private readonly syncStatus: SyncStatusService,
   ) {}
 
   /** Validates a change plan against the indexed graph for the given project/repo. */
@@ -60,6 +63,33 @@ export class ChangePlanValidationService {
         missingFromPlan: [],
         extraInPlan: plan.files.map((f) => f.path),
         referenceOverlapRatio: 0,
+      });
+    }
+
+    const freshness = await this.syncStatus.getStatusForProjectOrRepo(plan.projectId);
+    if (freshness.stale && this.syncStatus.isStaleBlocked()) {
+      checks.push({
+        id: 'INDEX_STALE',
+        status: 'fail',
+        message: `Graph index stale (last sync: ${freshness.lastSync ?? 'never'}). Run resync before planning.`,
+      });
+      blockers.push('INDEX_STALE: resync required before validate_change_plan');
+      suggestedFixes.push({
+        checkId: 'INDEX_STALE',
+        action: freshness.recommendation ?? 'Run full resync on all project repositories.',
+      });
+    } else if (freshness.stale) {
+      checks.push({
+        id: 'INDEX_STALE',
+        status: 'warn',
+        message: 'Graph may be stale; CHANGE_PLAN_ALLOW_STALE is set.',
+      });
+      warnings.push('Index stale but validation allowed by CHANGE_PLAN_ALLOW_STALE');
+    } else {
+      checks.push({
+        id: 'INDEX_STALE',
+        status: 'pass',
+        message: 'Graph index freshness OK',
       });
     }
 
@@ -187,15 +217,20 @@ export class ChangePlanValidationService {
           }
         }
         if (missingFromPlan.length > 0) {
+          const gapStatus: PlanCheckStatus =
+            missingFromPlan.length > RECOMPUTE_GAP_FAIL_MIN &&
+            (referenceOverlapRatio ?? 1) < 0.25
+              ? 'fail'
+              : 'warn';
           checks.push({
             id: 'RECOMPUTE_GAP',
-            status: 'warn',
+            status: gapStatus,
             message: `${missingFromPlan.length} file(s) from modification-plan missing in submitted plan`,
             paths: missingFromPlan.slice(0, 10),
           });
-          warnings.push(
-            `Ariadne suggests adding: ${missingFromPlan.slice(0, 5).join(', ')}${missingFromPlan.length > 5 ? '…' : ''}`,
-          );
+          const msg = `Ariadne suggests adding: ${missingFromPlan.slice(0, 5).join(', ')}${missingFromPlan.length > 5 ? '…' : ''}`;
+          if (gapStatus === 'fail') blockers.push(msg);
+          else warnings.push(msg);
         } else {
           checks.push({
             id: 'RECOMPUTE_GAP',
@@ -237,12 +272,20 @@ export class ChangePlanValidationService {
       if (api.changeType === 'remove') {
         const exists = await this.endpointExists(graphProjectId, method, api.path);
         if (exists) {
+          const hasDeps = await this.endpointHasFrontendDependents(graphProjectId, method, api.path);
+          const status: PlanCheckStatus = hasDeps ? 'fail' : 'warn';
           checks.push({
             id: 'ENDPOINT_REMOVE_UNSAFE',
-            status: 'warn',
-            message: `Removing indexed endpoint ${method} ${api.path} — verify impact`,
+            status,
+            message: hasDeps
+              ? `Removing indexed endpoint ${method} ${api.path} — front/API dependents in graph`
+              : `Removing indexed endpoint ${method} ${api.path} — verify impact`,
           });
-          warnings.push(`Endpoint removal: ${method} ${api.path}`);
+          if (hasDeps) {
+            blockers.push(`Endpoint removal blocked: ${method} ${api.path} has graph dependents`);
+          } else {
+            warnings.push(`Endpoint removal: ${method} ${api.path}`);
+          }
         }
       } else if (api.changeType === 'modify') {
         const exists = await this.endpointExists(graphProjectId, method, api.path);
@@ -365,6 +408,35 @@ export class ChangePlanValidationService {
       { method: method.toUpperCase(), path },
     )) as Array<{ path?: string }>;
     return rows.length > 0;
+  }
+
+  private async endpointHasFrontendDependents(
+    graphProjectId: string,
+    method: string,
+    path: string,
+  ): Promise<boolean> {
+    const depRows = (await this.cypher.executeCypher(
+      graphProjectId,
+      `MATCH (op:OpenApiOperation)
+       WHERE op.projectId = $projectId
+       AND toUpper(coalesce(op.method, '')) = $method
+       AND (op.path = $path OR op.route = $path)
+       MATCH ()-[r:CALLS_API|CALLS_NEST_ROUTE|ENTRY_REACHES_API]->(op)
+       RETURN count(r) AS c LIMIT 1`,
+      { method: method.toUpperCase(), path },
+    )) as Array<{ c?: number }>;
+    if (Number(depRows[0]?.c ?? 0) > 0) return true;
+    const apiRows = (await this.cypher.executeCypher(
+      graphProjectId,
+      `MATCH (e:API_Endpoint)
+       WHERE e.projectId = $projectId
+       AND toUpper(coalesce(e.method, '')) = $method
+       AND (e.path = $path OR e.route = $path OR e.url = $path)
+       MATCH ()-[r:CALLS_API|CALLS_NEST_ROUTE|ENTRY_REACHES_API]->(e)
+       RETURN count(r) AS c LIMIT 1`,
+      { method: method.toUpperCase(), path },
+    )) as Array<{ c?: number }>;
+    return Number(apiRows[0]?.c ?? 0) > 0;
   }
 
   private buildReport(

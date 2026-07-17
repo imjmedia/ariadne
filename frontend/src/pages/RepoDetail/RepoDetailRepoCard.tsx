@@ -11,6 +11,15 @@ import {
   sectionShellClass,
 } from './layoutClasses';
 
+const STALE_SYNC_HOURS = 72;
+
+function isRepoIndexStale(lastSyncAt: string | null | undefined): boolean {
+  if (!lastSyncAt) return true;
+  const ms = Date.now() - new Date(lastSyncAt).getTime();
+  if (Number.isNaN(ms)) return true;
+  return ms > STALE_SYNC_HOURS * 3600_000;
+}
+
 interface RepoDetailRepoCardProps {
   repo: Repository;
   id: string;
@@ -83,6 +92,11 @@ export function RepoDetailRepoCard({
             </dt>
             <dd className="mt-1 font-mono text-sm text-[var(--foreground)]">
               {repo.lastSyncAt ? new Date(repo.lastSyncAt).toLocaleString() : '—'}
+              {isRepoIndexStale(repo.lastSyncAt) && repo.status === 'ready' ? (
+                <span className="ml-2 text-xs font-sans text-amber-600 dark:text-amber-400">
+                  Índice desactualizado (&gt;72h) — resync antes de planear cambios
+                </span>
+              ) : null}
             </dd>
           </div>
           {repo.lastCommitSha ? (

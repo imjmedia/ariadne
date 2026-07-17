@@ -1,46 +1,43 @@
 ---
 id: refactor-seguro
-title: Refactor seguro (SDD)
+title: Refactor seguro con MCP
 category: Guías
-last_updated: 2026-06-29
+last_updated: 2026-07-17
 ---
 
-# Refactor seguro con el grafo (SDD)
+# Refactor seguro (SDD + dos gates)
 
-> **AI Context Brief:** Secuencia de herramientas MCP para refactorizar sin romper dependientes en repos indexados por Ariadne; léelo antes de renombrar/cambiar APIs públicas o de commitear.
-
-## 1. Uso Básico (Quick Start)
+## Secuencia obligatoria
 
 ```typescript
-// Antes de tocar un símbolo público:
-await validate_before_edit({ nodeName: "AuthGuard", projectId: "<repo-id>" });
-await get_references({ nodeName: "AuthGuard", projectId: "<repo-id>" }); // antes de renombrar
-await get_affected_scopes({ nodeName: "AuthGuard", projectId: "<repo-id>" });
+await list_known_projects();
+const sync = await get_sync_status({ projectId: "<repo-id>" });
+// if stale → resync in UI, then continue
 
-// Al cambiar firma:
-await check_breaking_changes({ nodeName: "AuthGuard", projectId: "<repo-id>" });
+const gate1 = await get_modification_plan({
+  projectId: "<repo-id>",
+  userDescription: "…",
+});
 
-// Antes del commit:
-await analyze_local_changes(); // git diff --cached vs grafo
+const report = await validate_change_plan({
+  projectId: "<repo-id>",
+  ...gate1.changePlanTemplate,
+  referencePlan: { filesToModify: gate1.filesToModify },
+});
+// if report.verdict === "BLOCKED" → STOP
+
+await validate_before_edit({ nodeName: "Foo", projectId: "<repo-id>" });
+await get_references({ symbolName: "Foo", projectId: "<repo-id>" });
+// edit …
+await detect_changes({ mode: "staged" });
 ```
 
-## 2. API & Contrato de Tipos (Specs)
+## Checks por tipo de cambio
 
-| Fase             | Tool                       | Qué aporta                                            |
-| ---------------- | -------------------------- | ----------------------------------------------------- |
-| Pre-edición      | `validate_before_edit`     | Dependientes + contrato de props (obligatorio).       |
-| Renombrar        | `get_references`           | Todos los call sites/imports del símbolo.             |
-| Blast radius     | `get_affected_scopes`      | Archivos/nodos que rompen si modificas X.             |
-| Cambio de firma  | `check_breaking_changes`   | Alerta si quitas un parámetro aún en uso.             |
-| Nombres reales   | `get_contract_specs`       | Props/tipos exactos (evita alucinación).              |
-| Pre-commit       | `analyze_local_changes`    | Impacto por cambio contra el grafo.                   |
-| Revisión PR/diff | `review_diff`              | Revisa un diff/PR con contexto legacy.                |
-| Frescura         | `get_sync_status`          | Si el grafo está actualizado.                         |
-
-## 3. Decisiones de Diseño y Restricciones
-
-- **Regla 1:** `validate_before_edit` antes de tocar cualquier componente/función pública — sin excepciones.
-- **Regla 2:** Antes de renombrar, `get_references`; antes de quitar parámetros, `check_breaking_changes`.
-- **Regla 3:** `analyze_local_changes()` antes de cada commit para detectar dependientes rotos.
-- **Regla 4:** Al extraer código a un archivo nuevo, los imports deben resolver desde el directorio del nuevo archivo; verifica con `get_definitions` y compila antes de confiar.
-- **Regla 5:** Si el grafo devuelve "no encontrado" estructurado, no inventes contratos: re-sincroniza o corrige el `scope`/`projectId`.
+| Cambio           | Tool                       | Notas                                      |
+| ---------------- | -------------------------- | ------------------------------------------ |
+| Multi-archivo    | Gate 1 + Gate 2            | Obligatorio                                |
+| Renombrar        | `get_references`           | Antes de aplicar                           |
+| Props / firma    | `check_breaking_changes`   | `removedParams`, `removedFunctionParams`   |
+| Endpoint remove  | Gate 2 `apiChanges`        | Bloquea si hay dependientes en grafo       |
+| Frescura         | `get_sync_status`          | Gate 2 falla con `INDEX_STALE`             |

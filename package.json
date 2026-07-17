@@ -21,6 +21,7 @@
     "docker:up": "node scripts/ensure-docker.js",
     "docker:down": "node scripts/colima-stop.js",
     "metrics:chat-telemetry": "node scripts/aggregate-chat-telemetry.mjs",
+    "benchmark:calls": "node --experimental-strip-types scripts/benchmark-calls-resolution.ts",
     "test:ingest": "pnpm -C services/ingest test -- --run",
     "test:frontend:unit": "pnpm -C frontend test:unit",
     "test:unit": "pnpm run test:ingest && pnpm run test:frontend:unit"

@@ -16,6 +16,7 @@ import { FileContentService } from '../repositories/file-content.service';
 import { JobAnalysisService } from '../repositories/job-analysis.service';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { DomainsService } from '../domains/domains.service';
+import { SyncStatusService } from './sync-status.service';
 
 @Controller('projects')
 export class ProjectsController {
@@ -25,6 +26,7 @@ export class ProjectsController {
     private readonly jobAnalysis: JobAnalysisService,
     private readonly reposService: RepositoriesService,
     private readonly domains: DomainsService,
+    private readonly syncStatus: SyncStatusService,
   ) {}
 
   @Get()
@@ -57,6 +59,12 @@ export class ProjectsController {
   @Get(':id/graph-routing')
   graphRouting(@Param('id') id: string) {
     return this.service.getGraphRouting(id);
+  }
+
+  /** Sync freshness for MCP get_sync_status and UI badges. */
+  @Get(':id/sync-status')
+  getSyncStatus(@Param('id') id: string) {
+    return this.syncStatus.getStatusForProjectOrRepo(id);
   }
 
   /** Lista archivos del proyecto (multi-root). Filtra por pathPrefix opcional. */

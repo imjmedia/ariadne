@@ -13,11 +13,23 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 ## Core workflow
 
 ```
-1. semantic_search("what you're looking for") → find relevant code
-2. get_file_context(filePath) or get_file_content(path) → read the file
-3. validate_before_edit(nodeName) → check impact + contract
-4. Edit the code
-5. detect_changes() → pre-commit blast radius check
+1. list_known_projects() → get_sync_status(projectId)  [STOP if stale before large refactors]
+2. semantic_search("what you're looking for") → find relevant code
+3. get_file_context(filePath) or get_file_content(path) → read the file
+4. validate_before_edit(nodeName) → check impact + contract
+5. Edit the code
+6. detect_changes() → pre-commit blast radius check
+```
+
+## Planned change workflow (multi-file / refactors)
+
+```
+1. get_sync_status → resync if stale
+2. Gate 1: get_modification_plan(userDescription) → filesToModify + changePlanTemplate
+3. Build ChangePlan JSON (include referencePlan from Gate 1)
+4. Gate 2: validate_change_plan → STOP if verdict === BLOCKED
+5. Per symbol: validate_before_edit + get_references
+6. Edit → detect_changes before commit
 ```
 
 ## Tool catalog
@@ -59,7 +71,9 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 
 ### Planning & review
 - **`get_modification_plan`** — Returns `filesToModify` + business questions. Multi-root: pass `roots[].id`.
-- **`validate_change_plan`** — Gate 2: audit structured ChangePlan JSON; returns `APPROVED` | `APPROVED_WITH_WARNINGS` | `BLOCKED`.
+- **`validate_change_plan`** — Gate 2: audit structured ChangePlan JSON; returns `APPROVED` | `APPROVED_WITH_WARNINGS` | `BLOCKED`. **Mandatory** before multi-file edits.
+- **`export_brownfield_parity_pack`** — MDD + modification-plan seed + scaffold preview for The Forge brownfield import.
+- **`generate_scaffold_from_mdd`** — Nest/React/Prisma skeleton files from persisted MDD (no business logic).
 - **`detect_changes`** — Pre-commit blast radius: `mode` staged|unstaged|all, returns JSON (`changedFiles`, `affectedSymbols`, risk summary).
 - **`analyze_local_changes`** — Deprecated alias of `detect_changes` (Markdown output, default `mode=staged`).
 - **`review_diff`** — Review any diff or PR URL with legacy context enrichment.
@@ -74,4 +88,5 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 4. **Route to cheap tools** — If you know the symbol/path, use `get_file_content`/`get_definitions`/`get_references` instead of `ask_codebase`. Less latency, fewer tokens.
 5. **Check for duplicates before writing** — `find_similar_implementations` before implementing anything new.
 6. **Pre-commit review** — `detect_changes()` (or legacy `analyze_local_changes()`) before every commit to catch broken dependencies.
-7. **Graph freshness** — If results look stale, `get_sync_status` to check when the project was last indexed.
+7. **Graph freshness** — Call `get_sync_status` before Gate 1/2; if `stale: true`, resync first.
+8. **Two gates for refactors** — `get_modification_plan` then `validate_change_plan`; never skip Gate 2 on multi-file work.

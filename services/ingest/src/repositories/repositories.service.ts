@@ -190,6 +190,8 @@ export class RepositoriesService {
       theforgeConvergePersist?: boolean;
       theforgeConvergeTriggerMode?: string;
       theforgeServiceTokenEncrypted?: string | null;
+      autoMddOnFullSync?: boolean;
+      indexTestsEnabled?: boolean;
     } = {};
     if (dto.defaultBranch != null) updates.defaultBranch = dto.defaultBranch || 'main';
     if (dto.credentialsRef !== undefined) updates.credentialsRef = dto.credentialsRef ?? null;
@@ -233,6 +235,12 @@ export class RepositoriesService {
         dto.theforgeServiceToken != null && dto.theforgeServiceToken.trim() !== ''
           ? this.encryptTheForgeServiceToken(dto.theforgeServiceToken)
           : null;
+    }
+    if (dto.autoMddOnFullSync !== undefined) {
+      updates.autoMddOnFullSync = dto.autoMddOnFullSync === true;
+    }
+    if (dto.indexTestsPreset !== undefined) {
+      updates.indexTestsEnabled = dto.indexTestsPreset === true;
     }
     if (dto.projectId != null && dto.projectId.trim() !== '') await this.addRepoToProject(id, dto.projectId);
     if (Object.keys(updates).length > 0) await this.repo.update(id, updates);

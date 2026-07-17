@@ -44,6 +44,24 @@ const MCP_PATH = "/mcp";
 
 const logger = createLogger('mcp-ariadne');
 
+interface SyncStatusJobDetail {
+  id: string;
+  type: string;
+  status: string;
+  startedAt: string;
+}
+
+interface SyncStatusResponse {
+  status: string;
+  lastSync: string | null;
+  lastCommitSha: string | null;
+  stale: boolean;
+  staleAfterHours: number;
+  recommendation: string | null;
+  details: SyncStatusJobDetail[];
+  repositories: Array<{ id: string; repoSlug: string; stale: boolean }>;
+}
+
 /** Bearer del cliente HTTP en esta petición (p. ej. Secret MCP `ari_…` en mcp.json) para reenviar al API Nest. */
 type McpNestAuthStore = { clientBearerForNest?: string };
 const mcpNestAuthAls = new AsyncLocalStorage<McpNestAuthStore>();
@@ -1044,6 +1062,38 @@ function createMcpServer(): Server {
           projectId: { type: "string", description: "ID del proyecto (list_known_projects) — requerido" },
         },
         required: ["projectId"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "export_brownfield_parity_pack",
+      description:
+        "Exporta JSON brownfield parity pack (MDD + seeds modification-plan + scaffold preview) para import en The Forge. Requiere repo indexado; usa MDD persistido post-sync si existe.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: { type: "string", description: "roots[].id del repo o UUID proyecto" },
+          repositoryId: { type: "string", description: "UUID repositorio (alternativa a projectId=repo)" },
+          userDescription: { type: "string", description: "Descripción opcional para seed del modification-plan" },
+        },
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "generate_scaffold_from_mdd",
+      description:
+        "Genera esqueleto Nest/React/Prisma desde MDD persistido o live (sin lógica de negocio). Output: lista { path, content }.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: { type: "string", description: "roots[].id del repo" },
+          repositoryId: { type: "string", description: "UUID repositorio" },
+          targets: {
+            type: "array",
+            items: { type: "string", enum: ["nest", "react", "prisma"] },
+            description: "Default: nest, react, prisma",
+          },
+        },
         additionalProperties: false,
       },
     },
@@ -2399,9 +2449,13 @@ async function fetchFileFromIngest(
       if (!res.ok) {
         return { content: [{ type: "text", text: `**Error ${res.status}:** No se pudo obtener el estado del proyecto.` }], isError: true };
       }
-      const data = (await res.json()) as any;
-      const statusIcon = data.status === "up_to_date" ? "✅" : data.status === "syncing" ? "⏳" : "⚠️";
-      const text = `${statusIcon} **Estatus:** \`${data.status}\`\n- **Última Sincronización:** ${data.lastSync ? new Date(data.lastSync).toLocaleString() : "Nunca"}\n\n**Jobs Recientes:**\n${(data.details || []).slice(0, mcpLimits.syncStatusRecentJobsMax).map((j: any) => `- [${j.type}] ${j.status === "completed" ? "✅" : "❌"} (${new Date(j.createdAt).toLocaleDateString()})`).join("\n")}`;
+      const data = (await res.json()) as SyncStatusResponse;
+      const statusIcon =
+        data.status === "up_to_date" ? "✅" : data.status === "syncing" ? "⏳" : data.stale ? "⚠️" : "❌";
+      const staleLine = data.stale
+        ? `\n- **Stale:** sí (> ${data.staleAfterHours}h o nunca sync). ${data.recommendation ?? "Ejecuta resync."}`
+        : "\n- **Stale:** no";
+      const text = `${statusIcon} **Estatus:** \`${data.status}\`\n- **Última Sincronización:** ${data.lastSync ? new Date(data.lastSync).toLocaleString() : "Nunca"}\n- **Commit indexado:** ${data.lastCommitSha ?? "—"}${staleLine}\n\n**Repos:**\n${(data.repositories ?? []).map((r) => `- \`${r.repoSlug}\` (${r.id.slice(0, 8)}…) — ${r.stale ? "⚠️ stale" : "✅ OK"}`).join("\n") || "—"}\n\n**Jobs Recientes:**\n${(data.details || []).slice(0, mcpLimits.syncStatusRecentJobsMax).map((j: SyncStatusJobDetail) => `- [${j.type}] ${j.status === "completed" ? "✅" : "❌"} (${new Date(j.startedAt).toLocaleDateString()})`).join("\n")}`;
       
       await cache.set(cacheKey, text, 30);
       return { content: [{ type: "text", text: `### Estado de Sincronización\n\n${text}` }] };
@@ -2821,6 +2875,20 @@ async function fetchFileFromIngest(
         {
           filesToModify,
           questionsToRefine,
+          changePlanTemplate: {
+            schemaVersion: "1.0",
+            source: "cursor",
+            projectId,
+            changeDescription: userDescription,
+            referencePlan: { filesToModify, questionsToRefine },
+            files: filesToModify.map((f) => ({
+              path: f.path,
+              repoId: f.repoId,
+              changeType: "modify",
+              symbols: [],
+            })),
+            tasks: [],
+          },
           ...(data.warnings?.length ? { warnings: data.warnings } : {}),
           ...(data.diagnostic ? { diagnostic: data.diagnostic } : {}),
         },
@@ -2828,8 +2896,8 @@ async function fetchFileFromIngest(
         2,
       );
       const hint = filesToModify.length > 0
-        ? "\n\nCada archivo en `filesToModify` incluye `path` y `repoId` (root). Si hay varios repoId distintos, el cambio afecta a más de un repo (multi-root)."
-        : "";
+        ? "\n\nUsa `changePlanTemplate` como base para Gate 2 (`validate_change_plan`). Cada archivo en `filesToModify` incluye `path` y `repoId`."
+        : "\n\nGate 2: tras editar el plan, llama `validate_change_plan` antes de modificar código.";
       return { content: [{ type: "text", text: text + hint }] };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -3399,6 +3467,8 @@ async function fetchFileFromIngest(
   if (name === "check_breaking_changes") {
     const nodeName = (args?.nodeName as string) ?? "";
     const removedParams = (args?.removedParams as string[]) ?? [];
+    const removedFunctionParams = (args?.removedFunctionParams as string[]) ?? [];
+    const changeType = (args?.changeType as string) ?? "props";
     let projectId = args?.projectId as string | undefined;
     const currentFilePath = args?.currentFilePath as string | undefined;
     if (!projectId && currentFilePath) {
@@ -3431,18 +3501,34 @@ async function fetchFileFromIngest(
     const propsRes = (await graph.query(propsQ, { params })) as { data?: Array<Record<string, unknown>> };
     const currentProps = new Set(((propsRes.data ?? [])).map((r) => _rv<string>(r, "name")).filter(Boolean));
     const removed = removedParams.filter((p) => currentProps.has(p));
+    const fnCallQ = `MATCH (caller)-[:CALLS]->(f:Function {name: $nodeName}) RETURN caller.name AS caller, caller.path AS path LIMIT 15`;
+    const fnCallRes = (await graph.query(fnCallQ, { params })) as { data?: Array<Record<string, unknown>> };
+    const callers = (fnCallRes.data ?? []).map((r) => String(_rv(r, "path") ?? _rv(r, "caller") ?? "")).filter(Boolean);
     const lines = [
       `## Análisis de cambios: ${nodeName}`,
       "",
-      `**Dependientes:** ${depCount}`,
+      `**Dependientes (CALLS|RENDERS):** ${depCount}`,
+      `**Tipo de cambio:** ${changeType}`,
       "",
       ...(removed.length
         ? [
-            "⚠️ **ALERTA:** Los siguientes parámetros se planean eliminar pero existen en el contrato:",
+            "⚠️ **Props:** parámetros en contrato que se planean eliminar:",
             ...removed.map((p) => `- \`${p}\``),
             "",
-            `Esto podría romper ${depCount} sitio(s) que usan este nodo. Revisar cada llamada antes de aplicar.`,
           ]
+        : []),
+      ...(removedFunctionParams.length
+        ? [
+            "⚠️ **Function params:** revisar call sites manualmente:",
+            ...removedFunctionParams.map((p) => `- \`${p}\``),
+            "",
+          ]
+        : []),
+      ...(callers.length
+        ? ["**Call sites (Function CALLS, top 15):**", ...callers.map((p) => `- \`${p}\``), ""]
+        : []),
+      ...(removed.length || removedFunctionParams.length
+        ? [`Esto podría romper ${depCount} sitio(s) que usan este nodo. Revisar cada llamada antes de aplicar.`]
         : removedParams.length
           ? ["(Los parámetros indicados no existen en el contrato actual; revisar nombres.)"]
           : ["Sin parámetros indicados para eliminar. Si cambias la firma, verificar manualmente los dependientes."]),
@@ -3780,6 +3866,68 @@ async function fetchFileFromIngest(
         content: [{ type: "text", text: `**Error al generar mapa de navegación:** ${msg}` }],
         isError: true,
       };
+    }
+  }
+
+  // --- generate_scaffold_from_mdd ---
+  if (name === "generate_scaffold_from_mdd") {
+    let repoId = (args?.repositoryId as string) ?? (args?.projectId as string) ?? "";
+    const currentFilePath = args?.currentFilePath as string | undefined;
+    if (!repoId && currentFilePath) {
+      repoId = (await applyShardingInference(undefined, currentFilePath)) ?? "";
+    }
+    if (!repoId) {
+      return { content: [{ type: "text", text: "**Error:** Se requiere `repositoryId` o `projectId` (roots[].id)." }], isError: true };
+    }
+    const ingestUrl = (process.env.INGEST_URL ?? "http://localhost:3002").replace(/\/$/, "");
+    const targets = args?.targets as string[] | undefined;
+    try {
+      const res = await fetch(`${ingestUrl}/internal/repositories/${repoId}/scaffold-from-mdd`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targets }),
+      });
+      if (!res.ok) {
+        return { content: [{ type: "text", text: `**Error ${res.status}:** ${await res.text()}` }], isError: true };
+      }
+      const data = await res.json();
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `**Error:** ${msg}` }], isError: true };
+    }
+  }
+
+  // --- export_brownfield_parity_pack ---
+  if (name === "export_brownfield_parity_pack") {
+    let repoId = (args?.repositoryId as string) ?? "";
+    let projectId = args?.projectId as string | undefined;
+    const currentFilePath = args?.currentFilePath as string | undefined;
+    if (!repoId && projectId) repoId = projectId;
+    if (!repoId && currentFilePath) {
+      repoId = (await applyShardingInference(undefined, currentFilePath)) ?? "";
+    }
+    if (!repoId) {
+      return { content: [{ type: "text", text: "**Error:** Se requiere `repositoryId` o `projectId`." }], isError: true };
+    }
+    const ingestUrl = (process.env.INGEST_URL ?? "http://localhost:3002").replace(/\/$/, "");
+    try {
+      const res = await fetch(`${ingestUrl}/internal/repositories/${repoId}/brownfield-parity-pack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          userDescription: args?.userDescription,
+        }),
+      });
+      if (!res.ok) {
+        return { content: [{ type: "text", text: `**Error ${res.status}:** ${await res.text()}` }], isError: true };
+      }
+      const data = await res.json();
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `**Error:** ${msg}` }], isError: true };
     }
   }
 

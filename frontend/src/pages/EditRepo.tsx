@@ -44,6 +44,8 @@ export function EditRepo() {
     useState<TheForgeConvergeTriggerMode>('off');
   const [theforgeServiceToken, setTheforgeServiceToken] = useState('');
   const [theforgeServiceTokenTouched, setTheforgeServiceTokenTouched] = useState(false);
+  const [autoMddOnFullSync, setAutoMddOnFullSync] = useState(false);
+  const [indexTestsPreset, setIndexTestsPreset] = useState(false);
 
   const newEmptyEntry = (): IndexIncludeEntry => ({ kind: 'path_prefix', path: '' });
 
@@ -69,6 +71,8 @@ export function EditRepo() {
         setTheforgeStageId(r.theforgeStageId ?? '');
         setTheforgeConvergePersist(r.theforgeConvergePersist === true);
         setTheforgeConvergeTriggerMode(r.theforgeConvergeTriggerMode ?? 'off');
+        setAutoMddOnFullSync(r.autoMddOnFullSync === true);
+        setIndexTestsPreset(r.indexTestsEnabled === true);
         api.getCredentials(r.provider).then(setCredentials).catch(() => setCredentials([]));
       })
       .catch((e) => setError(e.message));
@@ -112,6 +116,8 @@ export function EditRepo() {
           ? theforgeServiceToken.trim()
           : null;
       }
+      payload.autoMddOnFullSync = autoMddOnFullSync;
+      payload.indexTestsPreset = indexTestsPreset;
       await api.updateRepository(id, payload);
       navigate(`/repos/${id}`);
     } catch (e) {
@@ -410,6 +416,31 @@ export function EditRepo() {
                   placeholder="Bearer token largo plazo"
                 />
               </div>
+            </div>
+
+            <div className="space-y-3 rounded-md border p-4">
+              <div>
+                <Label className="text-base">Indexación y documentación brownfield</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tras full sync: persistir MDD 7§ automáticamente e incluir tests (*.spec.*) en el grafo.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={autoMddOnFullSync}
+                  onChange={(e) => setAutoMddOnFullSync(e.target.checked)}
+                />
+                Auto MDD post full sync (también activo si hay The Forge project ID)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={indexTestsPreset}
+                  onChange={(e) => setIndexTestsPreset(e.target.checked)}
+                />
+                Indexar tests (*.spec.*, *.test.*) — requiere resync
+              </label>
             </div>
 
             <div className="flex gap-2 pt-2">

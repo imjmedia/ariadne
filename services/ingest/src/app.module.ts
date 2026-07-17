@@ -35,6 +35,9 @@ import { SharedBullModule } from './shared-bull/shared-bull.module';
 import { AnalysisModule } from './analysis/analysis.module';
 import { LlmSettingsModule } from './llm-settings/llm-settings.module';
 import { LlmSettingsEntity } from './llm-settings/entities/llm-settings.entity';
+import { MddSnapshotEntity } from './mdd-persistence/entities/mdd-snapshot.entity';
+import { MddPersistenceModule } from './mdd-persistence/mdd-persistence.module';
+import { BrownfieldModule } from './brownfield/brownfield.module';
 
 @Module({
   imports: [
@@ -60,6 +63,7 @@ import { LlmSettingsEntity } from './llm-settings/entities/llm-settings.entity';
         DomainDomainVisibilityEntity,
         UserEntity,
         LlmSettingsEntity,
+        MddSnapshotEntity,
       ],
       synchronize: true,
       logging: process.env.NODE_ENV === 'development',
@@ -78,6 +82,8 @@ import { LlmSettingsEntity } from './llm-settings/entities/llm-settings.entity';
     ReviewModule,
     AnalysisModule,
     LlmSettingsModule,
+    MddPersistenceModule,
+    BrownfieldModule,
   ],
 })
 /** Módulo principal del microservicio Ingest. */

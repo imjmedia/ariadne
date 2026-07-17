@@ -16,6 +16,10 @@ export const FALKOR_EMBEDDABLE_NODE_LABELS = [
   'Enum',
   /** Contratos HTTP OpenAPI / Strapi documentation plugin. */
   'OpenApiOperation',
+  /** NestJS HTTP routes (semantic search). */
+  'NestRoute',
+  /** NestJS controllers (semantic search). */
+  'NestController',
   /** Content-types Strapi v4 (`schema.json`). */
   'StrapiContentType',
   /** Rutas REST Strapi (`routes.json`, core router inferido). */

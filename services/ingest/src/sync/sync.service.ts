@@ -57,6 +57,9 @@ import {
 import { TheForgeConvergeService } from '../theforge/theforge-converge.service';
 import { GraphExportService } from '../artifact/graph-export.service';
 import { GraphImportService } from '../artifact/graph-import.service';
+import { MddPersistenceService } from '../mdd-persistence/mdd-persistence.service';
+import { DesignSystemLinkService } from '../pipeline/design-system-link.service';
+import { shouldSyncIndexPath } from '../providers/sync-path-filter';
 
 /**
  * @fileoverview Servicio de sync: mapping, deps, chunking, FalkorDB, embed-index post-sync.
@@ -121,6 +124,8 @@ export class SyncService {
     private readonly theforgeConverge: TheForgeConvergeService,
     private readonly graphExport: GraphExportService,
     private readonly graphImport: GraphImportService,
+    private readonly mddPersistence: MddPersistenceService,
+    private readonly designSystemLink: DesignSystemLinkService,
   ) {}
 
   /**
@@ -390,6 +395,16 @@ export class SyncService {
             paths,
             credentialsRef,
           );
+        }
+        pathSet = new Set(paths);
+      }
+
+      if (repo.indexTestsEnabled) {
+        const syncOpts = { indexTests: true };
+        if (repo.indexIncludeRules == null) {
+          paths = paths.filter((p) => shouldSyncIndexPath(p, syncOpts));
+        } else {
+          paths = filterPathsByRepoIndexRules(paths, repo.indexIncludeRules, syncOpts);
         }
         pathSet = new Set(paths);
       }
@@ -894,6 +909,11 @@ export class SyncService {
         }
       }
       void this.theforgeConverge.triggerAfterSync(repositoryId, 'full');
+      const primaryProjectId = projectIds[0];
+      if (primaryProjectId) {
+        void this.designSystemLink.linkAfterSync(primaryProjectId, repositoryId);
+        void this.mddPersistence.persistAfterFullSync(repositoryId, primaryProjectId, commitSha ?? null);
+      }
       return { jobId: job.id, indexed: indexedPaths.length };
     } catch (err) {
       recordSyncJobFailed('full_sync');

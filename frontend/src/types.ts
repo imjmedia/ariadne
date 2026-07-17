@@ -33,6 +33,8 @@ export interface Repository {
   theforgeStageId?: string | null;
   theforgeConvergePersist?: boolean;
   theforgeConvergeTriggerMode?: TheForgeConvergeTriggerMode;
+  autoMddOnFullSync?: boolean;
+  indexTestsEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -178,6 +180,8 @@ export interface UpdateRepositoryDto {
   theforgeConvergeTriggerMode?: TheForgeConvergeTriggerMode;
   /** Service JWT The Forge. Vacío borra; omitido no cambia. */
   theforgeServiceToken?: string | null;
+  autoMddOnFullSync?: boolean;
+  indexTestsPreset?: boolean;
 }
 
 /** Entidad credencial (token, app_password, webhook_secret). */

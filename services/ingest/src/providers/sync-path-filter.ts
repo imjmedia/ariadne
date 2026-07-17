@@ -116,13 +116,14 @@ export function isStrapiIndexableJsonPath(path: string): boolean {
   return false;
 }
 
-function shouldIndexTests(): boolean {
+function shouldIndexTests(opts?: { indexTests?: boolean }): boolean {
+  if (opts?.indexTests === true) return true;
   const v = process.env.INDEX_TESTS;
   return v === 'true' || v === '1';
 }
 
 /** ¿Incluir este path en mapping/sync/chunking? */
-export function shouldSyncIndexPath(path: string): boolean {
+export function shouldSyncIndexPath(path: string, opts?: { indexTests?: boolean }): boolean {
   const norm = path.replace(/\\/g, '/');
 
   if (pathHasSegmentIn(norm, SYNC_ALWAYS_SKIP_SEGMENTS)) return false;
@@ -135,7 +136,7 @@ export function shouldSyncIndexPath(path: string): boolean {
   }
 
   const ext = norm.slice(norm.lastIndexOf('.')).toLowerCase();
-  const ignoreRe = shouldIndexTests() ? /\.log$|\/\.env$|^\.env$/ : IGNORE_FILE;
+  const ignoreRe = shouldIndexTests(opts) ? /\.log$|\/\.env$|^\.env$/ : IGNORE_FILE;
   if (CODE_EXT.includes(ext) && !ignoreRe.test(norm)) return true;
   if (ext === '.js' && (isStrapiConfigJsPath(norm) || isStrapiPluginSyncPath(norm)) && !ignoreRe.test(norm)) {
     return true;

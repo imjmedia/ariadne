@@ -31,4 +31,10 @@ export class UpdateRepositoryDto {
   theforgeConvergeTriggerMode?: TheForgeConvergeTriggerMode;
   /** Service JWT for The Forge API. Empty clears; undefined leaves unchanged. */
   theforgeServiceToken?: string | null;
+
+  /** Persist MDD snapshot after full sync. */
+  autoMddOnFullSync?: boolean;
+
+  /** Preset: include tests in index (sets INDEX_TESTS-style rules). */
+  indexTestsPreset?: boolean;
 }

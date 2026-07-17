@@ -115,6 +115,14 @@ export class RepositoryEntity {
   @Column({ name: 'theforge_converge_trigger_mode', type: 'varchar', length: 16, default: 'off' })
   theforgeConvergeTriggerMode!: string;
 
+  /** Persist MDD JSON after successful full sync (also auto when theforgeProjectId is set). */
+  @Column({ name: 'auto_mdd_on_full_sync', type: 'boolean', default: false })
+  autoMddOnFullSync!: boolean;
+
+  /** Include *.spec.* / *.test.* in index for this repo. */
+  @Column({ name: 'index_tests_enabled', type: 'boolean', default: false })
+  indexTestsEnabled!: boolean;
+
   /** Bearer JWT for The Forge API. Encrypted with CREDENTIALS_ENCRYPTION_KEY. */
   @Column({
     name: 'theforge_service_token_encrypted',

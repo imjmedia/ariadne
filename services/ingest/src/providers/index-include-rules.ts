@@ -77,16 +77,17 @@ function matchesPathPrefix(normPath: string, prefixRaw: string): boolean {
 export function shouldIndexPathWithRepoRules(
   relPath: string,
   rules: IndexIncludeRules | null | undefined,
+  syncOpts?: { indexTests?: boolean },
 ): boolean {
   const norm = normalizeIndexPath(relPath);
-  if (rules == null) return shouldSyncIndexPath(relPath);
+  if (rules == null) return shouldSyncIndexPath(relPath, syncOpts);
   if (pathHasGlobalSkipSegment(norm)) return false;
   if (isMandatoryDefaultRootIndexPath(norm)) return true;
   if (rules.entries.length === 0) return false;
   for (const e of rules.entries) {
     if (e.kind === 'file' && normalizeIndexPath(e.path) === norm) return true;
   }
-  if (!shouldSyncIndexPath(relPath)) return false;
+  if (!shouldSyncIndexPath(relPath, syncOpts)) return false;
   for (const e of rules.entries) {
     if (e.kind === 'path_prefix' && matchesPathPrefix(norm, e.path)) return true;
   }
@@ -96,9 +97,10 @@ export function shouldIndexPathWithRepoRules(
 export function filterPathsByRepoIndexRules(
   paths: string[],
   rules: IndexIncludeRules | null | undefined,
+  syncOpts?: { indexTests?: boolean },
 ): string[] {
   if (rules == null) return paths;
-  return paths.filter((p) => shouldIndexPathWithRepoRules(p, rules));
+  return paths.filter((p) => shouldIndexPathWithRepoRules(p, rules, syncOpts));
 }
 
 /** Tras walk del clone: añade mandatory root y archivos `file` que existan en disco, y filtra por reglas. */

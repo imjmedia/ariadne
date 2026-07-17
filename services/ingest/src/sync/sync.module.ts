@@ -21,6 +21,9 @@ import { SharedBullModule } from '../shared-bull/shared-bull.module';
 import { SYNC_QUEUE } from '../constants';
 import { TheForgeModule } from '../theforge/theforge.module';
 import { ArtifactModule } from '../artifact/artifact.module';
+import { MddPersistenceModule } from '../mdd-persistence/mdd-persistence.module';
+import { DesignSystemLinkService } from '../pipeline/design-system-link.service';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
@@ -31,6 +34,8 @@ import { ArtifactModule } from '../artifact/artifact.module';
     CredentialsModule,
     TheForgeModule,
     ArtifactModule,
+    MddPersistenceModule,
+    ChatModule,
     SharedBullModule,
     BullModule.registerQueue({ name: SYNC_QUEUE }),
   ],

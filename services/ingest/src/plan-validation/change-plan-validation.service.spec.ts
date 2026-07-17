@@ -31,11 +31,25 @@ function buildService(deps: {
     getProjectIdsForRepo: vi.fn(async () => ['proj-1']),
   };
   const projects = { findOne: vi.fn(async () => ({ id: 'proj-1' })) };
+  const syncStatus = {
+    getStatusForProjectOrRepo: vi.fn(async () => ({
+      status: 'up_to_date',
+      lastSync: new Date().toISOString(),
+      lastCommitSha: 'abc',
+      stale: false,
+      staleAfterHours: 72,
+      recommendation: null,
+      details: [],
+      repositories: [],
+    })),
+    isStaleBlocked: vi.fn(() => true),
+  };
   return new ChangePlanValidationService(
     cypher as never,
     chat as never,
     repos as never,
     projects as never,
+    syncStatus as never,
   );
 }
 

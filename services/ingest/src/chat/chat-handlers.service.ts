@@ -232,6 +232,21 @@ export class ChatHandlersService {
         `MATCH (n:StrapiContentType) WHERE n.projectId = $projectId${repoClause} AND n.${vProp} IS NOT NULL RETURN count(n) as c`,
         countExtra,
       );
+      const countOpenApi = await this.cypher.executeCypher(
+        graphProjectId,
+        `MATCH (n:OpenApiOperation) WHERE n.projectId = $projectId${repoClause} AND n.${vProp} IS NOT NULL RETURN count(n) as c`,
+        countExtra,
+      );
+      const countNestRoute = await this.cypher.executeCypher(
+        graphProjectId,
+        `MATCH (n:NestRoute) WHERE n.projectId = $projectId${repoClause} AND n.${vProp} IS NOT NULL RETURN count(n) as c`,
+        countExtra,
+      );
+      const countNestCtrl = await this.cypher.executeCypher(
+        graphProjectId,
+        `MATCH (n:NestController) WHERE n.projectId = $projectId${repoClause} AND n.${vProp} IS NOT NULL RETURN count(n) as c`,
+        countExtra,
+      );
       const hasFn = (countFn as Array<{ c?: number }>)?.[0]?.c ?? 0;
       const hasComp = (countComp as Array<{ c?: number }>)?.[0]?.c ?? 0;
       const hasDoc = (countDoc as Array<{ c?: number }>)?.[0]?.c ?? 0;
@@ -240,6 +255,9 @@ export class ChatHandlersService {
       const hasModel = (countModel as Array<{ c?: number }>)?.[0]?.c ?? 0;
       const hasEnum = (countEnum as Array<{ c?: number }>)?.[0]?.c ?? 0;
       const hasCt = (countCt as Array<{ c?: number }>)?.[0]?.c ?? 0;
+      const hasOpenApi = (countOpenApi as Array<{ c?: number }>)?.[0]?.c ?? 0;
+      const hasNestRoute = (countNestRoute as Array<{ c?: number }>)?.[0]?.c ?? 0;
+      const hasNestCtrl = (countNestCtrl as Array<{ c?: number }>)?.[0]?.c ?? 0;
       if (
         hasFn === 0 &&
         hasComp === 0 &&
@@ -248,7 +266,10 @@ export class ChatHandlersService {
         hasMd === 0 &&
         hasModel === 0 &&
         hasEnum === 0 &&
-        hasCt === 0
+        hasCt === 0 &&
+        hasOpenApi === 0 &&
+        hasNestRoute === 0 &&
+        hasNestCtrl === 0
       )
         return { cypher: '', result: [] };
 
@@ -264,8 +285,11 @@ export class ChatHandlersService {
       const modelVecQ = `CALL db.idx.vector.queryNodes('Model', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
       const enumVecQ = `CALL db.idx.vector.queryNodes('Enum', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
       const ctVecQ = `CALL db.idx.vector.queryNodes('StrapiContentType', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
+      const openApiVecQ = `CALL db.idx.vector.queryNodes('OpenApiOperation', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.method AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
+      const nestRouteVecQ = `CALL db.idx.vector.queryNodes('NestRoute', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.method AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
+      const nestCtrlVecQ = `CALL db.idx.vector.queryNodes('NestController', '${vProp}', ${k}, vecf32(${vecStr})) YIELD node, score${yieldWhere} RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
 
-      const [fRes, cRes, dRes, sbRes, mdDocRes, modelVecRes, enumVecRes, ctVecRes] = await Promise.all([
+      const [fRes, cRes, dRes, sbRes, mdDocRes, modelVecRes, enumVecRes, ctVecRes, openApiRes, nestRouteRes, nestCtrlRes] = await Promise.all([
         hasFn > 0 ? this.cypher.executeCypherRaw(funcVecQ, graphProjectId) : Promise.resolve([]),
         hasComp > 0 ? this.cypher.executeCypherRaw(compVecQ, graphProjectId) : Promise.resolve([]),
         hasDoc > 0 ? this.cypher.executeCypherRaw(docVecQ, graphProjectId) : Promise.resolve([]),
@@ -274,6 +298,9 @@ export class ChatHandlersService {
         hasModel > 0 ? this.cypher.executeCypherRaw(modelVecQ, graphProjectId) : Promise.resolve([]),
         hasEnum > 0 ? this.cypher.executeCypherRaw(enumVecQ, graphProjectId) : Promise.resolve([]),
         hasCt > 0 ? this.cypher.executeCypherRaw(ctVecQ, graphProjectId) : Promise.resolve([]),
+        hasOpenApi > 0 ? this.cypher.executeCypherRaw(openApiVecQ, graphProjectId) : Promise.resolve([]),
+        hasNestRoute > 0 ? this.cypher.executeCypherRaw(nestRouteVecQ, graphProjectId) : Promise.resolve([]),
+        hasNestCtrl > 0 ? this.cypher.executeCypherRaw(nestCtrlVecQ, graphProjectId) : Promise.resolve([]),
       ]);
 
       const fData = (Array.isArray(fRes) ? fRes : []) as Array<unknown>;
@@ -467,6 +494,31 @@ export class ChatHandlersService {
         if (repoId != null && String(repoId)) out.repoId = String(repoId);
         results.push(out);
       }
+
+      const pushApiHits = (rows: unknown[], tipo: string) => {
+        const data = (Array.isArray(rows) ? rows : []) as Array<unknown>;
+        for (const row of data) {
+          if (results.length >= limit) break;
+          const { name, path, projectId: pid, repoId } = toRow(row);
+          if (pid !== graphProjectId || !passesRepo(repoId)) continue;
+          const pathStr = String(path ?? '');
+          const nameStr = String(name ?? '');
+          const key = `${tipo}:${nameStr}:${pathStr}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const label = pathStr ? `${nameStr} ${pathStr}`.trim() : nameStr;
+          const out: { tipo: string; path: string; name: string; repoId?: string } = {
+            tipo,
+            path: pathStr || label,
+            name: label,
+          };
+          if (repoId != null && String(repoId)) out.repoId = String(repoId);
+          results.push(out);
+        }
+      };
+      pushApiHits(openApiRes, 'OpenApiOperation');
+      pushApiHits(nestRouteRes, 'NestRoute');
+      pushApiHits(nestCtrlRes, 'NestController');
 
       return {
         cypher: 'CALL db.idx.vector.queryNodes (semantic search)',

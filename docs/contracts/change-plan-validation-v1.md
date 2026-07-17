@@ -31,7 +31,7 @@ Canonical JSON contract for **`validate_change_plan`** (Ariadne MCP + ingest RES
 
 ## Verdict rules
 
-- **BLOCKED** if any check fails: `FILE_EXISTS`, `SYMBOL_UNRESOLVED`, `ENDPOINT_REMOVE_UNSAFE`
+- **BLOCKED** if any check fails: `FILE_EXISTS`, `SYMBOL_UNRESOLVED`, `INDEX_STALE`, `ENDPOINT_REMOVE_UNSAFE` (when graph dependents exist), `RECOMPUTE_GAP` (>3 missing files and overlap <25%), `REFERENCE_OVERLAP` (<25%)
 - **APPROVED_WITH_WARNINGS** if only warnings (low overlap, shared components, extra paths)
 - **APPROVED** otherwise
 
