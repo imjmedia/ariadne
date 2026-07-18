@@ -2,7 +2,7 @@
  * Global LLM settings (admin): provider catalog, API key, models, embeddings.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Eye, EyeOff, Lock, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 import { api } from '@/api';
 import type {
   LlmProviderCatalogEntry,
@@ -24,32 +24,43 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { panelIntroClass, sectionHeaderClass, sectionShellClass } from './RepoDetail/layoutClasses';
+import { sectionHeaderClass, sectionShellClass } from './RepoDetail/layoutClasses';
 import {
   settingsAlertClass,
   settingsCheckboxClass,
-  settingsFormSubsectionClass,
+  settingsPageClass,
+  settingsSectionBodyClass,
+  settingsSubsectionClass,
   settingsToggleFieldClass,
 } from './settingsUiClasses';
 import { SettingsTheForgeCard } from './SettingsTheForgeCard';
 
-const settingsPageClass = 'mx-auto max-w-3xl space-y-6 pb-10';
+function SettingsPageHeader() {
+  return (
+    <header>
+      <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl">
+        Ajustes
+      </h1>
+      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
+        Configuración global del despliegue: proveedor LLM e integraciones opcionales.
+      </p>
+    </header>
+  );
+}
 
 function SettingsFormSection({
   id,
   title,
   description,
   children,
-  boxed = false,
 }: {
   id: string;
   title: string;
   description?: string;
   children: ReactNode;
-  boxed?: boolean;
 }) {
   return (
-    <div className={boxed ? settingsFormSubsectionClass : 'space-y-4'} aria-labelledby={id}>
+    <div className={settingsSubsectionClass} aria-labelledby={id}>
       <div>
         <h3 id={id} className="text-sm font-semibold text-[var(--foreground)]">
           {title}
@@ -221,12 +232,7 @@ export function SettingsPage() {
   if (!isAdmin) {
     return (
       <div className={settingsPageClass}>
-        <div className={panelIntroClass}>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
-            Configuración global del despliegue: proveedor LLM e integraciones opcionales.
-          </p>
-        </div>
+        <SettingsPageHeader />
         <Alert className={settingsAlertClass}>
           <Lock className="size-4" aria-hidden />
           <AlertTitle>Acceso restringido</AlertTitle>
@@ -241,13 +247,16 @@ export function SettingsPage() {
   if (loading || !form) {
     return (
       <div className={settingsPageClass}>
-        <Skeleton className="h-28 w-full rounded-3xl" />
-        <section className={sectionShellClass} aria-busy="true" aria-label="Cargando ajustes">
+        <header aria-busy="true" aria-label="Cargando ajustes">
+          <Skeleton className="h-7 w-32" />
+          <Skeleton className="mt-2 h-4 w-full max-w-md" />
+        </header>
+        <section className={sectionShellClass}>
           <div className={sectionHeaderClass}>
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="mt-2 h-4 w-full max-w-md" />
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="mt-2 h-3 w-full max-w-sm" />
           </div>
-          <div className="space-y-4 px-5 py-6 sm:px-6">
+          <div className={settingsSectionBodyClass}>
             <Skeleton className="h-10 w-full rounded-xl" />
             <Skeleton className="h-10 w-full rounded-xl" />
             <Skeleton className="h-10 w-full rounded-xl sm:max-w-xs" />
@@ -255,9 +264,9 @@ export function SettingsPage() {
         </section>
         <section className={sectionShellClass} aria-hidden>
           <div className={sectionHeaderClass}>
-            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-5 w-48" />
           </div>
-          <div className="space-y-4 px-5 py-6 sm:px-6">
+          <div className={settingsSectionBodyClass}>
             <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-10 w-full rounded-xl" />
           </div>
@@ -268,23 +277,7 @@ export function SettingsPage() {
 
   return (
     <div className={settingsPageClass}>
-      <div className={panelIntroClass}>
-        <div className="flex items-start gap-3">
-          <div
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--primary)_12%,var(--card))]"
-            aria-hidden
-          >
-            <Sparkles className="size-5 text-[var(--primary)]" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
-              Configuración global del despliegue: proveedor LLM para chat, análisis y embeddings, e
-              integraciones opcionales como The Forge.
-            </p>
-          </div>
-        </div>
-      </div>
+      <SettingsPageHeader />
 
       {error ? (
         <Alert variant="destructive" className={settingsAlertClass}>
@@ -323,89 +316,93 @@ export function SettingsPage() {
                 : ' · Sin API key'}
           </p>
         </div>
-        <div className="space-y-8 px-5 py-6 sm:px-6">
+        <div className={settingsSectionBodyClass}>
           <SettingsFormSection
             id="llm-connection-heading"
             title="Conexión"
             description="Proveedor, credenciales y URL base del API."
           >
-          <div className="space-y-2">
-            <Label htmlFor="provider">Proveedor</Label>
-            <Select value={form.provider} onValueChange={(v) => handleProviderChange(v as LlmProviderId)}>
-              <SelectTrigger id="provider">
-                <SelectValue placeholder="Selecciona proveedor" />
-              </SelectTrigger>
-              <SelectContent>
-                {catalog.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedCatalog?.apiKeyHelpUrl && (
-              <p className="text-xs text-[var(--foreground-muted)]">
-                <a
-                  href={selectedCatalog.apiKeyHelpUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline"
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="provider">Proveedor</Label>
+                <Select
+                  value={form.provider}
+                  onValueChange={(v) => handleProviderChange(v as LlmProviderId)}
                 >
-                  Obtener clave API
-                </a>
-              </p>
-            )}
-          </div>
+                  <SelectTrigger id="provider">
+                    <SelectValue placeholder="Selecciona proveedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {catalog.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedCatalog?.apiKeyHelpUrl ? (
+                  <p className="text-xs text-[var(--foreground-muted)]">
+                    <a
+                      href={selectedCatalog.apiKeyHelpUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      Obtener clave API
+                    </a>
+                  </p>
+                ) : null}
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">
-              Clave API {settings?.apiKeyHint ? `(actual: ${settings.apiKeyHint})` : ''}
-            </Label>
-            <div className="relative">
-              <Input
-                id="apiKey"
-                type={showKey ? 'text' : 'password'}
-                value={form.apiKey}
-                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                placeholder="Dejar vacío para no cambiar"
-                autoComplete="off"
-              />
-              <button
-                type="button"
-                className={cn(
-                  'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--foreground-muted)]',
-                  'hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/18',
-                )}
-                onClick={() => setShowKey((s) => !s)}
-                aria-label={showKey ? 'Ocultar clave' : 'Mostrar clave'}
-              >
-                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+              <div className="space-y-2">
+                <Label htmlFor="apiKey">
+                  Clave API {settings?.apiKeyHint ? `(actual: ${settings.apiKeyHint})` : ''}
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="apiKey"
+                    type={showKey ? 'text' : 'password'}
+                    value={form.apiKey}
+                    onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+                    placeholder="Dejar vacío para no cambiar"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    className={cn(
+                      'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--foreground-muted)]',
+                      'hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/18',
+                    )}
+                    onClick={() => setShowKey((s) => !s)}
+                    aria-label={showKey ? 'Ocultar clave' : 'Mostrar clave'}
+                  >
+                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {form.provider === 'cloudflare' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="accountId">Account ID (Cloudflare)</Label>
+                  <Input
+                    id="accountId"
+                    value={form.accountId}
+                    onChange={(e) => setForm({ ...form, accountId: e.target.value })}
+                    placeholder="Cloudflare account ID"
+                  />
+                </div>
+              ) : null}
+
+              <div className={cn('space-y-2', form.provider !== 'cloudflare' && 'sm:col-span-2')}>
+                <Label htmlFor="baseUrl">URL base</Label>
+                <Input
+                  id="baseUrl"
+                  value={form.baseUrl}
+                  onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
+                  disabled={!selectedCatalog?.baseUrlEditable && form.provider !== 'cloudflare'}
+                />
+              </div>
             </div>
-          </div>
-
-          {form.provider === 'cloudflare' && (
-            <div className="space-y-2">
-              <Label htmlFor="accountId">Account ID (Cloudflare)</Label>
-              <Input
-                id="accountId"
-                value={form.accountId}
-                onChange={(e) => setForm({ ...form, accountId: e.target.value })}
-                placeholder="Cloudflare account ID"
-              />
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="baseUrl">URL base</Label>
-            <Input
-              id="baseUrl"
-              value={form.baseUrl}
-              onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
-              disabled={!selectedCatalog?.baseUrlEditable && form.provider !== 'cloudflare'}
-            />
-          </div>
-
           </SettingsFormSection>
 
           <SettingsFormSection
@@ -437,18 +434,18 @@ export function SettingsPage() {
                   placeholder="Vacío = mismo que ingest"
                 />
               </div>
-            </div>
-            <div className="space-y-2 sm:max-w-xs">
-              <Label htmlFor="temperature">Temperatura</Label>
-              <Input
-                id="temperature"
-                type="number"
-                min={0}
-                max={2}
-                step={0.05}
-                value={form.temperature}
-                onChange={(e) => setForm({ ...form, temperature: e.target.value })}
-              />
+              <div className="space-y-2 sm:max-w-xs">
+                <Label htmlFor="temperature">Temperatura</Label>
+                <Input
+                  id="temperature"
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  value={form.temperature}
+                  onChange={(e) => setForm({ ...form, temperature: e.target.value })}
+                />
+              </div>
             </div>
           </SettingsFormSection>
 
@@ -456,7 +453,6 @@ export function SettingsPage() {
             id="llm-multiagent-heading"
             title="Chat multi-agente"
             description="Router (intención + auditoría de reingeniería) y worker (retrieve + síntesis). Vacío = mismo que modelo orchestrator."
-            boxed
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -504,7 +500,6 @@ export function SettingsPage() {
               id="llm-embeddings-heading"
               title="Embeddings (RAG)"
               description="Modelo y dimensión de vectores para búsqueda semántica."
-              boxed
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -559,7 +554,7 @@ export function SettingsPage() {
             </div>
           </SettingsFormSection>
 
-          <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-6 sm:flex-row sm:flex-wrap">
+          <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-5 sm:flex-row sm:flex-wrap">
             <Button type="button" onClick={() => void handleSave()} disabled={saving || testing}>
               {saving ? 'Guardando…' : 'Guardar'}
             </Button>

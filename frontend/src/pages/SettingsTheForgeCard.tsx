@@ -11,6 +11,7 @@ import { sectionHeaderClass, sectionShellClass } from './RepoDetail/layoutClasse
 import {
   settingsAlertClass,
   settingsCheckboxClass,
+  settingsSectionBodyClass,
   settingsToggleFieldClass,
 } from './settingsUiClasses';
 
@@ -91,10 +92,10 @@ export function SettingsTheForgeCard() {
     return (
       <section className={sectionShellClass} aria-busy="true" aria-label="Cargando integración The Forge">
         <div className={sectionHeaderClass}>
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="mt-2 h-4 w-full max-w-lg" />
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="mt-2 h-3 w-full max-w-lg" />
         </div>
-        <div className="space-y-4 px-5 py-6 sm:px-6">
+        <div className={settingsSectionBodyClass}>
           <Skeleton className="h-16 w-full rounded-xl" />
           <Skeleton className="h-10 w-full rounded-xl" />
           <Skeleton className="h-10 w-full rounded-xl sm:max-w-xs" />
@@ -113,13 +114,13 @@ export function SettingsTheForgeCard() {
           <Hammer className="size-5 shrink-0 text-[var(--foreground-muted)]" aria-hidden />
           The Forge (opcional)
         </h2>
-        <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)] sm:text-sm">
+        <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)]">
           Ariadne es open source y funciona sin The Forge. Activa esta integración solo si tienes The
           Forge desplegado y quieres promover conversaciones de chat a etapas de cambio (reingeniería,
           etc.). El brownfield converge por repo sigue configurándose en Editar repositorio.
         </p>
       </div>
-      <div className="space-y-5 px-5 py-6 sm:px-6">
+      <div className={settingsSectionBodyClass}>
         {error ? (
           <Alert variant="destructive" className={settingsAlertClass}>
             <AlertTitle>Error</AlertTitle>
@@ -149,8 +150,8 @@ export function SettingsTheForgeCard() {
           </span>
         </label>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="theforge-api-url">URL API The Forge</Label>
             <Input
               id="theforge-api-url"
@@ -167,7 +168,7 @@ export function SettingsTheForgeCard() {
             ) : null}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="theforge-service-token">JWT de servicio (opcional)</Label>
             <Input
               id="theforge-service-token"
