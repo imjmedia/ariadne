@@ -28,6 +28,7 @@ Vistas principales de la aplicación Ariadne (shell SaaS: sidebar + header con b
 
 - **Login.tsx** — Autenticación OTP: email → código de 6 dígitos.
 - **CredentialsList.tsx**, **CreateCredentialForm.tsx**, **EditCredential.tsx** — CRUD de credenciales (alta en modal con `?create=1`).
-- **SettingsPage.tsx** — **Ajustes** (admin): configuración global LLM (proveedor, API key cifrada, modelos, embeddings, temperatura). API: `GET/PUT /api/llm-settings`, `POST /api/llm-settings/test`. Ruta: `/settings` (enlace en sidebar Plataforma).
+- **SettingsPage.tsx** — **Ajustes** (admin): LLM global + **The Forge (opcional)**. API: `GET/PUT /api/llm-settings`, `GET/PUT /api/theforge-integration`, `GET /api/theforge-integration/status`. Ruta: `/settings`.
+- **SettingsTheForgeCard.tsx** — Tarjeta Ajustes: integración opt-in The Forge (URL API, JWT servicio).
 - **Ayuda.tsx** — Manual y ayuda (docs).
 - **ErrorPage.tsx** — Página de error genérica.

@@ -20,6 +20,7 @@ import { ChatConversationsPanel } from './RepoChat/ChatConversationsPanel';
 import { ChatMessageThread } from './RepoChat/ChatMessageThread';
 import { ChatRepoHeader } from './RepoChat/ChatRepoHeader';
 import { useChatPersistence } from './RepoChat/useChatPersistence';
+import { useTheForgeChatPromotion } from './RepoChat/useTheForgeChatPromotion';
 import {
   chatNavBtnClass,
   chatPageMaxClass,
@@ -70,6 +71,8 @@ export function RepoChat() {
     ensureActiveConversation,
     persistMessage,
   } = persistence;
+
+  const { available: forgePromotionAvailable } = useTheForgeChatPromotion();
 
   useEffect(() => {
     if (!id) return;
@@ -280,6 +283,7 @@ export function RepoChat() {
 
   const analysisPending = Boolean(analysisResult || loadingAnalysis || analysisError);
   const chatBusy = loading || messagesLoading || conversationsLoading;
+  const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
   return (
     <div className={chatPageSplitClass}>
@@ -312,6 +316,10 @@ export function RepoChat() {
           newConversationDisabled={chatBusy}
           onOpenAnalysis={() => setAnalysisOpen(true)}
           analysisPending={analysisPending}
+          activeConversationId={activeConversationId}
+          forgePromoteDisabled={chatBusy || messages.length === 0}
+          forgeDefaultStageName={activeConversation?.title ?? undefined}
+          forgePromotionAvailable={forgePromotionAvailable}
           headerLeadingExtra={
             <ChatConversationsMobileToggle onOpen={() => setHistoryOpen(true)} />
           }

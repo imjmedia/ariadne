@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { chatNavBtnClass } from '../chat/chatShellClasses';
 import { ChatOptionsPopover } from './ChatOptionsPopover';
+import { ChatForgePromoteButton } from './ChatForgePromoteDialog';
 
 const PIPELINE_BADGE: Record<ChatPipelineMode, string> = {
   default: 'Chat',
@@ -35,6 +36,10 @@ export function ChatPageHeader(props: {
   newConversationDisabled?: boolean;
   onOpenAnalysis: () => void;
   analysisPending: boolean;
+  activeConversationId?: string | null;
+  forgePromoteDisabled?: boolean;
+  forgeDefaultStageName?: string;
+  forgePromotionAvailable?: boolean;
   headerLeadingExtra?: ReactNode;
   optionsExtra?: ReactNode;
   extraBadges?: ReactNode;
@@ -119,6 +124,14 @@ export function ChatPageHeader(props: {
             />
           ) : null}
         </Button>
+
+        {props.forgePromotionAvailable ? (
+          <ChatForgePromoteButton
+            conversationId={props.activeConversationId ?? null}
+            disabled={props.forgePromoteDisabled}
+            defaultStageName={props.forgeDefaultStageName}
+          />
+        ) : null}
 
         <Button
           type="button"

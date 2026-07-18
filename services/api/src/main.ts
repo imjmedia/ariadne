@@ -64,6 +64,7 @@ async function bootstrap() {
       pathname.startsWith('/api/webhooks') ||
       pathname.startsWith('/api/users') ||
       pathname.startsWith('/api/llm-settings') ||
+      pathname.startsWith('/api/theforge-integration') ||
       pathname.startsWith('/api/internal'),
     target: ingestUrl,
     changeOrigin: true,

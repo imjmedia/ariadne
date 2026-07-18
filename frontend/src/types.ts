@@ -284,6 +284,100 @@ export interface ChatConversationMessage {
   createdAt: string;
 }
 
+/** Deliverables solicitados al promover chat → The Forge. */
+export type ForgeDeliverableKind =
+  | 'change_spec'
+  | 'data_model'
+  | 'api_contracts'
+  | 'modification_plan'
+  | 'migration_tasks'
+  | 'mdd_full';
+
+export type ForgePromotionStatus = 'none' | 'pending' | 'success' | 'failed';
+
+export interface ForgePromotionState {
+  status: ForgePromotionStatus;
+  forgeProjectId: string | null;
+  forgeStageId: string | null;
+  promotedAt: string | null;
+  lastError: string | null;
+  stageUrl: string | null;
+  idempotencyKey: string | null;
+}
+
+export interface TheForgePackPreview {
+  changeTitle: string;
+  stageKeySuggested: string;
+  userDescription: string;
+  hasMermaid: boolean;
+  erDiagramPreview: string | null;
+  modificationPlanFileCount: number;
+  modificationPlanSample: string[];
+  indexFresh: boolean;
+  indexStaleHours: number | null;
+  warnings: string[];
+  messageCount: number;
+}
+
+export interface PreviewTheForgePackResponse {
+  preview: TheForgePackPreview;
+  promoteEnabled: boolean;
+}
+
+export interface PromoteToTheForgeRequest {
+  stageName: string;
+  stageKey?: string;
+  deliverables: ForgeDeliverableKind[];
+  activate?: boolean;
+  forgeProjectId?: string;
+}
+
+export interface PromoteToTheForgeResponse {
+  status: 'success';
+  alreadyPromoted: boolean;
+  forgeProjectId: string | null;
+  forgeProjectName?: string;
+  forgeStageId: string | null;
+  stageKey?: string;
+  stageName?: string;
+  stageUrl?: string | null;
+  importMode?: 'create' | 'import';
+  legacyStart?: { triggered?: boolean; skipped?: boolean; reason?: string };
+  ariadneWire?: { linked?: boolean; linkKind?: string; warnings?: string[] };
+  recommendedNextTools?: string[];
+  deliverablesCreated?: string[];
+  warnings?: string[];
+  linkKind?: string;
+}
+
+export interface ForgeProjectCandidate {
+  forgeProjectId: string;
+  forgeProjectName: string;
+  linkKind: string;
+}
+
+/** Estado público: ¿mostrar promoción chat → The Forge? */
+export interface TheForgeIntegrationStatus {
+  chatPromotionAvailable: boolean;
+  mock: boolean;
+  enabled: boolean;
+}
+
+/** Ajustes admin (The Forge opcional). */
+export interface TheForgeIntegrationSettings {
+  enabled: boolean;
+  apiUrl: string | null;
+  hasServiceToken: boolean;
+  serviceTokenHint: string | null;
+  envApiUrlConfigured: boolean;
+}
+
+export interface UpdateTheForgeIntegrationDto {
+  enabled?: boolean;
+  apiUrl?: string | null;
+  serviceToken?: string | null;
+}
+
 /** Metadatos de `POST .../analyze` (caché, foco, cobertura). */
 export interface AnalyzeReportMeta {
   scopeApplied: boolean;

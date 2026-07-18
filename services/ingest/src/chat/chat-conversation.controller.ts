@@ -3,6 +3,8 @@
  */
 import { Body, Controller, Delete, Get, Headers, Param, Patch, Post } from '@nestjs/common';
 import { actorFromHeaders } from '../credentials/credential-actor';
+import type { PromoteToTheForgeBody } from '../theforge/theforge-promotion.service';
+import { TheForgePromotionService } from '../theforge/theforge-promotion.service';
 import { ChatConversationService } from './chat-conversation.service';
 
 @Controller('repositories/:repositoryId/conversations')
@@ -51,7 +53,10 @@ export class ProjectChatConversationsController {
 
 @Controller('conversations')
 export class ChatConversationsController {
-  constructor(private readonly service: ChatConversationService) {}
+  constructor(
+    private readonly service: ChatConversationService,
+    private readonly forgePromotion: TheForgePromotionService,
+  ) {}
 
   @Get(':conversationId/messages')
   getMessages(
@@ -85,5 +90,31 @@ export class ChatConversationsController {
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
     return this.service.remove(actorFromHeaders(headers), conversationId);
+  }
+
+  @Get(':conversationId/forge-promotion')
+  getForgePromotion(
+    @Param('conversationId') conversationId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.forgePromotion.getPromotionState(actorFromHeaders(headers), conversationId);
+  }
+
+  @Post(':conversationId/preview-theforge-pack')
+  previewTheForgePack(
+    @Param('conversationId') conversationId: string,
+    @Body() body: Partial<PromoteToTheForgeBody>,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.forgePromotion.previewPack(actorFromHeaders(headers), conversationId, body ?? {});
+  }
+
+  @Post(':conversationId/promote-to-theforge')
+  promoteToTheForge(
+    @Param('conversationId') conversationId: string,
+    @Body() body: PromoteToTheForgeBody,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.forgePromotion.promote(actorFromHeaders(headers), conversationId, body);
   }
 }

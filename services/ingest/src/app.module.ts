@@ -40,6 +40,7 @@ import { ChatConversationEntity } from './chat/entities/chat-conversation.entity
 import { ChatMessageEntity } from './chat/entities/chat-message.entity';
 import { MddPersistenceModule } from './mdd-persistence/mdd-persistence.module';
 import { BrownfieldModule } from './brownfield/brownfield.module';
+import { TheForgeIntegrationEntity } from './theforge/entities/theforge-integration.entity';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { BrownfieldModule } from './brownfield/brownfield.module';
         MddSnapshotEntity,
         ChatConversationEntity,
         ChatMessageEntity,
+        TheForgeIntegrationEntity,
       ],
       synchronize: true,
       logging: process.env.NODE_ENV === 'development',

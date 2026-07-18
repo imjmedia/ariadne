@@ -354,6 +354,39 @@ export const api = {
   deleteConversation: (conversationId: string) =>
     request<void>(`/conversations/${conversationId}`, { method: 'DELETE' }),
 
+  getConversationForgePromotion: (conversationId: string) =>
+    request<import('./types').ForgePromotionState>(`/conversations/${conversationId}/forge-promotion`),
+
+  previewTheForgePack: (
+    conversationId: string,
+    body: Partial<import('./types').PromoteToTheForgeRequest>,
+  ) =>
+    request<import('./types').PreviewTheForgePackResponse>(
+      `/conversations/${conversationId}/preview-theforge-pack`,
+      { method: 'POST', body: JSON.stringify(body ?? {}) },
+    ),
+
+  promoteConversationToTheForge: (
+    conversationId: string,
+    body: import('./types').PromoteToTheForgeRequest,
+  ) =>
+    request<import('./types').PromoteToTheForgeResponse>(
+      `/conversations/${conversationId}/promote-to-theforge`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getTheForgeIntegrationStatus: () =>
+    request<import('./types').TheForgeIntegrationStatus>('/theforge-integration/status'),
+
+  getTheForgeIntegrationSettings: () =>
+    request<import('./types').TheForgeIntegrationSettings>('/theforge-integration'),
+
+  updateTheForgeIntegrationSettings: (body: import('./types').UpdateTheForgeIntegrationDto) =>
+    request<import('./types').TheForgeIntegrationSettings>('/theforge-integration', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
   listBitbucketWorkspaces: (credentialsRef: string) =>
     request<Array<{ slug: string; name?: string }>>(
       `/providers/bitbucket/workspaces?credentialsRef=${encodeURIComponent(credentialsRef)}`,

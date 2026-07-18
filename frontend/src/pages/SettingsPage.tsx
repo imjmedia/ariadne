@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { SettingsTheForgeCard } from './SettingsTheForgeCard';
 
 interface FormState {
   provider: LlmProviderId;
@@ -478,6 +479,8 @@ export function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      <SettingsTheForgeCard />
     </div>
   );
 }

@@ -34,6 +34,27 @@ export class ChatConversationEntity {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
 
+  @Column({ name: 'forge_project_id', type: 'varchar', length: 64, nullable: true })
+  forgeProjectId!: string | null;
+
+  @Column({ name: 'forge_stage_id', type: 'varchar', length: 64, nullable: true })
+  forgeStageId!: string | null;
+
+  @Column({ name: 'forge_stage_url', type: 'varchar', length: 512, nullable: true })
+  forgeStageUrl!: string | null;
+
+  @Column({ name: 'forge_promoted_at', type: 'timestamptz', nullable: true })
+  forgePromotedAt!: Date | null;
+
+  @Column({ name: 'forge_promotion_status', type: 'varchar', length: 16, nullable: true })
+  forgePromotionStatus!: string | null;
+
+  @Column({ name: 'forge_promotion_idempotency_key', type: 'varchar', length: 64, nullable: true })
+  forgePromotionIdempotencyKey!: string | null;
+
+  @Column({ name: 'forge_promotion_last_error', type: 'text', nullable: true })
+  forgePromotionLastError!: string | null;
+
   @OneToMany(() => ChatMessageEntity, (m) => m.conversation)
   messages?: ChatMessageEntity[];
 }

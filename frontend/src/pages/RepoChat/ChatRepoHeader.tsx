@@ -19,6 +19,10 @@ export function ChatRepoHeader(props: {
   newConversationDisabled?: boolean;
   onOpenAnalysis: () => void;
   analysisPending: boolean;
+  activeConversationId?: string | null;
+  forgePromoteDisabled?: boolean;
+  forgeDefaultStageName?: string;
+  forgePromotionAvailable?: boolean;
   headerLeadingExtra?: ReactNode;
 }) {
   return (
@@ -42,6 +46,10 @@ export function ChatRepoHeader(props: {
       newConversationDisabled={props.newConversationDisabled}
       onOpenAnalysis={props.onOpenAnalysis}
       analysisPending={props.analysisPending}
+      activeConversationId={props.activeConversationId}
+      forgePromoteDisabled={props.forgePromoteDisabled}
+      forgeDefaultStageName={props.forgeDefaultStageName}
+      forgePromotionAvailable={props.forgePromotionAvailable}
       headerLeadingExtra={props.headerLeadingExtra}
       modeSelectId="repo-chat-mode-popover"
     />

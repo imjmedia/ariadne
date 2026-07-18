@@ -1,7 +1,7 @@
 /**
  * @fileoverview Módulo Chat: NL→Cypher. Pipeline unificado Retriever (Cypher + archivos + RAG) → Synthesizer.
  */
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IndexedFile } from '../repositories/entities/indexed-file.entity';
 import { ChatController } from './chat.controller';
@@ -29,6 +29,7 @@ import {
   RepositoryChatConversationsController,
 } from './chat-conversation.controller';
 import { ChatConversationService } from './chat-conversation.service';
+import { TheForgeModule } from '../theforge/theforge.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ChatConversationService } from './chat-conversation.service';
     RepositoriesModule,
     EmbeddingModule,
     ProjectsModule,
+    forwardRef(() => TheForgeModule),
   ],
   controllers: [
     ChatController,

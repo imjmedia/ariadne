@@ -22,6 +22,7 @@ import { ChatMessageThread } from './RepoChat/ChatMessageThread';
 import { ChatPageHeader } from './RepoChat/ChatPageHeader';
 import { ChatProjectScopeOptions } from './RepoChat/ChatProjectScopeOptions';
 import { useChatPersistence } from './RepoChat/useChatPersistence';
+import { useTheForgeChatPromotion } from './RepoChat/useTheForgeChatPromotion';
 import {
   chatNavBtnClass,
   chatPageMaxClass,
@@ -70,6 +71,8 @@ export function ProjectChat() {
     ensureActiveConversation,
     persistMessage,
   } = persistence;
+
+  const { available: forgePromotionAvailable } = useTheForgeChatPromotion();
 
   useEffect(() => {
     if (!project?.repositories?.length) return;
@@ -321,6 +324,7 @@ export function ProjectChat() {
   const analysisPending = Boolean(analysisResult || loadingAnalysis || analysisError);
   const codeAnalysisDisabled = repoCount === 0 || (repoCount > 1 && !selectedRepoId);
   const chatBusy = loading || messagesLoading || conversationsLoading;
+  const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
   return (
     <div className={chatPageSplitClass}>
@@ -358,6 +362,10 @@ export function ProjectChat() {
         newConversationDisabled={chatBusy}
         onOpenAnalysis={() => setAnalysisOpen(true)}
         analysisPending={analysisPending}
+        activeConversationId={activeConversationId}
+        forgePromoteDisabled={chatBusy || messages.length === 0}
+        forgeDefaultStageName={activeConversation?.title ?? undefined}
+        forgePromotionAvailable={forgePromotionAvailable}
         headerLeadingExtra={
           <ChatConversationsMobileToggle onOpen={() => setHistoryOpen(true)} />
         }
