@@ -161,6 +161,7 @@ import {
   filterGatheredContextByTargetRepo,
   repoIdsInCollectedResults,
 } from './chat-preflight-scope.util';
+import { isCodigoMuertoInfrastructurePath } from './codigo-muerto-path.util';
 import {
   inferChatRepoScopeFromMessage,
   isChatRoleScopeInferenceEnabled,
@@ -1824,6 +1825,7 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
 
     for (const path of filePaths) {
       if (isTestOrStory(path)) continue;
+      if (isCodigoMuertoInfrastructurePath(path)) continue;
 
       const shortName = path.split('/').pop() ?? path;
       const importers =
@@ -1855,6 +1857,7 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
       '# ANÁLISIS DE CÓDIGO MUERTO',
       '',
       'Clasificación automática tras verificación de imports en contenido de archivos (hasta 150 archivos).',
+      'Se excluyen manifiestos, configs de build, HTML de entrada, documentación y assets estáticos.',
       '**No añadir categoría "Revisar"** — la verificación ya se ejecutó.',
       '',
     ];
@@ -1978,6 +1981,8 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
     }> = [];
 
     for (const d of deadFiles) {
+      if (isCodigoMuertoInfrastructurePath(d.path)) continue;
+
       const baseName = d.shortName.replace(/\.(tsx?|jsx?|js)$/, '');
       const pathSeg = d.path.replace(/\\/g, '/').replace(/\.(tsx?|jsx?|js)$/i, '');
       const pathTail = pathSeg.split('/').slice(-2).join('/');

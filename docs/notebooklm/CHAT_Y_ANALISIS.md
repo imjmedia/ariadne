@@ -113,7 +113,8 @@ Todas las preguntas pasan por el mismo pipeline. No hay clasificación code vs k
 - **Consultas:** `File IMPORTS`, `File CONTAINS`, `RENDERS`, `CALLS`, `Route`.
 - **Por archivo:** (1) ruta exacta, (2) referencias (quién importa, quién renderiza componentes, quién llama funciones), (3) detalle funcional (Componentes/Funciones/Modelos), (4) conclusión (Sí se usa / No se usa).
 - **Resumen:** Tabla final con Archivo | Ruta | Estado | Notas.
-- **Entradas:** index.tsx, main.tsx, App.tsx y componentes en Route se consideran usados.
+- **Entradas:** index.tsx, main.tsx, App.tsx, index.html y componentes en Route se consideran usados o infraestructura (no candidatos).
+- **Excluidos del informe:** `package.json`, configs (`*.config.js`, postcss/vite/tailwind/eslint…), `.md`, `.html`, locks, `.json` de manifiesto y assets estáticos — no son módulos eliminables aunque no tengan exports en el grafo.
 - **Normalización de paths:** Para reducir falsos positivos (archivos usados pero marcados como muertos), al construir y consultar IMPORTS se usa una forma canónica: barras unificadas (`/`), extensión de módulo quitada (`.ts`/`.tsx`/`.js`/`.jsx`). Así, si el grafo tiene la arista con un path y el archivo se guarda con otro (por extensión o barras), se considera que tiene importers. La verificación por contenido (import/require en otros archivos) usa además términos derivados del path (baseName, pathTail, pathSeg) para detectar referencias aunque el grafo no tenga la arista.
 
 ---
