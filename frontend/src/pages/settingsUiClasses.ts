@@ -16,3 +16,16 @@ export const settingsToggleFieldClass = cn(
 );
 
 export const settingsAlertClass = 'rounded-xl';
+
+export const settingsTabListClass = cn(
+  'flex w-full flex-wrap gap-1 rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_22%,var(--card))] p-1',
+);
+
+export function settingsTabPillClass(active: boolean): string {
+  return cn(
+    'min-h-9 flex-1 rounded-xl px-3 py-2 text-center text-xs font-medium transition-colors sm:flex-none sm:px-4 sm:text-sm',
+    active
+      ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm ring-1 ring-[var(--border)]/80'
+      : 'text-[var(--foreground-muted)] hover:bg-[var(--card)]/40 hover:text-[var(--foreground)]',
+  );
+}
