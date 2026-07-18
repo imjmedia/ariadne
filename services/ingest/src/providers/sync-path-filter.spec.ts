@@ -48,6 +48,16 @@ describe('sync-path-filter (e2e / tests)', () => {
     expect(shouldSkipWalkDirectory('migrations')).toBe(false);
   });
 
+  it('incluye extensiones CSS y HTML (Python/Rust/SQL en roadmap)', () => {
+    expect(shouldSyncIndexPath('backend/models/user.py')).toBe(false);
+    expect(shouldSyncIndexPath('src/lib.rs')).toBe(false);
+    expect(shouldSyncIndexPath('db/schema.sql')).toBe(false);
+    expect(shouldSyncIndexPath('styles/theme.css')).toBe(true);
+    expect(shouldSyncIndexPath('styles/theme.scss')).toBe(true);
+    expect(shouldSyncIndexPath('public/index.html')).toBe(true);
+    expect(shouldSyncIndexPath('public/legacy.htm')).toBe(true);
+  });
+
   it('sigue indexando código normal', () => {
     expect(shouldSyncIndexPath('src/features/Login.tsx')).toBe(true);
     expect(shouldSyncIndexPath('src/lib/utils.spec.ts')).toBe(false);

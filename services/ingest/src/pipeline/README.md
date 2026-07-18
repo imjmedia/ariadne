@@ -1,6 +1,6 @@
 # Pipeline de ingesta (FalkorDB)
 
-- **parser.ts** — Tree-sitter: TS/JS/JSX, componentes, Nest, rutas React Router (`RouteInfo.enclosingComponent`), **entidades TypeORM** (`@Entity` en la clase o en la línea sobre `export class`/`export abstract class` → `:Model` con `source=typeorm` + `fieldSummary`; también `abstract_class_declaration`), **tsconfig.json** / **.env.example** (nodo `File` con `fileRole`). **Clase PascalCase → `:Component`:** solo si hay JSX en el archivo, extensión `.tsx` o `extends React.Component` (evita falsos positivos en `.ts` Nest). **`@Roles()`** en `@Controller`: literales/identificadores en clase y métodos → `NestControllerInfo.roles` → grafo `:AccessRole` + `ALLOWS_ACCESS_ROLE` en **producer**. Los **`.prisma`** no se parsean aquí: **`prisma-extract.ts`** en sync. `Parser.parse` usa `bufferSize` acorde al tamaño UTF-8 del archivo (el binding por defecto ~32 KiB lanza `Invalid argument` si el código es más largo). Si aún falla, fallback truncado (`TRUNCATE_PARSE_MAX_BYTES`).
+- **parser.ts** — Tree-sitter: TS/JS/JSX, componentes, Nest, rutas React Router (`RouteInfo.enclosingComponent`), **entidades TypeORM** (`typeorm-entity-metadata.ts`: `@Entity`/`@Embeddable` → `:Model`, `tableName`, columnas, relaciones, `@Index`), **CSS/HTML** (`.css/.scss/.html` vía `static-asset-extract.ts` → `:StaticAsset`), …
 - **storybook-documentation.ts** — Detección de rutas Storybook, parseo MDX/MD y markdown general (`README`, `docs/`, …).
 - **producer.ts** — … **Strapi:** `:StrapiContentType` (con `strapiUid`), `:StrapiRoute`, `:StrapiController`/`:StrapiService` (API y **`src/plugins/**`**), `(File)-[:LIFECYCLE_OF]->(StrapiContentType)`; **`fileRole`**: `strapi_config`, `strapi_plugin`.
 - **tsconfig-resolve.ts** — Merge de `tsconfig`/`jsconfig` con `extends` (TypeScript API) para aliases en imports (docs → `*_TARGETS_FILE`).
@@ -16,7 +16,11 @@
 - **strapi-openapi-route-match.ts** — Coincidencia `OpenApiOperation.pathTemplate` ↔ `StrapiRoute.routePath`.
 - **react-route-public-entry.ts** — Clasifica rutas React públicas (`urbanos/public`, `visualizacionCampania`) → `Route.isPublicEntry`; post-sync `ENTRY_CONSUMES` / `ENTRY_REACHES_API`.
 - **openapi-spec-ingest.ts** — `swagger.json`, `openapi.{yaml,yml,json}`, **`full_documentation.json`**, `src/**/documentation/**/*.json` (OpenAPI Strapi): `File.openApiTruth`, nodos `OpenApiOperation` (MERGE por `pathTemplate+method+projectId+repoId`, sin duplicar por `specPath`; preferencia `full_documentation.json`), relación `DEFINES_OP`.
-- **prisma-extract.ts** — `getDMMF` (`@prisma/internals`): nodos `Model`, `Enum`, relaciones `RELATES_TO` / `USES_ENUM`; propiedad `fieldSummary` (JSON de campos).
+- **prisma-extract.ts** — …
+- **typeorm-entity-metadata.ts** — AST TypeORM: tabla, columnas, `@Embedded`, `@Index`/`@Unique`, relaciones (`@JoinColumn`, `@JoinTable`), inferencia `*Id` + nav prop.
+- **static-asset-extract.ts** — CSS/SCSS (vars, selectores, media, keyframes) y HTML (tags, ids, links, title) → `:StaticAsset` con `detailJson`.
+- **ROADMAP_INDEX_LANGUAGES.md** — Python, Rust, SQL suelto (fuera de alcance P0).
+- **INDEX_COVERAGE.md** — Matriz de cobertura orientativa por lenguaje/fuente (no hay % automático por repo).
 - **schema-relational-rag-doc.ts** — Tras Prisma/OpenAPI en `runFullSync`, genera un `:MarkdownDoc` sintético en path reservado `graph-internal/relational-schema-rag-index.md` (virtual; no en `indexed_files`): prosa tipo «esquema relacional» (Prisma DMMF, entidades TypeORM, **Strapi content-types y routes**, lista de operaciones OpenAPI) para RAG. El path evita prefijos tratados como no-evidencia de código (`ariadne-internal/`, `docs/`, …) alineados con **`../chat/chat-evidence-path-filter.ts`**.
 - **project.ts**, **falkor.ts**, **domain-*** — Proyecto Falkor y dominio.
 

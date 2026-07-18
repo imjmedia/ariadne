@@ -1,26 +1,31 @@
 /**
  * Detección de intención de esquema (ariadne-common) + Cypher determinista para FalkorDB.
+ * Import directo del módulo util (evita cargar logger/pino vía barrel de ariadne-common en tests).
  */
 export {
   SCHEMA_MODEL_SOURCES,
   wantsArchitectureDomainQuestion,
   wantsReengineeringQuestion,
   wantsSchemaDatabaseQuestion,
-} from 'ariadne-common';
+} from 'ariadne-common/dist/chat-schema-question.util.js';
 
-/** `:Model` de esquema real (Prisma/TypeORM), excluye DTOs heurísticos del frontend. */
+/** Aligned with `SCHEMA_MODEL_SOURCES` in ariadne-common. */
+const PERSISTENCE_MODEL_SOURCES = ['prisma', 'typeorm'] as const;
+const SCHEMA_SOURCES_CYPHER = PERSISTENCE_MODEL_SOURCES.map((s) => `'${s}'`).join(', ');
+
+/** `:Model` de esquema real (Prisma/TypeORM/SQL), excluye DTOs heurísticos del frontend. */
 export function schemaOrmModelsCypher(limit: number): string {
   return `MATCH (m:Model)
-WHERE m.projectId = $projectId AND m.source IN ['prisma', 'typeorm']
+WHERE m.projectId = $projectId AND m.source IN [${SCHEMA_SOURCES_CYPHER}]
 AND NOT (m.path CONTAINS '/migrations/' OR m.path CONTAINS '/migration/')
-RETURN m.name AS name, m.source AS source, m.path AS path, coalesce(m.fieldSummary, '') AS fieldSummary, coalesce(m.repoId, m.projectId) AS repoId
+RETURN m.name AS name, m.source AS source, m.path AS path, coalesce(m.fieldSummary, '') AS fieldSummary, coalesce(m.tableName, '') AS tableName, coalesce(m.repoId, m.projectId) AS repoId
 ORDER BY m.source, m.name
 LIMIT ${limit}`;
 }
 
 export function schemaOrmModelRelationsCypher(limit: number): string {
   return `MATCH (a:Model)-[r:RELATES_TO]->(b:Model)
-WHERE a.projectId = $projectId AND b.projectId = $projectId AND a.source IN ['prisma', 'typeorm']
+WHERE a.projectId = $projectId AND b.projectId = $projectId AND a.source IN [${SCHEMA_SOURCES_CYPHER}]
 RETURN a.name AS fromEntity, b.name AS toEntity, coalesce(r.field, '') AS field, coalesce(a.repoId, a.projectId) AS repoId
 ORDER BY a.name, b.name
 LIMIT ${limit}`;

@@ -14,6 +14,8 @@ export const FALKOR_EMBEDDABLE_NODE_LABELS = [
   'Model',
   /** Prisma enums (`prisma-extract`). */
   'Enum',
+  /** CSS/HTML y assets estáticos indexados. */
+  'StaticAsset',
   /** Contratos HTTP OpenAPI / Strapi documentation plugin. */
   'OpenApiOperation',
   /** NestJS HTTP routes (semantic search). */

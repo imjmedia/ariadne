@@ -68,7 +68,7 @@ import {
   schemaStrapiContentTypesCypher,
   schemaStrapiRelationsCypher,
 } from './chat-schema-question.util';
-import { inferTypeOrmRelationsFromModels } from '../pipeline/typeorm-schema.util';
+import { buildErDiagramMermaid } from './er-diagram-mermaid.util';
 import {
   computeRiskScore,
   groupDuplicates,
@@ -3068,12 +3068,12 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       lines.push('');
     }
 
-    const { diagram: mermaid, usedInference } = this.buildErDiagramMermaid(
+    const { diagram: mermaid, usedInference } = buildErDiagramMermaid({
       contentTypes,
       ctRel,
       models,
       modelRel,
-    );
+    });
     if (mermaid) {
       lines.push('### Diagrama entidad-relación (Mermaid)');
       lines.push('');
@@ -3122,60 +3122,6 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     const header = `> **Modo:** reingeniería · ingest legacy (activa \`ORCHESTRATOR_URL\` para router multi-agente)\n\n`;
     return {
       answer: `${header}**Pregunta:** ${message.trim()}\n\n${analysis.summary}${filesBlock}`,
-    };
-  }
-
-  /** Nombre de entidad seguro para Mermaid (alfanumérico/underscore). */
-  private sanitizeMermaidEntity(name: string): string {
-    const cleaned = (name ?? '').replace(/[^A-Za-z0-9_]/g, '_').replace(/^_+|_+$/g, '');
-    return cleaned || 'Entity';
-  }
-
-  /**
-   * Genera un bloque `erDiagram` de Mermaid a partir de relaciones indexadas.
-   * Para TypeORM sin aristas `RELATES_TO`, infiere FK desde `fieldSummary` indexado.
-   */
-  private buildErDiagramMermaid(
-    contentTypes: Record<string, unknown>[],
-    ctRel: Record<string, unknown>[],
-    models: Record<string, unknown>[],
-    modelRel: Record<string, unknown>[],
-  ): { diagram: string | null; usedInference: boolean } {
-    const rels: string[] = [];
-    const seen = new Set<string>();
-    let indexedRelCount = 0;
-    const pushRel = (from: unknown, to: unknown, label: string) => {
-      const a = this.sanitizeMermaidEntity(String(from ?? ''));
-      const b = this.sanitizeMermaidEntity(String(to ?? ''));
-      if (!a || !b) return;
-      const lbl = (label || 'rel').replace(/[^A-Za-z0-9_ -]/g, '').trim().slice(0, 40) || 'rel';
-      const line = `  ${a} ||--o{ ${b} : "${lbl}"`;
-      if (seen.has(line)) return;
-      seen.add(line);
-      rels.push(line);
-    };
-
-    for (const r of ctRel) {
-      pushRel(r.fromEntity, r.toEntity, String(r.relation || r.attribute || 'rel'));
-      indexedRelCount++;
-    }
-    for (const r of modelRel) {
-      pushRel(r.fromEntity, r.toEntity, String(r.field || 'rel'));
-      indexedRelCount++;
-    }
-
-    const beforeInference = rels.length;
-    for (const r of inferTypeOrmRelationsFromModels(models)) {
-      pushRel(r.fromEntity, r.toEntity, r.field);
-    }
-    const usedInference = indexedRelCount === 0 && rels.length > beforeInference;
-
-    if (rels.length === 0) return { diagram: null, usedInference: false };
-
-    const maxRel = 200;
-    return {
-      diagram: ['erDiagram', ...rels.slice(0, maxRel)].join('\n'),
-      usedInference,
     };
   }
 

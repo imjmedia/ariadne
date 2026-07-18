@@ -42,7 +42,41 @@ export class Attendee {
     const r = parseSource('src/entities/attendee.entity.ts', src);
     const model = r?.models?.find((m) => m.name === 'Attendee');
     expect(model?.entityRelations).toEqual([
-      { field: 'event', targetType: 'EventEntity', relationKind: 'ManyToOne' },
+      {
+        field: 'event',
+        targetType: 'EventEntity',
+        relationKind: 'ManyToOne',
+        joinColumn: 'event_id',
+        joinTable: undefined,
+      },
     ]);
+  });
+
+  it('persiste tableName, indexSummary y embeddable', () => {
+    const src = `@Entity('payments')
+@Index(['status'])
+export class Payment {
+  @Column() amount!: number;
+}
+
+@Embeddable()
+export class Money {
+  @Column() value!: number;
+}
+`;
+    const r = parseSource('src/entities/payment.entity.ts', src);
+    const payment = r?.models?.find((m) => m.name === 'Payment');
+    expect(payment?.tableName).toBe('payments');
+    expect(payment?.indexSummary).toContain('Index(');
+    const money = r?.models?.find((m) => m.name === 'Money');
+    expect(money?.embeddable).toBe(true);
+    expect(money?.source).toBe('typeorm');
+  });
+
+  it('indexa CSS como StaticAsset', () => {
+    const css = ':root { --x: 1; } .btn { color: red; }';
+    const r = parseSource('src/styles/theme.css', css);
+    expect(r?.staticAssets?.[0]?.kind).toBe('css');
+    expect(r?.staticAssets?.[0]?.cssDetail?.customProperties).toContain('--x');
   });
 });

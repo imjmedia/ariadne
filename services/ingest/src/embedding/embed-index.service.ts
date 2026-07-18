@@ -441,19 +441,63 @@ export class EmbedIndexService {
       }
     }
 
-    // ── Models ─────────────────────────────────────────────────────────────
-    const modelRes = (await graph.query(
-      `MATCH (m:Model) WHERE m.projectId = $projectId AND m.repoId = $repoId RETURN m.path AS path, m.name AS name, m.description AS description, m.fieldSummary AS fieldSummary, m.source AS source`,
+    // ── StaticAsset (CSS/HTML) ─────────────────────────────────────────────
+    const saRes = (await graph.query(
+      `MATCH (sa:StaticAsset) WHERE sa.projectId = $projectId AND sa.repoId = $repoId AND sa.summary IS NOT NULL RETURN sa.path AS path, sa.kind AS kind, sa.summary AS summary, sa.tokensJson AS tokensJson, sa.detailJson AS detailJson`,
       { params: { projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
     )) as { data?: unknown[] };
-    const modelRows = (modelRes.data ?? []).map(r => rowAsRecord(r, ['path', 'name', 'description', 'fieldSummary', 'source']));
+    const saRows = (saRes.data ?? []).map((r) => rowAsRecord(r, ['path', 'kind', 'summary', 'tokensJson', 'detailJson']));
+    const saItems: DocNodeItem[] = saRows
+      .map((r) => ({
+        text: [String(r.kind ?? ''), String(r.path ?? ''), String(r.summary ?? ''), String(r.tokensJson ?? ''), String(r.detailJson ?? '')]
+          .filter(Boolean)
+          .join('\n')
+          .slice(0, 12_000),
+        path: String(r.path ?? ''),
+      }))
+      .filter((i) => i.text.length >= 12);
+
+    const saEmbeds = await embedAll(
+      saItems.map((i) => i.text),
+      embed,
+      batchSize,
+      concurrency,
+    );
+    const saSuccesses = saItems.map((item, i) => ({ item, result: saEmbeds[i] })).filter(({ result }) => result.ok);
+    errors += saEmbeds.filter((r) => !r.ok).length;
+
+    for (const chunk of chunkArray(saSuccesses, batchSize)) {
+      const batch = chunk.map(({ item, result }) => ({
+        path: item.path,
+        vec: (result as { ok: true; vec: number[] }).vec,
+      }));
+      try {
+        await graph.query(
+          `UNWIND $batch AS item MATCH (sa:StaticAsset {path: item.path, projectId: $projectId, repoId: $repoId}) SET sa.${prop} = vecf32(item.vec)`,
+          { params: { batch, projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
+        );
+        indexed += chunk.length;
+      } catch (e) {
+        errors += chunk.length;
+        if (errors <= 3) {
+          console.warn(`[embed-index] StaticAsset UNWIND write failed:`, e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+
+    // ── Models ─────────────────────────────────────────────────────────────
+    const modelRes = (await graph.query(
+      `MATCH (m:Model) WHERE m.projectId = $projectId AND m.repoId = $repoId RETURN m.path AS path, m.name AS name, m.description AS description, m.fieldSummary AS fieldSummary, m.source AS source, m.tableName AS tableName, m.indexSummary AS indexSummary`,
+      { params: { projectId: falkorProjectId, repoId: repositoryIdForFileContent } },
+    )) as { data?: unknown[] };
+    const modelRows = (modelRes.data ?? []).map(r => rowAsRecord(r, ['path', 'name', 'description', 'fieldSummary', 'source', 'tableName', 'indexSummary']));
     interface ModelItem { text: string; path: string; name: string }
     const modelItems: ModelItem[] = modelRows
       .map(r => {
         const path = String(r.path ?? '');
         const name = String(r.name ?? '');
         const source = r.source != null ? String(r.source) : '';
-        const text = [name, path, source && `source:${source}`, r.description != null ? String(r.description) : '', r.fieldSummary != null ? `fields:${String(r.fieldSummary)}` : '']
+        const text = [name, path, source && `source:${source}`, r.tableName != null ? `table:${String(r.tableName)}` : '', r.indexSummary != null ? `indexes:${String(r.indexSummary)}` : '', r.description != null ? String(r.description) : '', r.fieldSummary != null ? `fields:${String(r.fieldSummary)}` : '']
           .filter(Boolean).join('\n').slice(0, 12_000);
         return { text, path, name };
       })

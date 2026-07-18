@@ -286,6 +286,9 @@ export function buildCypherForFile(
   for (const m of parsed.models ?? []) {
     const sets: string[] = [];
     if (m.source) sets.push(`m.source = ${cypherSafe(m.source)}`);
+    if (m.tableName?.trim()) sets.push(`m.tableName = ${cypherSafe(m.tableName.trim())}`);
+    if (m.embeddable) sets.push(`m.embeddable = true`);
+    if (m.indexSummary?.trim()) sets.push(`m.indexSummary = ${cypherSafe(m.indexSummary.trim())}`);
     if (m.entityFields?.length) {
       sets.push(`m.fieldSummary = ${cypherSafe(JSON.stringify(m.entityFields.slice(0, 120)))}`);
     }
@@ -305,10 +308,30 @@ export function buildCypherForFile(
       const targetName =
         resolveTypeOrmTargetName(rel.targetType, modelNamesInFile) ??
         (rel.targetType.endsWith('Entity') ? rel.targetType.slice(0, -6) : rel.targetType);
+      const relSets: string[] = [`r.field = ${cypherSafe(rel.field)}`];
+      if (rel.relationKind) relSets.push(`r.relationKind = ${cypherSafe(rel.relationKind)}`);
+      if (rel.joinColumn?.trim()) relSets.push(`r.joinColumn = ${cypherSafe(rel.joinColumn.trim())}`);
+      if (rel.joinTable?.trim()) relSets.push(`r.joinTable = ${cypherSafe(rel.joinTable.trim())}`);
+      const relSetClause = relSets.join(', ');
       statements.push(
-        `MATCH (a:Model {path: ${cypherSafe(path)}, name: ${cypherSafe(m.name)}, projectId: ${pid}, repoId: ${rid}}) MATCH (b:Model {name: ${cypherSafe(targetName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (a)-[:RELATES_TO {field: ${cypherSafe(rel.field)}}]->(b)`,
+        `MATCH (a:Model {path: ${cypherSafe(path)}, name: ${cypherSafe(m.name)}, projectId: ${pid}, repoId: ${rid}}) MATCH (b:Model {name: ${cypherSafe(targetName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (a)-[r:RELATES_TO]->(b) ON CREATE SET ${relSetClause} ON MATCH SET ${relSetClause}`,
       );
     }
+  }
+
+  for (const asset of parsed.staticAssets ?? []) {
+    const detailJson = asset.cssDetail
+      ? JSON.stringify(asset.cssDetail)
+      : asset.htmlDetail
+        ? JSON.stringify(asset.htmlDetail)
+        : null;
+    const detailProp = detailJson ? `, sa.detailJson = ${cypherSafe(detailJson.slice(0, 8000))}` : '';
+    statements.push(
+      `MERGE (sa:StaticAsset {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET sa.kind = ${cypherSafe(asset.kind)}, sa.summary = ${cypherSafe(asset.summary.slice(0, 4000))}, sa.tokensJson = ${cypherSafe(JSON.stringify(asset.tokens.slice(0, 200)))}${detailProp} ON MATCH SET sa.kind = ${cypherSafe(asset.kind)}, sa.summary = ${cypherSafe(asset.summary.slice(0, 4000))}, sa.tokensJson = ${cypherSafe(JSON.stringify(asset.tokens.slice(0, 200)))}${detailProp}`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (sa:StaticAsset {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(sa)`,
+    );
   }
 
   for (const targetPath of resolvedImportPaths) {
@@ -712,6 +735,9 @@ const FALKOR_INDEXES = [
   'CREATE INDEX FOR (ct:StrapiContentType) ON (ct.projectId)',
   'CREATE INDEX FOR (ct:StrapiContentType) ON (ct.projectId, ct.repoId)',
   'CREATE INDEX FOR (ct:StrapiContentType) ON (ct.name)',
+  'CREATE INDEX FOR (sa:StaticAsset) ON (sa.projectId)',
+  'CREATE INDEX FOR (sa:StaticAsset) ON (sa.projectId, sa.repoId)',
+  'CREATE INDEX FOR (sa:StaticAsset) ON (sa.path)',
 ];
 
 /**
@@ -762,6 +788,7 @@ const REPOID_BACKFILL_LABELS = [
   'Document',
   'StorybookDoc',
   'MarkdownDoc',
+  'StaticAsset',
 ];
 
 /**

@@ -20,6 +20,8 @@ import {
 } from '../pipeline/strapi-path-patterns';
 
 const CODE_EXT = ['.js', '.jsx', '.ts', '.tsx'];
+/** CSS/SCSS y HTML indexados como :StaticAsset (Python/Rust/SQL → ROADMAP_INDEX_LANGUAGES.md). */
+const STATIC_ASSET_EXT = ['.css', '.scss', '.html', '.htm'];
 
 /** Segmentos de ruta que nunca se indexan (artefactos, deps, entornos). */
 export const SYNC_ALWAYS_SKIP_SEGMENTS = new Set([
@@ -138,6 +140,7 @@ export function shouldSyncIndexPath(path: string, opts?: { indexTests?: boolean 
   const ext = norm.slice(norm.lastIndexOf('.')).toLowerCase();
   const ignoreRe = shouldIndexTests(opts) ? /\.log$|\/\.env$|^\.env$/ : IGNORE_FILE;
   if (CODE_EXT.includes(ext) && !ignoreRe.test(norm)) return true;
+  if (STATIC_ASSET_EXT.includes(ext) && !ignoreRe.test(norm)) return true;
   if (ext === '.js' && (isStrapiConfigJsPath(norm) || isStrapiPluginSyncPath(norm)) && !ignoreRe.test(norm)) {
     return true;
   }

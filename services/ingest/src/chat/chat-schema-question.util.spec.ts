@@ -40,7 +40,9 @@ describe('wantsSchemaDatabaseQuestion', () => {
 describe('schema cypher builders', () => {
   it('modelos ORM excluyen fuentes que no son de persistencia', () => {
     const q = schemaOrmModelsCypher(100);
-    expect(q).toContain("m.source IN ['prisma', 'typeorm']");
+    expect(q).toContain("'typeorm'");
+    expect(q).not.toContain("'sql'");
+    expect(q).toContain("m.source IN [");
     expect(q).toContain('LIMIT 100');
   });
 

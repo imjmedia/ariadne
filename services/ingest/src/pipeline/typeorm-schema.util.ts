@@ -75,29 +75,30 @@ export function inferTypeOrmRelationsFromModels(
     const fieldLc = new Set(fields.map((f) => f.toLowerCase()));
 
     for (const field of fields) {
-      if (field === 'id' || field.endsWith('At')) continue;
+      const fieldName = field.split(':')[0]?.trim() || field;
+      if (fieldName === 'id' || fieldName.endsWith('At')) continue;
 
-      if (/Id$/.test(field) && field.length > 2) {
-        const base = field.slice(0, -2);
+      if (/Id$/.test(fieldName) && fieldName.length > 2) {
+        const base = fieldName.slice(0, -2);
         const toEntity = resolveTypeOrmModelName(base, index);
         if (toEntity && toEntity !== fromEntity) {
-          const key = `${fromEntity}|${toEntity}|${field}`;
+          const key = `${fromEntity}|${toEntity}|${fieldName}`;
           if (!seen.has(key)) {
             seen.add(key);
-            rels.push({ fromEntity, toEntity, field });
+            rels.push({ fromEntity, toEntity, field: fieldName });
           }
         }
         continue;
       }
 
-      const toEntity = resolveTypeOrmModelName(field, index);
+      const toEntity = resolveTypeOrmModelName(fieldName, index);
       if (!toEntity || toEntity === fromEntity) continue;
-      const fk = `${field}Id`;
+      const fk = `${fieldName}Id`;
       if (fieldLc.has(fk.toLowerCase())) {
-        const key = `${fromEntity}|${toEntity}|${field}`;
+        const key = `${fromEntity}|${toEntity}|${fieldName}`;
         if (!seen.has(key)) {
           seen.add(key);
-          rels.push({ fromEntity, toEntity, field });
+          rels.push({ fromEntity, toEntity, field: fieldName });
         }
       }
     }

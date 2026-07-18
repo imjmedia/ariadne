@@ -19,6 +19,15 @@ import {
   type StorybookDocumentationExtract,
 } from './storybook-documentation';
 import { extractStorybookCsfMetaTargets, isStorybookStoriesPath } from './storybook-csf-ast';
+import { parseStaticAssetSource, type StaticAssetInfo } from './static-asset-extract';
+import {
+  buildTypeOrmFieldSummary,
+  extractTypeOrmEntityIndexes,
+  extractTypeOrmEntityTableName,
+  extractTypeOrmFields,
+  extractTypeOrmRelations,
+  hasTypeOrmEmbeddableDecorator,
+} from './typeorm-entity-metadata';
 import { parseStrapiSchemaJson, buildStrapiUidFromSchema } from './strapi-schema-extract';
 import { parseStrapiRoutesFile } from './strapi-routes-extract';
 import {
@@ -221,16 +230,29 @@ export interface ModelInfo {
    * JSX) se etiquetan para poder excluirlos de respuestas de esquema/diagrama de BD.
    */
   source?: 'heuristic' | 'typeorm' | 'frontend';
-  /** Propiedades de columna detectadas en entidades TypeORM. */
+  /** Nombre físico de tabla (@Entity('…')). */
+  tableName?: string;
+  /** `@Embeddable` (no tabla raíz). */
+  embeddable?: boolean;
+  /** `@Index` / `@Unique` a nivel entidad (JSON array serializado). */
+  indexSummary?: string;
+  /** Propiedades de columna detectadas en entidades TypeORM / SQL. */
   entityFields?: string[];
-  /** Relaciones @ManyToOne/@OneToOne/@ManyToMany detectadas en la entidad. */
+  /** Relaciones @ManyToOne/@OneToOne/@ManyToMany/@OneToMany detectadas en la entidad. */
   entityRelations?: TypeOrmRelationInfo[];
 }
 
 export interface TypeOrmRelationInfo {
   field: string;
   targetType: string;
-  relationKind: 'ManyToOne' | 'OneToOne' | 'ManyToMany';
+  relationKind: 'ManyToOne' | 'OneToOne' | 'ManyToMany' | 'OneToMany';
+  joinColumn?: string;
+  joinTable?: string;
+}
+
+function mergeStaticAssetsIntoParsed(result: ParsedFile, assets: StaticAssetInfo[]): void {
+  if (!result.staticAssets) result.staticAssets = [];
+  result.staticAssets.push(...assets);
 }
 
 /** Heurística: ¿el path corresponde a un DTO/modelo de frontend (no esquema de BD)? */
@@ -293,6 +315,8 @@ export interface ParsedFile {
   routes: RouteInfo[];
   /** Modelos de datos (clases sin JSX, path Models/, nombre *Model). */
   models: ModelInfo[];
+  /** CSS/HTML indexados como activos estáticos. */
+  staticAssets?: StaticAssetInfo[];
   /** Conceptos de dominio (tipos, opciones) extraídos heurísticamente. */
   domainConcepts: DomainConceptInfo[];
   /** Docs Storybook (MDX/MD indexable): texto para embedding y enlaces heurísticos a :Component. */
@@ -674,6 +698,17 @@ export function parseSource(
   collectStrapiFromPath(path, source, result);
   collectStrapiRoutesFromPath(path, source, result);
 
+  const staticAsset = parseStaticAssetSource(path, source);
+  if (staticAsset) {
+    mergeStaticAssetsIntoParsed(result, staticAsset.staticAssets);
+    if (options.returnAst) {
+      const stubParser = new Parser();
+      stubParser.setLanguage(LANG_TS as Parameters<Parser['setLanguage']>[0]);
+      return { parsed: result, root: stubParser.parse('').rootNode, source };
+    }
+    return result.staticAssets?.length ? result : null;
+  }
+
   const normPathEarly = path.replace(/\\/g, '/');
   const lowerEarly = normPathEarly.toLowerCase();
   if (isStrapiConfigJsPath(normPathEarly)) {
@@ -822,11 +857,22 @@ export function parseSource(
       collectNestFromClass(node, source, result, name, nestKind);
       continue;
     }
-    if (hasTypeOrmEntityDecorator(node, source)) {
+    if (hasTypeOrmEntityDecorator(node, source) || hasTypeOrmEmbeddableDecorator(node, source)) {
       const description = getPrecedingJSDoc(source, node.startIndex);
-      const entityFields = extractTypeOrmColumnPropertyNames(node, source);
-      const entityRelations = extractTypeOrmEntityRelations(node, source);
-      result.models.push({ name, description, source: 'typeorm', entityFields, entityRelations });
+      const fields = extractTypeOrmFields(node, source);
+      const entityRelations = extractTypeOrmRelations(node, source);
+      const tableName = extractTypeOrmEntityTableName(node, source);
+      const indexes = extractTypeOrmEntityIndexes(node, source);
+      result.models.push({
+        name,
+        description,
+        source: 'typeorm',
+        tableName,
+        embeddable: hasTypeOrmEmbeddableDecorator(node, source) || undefined,
+        indexSummary: indexes.length ? JSON.stringify(indexes) : undefined,
+        entityFields: buildTypeOrmFieldSummary(fields),
+        entityRelations,
+      });
       continue;
     }
     const superClass = node.childForFieldName('superclass');
@@ -1356,81 +1402,6 @@ function hasTypeOrmEntityDecorator(classNode: Parser.SyntaxNode, source: string)
     if (name === 'Entity') return true;
   }
   return false;
-}
-
-/** Propiedades de clase/abstract class (sin métodos). */
-function extractTypeOrmColumnPropertyNames(classNode: Parser.SyntaxNode, source: string): string[] {
-  const body = classNode.childForFieldName('body');
-  if (!body) return [];
-  const names: string[] = [];
-  for (let i = 0; i < body.childCount; i++) {
-    const ch = body.child(i);
-    if (!ch) continue;
-    if (ch.type === 'public_field_definition') {
-      const nameNode = ch.childForFieldName('name');
-      if (nameNode) names.push(getNodeText(source, nameNode));
-    } else if (ch.type === 'property_signature') {
-      const nameNode = ch.childForFieldName('name');
-      if (nameNode) names.push(getNodeText(source, nameNode));
-    }
-  }
-  return names;
-}
-
-const TYPEORM_RELATION_DECORATORS = new Set(['ManyToOne', 'OneToOne', 'ManyToMany']);
-
-function extractTypeOrmEntityRelations(
-  classNode: Parser.SyntaxNode,
-  source: string,
-): TypeOrmRelationInfo[] {
-  const body = classNode.childForFieldName('body');
-  if (!body) return [];
-  const rels: TypeOrmRelationInfo[] = [];
-  for (let i = 0; i < body.childCount; i++) {
-    const ch = body.child(i);
-    if (!ch || ch.type !== 'public_field_definition') continue;
-    const nameNode = ch.childForFieldName('name');
-    if (!nameNode) continue;
-    const field = getNodeText(source, nameNode);
-    for (const dec of findNodesByType(ch, 'decorator')) {
-      const callee = getDecoratorCallExpressionCalleeName(dec, source);
-      if (!callee || !TYPEORM_RELATION_DECORATORS.has(callee)) continue;
-      const targetType = extractTypeOrmRelationTargetType(dec, source);
-      if (!targetType) continue;
-      rels.push({
-        field,
-        targetType,
-        relationKind: callee as TypeOrmRelationInfo['relationKind'],
-      });
-    }
-  }
-  return rels;
-}
-
-/** Primer argumento de @ManyToOne(() => TargetEntity) → TargetEntity */
-function extractTypeOrmRelationTargetType(dec: Parser.SyntaxNode, source: string): string | null {
-  const call = dec.childForFieldName('expression') ?? findNodesByType(dec, 'call_expression')[0];
-  if (!call || call.type !== 'call_expression') return null;
-  const args = call.childForFieldName('arguments');
-  if (!args) return null;
-  for (let i = 0; i < args.childCount; i++) {
-    const arg = args.child(i);
-    if (!arg || arg.type === ',' || arg.type === '(' || arg.type === ')') continue;
-    if (arg.type === 'arrow_function') {
-      const bodyNode = arg.childForFieldName('body') ?? arg.lastNamedChild;
-      if (!bodyNode) return null;
-      if (bodyNode.type === 'identifier') return getNodeText(source, bodyNode);
-      if (bodyNode.type === 'call_expression') {
-        const callee = bodyNode.childForFieldName('function') ?? bodyNode.childForFieldName('callee');
-        if (callee?.type === 'identifier') return getNodeText(source, callee);
-      }
-      const id = findNodesByType(bodyNode, 'identifier')[0];
-      return id ? getNodeText(source, id) : null;
-    }
-    if (arg.type === 'identifier') return getNodeText(source, arg);
-    break;
-  }
-  return null;
 }
 
 /** Callee del decorador: `Roles` en `@Roles()`, `Foo` en `@Foo.bar()`. */
