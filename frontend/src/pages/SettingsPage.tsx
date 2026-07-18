@@ -1,8 +1,8 @@
 /**
  * Global LLM settings (admin): provider catalog, API key, models, embeddings.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Eye, EyeOff, Lock, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 import { api } from '@/api';
 import type {
   LlmProviderCatalogEntry,
@@ -24,44 +24,16 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { panelIntroClass, sectionHeaderClass, sectionShellClass } from './RepoDetail/layoutClasses';
+import { sectionHeaderClass, sectionShellClass } from './RepoDetail/layoutClasses';
+import { SettingsDetailsSection } from './SettingsDetailsSection';
 import {
   settingsAlertClass,
   settingsCheckboxClass,
-  settingsFormSubsectionClass,
+  settingsPageClass,
+  settingsSectionBodyClass,
   settingsToggleFieldClass,
 } from './settingsUiClasses';
 import { SettingsTheForgeCard } from './SettingsTheForgeCard';
-
-const settingsPageClass = 'mx-auto max-w-3xl space-y-6 pb-10';
-
-function SettingsFormSection({
-  id,
-  title,
-  description,
-  children,
-  boxed = false,
-}: {
-  id: string;
-  title: string;
-  description?: string;
-  children: ReactNode;
-  boxed?: boolean;
-}) {
-  return (
-    <div className={boxed ? settingsFormSubsectionClass : 'space-y-4'} aria-labelledby={id}>
-      <div>
-        <h3 id={id} className="text-sm font-semibold text-[var(--foreground)]">
-          {title}
-        </h3>
-        {description ? (
-          <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)]">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </div>
-  );
-}
 
 interface FormState {
   provider: LlmProviderId;
@@ -106,6 +78,17 @@ function defaultForm(catalog: LlmProviderCatalogEntry[], settings?: LlmSettingsM
   };
 }
 
+function formUsesAdvancedLlmOptions(form: FormState): boolean {
+  return Boolean(
+    form.orchestratorChatModel.trim() ||
+      form.orchestratorRouterModel.trim() ||
+      form.orchestratorWorkerModel.trim() ||
+      !form.chatIntentRouterEnabled ||
+      form.httpReferer.trim() ||
+      (form.appTitle.trim() && form.appTitle !== 'Ariadne'),
+  );
+}
+
 export function SettingsPage() {
   const user = getUser();
   const isAdmin = user?.role === 'admin';
@@ -144,6 +127,11 @@ export function SettingsPage() {
   const selectedCatalog = useMemo(
     () => catalog.find((c) => c.id === form?.provider),
     [catalog, form?.provider],
+  );
+
+  const advancedOpenByDefault = useMemo(
+    () => (form ? formUsesAdvancedLlmOptions(form) : false),
+    [form],
   );
 
   const handleProviderChange = (provider: LlmProviderId) => {
@@ -221,17 +209,17 @@ export function SettingsPage() {
   if (!isAdmin) {
     return (
       <div className={settingsPageClass}>
-        <div className={panelIntroClass}>
+        <header>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
-            Configuración global del despliegue: proveedor LLM e integraciones opcionales.
+          <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">
+            Configuración global del despliegue.
           </p>
-        </div>
+        </header>
         <Alert className={settingsAlertClass}>
           <Lock className="size-4" aria-hidden />
           <AlertTitle>Acceso restringido</AlertTitle>
           <AlertDescription>
-            Solo los administradores pueden gestionar la configuración LLM e integraciones del despliegue.
+            Solo los administradores pueden gestionar la configuración LLM e integraciones.
           </AlertDescription>
         </Alert>
       </div>
@@ -241,24 +229,13 @@ export function SettingsPage() {
   if (loading || !form) {
     return (
       <div className={settingsPageClass}>
-        <Skeleton className="h-28 w-full rounded-3xl" />
+        <Skeleton className="h-12 w-full max-w-md rounded-lg" />
         <section className={sectionShellClass} aria-busy="true" aria-label="Cargando ajustes">
           <div className={sectionHeaderClass}>
             <Skeleton className="h-6 w-40" />
-            <Skeleton className="mt-2 h-4 w-full max-w-md" />
           </div>
-          <div className="space-y-4 px-5 py-6 sm:px-6">
+          <div className={settingsSectionBodyClass}>
             <Skeleton className="h-10 w-full rounded-xl" />
-            <Skeleton className="h-10 w-full rounded-xl" />
-            <Skeleton className="h-10 w-full rounded-xl sm:max-w-xs" />
-          </div>
-        </section>
-        <section className={sectionShellClass} aria-hidden>
-          <div className={sectionHeaderClass}>
-            <Skeleton className="h-6 w-48" />
-          </div>
-          <div className="space-y-4 px-5 py-6 sm:px-6">
-            <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-10 w-full rounded-xl" />
           </div>
         </section>
@@ -268,23 +245,12 @@ export function SettingsPage() {
 
   return (
     <div className={settingsPageClass}>
-      <div className={panelIntroClass}>
-        <div className="flex items-start gap-3">
-          <div
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--primary)_12%,var(--card))]"
-            aria-hidden
-          >
-            <Sparkles className="size-5 text-[var(--primary)]" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
-              Configuración global del despliegue: proveedor LLM para chat, análisis y embeddings, e
-              integraciones opcionales como The Forge.
-            </p>
-          </div>
-        </div>
-      </div>
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
+        <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">
+          Lo esencial para conectar el LLM. Opciones avanzadas e integraciones quedan colapsadas.
+        </p>
+      </header>
 
       {error ? (
         <Alert variant="destructive" className={settingsAlertClass}>
@@ -314,131 +280,92 @@ export function SettingsPage() {
             Proveedor de IA
           </h2>
           <p className="mt-1 text-xs text-[var(--foreground-muted)]">
-            Fuente actual:{' '}
+            Fuente:{' '}
             <strong>{settings?.source === 'db' ? 'Ajustes (BD)' : 'Variables de entorno'}</strong>
-            {settings?.apiKeyHint
-              ? ` · Clave: ${settings.apiKeyHint}`
-              : settings?.hasApiKey
-                ? ''
-                : ' · Sin API key'}
+            {settings?.apiKeyHint ? ` · ${settings.apiKeyHint}` : settings?.hasApiKey ? '' : ' · Sin API key'}
           </p>
         </div>
-        <div className="space-y-8 px-5 py-6 sm:px-6">
-          <SettingsFormSection
-            id="llm-connection-heading"
-            title="Conexión"
-            description="Proveedor, credenciales y URL base del API."
-          >
-          <div className="space-y-2">
-            <Label htmlFor="provider">Proveedor</Label>
-            <Select value={form.provider} onValueChange={(v) => handleProviderChange(v as LlmProviderId)}>
-              <SelectTrigger id="provider">
-                <SelectValue placeholder="Selecciona proveedor" />
-              </SelectTrigger>
-              <SelectContent>
-                {catalog.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedCatalog?.apiKeyHelpUrl && (
-              <p className="text-xs text-[var(--foreground-muted)]">
-                <a
-                  href={selectedCatalog.apiKeyHelpUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline"
-                >
-                  Obtener clave API
-                </a>
-              </p>
-            )}
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">
-              Clave API {settings?.apiKeyHint ? `(actual: ${settings.apiKeyHint})` : ''}
-            </Label>
-            <div className="relative">
-              <Input
-                id="apiKey"
-                type={showKey ? 'text' : 'password'}
-                value={form.apiKey}
-                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                placeholder="Dejar vacío para no cambiar"
-                autoComplete="off"
-              />
-              <button
-                type="button"
-                className={cn(
-                  'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--foreground-muted)]',
-                  'hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/18',
-                )}
-                onClick={() => setShowKey((s) => !s)}
-                aria-label={showKey ? 'Ocultar clave' : 'Mostrar clave'}
-              >
-                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-
-          {form.provider === 'cloudflare' && (
-            <div className="space-y-2">
-              <Label htmlFor="accountId">Account ID (Cloudflare)</Label>
-              <Input
-                id="accountId"
-                value={form.accountId}
-                onChange={(e) => setForm({ ...form, accountId: e.target.value })}
-                placeholder="Cloudflare account ID"
-              />
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="baseUrl">URL base</Label>
-            <Input
-              id="baseUrl"
-              value={form.baseUrl}
-              onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
-              disabled={!selectedCatalog?.baseUrlEditable && form.provider !== 'cloudflare'}
-            />
-          </div>
-
-          </SettingsFormSection>
-
-          <SettingsFormSection
-            id="llm-models-heading"
-            title="Modelos"
-            description="Modelos de chat, orchestrator y temperatura de generación."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="chatModel">Modelo de chat (ingest)</Label>
-                <Input
-                  id="chatModel"
-                  value={form.chatModel}
-                  onChange={(e) => setForm({ ...form, chatModel: e.target.value })}
-                  list="chat-models"
-                />
-                <datalist id="chat-models">
-                  {selectedCatalog?.chatModels?.map((m) => (
-                    <option key={m} value={m} />
+        <div className={settingsSectionBodyClass}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="provider">Proveedor</Label>
+              <Select value={form.provider} onValueChange={(v) => handleProviderChange(v as LlmProviderId)}>
+                <SelectTrigger id="provider">
+                  <SelectValue placeholder="Selecciona proveedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalog.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.label}
+                    </SelectItem>
                   ))}
-                </datalist>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="orchModel">Modelo orchestrator (opcional)</Label>
+                </SelectContent>
+              </Select>
+              {selectedCatalog?.apiKeyHelpUrl ? (
+                <p className="text-xs text-[var(--foreground-muted)]">
+                  <a href={selectedCatalog.apiKeyHelpUrl} target="_blank" rel="noreferrer" className="underline">
+                    Obtener clave API
+                  </a>
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="apiKey">
+                Clave API {settings?.apiKeyHint ? `(actual: ${settings.apiKeyHint})` : ''}
+              </Label>
+              <div className="relative">
                 <Input
-                  id="orchModel"
-                  value={form.orchestratorChatModel}
-                  onChange={(e) => setForm({ ...form, orchestratorChatModel: e.target.value })}
-                  placeholder="Vacío = mismo que ingest"
+                  id="apiKey"
+                  type={showKey ? 'text' : 'password'}
+                  value={form.apiKey}
+                  onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+                  placeholder="Dejar vacío para no cambiar"
+                  autoComplete="off"
                 />
+                <button
+                  type="button"
+                  className={cn(
+                    'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--foreground-muted)]',
+                    'hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/18',
+                  )}
+                  onClick={() => setShowKey((s) => !s)}
+                  aria-label={showKey ? 'Ocultar clave' : 'Mostrar clave'}
+                >
+                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
-            <div className="space-y-2 sm:max-w-xs">
+
+            {form.provider === 'cloudflare' ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="accountId">Account ID (Cloudflare)</Label>
+                <Input
+                  id="accountId"
+                  value={form.accountId}
+                  onChange={(e) => setForm({ ...form, accountId: e.target.value })}
+                  placeholder="Cloudflare account ID"
+                />
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              <Label htmlFor="chatModel">Modelo de chat</Label>
+              <Input
+                id="chatModel"
+                value={form.chatModel}
+                onChange={(e) => setForm({ ...form, chatModel: e.target.value })}
+                list="chat-models"
+              />
+              <datalist id="chat-models">
+                {selectedCatalog?.chatModels?.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="temperature">Temperatura</Label>
               <Input
                 id="temperature"
@@ -450,116 +377,131 @@ export function SettingsPage() {
                 onChange={(e) => setForm({ ...form, temperature: e.target.value })}
               />
             </div>
-          </SettingsFormSection>
+          </div>
 
-          <SettingsFormSection
-            id="llm-multiagent-heading"
-            title="Chat multi-agente"
-            description="Router (intención + auditoría de reingeniería) y worker (retrieve + síntesis). Vacío = mismo que modelo orchestrator."
-            boxed
+          <SettingsDetailsSection
+            id="llm-advanced"
+            title="Configuración avanzada"
+            hint="URL base, orchestrator, multi-agente, embeddings y metadatos."
+            defaultOpen={advancedOpenByDefault}
           >
+            <div className="space-y-2">
+              <Label htmlFor="baseUrl">URL base</Label>
+              <Input
+                id="baseUrl"
+                value={form.baseUrl}
+                onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
+                disabled={!selectedCatalog?.baseUrlEditable && form.provider !== 'cloudflare'}
+              />
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="routerModel">Modelo router (razonamiento)</Label>
+                <Label htmlFor="orchModel">Modelo orchestrator</Label>
                 <Input
-                  id="routerModel"
-                  value={form.orchestratorRouterModel}
-                  onChange={(e) => setForm({ ...form, orchestratorRouterModel: e.target.value })}
-                  placeholder="ej. anthropic/claude-sonnet-4"
-                  list="chat-models"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="workerModel">Modelo worker (económico)</Label>
-                <Input
-                  id="workerModel"
-                  value={form.orchestratorWorkerModel}
-                  onChange={(e) => setForm({ ...form, orchestratorWorkerModel: e.target.value })}
-                  placeholder="ej. google/gemini-2.0-flash-001"
-                  list="chat-models"
+                  id="orchModel"
+                  value={form.orchestratorChatModel}
+                  onChange={(e) => setForm({ ...form, orchestratorChatModel: e.target.value })}
+                  placeholder="Vacío = mismo que chat"
                 />
               </div>
             </div>
-            <label htmlFor="chatIntentRouterEnabled" className={settingsToggleFieldClass}>
-              <input
-                id="chatIntentRouterEnabled"
-                type="checkbox"
-                className={settingsCheckboxClass}
-                checked={form.chatIntentRouterEnabled}
-                onChange={(e) =>
-                  setForm({ ...form, chatIntentRouterEnabled: e.target.checked })
-                }
-              />
-              <span className="text-sm">
-                <span className="font-medium">Router de intención con LLM</span>
-                <span className="mt-1 block text-xs text-[var(--foreground-muted)]">
-                  Desactivado: solo heurística por keywords (más rápido, menos preciso).
-                </span>
-              </span>
-            </label>
-          </SettingsFormSection>
 
-          {selectedCatalog?.supportsEmbeddings ? (
-            <SettingsFormSection
-              id="llm-embeddings-heading"
-              title="Embeddings (RAG)"
-              description="Modelo y dimensión de vectores para búsqueda semántica."
-              boxed
-            >
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-[var(--foreground)]">Chat multi-agente</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="embeddingModel">Modelo de embeddings</Label>
+                  <Label htmlFor="routerModel">Router (razonamiento)</Label>
                   <Input
-                    id="embeddingModel"
-                    value={form.embeddingModel}
-                    onChange={(e) => setForm({ ...form, embeddingModel: e.target.value })}
-                    list="embed-models"
+                    id="routerModel"
+                    value={form.orchestratorRouterModel}
+                    onChange={(e) => setForm({ ...form, orchestratorRouterModel: e.target.value })}
+                    list="chat-models"
                   />
-                  <datalist id="embed-models">
-                    {selectedCatalog.embeddingModels?.map((m) => (
-                      <option key={m} value={m} />
-                    ))}
-                  </datalist>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="embeddingDim">Dimensión</Label>
+                  <Label htmlFor="workerModel">Worker (económico)</Label>
                   <Input
-                    id="embeddingDim"
-                    type="number"
-                    value={form.embeddingDimension}
-                    onChange={(e) => setForm({ ...form, embeddingDimension: e.target.value })}
+                    id="workerModel"
+                    value={form.orchestratorWorkerModel}
+                    onChange={(e) => setForm({ ...form, orchestratorWorkerModel: e.target.value })}
+                    list="chat-models"
                   />
                 </div>
               </div>
-            </SettingsFormSection>
-          ) : null}
-
-          <SettingsFormSection
-            id="llm-openrouter-heading"
-            title="Metadatos OpenRouter"
-            description="Cabeceras opcionales enviadas a OpenRouter en cada petición."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="httpReferer">HTTP Referer</Label>
-                <Input
-                  id="httpReferer"
-                  value={form.httpReferer}
-                  onChange={(e) => setForm({ ...form, httpReferer: e.target.value })}
+              <label htmlFor="chatIntentRouterEnabled" className={settingsToggleFieldClass}>
+                <input
+                  id="chatIntentRouterEnabled"
+                  type="checkbox"
+                  className={settingsCheckboxClass}
+                  checked={form.chatIntentRouterEnabled}
+                  onChange={(e) =>
+                    setForm({ ...form, chatIntentRouterEnabled: e.target.checked })
+                  }
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="appTitle">App title</Label>
-                <Input
-                  id="appTitle"
-                  value={form.appTitle}
-                  onChange={(e) => setForm({ ...form, appTitle: e.target.value })}
-                />
-              </div>
+                <span className="text-sm">
+                  <span className="font-medium">Router de intención con LLM</span>
+                  <span className="mt-1 block text-xs text-[var(--foreground-muted)]">
+                    Off = heurística por keywords (más rápido).
+                  </span>
+                </span>
+              </label>
             </div>
-          </SettingsFormSection>
 
-          <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-6 sm:flex-row sm:flex-wrap">
+            {selectedCatalog?.supportsEmbeddings ? (
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-[var(--foreground)]">Embeddings (RAG)</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="embeddingModel">Modelo</Label>
+                    <Input
+                      id="embeddingModel"
+                      value={form.embeddingModel}
+                      onChange={(e) => setForm({ ...form, embeddingModel: e.target.value })}
+                      list="embed-models"
+                    />
+                    <datalist id="embed-models">
+                      {selectedCatalog.embeddingModels?.map((m) => (
+                        <option key={m} value={m} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="embeddingDim">Dimensión</Label>
+                    <Input
+                      id="embeddingDim"
+                      type="number"
+                      value={form.embeddingDimension}
+                      onChange={(e) => setForm({ ...form, embeddingDimension: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {form.provider === 'openrouter' ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="httpReferer">HTTP Referer</Label>
+                  <Input
+                    id="httpReferer"
+                    value={form.httpReferer}
+                    onChange={(e) => setForm({ ...form, httpReferer: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="appTitle">App title</Label>
+                  <Input
+                    id="appTitle"
+                    value={form.appTitle}
+                    onChange={(e) => setForm({ ...form, appTitle: e.target.value })}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </SettingsDetailsSection>
+
+          <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-5 sm:flex-row sm:flex-wrap">
             <Button type="button" onClick={() => void handleSave()} disabled={saving || testing}>
               {saving ? 'Guardando…' : 'Guardar'}
             </Button>
@@ -573,9 +515,8 @@ export function SettingsPage() {
             </Button>
           </div>
 
-          <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">
-            Las variables <code className="text-xs">LLM_*</code> en el entorno siguen como fallback si no
-            hay fila guardada en BD. Tras guardar aquí, Ajustes tiene prioridad.
+          <p className="text-xs text-[var(--foreground-muted)]">
+            Fallback: variables <code className="text-xs">LLM_*</code> en el entorno hasta guardar aquí.
           </p>
         </div>
       </section>

@@ -28,8 +28,9 @@ Vistas principales de la aplicación Ariadne (shell SaaS: sidebar + header con b
 
 - **Login.tsx** — Autenticación OTP: email → código de 6 dígitos.
 - **CredentialsList.tsx**, **CreateCredentialForm.tsx**, **EditCredential.tsx** — CRUD de credenciales (alta en modal con `?create=1`).
-- **SettingsPage.tsx** — **Ajustes** (admin): intro `panelIntroClass` + secciones `sectionShellClass` (LLM en bloques Conexión / Modelos / Multi-agente / Embeddings / OpenRouter + The Forge opcional). API: `GET/PUT /api/llm-settings`, `GET/PUT /api/theforge-integration`, `GET /api/theforge-integration/status`. Ruta: `/settings`.
-- **SettingsTheForgeCard.tsx** — Sección Ajustes (mismo shell que LLM): integración opt-in The Forge (URL API, JWT servicio).
+- **SettingsPage.tsx** — **Ajustes** (admin): LLM global + The Forge opcional. Campos esenciales visibles (proveedor, API key, modelo chat, temperatura); resto en **Configuración avanzada** (`<details>`). API: `GET/PUT /api/llm-settings`, `GET/PUT /api/theforge-integration`, `GET /api/theforge-integration/status`. Ruta: `/settings`.
+- **SettingsTheForgeCard.tsx** — Integración opt-in The Forge: toggle + URL/JWT solo si está activa; notas dev colapsadas.
+- **SettingsDetailsSection.tsx** — Disclosure progresivo reutilizable para secciones avanzadas.
 - **settingsUiClasses.ts** — Clases compartidas de checkbox, toggle y alertas en Ajustes.
 - **Ayuda.tsx** — Manual y ayuda (docs).
 - **ErrorPage.tsx** — Página de error genérica.
