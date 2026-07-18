@@ -1815,9 +1815,6 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
       functionRefsByFile.get(targetPath)!.push({ referrer: `${callerPath} (${callerName})`, fn: calleeName });
     }
 
-    const entryPatterns =
-      /^(src\/)?(index|main|App|bootstrap|_app|_document)\.(tsx?|jsx?)$|\.(index|main|bootstrap)\.(tsx?|jsx?)$/;
-    const isEntryFile = (path: string) => entryPatterns.test(path.replace(/^[^/]+\//, ''));
     const isTestOrStory = (p: string) =>
       /\.(test|spec|stories)\.(tsx?|jsx?)$/.test(p) || /(__tests__|__specs__|\/stories\/)/.test(p);
 
@@ -1843,8 +1840,7 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
       const hasComponentRefs = refs.length > 0 || inRoute;
       const hasFunctionRefs = fnRefs.length > 0;
       const hasHookRefs = hookDefFileSet.has(path);
-      const isEntry = isEntryFile(path);
-      const used = hasImporters || hasComponentRefs || hasFunctionRefs || hasHookRefs || isEntry;
+      const used = hasImporters || hasComponentRefs || hasFunctionRefs || hasHookRefs;
 
       if (used) continue;
 
@@ -1857,7 +1853,7 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
       '# ANÁLISIS DE CÓDIGO MUERTO',
       '',
       'Clasificación automática tras verificación de imports en contenido de archivos (hasta 150 archivos).',
-      'Se excluyen manifiestos, configs de build, HTML de entrada, documentación y assets estáticos.',
+      'Se excluyen manifiestos, configs de build, HTML de entrada, puntos de entrada (main/index/App), tipos ambient (.d.ts), documentación y assets estáticos.',
       '**No añadir categoría "Revisar"** — la verificación ya se ejecutó.',
       '',
     ];
@@ -2003,6 +1999,9 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
           `(?:import(?:\\s+type)?\\s+(?:[^;]*\\{|\\*)|export\\s+(?:type\\s+)?(?:\\{[^}]*\\}|\\*)\\s+from|\\bfrom\\b|require)\\s*[\\(\\[]?\\s*['"\`][^'"\`]*${esc(term)}[^'"\`]*['"\`]`,
           'i',
         );
+      const buildJsxRe = (name: string) => new RegExp(`<${esc(name)}(?:[\\s/>]|\\.)`);
+      const buildSymbolRe = (name: string) =>
+        name.length >= 4 ? new RegExp(`\\b${esc(name)}\\b`) : null;
 
       for (const { path, content } of contents) {
         if (!content) continue;
@@ -2018,6 +2017,25 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
         }
         if (!matched && buildImportRe(baseName).test(content)) {
           foundIn.push(shortPath);
+          matched = true;
+        }
+        if (matched) continue;
+
+        for (const comp of d.components) {
+          if (buildJsxRe(comp).test(content)) {
+            foundIn.push(shortPath);
+            matched = true;
+            break;
+          }
+        }
+        if (matched) continue;
+
+        for (const sym of [...d.components, ...d.functions]) {
+          const symRe = buildSymbolRe(sym);
+          if (symRe?.test(content)) {
+            foundIn.push(shortPath);
+            break;
+          }
         }
       }
 
@@ -2049,6 +2067,21 @@ Repositorio ${repo.projectKey}/${repo.repoSlug} — hallazgos automáticos (rege
               : /chistmaslights|ecosystem/.test(d.path)
                 ? 'script/config no referenciado'
                 : 'alta confianza',
+          exportsSummary,
+          searchedIn: contentByPath.size,
+        });
+        continue;
+      }
+
+      const hasIndexedExports =
+        d.components.length > 0 || d.functions.length > 0 || d.models.length > 0;
+      if (hasIndexedExports) {
+        result.push({
+          path: d.path,
+          shortName: d.shortName,
+          category: 'eliminar_con_seguridad',
+          reason:
+            'exports indexados sin referencias en grafo; revisar lazy imports, JSX dinámico o rutas antes de eliminar',
           exportsSummary,
           searchedIn: contentByPath.size,
         });

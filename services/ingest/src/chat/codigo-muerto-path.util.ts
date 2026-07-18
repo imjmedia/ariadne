@@ -34,6 +34,10 @@ export function isCodigoMuertoInfrastructurePath(raw: string): boolean {
 
   if (/\.html?$/i.test(base)) return true;
 
+  if (/\.d\.ts$/i.test(base) || baseLower === 'vite-env.d.ts') return true;
+
+  if (isCodigoMuertoEntryPath(path)) return true;
+
   if (
     baseLower === 'package.json' ||
     baseLower === 'package-lock.json' ||
@@ -94,5 +98,20 @@ export function isCodigoMuertoInfrastructurePath(raw: string): boolean {
     return true;
   }
 
+  return false;
+}
+
+/** Puntos de entrada Vite/React (main.tsx, index.tsx, App.tsx) en monorepos y raíz. */
+export function isCodigoMuertoEntryPath(raw: string): boolean {
+  const path = normalizePath(raw);
+  const base = basename(path);
+  const lower = path.toLowerCase();
+
+  if (/(^|\/)src\/(index|main|app|bootstrap|_app|_document)\.(tsx?|jsx?)$/i.test(lower)) {
+    return true;
+  }
+  if (/^(index|main|app|bootstrap|_app|_document)\.(tsx?|jsx?)$/i.test(base)) {
+    return lower.startsWith('src/') || !lower.includes('/');
+  }
   return false;
 }
