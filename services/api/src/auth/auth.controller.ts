@@ -11,6 +11,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { getSystemSettingsRuntime } from '../system-settings/system-settings.client';
 
 @Controller('auth')
 export class AuthController {
@@ -58,7 +59,8 @@ export class AuthController {
     user?: { id: string; email: string; role: string; name: string | null };
     ssoUrl?: string;
   }> {
-    const ssoUrl = process.env.SSO_URL?.trim();
+    const cfg = await getSystemSettingsRuntime();
+    const ssoUrl = cfg.ssoUrl?.trim();
     if (!ssoUrl) {
       return { valid: false };
     }

@@ -1,10 +1,11 @@
 /**
- * @fileoverview Servicio OTP: generar código, enviar por email (SMTP), emitir JWT con rol.
+ * @fileoverview Servicio OTP: genera código, envía por email (SMTP), emite JWT con rol.
  * Tras verify OTP, resuelve usuario en Ingest para incluir userId y role en JWT.
  */
 import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { EmailService } from './email.service';
+import { getSystemSettingsRuntime } from '../system-settings/system-settings.client';
 
 /** Result of verifying an OTP/session JWT issued by verifyOtp / ssoLogin. */
 export type SessionJwtOutcome =
@@ -19,9 +20,6 @@ const OTP_LENGTH = 6;
 const JWT_SECRET = process.env.JWT_SECRET || 'ariadne-dev-secret-change-in-prod';
 // 7 días en segundos (JWT_EXPIRES: segundos, ej. 604800)
 const JWT_EXPIRES_SEC = parseInt(process.env.JWT_EXPIRES ?? '604800', 10) || 604800;
-
-/** Whitelist opcional: si EMAIL_OTP está definido, solo ese email puede solicitar OTP. */
-const EMAIL_OTP_WHITELIST = process.env.EMAIL_OTP?.trim().toLowerCase() || null;
 
 /** URL del servicio Ingest para resolver usuarios. */
 const INGEST_URL = process.env.INGEST_URL || 'http://localhost:3002';
@@ -59,7 +57,9 @@ export class AuthService {
       throw new BadRequestException('Email requerido');
     }
 
-    if (EMAIL_OTP_WHITELIST && normalized !== EMAIL_OTP_WHITELIST) {
+    const cfg = await getSystemSettingsRuntime();
+    const emailOtpWhitelist = cfg.emailOtp?.trim().toLowerCase() || null;
+    if (emailOtpWhitelist && normalized !== emailOtpWhitelist) {
       throw new BadRequestException('Email no autorizado para solicitar OTP');
     }
 
@@ -76,7 +76,7 @@ export class AuthService {
     if (!emailSent && !devMode) {
       throw new ServiceUnavailableException(
         'No se pudo enviar el email (SMTP no configurado o error de envío). ' +
-          'Configura SMTP_HOST, SMTP_USER y SMTP_PASS, o define OTP_DEV_MODE=true para desarrollo (código en devCode).',
+          'Configura SMTP en Ajustes → Sistema, o define OTP_DEV_MODE=true para desarrollo (código en devCode).',
       );
     }
 

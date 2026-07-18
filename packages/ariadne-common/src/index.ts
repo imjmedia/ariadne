@@ -48,10 +48,13 @@ export {
   getGraphNodeSoftLimit,
   isEnvDomainShardingEnabled,
   isAutoDomainOverflowEnabled,
+  isFalkorDebugCypherEnabled,
+  setFalkorRuntimeOverrides,
   effectiveShardMode,
   domainSegmentFromRepoPath,
   listGraphNamesForProjectRouting,
   type FalkorConfig,
+  type FalkorRuntimeOverrides,
   type FalkorShardMode,
   type GraphNameForProjectOptions,
 } from './falkor.js';

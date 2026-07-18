@@ -3,6 +3,7 @@
  */
 import type { EmbeddingProvider } from '../embedding.interface';
 import { defaultEmbeddingDimension } from '../../llm/llm-config';
+import { getActiveSystemConfig } from '../../system-settings/active-system-config';
 
 export const OLLAMA_DEFAULT_BASE = 'http://localhost:11434';
 export const OLLAMA_DEFAULT_EMBED_MODEL = 'nomic-embed-text';
@@ -14,11 +15,13 @@ export type OllamaEmbeddingProviderOptions = {
 };
 
 export function resolveOllamaBaseUrl(): string {
-  return (process.env.OLLAMA_BASE_URL?.trim() || OLLAMA_DEFAULT_BASE).replace(/\/$/, '');
+  const cfg = getActiveSystemConfig().integrations.ollamaBaseUrl;
+  return (cfg?.trim() || process.env.OLLAMA_BASE_URL?.trim() || OLLAMA_DEFAULT_BASE).replace(/\/$/, '');
 }
 
 export function resolveOllamaEmbedModel(): string {
-  return process.env.OLLAMA_EMBED_MODEL?.trim() || OLLAMA_DEFAULT_EMBED_MODEL;
+  const cfg = getActiveSystemConfig().integrations.ollamaEmbedModel;
+  return cfg?.trim() || process.env.OLLAMA_EMBED_MODEL?.trim() || OLLAMA_DEFAULT_EMBED_MODEL;
 }
 
 export class OllamaEmbeddingProvider implements EmbeddingProvider {

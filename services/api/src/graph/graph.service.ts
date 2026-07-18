@@ -2,7 +2,7 @@
  * @fileoverview Servicio de consultas al grafo FalkorDB: impacto, componente, contrato, compare (API).
  */
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { isProjectShardingEnabled } from 'ariadne-common';
+import { isProjectShardingEnabled, isFalkorDebugCypherEnabled } from 'ariadne-common';
 import { FalkorService } from '../falkor.service';
 import { CacheService } from '../cache.service';
 
@@ -1264,11 +1264,10 @@ export class GraphService {
     scopePath?: string;
     graphName?: string;
   }): Promise<{ headers: string[]; data: unknown[][]; graphLabel: string }> {
-    const enabled =
-      process.env.FALKOR_DEBUG_CYPHER === '1' || process.env.FALKOR_DEBUG_CYPHER === 'true';
+    const enabled = isFalkorDebugCypherEnabled();
     if (!enabled) {
       throw new HttpException(
-        'Cypher debug desactivado. Define FALKOR_DEBUG_CYPHER=1 en el servicio API (misma conexión Falkor que Nest).',
+        'Cypher debug desactivado. Actívalo en Ajustes → Sistema (Falkor) o define FALKOR_DEBUG_CYPHER=1.',
         HttpStatus.FORBIDDEN,
       );
     }

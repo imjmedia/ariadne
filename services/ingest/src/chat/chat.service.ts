@@ -162,6 +162,7 @@ import {
   repoIdsInCollectedResults,
 } from './chat-preflight-scope.util';
 import { isCodigoMuertoInfrastructurePath } from './codigo-muerto-path.util';
+import { getActiveSystemConfig } from '../system-settings/active-system-config';
 import {
   inferChatRepoScopeFromMessage,
   isChatRoleScopeInferenceEnabled,
@@ -305,11 +306,13 @@ export interface CriticalFinding {
   name?: string;
 }
 
-/** Default: dos fases activas salvo `CHAT_TWO_PHASE=0|false|off`. */
+/** Default: dos fases activas salvo desactivado en Ajustes → Sistema o `CHAT_TWO_PHASE=0|false|off`. */
 function defaultTwoPhaseFromEnv(): boolean {
+  const cfg = getActiveSystemConfig().chat.twoPhase;
   const v = process.env.CHAT_TWO_PHASE?.trim().toLowerCase();
   if (v === '0' || v === 'false' || v === 'off') return false;
-  return true;
+  if (v === '1' || v === 'true' || v === 'yes') return true;
+  return cfg;
 }
 
 /** JSON de §3: anclar la redacción a paths/repoIds del retrieval. */
@@ -1183,9 +1186,10 @@ Máximo 6 líneas útiles. En español.`;
     const qm: ModificationPlanQuestionsMode =
       questionsMode === 'technical' || questionsMode === 'both' ? questionsMode : 'business';
     const maxPlanFiles = (() => {
+      const cfgMax = getActiveSystemConfig().chat.modificationPlanMaxFiles;
       const raw = process.env.MODIFICATION_PLAN_MAX_FILES?.trim();
-      const n = raw ? parseInt(raw, 10) : 150;
-      if (!Number.isFinite(n) || n < 1) return 150;
+      const n = raw ? parseInt(raw, 10) : cfgMax;
+      if (!Number.isFinite(n) || n < 1) return cfgMax;
       return Math.min(n, 2000);
     })();
 
@@ -4532,7 +4536,10 @@ Sintetiza una respuesta clara. Si no hay datos útiles, di explícitamente **sin
       });
     }
 
-    const telemetryEnabled = process.env.CHAT_TELEMETRY_LOG === '1' || process.env.CHAT_TELEMETRY_LOG === 'true';
+    const telemetryEnabled =
+      getActiveSystemConfig().observability.chatTelemetryLog ||
+      process.env.CHAT_TELEMETRY_LOG === '1' ||
+      process.env.CHAT_TELEMETRY_LOG === 'true';
     if (telemetryEnabled) {
       const pathLike = /\b[\w.-]+\/[\w./-]+\.(tsx?|jsx?|mjs|cjs)\b/g;
       const pathsInAnswer = answer.match(pathLike) ?? [];
