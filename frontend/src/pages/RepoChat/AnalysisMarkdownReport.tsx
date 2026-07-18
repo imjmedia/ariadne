@@ -1,4 +1,4 @@
-import { createContext, useContext, Children, isValidElement, type ReactNode } from 'react';
+import { createContext, useContext, isValidElement, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
@@ -15,7 +15,7 @@ const TableSectionContext = createContext<'thead' | 'tbody'>('tbody');
 function extractText(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(extractText).join('');
-  if (isValidElement(node)) return extractText(node.props.children);
+  if (isValidElement<{ children?: ReactNode }>(node)) return extractText(node.props.children);
   return '';
 }
 
