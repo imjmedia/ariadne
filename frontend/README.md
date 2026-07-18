@@ -16,7 +16,8 @@ Proyecto en la raíz del repo (`frontend/`), independiente de `services/`. UI pa
 - React 19 + TypeScript + Vite
 - React Router
 - Tailwind CSS
-- Tema **Slate + acento azul** (`src/styles/vars.css`), tipografía Inter; Shadcn-style components; TanStack Table en listados densos.
+- Tema **cosmic-night** (violeta/púrpura OKLCH): tokens en `src/index.css` + extensiones en `src/styles/vars.css`; tipografía Inter; shadcn/ui **new-york**; TanStack Table en listados densos.
+- Guía de diseño completa: [`../DESIGN.md`](../DESIGN.md).
 
 ## Configuración
 
