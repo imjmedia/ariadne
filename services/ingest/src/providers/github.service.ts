@@ -121,14 +121,38 @@ export class GitHubService {
   ): Promise<Array<{ name: string; default_branch?: string }>> {
     const repos: Array<{ name: string; default_branch?: string }> = [];
     const user = await this.request<{ login?: string }>(`${this.baseUrl}/user`, credentialsRef);
-    const isOrg = user?.login !== owner; // si owner es el usuario actual, no es org
+    const isCurrentUser = user?.login === owner;
+
+    if (isCurrentUser) {
+      // GET /users/{login}/repos solo devuelve repos PÚBLICOS. Con token autenticado usar /user/repos.
+      let page = 1;
+      for (;;) {
+        const arr = await this.request<
+          Array<{ name?: string; default_branch?: string; owner?: { login?: string } }>
+        >(
+          `${this.baseUrl}/user/repos?affiliation=owner&per_page=100&sort=full_name&page=${page}`,
+          credentialsRef,
+        );
+        if (!Array.isArray(arr) || arr.length === 0) break;
+        for (const r of arr) {
+          if (r.name && r.owner?.login === owner) {
+            repos.push({ name: r.name, default_branch: r.default_branch });
+          }
+        }
+        if (arr.length < 100) break;
+        page++;
+      }
+      return repos.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    const isOrg = user?.login !== owner;
     const base = isOrg
       ? `${this.baseUrl}/orgs/${encodeURIComponent(owner)}/repos`
       : `${this.baseUrl}/users/${encodeURIComponent(owner)}/repos`;
     let page = 1;
     for (;;) {
       const arr = await this.request<Array<{ name?: string; default_branch?: string }>>(
-        `${base}?per_page=100&sort=full_name&page=${page}`,
+        `${base}?per_page=100&sort=full_name&type=all&page=${page}`,
         credentialsRef,
       );
       if (!Array.isArray(arr) || arr.length === 0) break;
