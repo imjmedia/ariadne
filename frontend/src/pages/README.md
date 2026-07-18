@@ -28,8 +28,8 @@ Vistas principales de la aplicación Ariadne (shell SaaS: sidebar + header con b
 
 - **Login.tsx** — Autenticación OTP: email → código de 6 dígitos.
 - **CredentialsList.tsx**, **CreateCredentialForm.tsx**, **EditCredential.tsx** — CRUD de credenciales (alta en modal con `?create=1`).
-- **SettingsPage.tsx** — **Ajustes** (admin, arquetipo *Formulario admin* en `DESIGN.md`): cabecera `h1` + una línea, secciones `sectionShellClass` (LLM / The Forge) con subsecciones `h3` + `border-t` (Conexión, Modelos, Multi-agente, Embeddings, OpenRouter). API: `GET/PUT /api/llm-settings`, `GET/PUT /api/theforge-integration`, `GET /api/theforge-integration/status`. Ruta: `/settings`.
-- **SettingsTheForgeCard.tsx** — Dominio The Forge en Ajustes: toggle opt-in, URL API y JWT servicio.
-- **settingsUiClasses.ts** — Clases canónicas de página, cuerpo de sección, subsección, checkbox, toggle y alertas.
+- **SettingsPage.tsx** — **Ajustes** (admin): intro `panelIntroClass` + secciones `sectionShellClass` (LLM en bloques Conexión / Modelos / Multi-agente / Embeddings / OpenRouter + The Forge opcional). API: `GET/PUT /api/llm-settings`, `GET/PUT /api/theforge-integration`, `GET /api/theforge-integration/status`. Ruta: `/settings`.
+- **SettingsTheForgeCard.tsx** — Sección Ajustes (mismo shell que LLM): integración opt-in The Forge (URL API, JWT servicio).
+- **settingsUiClasses.ts** — Clases compartidas de checkbox, toggle y alertas en Ajustes.
 - **Ayuda.tsx** — Manual y ayuda (docs).
 - **ErrorPage.tsx** — Página de error genérica.
