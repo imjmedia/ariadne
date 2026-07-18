@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeAnalysisMarkdown } from './analysis-semaphore.util';
+import { classifyAnalysisLine, summarizeAnalysisMarkdown } from './analysis-semaphore.util';
 
 describe('summarizeAnalysisMarkdown', () => {
   it('marks critical when red flags appear', () => {
@@ -18,5 +18,12 @@ describe('summarizeAnalysisMarkdown', () => {
     const result = summarizeAnalysisMarkdown('✅ Sin hallazgos de seguridad');
     expect(result.ok).toBeGreaterThan(0);
     expect(result.overall).toBe('ok');
+  });
+
+  it('classifies table paths as warning in duplicados mode', () => {
+    const line = '| apps/foo/src/a.tsx | apps/bar/src/b.tsx |';
+    expect(classifyAnalysisLine(line, 'duplicados')).toBe('warning');
+    const summary = summarizeAnalysisMarkdown(line, 'duplicados');
+    expect(summary.warning).toBeGreaterThan(0);
   });
 });

@@ -21,7 +21,7 @@ function CountPill(props: { colorClass: string; label: string; count: number }) 
 }
 
 export function AnalysisSemaphoreSummary(props: { summary: string; mode: string }) {
-  const signals: Summary = summarizeAnalysisMarkdown(props.summary);
+  const signals: Summary = summarizeAnalysisMarkdown(props.summary, props.mode);
   const meta = SEMAPHORE_LABELS[signals.overall];
 
   return (

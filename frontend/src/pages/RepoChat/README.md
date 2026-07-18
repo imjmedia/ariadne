@@ -6,7 +6,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 
 - **Split horizontal:** panel «Chats» fijo a la **izquierda** (scroll interno, ~240px); conversación o análisis a la derecha. En móvil el historial va en drawer (icono panel).
 - **Vista conmutada Chat ↔ Análisis:** el botón de cabecera alterna la columna principal (no drawer estrecho). Al ejecutar un análisis se abre la vista Análisis automáticamente.
-- **Análisis a pantalla completa:** `ChatAnalysisPanel` — acciones a la izquierda (sidebar) + informe ancho a la derecha; semáforos heurísticos sobre el markdown del resultado.
+- **Análisis a pantalla completa:** `ChatAnalysisPanel` — barra superior con acciones + informe ancho debajo; columna **●** con semáforo por fila de tabla / ítem de lista.
 - **Opciones avanzadas:** popover «Opciones» (modo de respuesta, alcance opcional, memoria compactada).
 - **Cabecera compacta:** volver al repo, badges de modo/alcance, interruptor Chat/Análisis, **The Forge** (opcional) y Nueva conversación.
 
@@ -41,7 +41,8 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable |
 | **ChatComposer.tsx** | Textarea + Enviar |
 | **ChatAnalysisPanel.tsx** | Vista análisis inline (informes + acciones) |
-| **AnalysisSemaphoreSummary.tsx** | Semáforos heurísticos sobre el informe |
+| **AnalysisSemaphoreSummary.tsx** | Resumen agregado de semáforos |
+| **AnalysisMarkdownReport.tsx** | Markdown del informe con semáforo por fila/sección |
 | **ChatAnalysisSheet.tsx** | Alias legacy del panel (sin drawer) |
 | **ChatOptionsPopover.tsx** | Modo pipeline + alcance |
 | **ChatAssistantContent.tsx** | MDD / Markdown / Mermaid |

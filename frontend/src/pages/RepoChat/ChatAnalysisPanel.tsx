@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import type { AnalyzeCodeMode, AnalyzeReportMeta, FullAuditResult } from '@/types';
-import { MarkdownBlock } from '@/components/MarkdownBlock';
 import { AnalyzeReportMetaBadges } from '@/components/analyze/AnalyzeReportMetaBadges';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,9 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { chatAnalysisBtnClass, chatMarkdownBoxClass, sectionHeaderClass, sectionShellClass } from '../chat/chatShellClasses';
+import { AnalysisMarkdownReport, SemaphoreDot } from './AnalysisMarkdownReport';
 import { AnalysisSemaphoreSummary } from './AnalysisSemaphoreSummary';
+import { SEMAPHORE_LABELS } from './analysis-semaphore.util';
 import {
   ANALYSIS_MODE_LABELS,
   ANALYSIS_RESULT_TITLES,
@@ -66,64 +67,62 @@ export function ChatAnalysisPanel(props: ChatAnalysisPanelProps) {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-          <aside className="shrink-0 space-y-4 border-b border-[var(--border)] px-4 py-4 lg:w-[min(100%,22rem)] lg:border-b-0 lg:border-r lg:overflow-y-auto xl:w-80">
-            {multiRepo && props.onSelectedRepoIdChange ? (
-              <div className="space-y-2">
-                <Label htmlFor="analysis-repo" className="text-xs font-medium text-[var(--foreground-muted)]">
-                  Repositorio para análisis de código
-                </Label>
-                <Select value={props.selectedRepoId} onValueChange={props.onSelectedRepoIdChange}>
-                  <SelectTrigger id="analysis-repo" size="sm" className="h-10 w-full rounded-xl font-mono text-xs">
-                    <SelectValue placeholder="Elegir repositorio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {props.projectRepos?.map((r) => (
-                      <SelectItem key={r.id} value={r.id} className="font-mono text-xs">
-                        {r.projectKey}/{r.repoSlug}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-                Frecuentes
-              </p>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-1">
-                {PRIMARY_ANALYSIS_ACTIONS.map((action) => (
-                  <Button
-                    key={action.mode}
-                    type="button"
-                    variant="outline"
-                    className={cn(chatAnalysisBtnClass, 'h-auto flex-col items-start gap-0.5 py-3 text-left')}
-                    onClick={() => props.onRunAnalysis(action.mode)}
-                    disabled={codeDisabled}
-                  >
-                    <span className="text-sm font-medium">
-                      {props.loadingAnalysis === action.mode ? 'Analizando…' : action.label}
-                    </span>
-                    <span className="text-[11px] font-normal text-[var(--foreground-muted)]">
-                      {action.description}
-                    </span>
-                  </Button>
-                ))}
-              </div>
+        <div className="shrink-0 space-y-3 border-b border-[var(--border)] px-4 py-4 sm:px-6">
+          {multiRepo && props.onSelectedRepoIdChange ? (
+            <div className="max-w-md space-y-2">
+              <Label htmlFor="analysis-repo" className="text-xs font-medium text-[var(--foreground-muted)]">
+                Repositorio para análisis de código
+              </Label>
+              <Select value={props.selectedRepoId} onValueChange={props.onSelectedRepoIdChange}>
+                <SelectTrigger id="analysis-repo" size="sm" className="h-10 w-full rounded-xl font-mono text-xs">
+                  <SelectValue placeholder="Elegir repositorio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {props.projectRepos?.map((r) => (
+                    <SelectItem key={r.id} value={r.id} className="font-mono text-xs">
+                      {r.projectKey}/{r.repoSlug}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          ) : null}
 
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
+              Frecuentes
+            </p>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {PRIMARY_ANALYSIS_ACTIONS.map((action) => (
+                <Button
+                  key={action.mode}
+                  type="button"
+                  variant={props.analysisResult?.mode === action.mode ? 'default' : 'outline'}
+                  className={cn(chatAnalysisBtnClass, 'h-auto flex-col items-start gap-0.5 py-3 text-left')}
+                  onClick={() => props.onRunAnalysis(action.mode)}
+                  disabled={codeDisabled}
+                >
+                  <span className="text-sm font-medium">
+                    {props.loadingAnalysis === action.mode ? 'Analizando…' : action.label}
+                  </span>
+                  <span className="text-[11px] font-normal opacity-80">{action.description}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
             <details className="group rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_6%,var(--card))]">
-              <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium text-[var(--foreground)] [&::-webkit-details-marker]:hidden">
+              <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-[var(--foreground)] [&::-webkit-details-marker]:hidden">
                 Más análisis
               </summary>
-              <div className="space-y-2 border-t border-[var(--border)] px-3 pb-3 pt-2">
+              <div className="grid gap-1 border-t border-[var(--border)] px-2 pb-2 pt-1 sm:grid-cols-2">
                 {SECONDARY_ANALYSIS_ACTIONS.map((action) => (
                   <Button
                     key={action.mode}
                     type="button"
                     variant="ghost"
-                    className="h-auto w-full justify-start rounded-lg px-2 py-2 text-left"
+                    className="h-auto justify-start rounded-lg px-2 py-2 text-left"
                     onClick={() => props.onRunAnalysis(action.mode)}
                     disabled={
                       !!props.loadingAnalysis ||
@@ -143,7 +142,7 @@ export function ChatAnalysisPanel(props: ChatAnalysisPanelProps) {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-auto w-full justify-start rounded-lg px-2 py-2 text-left"
+                    className="h-auto justify-start rounded-lg px-2 py-2 text-left"
                     onClick={props.onRunFullAudit}
                     disabled={!!props.loadingAnalysis}
                   >
@@ -154,82 +153,93 @@ export function ChatAnalysisPanel(props: ChatAnalysisPanelProps) {
                   </Button>
                 ) : null}
                 {props.indexHref ? (
-                  <Button type="button" variant="ghost" className="h-9 w-full justify-start px-2" asChild>
+                  <Button type="button" variant="ghost" className="h-9 justify-start px-2" asChild>
                     <Link to={props.indexHref}>Explorar índice del grafo</Link>
                   </Button>
                 ) : null}
               </div>
             </details>
-          </aside>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
-            {props.loadingAnalysis ? (
-              <section className={sectionShellClass}>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-[var(--foreground-muted)]">
+              <span className="font-medium uppercase tracking-wide">Leyenda</span>
+              {(['critical', 'warning', 'ok', 'neutral'] as const).map((level) => (
+                <span key={level} className="inline-flex items-center gap-1.5">
+                  <SemaphoreDot level={level} className="size-2" />
+                  {SEMAPHORE_LABELS[level].label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+          {props.loadingAnalysis ? (
+            <section className={sectionShellClass}>
+              <div className={sectionHeaderClass}>
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">
+                  {ANALYSIS_MODE_LABELS[props.loadingAnalysis] ?? props.loadingAnalysis}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 px-5 py-8 text-sm text-[var(--foreground-muted)]">
+                <span
+                  className="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  aria-hidden
+                />
+                Analizando…
+              </div>
+            </section>
+          ) : null}
+
+          {props.analysisError && !props.loadingAnalysis ? (
+            <Alert variant="destructive" className="rounded-xl">
+              <AlertTitle>Error en el análisis</AlertTitle>
+              <AlertDescription>{props.analysisError}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {props.analysisResult && !props.loadingAnalysis ? (
+            <div className="space-y-4">
+              <AnalysisSemaphoreSummary
+                summary={
+                  typeof props.analysisResult.summary === 'string'
+                    ? props.analysisResult.summary
+                    : String(props.analysisResult.summary ?? '')
+                }
+                mode={props.analysisResult.mode}
+              />
+              <section className={cn(sectionShellClass, 'flex min-h-0 flex-col')}>
                 <div className={sectionHeaderClass}>
                   <h3 className="text-sm font-semibold text-[var(--foreground)]">
-                    {ANALYSIS_MODE_LABELS[props.loadingAnalysis] ?? props.loadingAnalysis}
+                    {ANALYSIS_RESULT_TITLES[props.analysisResult.mode] ?? props.analysisResult.mode}
                   </h3>
+                  <AnalyzeReportMetaBadges meta={props.analysisResult.reportMeta} />
+                  {props.analysisResult.reportMeta?.graphCoverageNote ? (
+                    <p className="mt-2 text-xs leading-relaxed text-[var(--foreground-muted)]">
+                      {props.analysisResult.reportMeta.graphCoverageNote}
+                    </p>
+                  ) : null}
                 </div>
-                <div className="flex items-center gap-2 px-5 py-8 text-sm text-[var(--foreground-muted)]">
-                  <span
-                    className="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
-                    aria-hidden
-                  />
-                  Analizando…
+                <div className="flex min-h-0 flex-col p-4 sm:p-6">
+                  <div className={cn(chatMarkdownBoxClass, 'max-w-none')}>
+                    <AnalysisMarkdownReport
+                      mode={props.analysisResult.mode}
+                      content={
+                        typeof props.analysisResult.summary === 'string'
+                          ? props.analysisResult.summary
+                          : String(props.analysisResult.summary ?? '')
+                      }
+                    />
+                  </div>
                 </div>
               </section>
-            ) : null}
+            </div>
+          ) : null}
 
-            {props.analysisError && !props.loadingAnalysis ? (
-              <Alert variant="destructive" className="rounded-xl">
-                <AlertTitle>Error en el análisis</AlertTitle>
-                <AlertDescription>{props.analysisError}</AlertDescription>
-              </Alert>
-            ) : null}
-
-            {props.analysisResult && !props.loadingAnalysis ? (
-              <div className="space-y-4">
-                <AnalysisSemaphoreSummary
-                  summary={
-                    typeof props.analysisResult.summary === 'string'
-                      ? props.analysisResult.summary
-                      : String(props.analysisResult.summary ?? '')
-                  }
-                  mode={props.analysisResult.mode}
-                />
-                <section className={cn(sectionShellClass, 'flex min-h-0 flex-col')}>
-                  <div className={sectionHeaderClass}>
-                    <h3 className="text-sm font-semibold text-[var(--foreground)]">
-                      {ANALYSIS_RESULT_TITLES[props.analysisResult.mode] ?? props.analysisResult.mode}
-                    </h3>
-                    <AnalyzeReportMetaBadges meta={props.analysisResult.reportMeta} />
-                    {props.analysisResult.reportMeta?.graphCoverageNote ? (
-                      <p className="mt-2 text-xs leading-relaxed text-[var(--foreground-muted)]">
-                        {props.analysisResult.reportMeta.graphCoverageNote}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex min-h-0 flex-col p-4 sm:p-6">
-                    <div className={cn(chatMarkdownBoxClass, 'max-w-none')}>
-                      <MarkdownBlock
-                        content={
-                          typeof props.analysisResult.summary === 'string'
-                            ? props.analysisResult.summary
-                            : String(props.analysisResult.summary ?? '')
-                        }
-                      />
-                    </div>
-                  </div>
-                </section>
-              </div>
-            ) : null}
-
-            {!props.analysisResult && !props.loadingAnalysis && !props.analysisError ? (
-              <p className="py-12 text-center text-sm leading-relaxed text-[var(--foreground-muted)]">
-                Elige un análisis a la izquierda. Los informes se muestran aquí a pantalla completa.
-              </p>
-            ) : null}
-          </div>
+          {!props.analysisResult && !props.loadingAnalysis && !props.analysisError ? (
+            <p className="py-12 text-center text-sm leading-relaxed text-[var(--foreground-muted)]">
+              Elige un análisis arriba. El informe ocupará todo el ancho disponible.
+            </p>
+          ) : null}
         </div>
       </section>
 
