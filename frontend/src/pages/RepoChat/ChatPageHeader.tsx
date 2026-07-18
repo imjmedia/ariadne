@@ -32,9 +32,10 @@ export function ChatPageHeader(props: {
   memoryNote: string | null;
   messageCount: number;
   onNewConversation: () => void;
-  canClearConversation: boolean;
+  newConversationDisabled?: boolean;
   onOpenAnalysis: () => void;
   analysisPending: boolean;
+  headerLeadingExtra?: ReactNode;
   optionsExtra?: ReactNode;
   extraBadges?: ReactNode;
   modeSelectId?: string;
@@ -51,6 +52,7 @@ export function ChatPageHeader(props: {
             <span className="sr-only">{props.backLabel}</span>
           </Link>
         </Button>
+        {props.headerLeadingExtra}
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
             {props.eyebrow}
@@ -124,7 +126,7 @@ export function ChatPageHeader(props: {
           size="icon"
           className={cn(chatNavBtnClass, 'size-10 shrink-0')}
           onClick={props.onNewConversation}
-          disabled={!props.canClearConversation}
+          disabled={props.newConversationDisabled}
           title="Nueva conversación"
         >
           <MessageSquarePlus className="size-4" aria-hidden />

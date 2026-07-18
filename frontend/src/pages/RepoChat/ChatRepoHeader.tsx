@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Repository, ChatPipelineMode } from '@/types';
 import { ChatPageHeader } from './ChatPageHeader';
 
@@ -15,9 +16,10 @@ export function ChatRepoHeader(props: {
   memoryNote: string | null;
   messageCount: number;
   onNewConversation: () => void;
-  canClearConversation: boolean;
+  newConversationDisabled?: boolean;
   onOpenAnalysis: () => void;
   analysisPending: boolean;
+  headerLeadingExtra?: ReactNode;
 }) {
   return (
     <ChatPageHeader
@@ -37,9 +39,10 @@ export function ChatRepoHeader(props: {
       memoryNote={props.memoryNote}
       messageCount={props.messageCount}
       onNewConversation={props.onNewConversation}
-      canClearConversation={props.canClearConversation}
+      newConversationDisabled={props.newConversationDisabled}
       onOpenAnalysis={props.onOpenAnalysis}
       analysisPending={props.analysisPending}
+      headerLeadingExtra={props.headerLeadingExtra}
       modeSelectId="repo-chat-mode-popover"
     />
   );

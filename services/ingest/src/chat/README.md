@@ -139,4 +139,19 @@ Implementación: `mdd-limits.ts`, `mdd-document.builder.ts`, `mdd-document.types
 
 - `loc`, `complexity` (McCabe), `nestingDepth` — usadas en diagnóstico y antipatrones
 
+## Persistencia de conversaciones (UI)
+
+Tablas `chat_conversations` + `chat_messages` (por `user_id` vía `X-User-Id`, scoped a `repository_id` o `project_id`).
+
+| Método | Ruta |
+|--------|------|
+| GET/POST | `/repositories/:repositoryId/conversations` |
+| GET/POST | `/projects/:projectId/conversations` |
+| GET | `/conversations/:id/messages` |
+| POST | `/conversations/:id/messages` |
+| PATCH | `/conversations/:id` (title) |
+| DELETE | `/conversations/:id` |
+
+El pipeline NL→Cypher sigue stateless: el frontend reconstruye `history[]` desde el hilo activo. La DB es continuidad UX, no contexto del retriever.
+
 Ver [docs/notebooklm/CHAT_Y_ANALISIS.md](../../../docs/notebooklm/CHAT_Y_ANALISIS.md) para detalles de extensión y modificación.

@@ -36,6 +36,8 @@ import { AnalysisModule } from './analysis/analysis.module';
 import { LlmSettingsModule } from './llm-settings/llm-settings.module';
 import { LlmSettingsEntity } from './llm-settings/entities/llm-settings.entity';
 import { MddSnapshotEntity } from './mdd-persistence/entities/mdd-snapshot.entity';
+import { ChatConversationEntity } from './chat/entities/chat-conversation.entity';
+import { ChatMessageEntity } from './chat/entities/chat-message.entity';
 import { MddPersistenceModule } from './mdd-persistence/mdd-persistence.module';
 import { BrownfieldModule } from './brownfield/brownfield.module';
 
@@ -64,6 +66,8 @@ import { BrownfieldModule } from './brownfield/brownfield.module';
         UserEntity,
         LlmSettingsEntity,
         MddSnapshotEntity,
+        ChatConversationEntity,
+        ChatMessageEntity,
       ],
       synchronize: true,
       logging: process.env.NODE_ENV === 'development',

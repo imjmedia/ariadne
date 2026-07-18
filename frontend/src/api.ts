@@ -315,6 +315,45 @@ export const api = {
   chatProject: (projectId: string, body: import('./types').IngestChatRequestBody) =>
     postChatWith429Retry<import('./types').IngestChatResponse>(`/projects/${projectId}/chat`, body),
 
+  listRepoConversations: (repoId: string) =>
+    request<import('./types').ChatConversation[]>(`/repositories/${repoId}/conversations`),
+
+  createRepoConversation: (repoId: string, body?: { title?: string | null }) =>
+    request<import('./types').ChatConversation>(`/repositories/${repoId}/conversations`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
+
+  listProjectConversations: (projectId: string) =>
+    request<import('./types').ChatConversation[]>(`/projects/${projectId}/conversations`),
+
+  createProjectConversation: (projectId: string, body?: { title?: string | null }) =>
+    request<import('./types').ChatConversation>(`/projects/${projectId}/conversations`, {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    }),
+
+  getConversationMessages: (conversationId: string) =>
+    request<import('./types').ChatConversationMessage[]>(`/conversations/${conversationId}/messages`),
+
+  appendConversationMessage: (
+    conversationId: string,
+    body: { role: 'user' | 'assistant'; content: string; cypher?: string | null },
+  ) =>
+    request<import('./types').ChatConversationMessage>(`/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  renameConversation: (conversationId: string, title: string) =>
+    request<import('./types').ChatConversation>(`/conversations/${conversationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    }),
+
+  deleteConversation: (conversationId: string) =>
+    request<void>(`/conversations/${conversationId}`, { method: 'DELETE' }),
+
   listBitbucketWorkspaces: (credentialsRef: string) =>
     request<Array<{ slug: string; name?: string }>>(
       `/providers/bitbucket/workspaces?credentialsRef=${encodeURIComponent(credentialsRef)}`,

@@ -266,6 +266,24 @@ export interface IngestChatResponse {
   mddDocument?: Record<string, unknown>;
 }
 
+/** Conversación persistida por usuario (repo o proyecto). */
+export interface ChatConversation {
+  id: string;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+/** Mensaje persistido en Postgres. */
+export interface ChatConversationMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  cypher: string | null;
+  createdAt: string;
+}
+
 /** Metadatos de `POST .../analyze` (caché, foco, cobertura). */
 export interface AnalyzeReportMeta {
   scopeApplied: boolean;

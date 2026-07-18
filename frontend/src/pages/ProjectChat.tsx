@@ -16,9 +16,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ChatAnalysisSheet } from './RepoChat/ChatAnalysisSheet';
 import { ChatComposer } from './RepoChat/ChatComposer';
+import { ChatConversationsMobileToggle } from './RepoChat/ChatConversationsSidebar';
+import { ChatConversationsPanel } from './RepoChat/ChatConversationsPanel';
 import { ChatMessageThread } from './RepoChat/ChatMessageThread';
 import { ChatPageHeader } from './RepoChat/ChatPageHeader';
 import { ChatProjectScopeOptions } from './RepoChat/ChatProjectScopeOptions';
+import { useChatPersistence } from './RepoChat/useChatPersistence';
 import {
   chatNavBtnClass,
   chatPageMaxClass,
@@ -30,7 +33,6 @@ import {
 export function ProjectChat() {
   const { id: projectId } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; cypher?: string }>>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,24 @@ export function ProjectChat() {
   const [allowBroadProjectChat, setAllowBroadProjectChat] = useState(false);
   const [chatPipelineMode, setChatPipelineMode] = useState<ChatPipelineMode>('default');
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const persistence = useChatPersistence(projectId ? { kind: 'project', id: projectId } : null);
+  const {
+    conversations,
+    activeConversationId,
+    messages,
+    setMessages,
+    conversationsLoading,
+    messagesLoading,
+    persistenceError,
+    selectConversation,
+    deleteConversation,
+    startNewConversation,
+    ensureActiveConversation,
+    persistMessage,
+  } = persistence;
 
   useEffect(() => {
     if (!project?.repositories?.length) return;
@@ -120,13 +139,13 @@ export function ProjectChat() {
 
   const handleNewConversation = useCallback(() => {
     if (loading) return;
-    setMessages([]);
     setError(null);
     setMemoryCompactionNote(null);
-  }, [loading]);
+    void startNewConversation();
+  }, [loading, startNewConversation]);
 
   const send = useCallback(() => {
-    if (!projectId || !project || !input.trim() || loading) return;
+    if (!projectId || !project || !input.trim() || loading || messagesLoading) return;
     const msg = input.trim();
     setInput('');
     setLoading(true);
@@ -169,9 +188,22 @@ export function ProjectChat() {
       chatBody.strictChatScope = false;
     }
 
-    api
-      .chatProject(projectId, chatBody)
-      .then((res) => {
+    void (async () => {
+      let conversationId: string;
+      try {
+        conversationId = await ensureActiveConversation();
+        await persistMessage(conversationId, { role: 'user', content: msg });
+      } catch (e) {
+        conversationId = activeConversationId ?? '';
+        if (!conversationId) {
+          setError(e instanceof Error ? e.message : String(e));
+          setLoading(false);
+          return;
+        }
+      }
+
+      try {
+        const res = await api.chatProject(projectId, chatBody);
         setMessages((m) => {
           const withNew = [
             ...m,
@@ -182,23 +214,47 @@ export function ProjectChat() {
           if (note) setMemoryCompactionNote(note);
           return compacted.messages;
         });
-      })
-      .catch((e) => {
-        setError(e.message);
-        setMessages((m) => [...m, { role: 'assistant', content: `Error: ${e.message}` }]);
-      })
-      .finally(() => setLoading(false));
+        if (conversationId) {
+          await persistMessage(conversationId, {
+            role: 'assistant',
+            content: res.answer,
+            cypher: res.cypher,
+          });
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setError(message);
+        setMessages((m) => [...m, { role: 'assistant', content: `Error: ${message}` }]);
+        if (conversationId) {
+          try {
+            await persistMessage(conversationId, {
+              role: 'assistant',
+              content: `Error: ${message}`,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [
     projectId,
     project,
     input,
     loading,
+    messagesLoading,
     messages,
+    setMessages,
     allowBroadProjectChat,
     selectedRepoId,
     includePrefixesText,
     excludeGlobsText,
     chatPipelineMode,
+    ensureActiveConversation,
+    persistMessage,
+    activeConversationId,
   ]);
 
   function handleChatKeyDown(e: React.KeyboardEvent) {
@@ -263,14 +319,27 @@ export function ProjectChat() {
   const repoCount = project.repositories.length;
   const analysisPending = Boolean(analysisResult || loadingAnalysis || analysisError);
   const codeAnalysisDisabled = repoCount === 0 || (repoCount > 1 && !selectedRepoId);
+  const chatBusy = loading || messagesLoading || conversationsLoading;
 
   return (
     <div
       className={cn(
         chatPageMaxClass,
-        'flex min-h-0 flex-1 flex-col pb-4 xl:h-[min(calc(100dvh-9.25rem),900px)] xl:pb-0',
+        'flex min-h-0 flex-1 gap-3 pb-4 xl:h-[min(calc(100dvh-9.25rem),900px)] xl:pb-0',
       )}
     >
+      <ChatConversationsPanel
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        loading={conversationsLoading}
+        onSelect={(conversationId) => void selectConversation(conversationId)}
+        onCreate={() => void handleNewConversation()}
+        onDelete={(conversationId) => void deleteConversation(conversationId)}
+        mobileOpen={historyOpen}
+        onMobileOpenChange={setHistoryOpen}
+      />
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 sm:gap-4">
       <ChatPageHeader
         backHref={`/projects/${projectId}`}
         backLabel="Volver al proyecto"
@@ -290,9 +359,12 @@ export function ProjectChat() {
         memoryNote={memoryCompactionNote}
         messageCount={messages.length}
         onNewConversation={handleNewConversation}
-        canClearConversation={messages.length > 0 && !loading}
+        newConversationDisabled={chatBusy}
         onOpenAnalysis={() => setAnalysisOpen(true)}
         analysisPending={analysisPending}
+        headerLeadingExtra={
+          <ChatConversationsMobileToggle onOpen={() => setHistoryOpen(true)} />
+        }
         modeSelectId="project-chat-mode-popover"
         extraBadges={
           allowBroadProjectChat && repoCount > 1 ? (
@@ -319,23 +391,35 @@ export function ProjectChat() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
+        {persistenceError ? (
+          <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
+            <AlertTitle>Historial</AlertTitle>
+            <AlertDescription>{persistenceError}</AlertDescription>
+          </Alert>
+        ) : null}
 
-        <ChatMessageThread
-          messages={messages}
-          loading={loading}
-          chatPipelineMode={chatPipelineMode}
-          onPromptSelect={(t) => setInput(t.message)}
-          scrollRef={scrollRef}
-          emptyTitle="Consulta multi-repo"
-          emptyDescription="Pregunta por archivos o flujos en cualquier repositorio del proyecto. Ariadne usa el grafo unificado."
-        />
+        {messagesLoading ? (
+          <div className="flex flex-1 items-center justify-center p-8">
+            <Skeleton className="h-32 w-full max-w-md rounded-xl" />
+          </div>
+        ) : (
+          <ChatMessageThread
+            messages={messages}
+            loading={loading}
+            chatPipelineMode={chatPipelineMode}
+            onPromptSelect={(t) => setInput(t.message)}
+            scrollRef={scrollRef}
+            emptyTitle="Consulta multi-repo"
+            emptyDescription="Pregunta por archivos o flujos en cualquier repositorio del proyecto. Ariadne usa el grafo unificado."
+          />
+        )}
 
         <ChatComposer
           input={input}
           onInputChange={setInput}
           onSend={send}
           onKeyDown={handleChatKeyDown}
-          loading={loading}
+          loading={chatBusy}
           placeholder="¿Qué quieres saber del proyecto?"
         />
       </section>
@@ -356,6 +440,7 @@ export function ProjectChat() {
         indexHref={selectedRepoId ? `/repos/${selectedRepoId}/index` : null}
         showFullAudit={false}
       />
+      </div>
     </div>
   );
 }

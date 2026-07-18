@@ -21,14 +21,30 @@ import { DesignSystemLinkService } from '../pipeline/design-system-link.service'
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { ChatConversationEntity } from './entities/chat-conversation.entity';
+import { ChatMessageEntity } from './entities/chat-message.entity';
+import {
+  ChatConversationsController,
+  ProjectChatConversationsController,
+  RepositoryChatConversationsController,
+} from './chat-conversation.controller';
+import { ChatConversationService } from './chat-conversation.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([IndexedFile]), RepositoriesModule, EmbeddingModule, ProjectsModule],
+  imports: [
+    TypeOrmModule.forFeature([IndexedFile, ChatConversationEntity, ChatMessageEntity]),
+    RepositoriesModule,
+    EmbeddingModule,
+    ProjectsModule,
+  ],
   controllers: [
     ChatController,
     ProjectChatController,
     InternalChatToolsController,
     InternalProjectToolsController,
+    RepositoryChatConversationsController,
+    ProjectChatConversationsController,
+    ChatConversationsController,
   ],
   providers: [
     ChatCypherService,
@@ -41,6 +57,7 @@ import { ProjectsModule } from '../projects/projects.module';
     AnalyticsService,
     ChangePlanValidationService,
     DesignSystemLinkService,
+    ChatConversationService,
   ],
   exports: [ChatService, DesignSystemLinkService],
 })

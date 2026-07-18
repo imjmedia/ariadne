@@ -15,8 +15,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ChatAnalysisSheet } from './RepoChat/ChatAnalysisSheet';
 import { ChatComposer } from './RepoChat/ChatComposer';
+import { ChatConversationsMobileToggle } from './RepoChat/ChatConversationsSidebar';
+import { ChatConversationsPanel } from './RepoChat/ChatConversationsPanel';
 import { ChatMessageThread } from './RepoChat/ChatMessageThread';
 import { ChatRepoHeader } from './RepoChat/ChatRepoHeader';
+import { useChatPersistence } from './RepoChat/useChatPersistence';
 import {
   chatNavBtnClass,
   chatPageMaxClass,
@@ -28,7 +31,6 @@ import {
 export function RepoChat() {
   const { id } = useParams<{ id: string }>();
   const [repo, setRepo] = useState<Repository | null>(null);
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; cypher?: string }>>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,24 @@ export function RepoChat() {
   const [fullAuditError, setFullAuditError] = useState<string | null>(null);
   const [chatPipelineMode, setChatPipelineMode] = useState<ChatPipelineMode>('default');
   const [memoryCompactionNote, setMemoryCompactionNote] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const persistence = useChatPersistence(id ? { kind: 'repository', id } : null);
+  const {
+    conversations,
+    activeConversationId,
+    messages,
+    setMessages,
+    conversationsLoading,
+    messagesLoading,
+    persistenceError,
+    selectConversation,
+    deleteConversation,
+    startNewConversation,
+    ensureActiveConversation,
+    persistMessage,
+  } = persistence;
 
   useEffect(() => {
     if (!id) return;
@@ -104,13 +123,13 @@ export function RepoChat() {
 
   const handleNewConversation = useCallback(() => {
     if (loading) return;
-    setMessages([]);
     setError(null);
     setMemoryCompactionNote(null);
-  }, [loading]);
+    void startNewConversation();
+  }, [loading, startNewConversation]);
 
   const send = useCallback(() => {
-    if (!id || !input.trim() || loading) return;
+    if (!id || !input.trim() || loading || messagesLoading) return;
     const msg = input.trim();
     setInput('');
     setLoading(true);
@@ -140,9 +159,22 @@ export function RepoChat() {
       ...modeOpts,
     };
 
-    api
-      .chat(id, chatPayload)
-      .then((res) => {
+    void (async () => {
+      let conversationId: string;
+      try {
+        conversationId = await ensureActiveConversation();
+        await persistMessage(conversationId, { role: 'user', content: msg });
+      } catch (e) {
+        conversationId = activeConversationId ?? '';
+        if (!conversationId) {
+          setError(e instanceof Error ? e.message : String(e));
+          setLoading(false);
+          return;
+        }
+      }
+
+      try {
+        const res = await api.chat(id, chatPayload);
         setMessages((m) => {
           const withNew = [
             ...m,
@@ -153,13 +185,45 @@ export function RepoChat() {
           if (note) setMemoryCompactionNote(note);
           return compacted.messages;
         });
-      })
-      .catch((e) => {
-        setError(e.message);
-        setMessages((m) => [...m, { role: 'assistant', content: `Error: ${e.message}` }]);
-      })
-      .finally(() => setLoading(false));
-  }, [id, input, loading, messages, includePrefixesText, excludeGlobsText, chatPipelineMode]);
+        if (conversationId) {
+          await persistMessage(conversationId, {
+            role: 'assistant',
+            content: res.answer,
+            cypher: res.cypher,
+          });
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setError(message);
+        setMessages((m) => [...m, { role: 'assistant', content: `Error: ${message}` }]);
+        if (conversationId) {
+          try {
+            await persistMessage(conversationId, {
+              role: 'assistant',
+              content: `Error: ${message}`,
+            });
+          } catch {
+            /* ignore persistence error on error bubble */
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [
+    id,
+    input,
+    loading,
+    messagesLoading,
+    messages,
+    setMessages,
+    includePrefixesText,
+    excludeGlobsText,
+    chatPipelineMode,
+    ensureActiveConversation,
+    persistMessage,
+    activeConversationId,
+  ]);
 
   function handleChatKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -214,73 +278,102 @@ export function RepoChat() {
   }
 
   const analysisPending = Boolean(analysisResult || loadingAnalysis || analysisError);
+  const chatBusy = loading || messagesLoading || conversationsLoading;
 
   return (
     <div
       className={cn(
         chatPageMaxClass,
-        'flex min-h-0 flex-1 flex-col pb-4 xl:h-[min(calc(100dvh-9.25rem),900px)] xl:pb-0',
+        'flex min-h-0 flex-1 gap-3 pb-4 xl:h-[min(calc(100dvh-9.25rem),900px)] xl:pb-0',
       )}
     >
-      <ChatRepoHeader
-        repo={repo}
-        repoId={id}
-        chatPipelineMode={chatPipelineMode}
-        onChatPipelineModeChange={setChatPipelineMode}
-        includePrefixesText={includePrefixesText}
-        onIncludePrefixesText={setIncludePrefixesText}
-        excludeGlobsText={excludeGlobsText}
-        onExcludeGlobsText={setExcludeGlobsText}
-        crossPackageDuplicates={crossPackageDuplicates}
-        onCrossPackageDuplicates={setCrossPackageDuplicates}
-        memoryNote={memoryCompactionNote}
-        messageCount={messages.length}
-        onNewConversation={handleNewConversation}
-        canClearConversation={messages.length > 0 && !loading}
-        onOpenAnalysis={() => setAnalysisOpen(true)}
-        analysisPending={analysisPending}
+      <ChatConversationsPanel
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        loading={conversationsLoading}
+        onSelect={(conversationId) => void selectConversation(conversationId)}
+        onCreate={() => void handleNewConversation()}
+        onDelete={(conversationId) => void deleteConversation(conversationId)}
+        mobileOpen={historyOpen}
+        onMobileOpenChange={setHistoryOpen}
       />
 
-      <section className={cn(sectionShellClass, 'flex min-h-0 flex-1 flex-col overflow-hidden p-0')}>
-        {error ? (
-          <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : null}
-
-        <ChatMessageThread
-          messages={messages}
-          loading={loading}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 sm:gap-4">
+        <ChatRepoHeader
+          repo={repo}
+          repoId={id}
           chatPipelineMode={chatPipelineMode}
-          onPromptSelect={(t) => setInput(t.message)}
-          scrollRef={scrollRef}
+          onChatPipelineModeChange={setChatPipelineMode}
+          includePrefixesText={includePrefixesText}
+          onIncludePrefixesText={setIncludePrefixesText}
+          excludeGlobsText={excludeGlobsText}
+          onExcludeGlobsText={setExcludeGlobsText}
+          crossPackageDuplicates={crossPackageDuplicates}
+          onCrossPackageDuplicates={setCrossPackageDuplicates}
+          memoryNote={memoryCompactionNote}
+          messageCount={messages.length}
+          onNewConversation={handleNewConversation}
+          newConversationDisabled={chatBusy}
+          onOpenAnalysis={() => setAnalysisOpen(true)}
+          analysisPending={analysisPending}
+          headerLeadingExtra={
+            <ChatConversationsMobileToggle onOpen={() => setHistoryOpen(true)} />
+          }
         />
 
-        <ChatComposer
-          input={input}
-          onInputChange={setInput}
-          onSend={send}
-          onKeyDown={handleChatKeyDown}
-          loading={loading}
-        />
-      </section>
+        <section className={cn(sectionShellClass, 'flex min-h-0 flex-1 flex-col overflow-hidden p-0')}>
+          {error ? (
+            <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {persistenceError ? (
+            <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
+              <AlertTitle>Historial</AlertTitle>
+              <AlertDescription>{persistenceError}</AlertDescription>
+            </Alert>
+          ) : null}
 
-      <ChatAnalysisSheet
-        open={analysisOpen}
-        onOpenChange={setAnalysisOpen}
-        indexHref={`/repos/${id}/index`}
-        loadingAnalysis={loadingAnalysis}
-        analysisError={analysisError}
-        analysisResult={analysisResult}
-        onRunAnalysis={runAnalysis}
-        onRunFullAudit={runFullAudit}
-        fullAuditOpen={fullAuditOpen}
-        onFullAuditOpenChange={setFullAuditOpen}
-        fullAuditData={fullAuditData}
-        fullAuditLoading={fullAuditLoading}
-        fullAuditError={fullAuditError}
-      />
+          {messagesLoading ? (
+            <div className="flex flex-1 items-center justify-center p-8">
+              <Skeleton className="h-32 w-full max-w-md rounded-xl" />
+            </div>
+          ) : (
+            <ChatMessageThread
+              messages={messages}
+              loading={loading}
+              chatPipelineMode={chatPipelineMode}
+              onPromptSelect={(t) => setInput(t.message)}
+              scrollRef={scrollRef}
+            />
+          )}
+
+          <ChatComposer
+            input={input}
+            onInputChange={setInput}
+            onSend={send}
+            onKeyDown={handleChatKeyDown}
+            loading={chatBusy}
+          />
+        </section>
+
+        <ChatAnalysisSheet
+          open={analysisOpen}
+          onOpenChange={setAnalysisOpen}
+          indexHref={`/repos/${id}/index`}
+          loadingAnalysis={loadingAnalysis}
+          analysisError={analysisError}
+          analysisResult={analysisResult}
+          onRunAnalysis={runAnalysis}
+          onRunFullAudit={runFullAudit}
+          fullAuditOpen={fullAuditOpen}
+          onFullAuditOpenChange={setFullAuditOpen}
+          fullAuditData={fullAuditData}
+          fullAuditLoading={fullAuditLoading}
+          fullAuditError={fullAuditError}
+        />
+      </div>
     </div>
   );
 }

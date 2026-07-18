@@ -4,16 +4,27 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 
 ## Layout (rediseño UX)
 
-- **Una sola columna:** conversación a pantalla completa; sin split permanente ni pestañas móvil/chat+tools.
+- **Conversación + historial:** panel izquierdo «Chats» (estilo NotebookLM/Gemini) con conversaciones persistidas por usuario; en móvil se abre con el icono de panel.
+- **Una columna principal:** conversación; sin split permanente de herramientas.
 - **Análisis bajo demanda:** panel lateral (`ChatAnalysisSheet`) con 3 acciones frecuentes + acordeón «Más análisis».
 - **Opciones avanzadas:** popover «Opciones» (modo de respuesta, alcance opcional, memoria compactada).
 - **Cabecera compacta:** volver al repo, badges de modo/alcance, botones Análisis y Nueva conversación.
+
+## Persistencia (por usuario)
+
+- Tablas Postgres: `chat_conversations`, `chat_messages` (ingest).
+- API: `GET/POST /repositories/:id/conversations`, `GET/POST /projects/:id/conversations`, `GET/POST/DELETE /conversations/:id/...`.
+- Cada hilo es independiente: cambiar de chat no mezcla memoria LLM (`history[]` se reconstruye solo desde ese hilo).
+- Título auto desde el primer mensaje del usuario; eliminar con icono papelera (confirmación).
 
 ## Componentes
 
 | Archivo | Rol |
 |---------|-----|
 | **RepoChat.tsx** | Estado, envío de chat y orquestación |
+| **useChatPersistence.ts** | Hook: listar, crear, seleccionar, borrar y persistir mensajes |
+| **ChatConversationsSidebar.tsx** | Lista de chats + botón Nuevo |
+| **ChatConversationsPanel.tsx** | Sidebar desktop + drawer móvil |
 | **ChatPageHeader.tsx** | Cabecera compartida repo/proyecto |
 | **ChatRepoHeader.tsx** | Wrapper repo → ChatPageHeader |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
@@ -33,6 +44,6 @@ Prefijos y globs en **Opciones** → popover. Se envían como `scope` en chat y 
 
 Ver **ChatPipelineModeSelect** y `ingestOptionsFromChatPipelineMode` (`frontend/src/utils/chat-pipeline-mode.ts`).
 
-## Historial
+## Memoria en petición LLM
 
-`ChatConversationToolbar` sustituido por icono en cabecera + nota en popover Opciones. Ver `frontend/src/utils/chat-history-payload.ts`.
+La compactación in-memory para el POST (`history[]`) sigue en `frontend/src/utils/chat-history-payload.ts`. La persistencia en DB guarda el texto completo del hilo activo.
