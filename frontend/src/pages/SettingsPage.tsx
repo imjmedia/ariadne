@@ -1,8 +1,8 @@
 /**
  * Global LLM settings (admin): provider catalog, API key, models, embeddings.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eye, EyeOff, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Eye, EyeOff, Lock, Sparkles } from 'lucide-react';
 import { api } from '@/api';
 import type {
   LlmProviderCatalogEntry,
@@ -11,8 +11,8 @@ import type {
   LlmTestConnectionResult,
 } from '@/types';
 import { getUser } from '@/utils/auth';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -23,7 +23,45 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { panelIntroClass, sectionHeaderClass, sectionShellClass } from './RepoDetail/layoutClasses';
+import {
+  settingsAlertClass,
+  settingsCheckboxClass,
+  settingsFormSubsectionClass,
+  settingsToggleFieldClass,
+} from './settingsUiClasses';
 import { SettingsTheForgeCard } from './SettingsTheForgeCard';
+
+const settingsPageClass = 'mx-auto max-w-3xl space-y-6 pb-10';
+
+function SettingsFormSection({
+  id,
+  title,
+  description,
+  children,
+  boxed = false,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  boxed?: boolean;
+}) {
+  return (
+    <div className={boxed ? settingsFormSubsectionClass : 'space-y-4'} aria-labelledby={id}>
+      <div>
+        <h3 id={id} className="text-sm font-semibold text-[var(--foreground)]">
+          {title}
+        </h3>
+        {description ? (
+          <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)]">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 interface FormState {
   provider: LlmProviderId;
@@ -182,11 +220,18 @@ export function SettingsPage() {
 
   if (!isAdmin) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <Alert>
+      <div className={settingsPageClass}>
+        <div className={panelIntroClass}>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
+            Configuración global del despliegue: proveedor LLM e integraciones opcionales.
+          </p>
+        </div>
+        <Alert className={settingsAlertClass}>
+          <Lock className="size-4" aria-hidden />
           <AlertTitle>Acceso restringido</AlertTitle>
           <AlertDescription>
-            Solo los administradores pueden gestionar la configuración LLM del despliegue.
+            Solo los administradores pueden gestionar la configuración LLM e integraciones del despliegue.
           </AlertDescription>
         </Alert>
       </div>
@@ -195,59 +240,95 @@ export function SettingsPage() {
 
   if (loading || !form) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Cargando ajustes…</CardTitle>
-          </CardHeader>
-        </Card>
+      <div className={settingsPageClass}>
+        <Skeleton className="h-28 w-full rounded-3xl" />
+        <section className={sectionShellClass} aria-busy="true" aria-label="Cargando ajustes">
+          <div className={sectionHeaderClass}>
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="mt-2 h-4 w-full max-w-md" />
+          </div>
+          <div className="space-y-4 px-5 py-6 sm:px-6">
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full rounded-xl sm:max-w-xs" />
+          </div>
+        </section>
+        <section className={sectionShellClass} aria-hidden>
+          <div className={sectionHeaderClass}>
+            <Skeleton className="h-6 w-48" />
+          </div>
+          <div className="space-y-4 px-5 py-6 sm:px-6">
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full rounded-xl" />
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Sparkles className="h-6 w-6 text-[var(--primary)]" aria-hidden />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Ajustes</h1>
-          <p className="text-sm text-[var(--foreground-muted)]">
-            Configuración global del proveedor LLM para chat, análisis y embeddings.
-          </p>
+    <div className={settingsPageClass}>
+      <div className={panelIntroClass}>
+        <div className="flex items-start gap-3">
+          <div
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--primary)_12%,var(--card))]"
+            aria-hidden
+          >
+            <Sparkles className="size-5 text-[var(--primary)]" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
+              Configuración global del despliegue: proveedor LLM para chat, análisis y embeddings, e
+              integraciones opcionales como The Forge.
+            </p>
+          </div>
         </div>
       </div>
 
-      {error && (
-        <Alert variant="destructive">
+      {error ? (
+        <Alert variant="destructive" className={settingsAlertClass}>
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-      )}
-      {success && (
-        <Alert>
+      ) : null}
+      {success ? (
+        <Alert className={settingsAlertClass}>
           <AlertTitle>Guardado</AlertTitle>
           <AlertDescription>{success}</AlertDescription>
         </Alert>
-      )}
-      {testResult && (
-        <Alert variant={testResult.ok ? 'default' : 'destructive'}>
+      ) : null}
+      {testResult ? (
+        <Alert variant={testResult.ok ? 'default' : 'destructive'} className={settingsAlertClass}>
           <AlertTitle>{testResult.ok ? 'Conexión OK' : 'Conexión fallida'}</AlertTitle>
           <AlertDescription className="whitespace-pre-wrap break-words text-xs">
             {testResult.message}
             {testResult.model ? `\nModelo: ${testResult.model}` : ''}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Proveedor de IA</CardTitle>
-          <CardDescription>
-            Fuente actual: <strong>{settings?.source === 'db' ? 'Ajustes (BD)' : 'Variables de entorno'}</strong>
-            {settings?.apiKeyHint ? ` · Clave: ${settings.apiKeyHint}` : settings?.hasApiKey ? '' : ' · Sin API key'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      <section className={sectionShellClass} aria-labelledby="llm-settings-heading">
+        <div className={sectionHeaderClass}>
+          <h2 id="llm-settings-heading" className="text-base font-semibold text-[var(--foreground)]">
+            Proveedor de IA
+          </h2>
+          <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+            Fuente actual:{' '}
+            <strong>{settings?.source === 'db' ? 'Ajustes (BD)' : 'Variables de entorno'}</strong>
+            {settings?.apiKeyHint
+              ? ` · Clave: ${settings.apiKeyHint}`
+              : settings?.hasApiKey
+                ? ''
+                : ' · Sin API key'}
+          </p>
+        </div>
+        <div className="space-y-8 px-5 py-6 sm:px-6">
+          <SettingsFormSection
+            id="llm-connection-heading"
+            title="Conexión"
+            description="Proveedor, credenciales y URL base del API."
+          >
           <div className="space-y-2">
             <Label htmlFor="provider">Proveedor</Label>
             <Select value={form.provider} onValueChange={(v) => handleProviderChange(v as LlmProviderId)}>
@@ -291,7 +372,10 @@ export function SettingsPage() {
               />
               <button
                 type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--foreground-muted)]"
+                className={cn(
+                  'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--foreground-muted)]',
+                  'hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/18',
+                )}
                 onClick={() => setShowKey((s) => !s)}
                 aria-label={showKey ? 'Ocultar clave' : 'Mostrar clave'}
               >
@@ -322,40 +406,58 @@ export function SettingsPage() {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="chatModel">Modelo de chat (ingest)</Label>
-              <Input
-                id="chatModel"
-                value={form.chatModel}
-                onChange={(e) => setForm({ ...form, chatModel: e.target.value })}
-                list="chat-models"
-              />
-              <datalist id="chat-models">
-                {selectedCatalog?.chatModels?.map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="orchModel">Modelo orchestrator (opcional)</Label>
-              <Input
-                id="orchModel"
-                value={form.orchestratorChatModel}
-                onChange={(e) => setForm({ ...form, orchestratorChatModel: e.target.value })}
-                placeholder="Vacío = mismo que ingest"
-              />
-            </div>
-          </div>
+          </SettingsFormSection>
 
-          <div className="space-y-4 rounded-lg border border-[var(--border)] p-4">
-            <div>
-              <p className="text-sm font-medium">Chat multi-agente</p>
-              <p className="text-xs text-[var(--foreground-muted)]">
-                Router (intención + auditoría de reingeniería) y worker (retrieve + síntesis). Vacío =
-                mismo que modelo orchestrator.
-              </p>
+          <SettingsFormSection
+            id="llm-models-heading"
+            title="Modelos"
+            description="Modelos de chat, orchestrator y temperatura de generación."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="chatModel">Modelo de chat (ingest)</Label>
+                <Input
+                  id="chatModel"
+                  value={form.chatModel}
+                  onChange={(e) => setForm({ ...form, chatModel: e.target.value })}
+                  list="chat-models"
+                />
+                <datalist id="chat-models">
+                  {selectedCatalog?.chatModels?.map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="orchModel">Modelo orchestrator (opcional)</Label>
+                <Input
+                  id="orchModel"
+                  value={form.orchestratorChatModel}
+                  onChange={(e) => setForm({ ...form, orchestratorChatModel: e.target.value })}
+                  placeholder="Vacío = mismo que ingest"
+                />
+              </div>
             </div>
+            <div className="space-y-2 sm:max-w-xs">
+              <Label htmlFor="temperature">Temperatura</Label>
+              <Input
+                id="temperature"
+                type="number"
+                min={0}
+                max={2}
+                step={0.05}
+                value={form.temperature}
+                onChange={(e) => setForm({ ...form, temperature: e.target.value })}
+              />
+            </div>
+          </SettingsFormSection>
+
+          <SettingsFormSection
+            id="llm-multiagent-heading"
+            title="Chat multi-agente"
+            description="Router (intención + auditoría de reingeniería) y worker (retrieve + síntesis). Vacío = mismo que modelo orchestrator."
+            boxed
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="routerModel">Modelo router (razonamiento)</Label>
@@ -378,40 +480,32 @@ export function SettingsPage() {
                 />
               </div>
             </div>
-            <label className="flex cursor-pointer items-start gap-2 text-sm">
+            <label htmlFor="chatIntentRouterEnabled" className={settingsToggleFieldClass}>
               <input
+                id="chatIntentRouterEnabled"
                 type="checkbox"
-                className="mt-1"
+                className={settingsCheckboxClass}
                 checked={form.chatIntentRouterEnabled}
                 onChange={(e) =>
                   setForm({ ...form, chatIntentRouterEnabled: e.target.checked })
                 }
               />
-              <span>
-                Router de intención con LLM
-                <span className="mt-0.5 block text-xs text-[var(--foreground-muted)]">
+              <span className="text-sm">
+                <span className="font-medium">Router de intención con LLM</span>
+                <span className="mt-1 block text-xs text-[var(--foreground-muted)]">
                   Desactivado: solo heurística por keywords (más rápido, menos preciso).
                 </span>
               </span>
             </label>
-          </div>
+          </SettingsFormSection>
 
-          <div className="space-y-2">
-            <Label htmlFor="temperature">Temperatura</Label>
-            <Input
-              id="temperature"
-              type="number"
-              min={0}
-              max={2}
-              step={0.05}
-              value={form.temperature}
-              onChange={(e) => setForm({ ...form, temperature: e.target.value })}
-            />
-          </div>
-
-          {selectedCatalog?.supportsEmbeddings && (
-            <div className="space-y-4 rounded-lg border border-[var(--border)] p-4">
-              <p className="text-sm font-medium">Embeddings (RAG)</p>
+          {selectedCatalog?.supportsEmbeddings ? (
+            <SettingsFormSection
+              id="llm-embeddings-heading"
+              title="Embeddings (RAG)"
+              description="Modelo y dimensión de vectores para búsqueda semántica."
+              boxed
+            >
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="embeddingModel">Modelo de embeddings</Label>
@@ -437,29 +531,35 @@ export function SettingsPage() {
                   />
                 </div>
               </div>
-            </div>
-          )}
+            </SettingsFormSection>
+          ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="httpReferer">HTTP Referer (OpenRouter)</Label>
-              <Input
-                id="httpReferer"
-                value={form.httpReferer}
-                onChange={(e) => setForm({ ...form, httpReferer: e.target.value })}
-              />
+          <SettingsFormSection
+            id="llm-openrouter-heading"
+            title="Metadatos OpenRouter"
+            description="Cabeceras opcionales enviadas a OpenRouter en cada petición."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="httpReferer">HTTP Referer</Label>
+                <Input
+                  id="httpReferer"
+                  value={form.httpReferer}
+                  onChange={(e) => setForm({ ...form, httpReferer: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="appTitle">App title</Label>
+                <Input
+                  id="appTitle"
+                  value={form.appTitle}
+                  onChange={(e) => setForm({ ...form, appTitle: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="appTitle">App title (OpenRouter)</Label>
-              <Input
-                id="appTitle"
-                value={form.appTitle}
-                onChange={(e) => setForm({ ...form, appTitle: e.target.value })}
-              />
-            </div>
-          </div>
+          </SettingsFormSection>
 
-          <div className="flex flex-wrap gap-3 pt-2">
+          <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-6 sm:flex-row sm:flex-wrap">
             <Button type="button" onClick={() => void handleSave()} disabled={saving || testing}>
               {saving ? 'Guardando…' : 'Guardar'}
             </Button>
@@ -473,12 +573,12 @@ export function SettingsPage() {
             </Button>
           </div>
 
-          <p className="text-xs text-[var(--foreground-muted)]">
+          <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">
             Las variables <code className="text-xs">LLM_*</code> en el entorno siguen como fallback si no
             hay fila guardada en BD. Tras guardar aquí, Ajustes tiene prioridad.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <SettingsTheForgeCard />
     </div>
