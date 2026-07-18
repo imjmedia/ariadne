@@ -233,7 +233,7 @@ export function SystemSettingsPage() {
             </div>
           </section>
 
-          <SettingsDetailsSection title="Red y FalkorDB" defaultOpen>
+          <SettingsDetailsSection id="system-network-falkor" title="Red y FalkorDB" defaultOpen>
             <div className={`${settingsSectionBodyClass} grid gap-4 md:grid-cols-2`}>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="corsOrigin">CORS origin (coma-separado)</Label>
@@ -263,7 +263,7 @@ export function SystemSettingsPage() {
             </div>
           </SettingsDetailsSection>
 
-          <SettingsDetailsSection title="Observabilidad y chat" defaultOpen={false}>
+          <SettingsDetailsSection id="system-observability-chat" title="Observabilidad y chat" defaultOpen={false}>
             <div className={`${settingsSectionBodyClass} grid gap-4 md:grid-cols-2`}>
               <label className={settingsToggleFieldClass}>
                 <input type="checkbox" className={settingsCheckboxClass} checked={form.metricsEnabled} onChange={(e) => setForm({ ...form, metricsEnabled: e.target.checked })} />
@@ -284,7 +284,7 @@ export function SystemSettingsPage() {
             </div>
           </SettingsDetailsSection>
 
-          <SettingsDetailsSection title="Integraciones" defaultOpen={false}>
+          <SettingsDetailsSection id="system-integrations" title="Integraciones" defaultOpen={false}>
             <div className={`${settingsSectionBodyClass} grid gap-4 md:grid-cols-2`}>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="githubToken">GitHub token (PR review) {settings?.integrations.githubTokenHint ? `(actual: ${settings.integrations.githubTokenHint})` : ''}</Label>
