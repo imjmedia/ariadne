@@ -49,7 +49,7 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
 
   async embedBatch(texts: string[]): Promise<number[][]> {
     if (!this.apiKey) {
-      throw new Error('LLM_API_KEY required for OpenRouter embeddings');
+      throw new Error('API key LLM requerida para embeddings OpenRouter. Configúrala en Ajustes → Proveedores IA.');
     }
     if (texts.length === 0) return [];
     const base = resolveLlmBaseUrl().replace(/\/$/, '');

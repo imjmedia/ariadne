@@ -26,7 +26,7 @@ export class EmbeddingController {
       const b = await this.embeddingSpaces.getReadBindingForRepository(repositoryId.trim());
       if (!b.provider?.isAvailable()) {
         throw new BadRequestException(
-          'Embedding provider for this repository read space is not configured (LLM_API_KEY or space provider).',
+          'Embedding provider for this repository read space is not configured (Ajustes → Proveedores IA o space provider).',
         );
       }
       const embedding = await b.provider.embed(trimmed);
@@ -38,7 +38,7 @@ export class EmbeddingController {
     }
     if (!this.embedding.isAvailable()) {
       throw new BadRequestException(
-        'Embedding provider not configured. Set LLM_API_KEY and EMBEDDING_PROVIDER.',
+        'Embedding provider not configured. Guarda la API key en Ajustes → Proveedores IA.',
       );
     }
     const embedding = await this.embedding.embed(trimmed);

@@ -36,7 +36,7 @@ export class EmbeddingService {
   getDimension(): number {
     if (!this.provider) {
       throw new Error(
-        'No embedding provider configured. Set LLM_API_KEY and EMBEDDING_PROVIDER.',
+        'No embedding provider configured. Configura la API key en Ajustes → Proveedores IA.',
       );
     }
     return this.provider.getDimension();
@@ -50,7 +50,7 @@ export class EmbeddingService {
   async embed(text: string): Promise<number[]> {
     if (!this.provider) {
       throw new Error(
-        'No embedding provider configured. Set LLM_API_KEY and EMBEDDING_PROVIDER.',
+        'No embedding provider configured. Configura la API key en Ajustes → Proveedores IA.',
       );
     }
     return this.provider.embed(text);

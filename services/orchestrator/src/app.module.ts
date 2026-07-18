@@ -8,11 +8,12 @@
 import { Module } from '@nestjs/common';
 import { CodebaseChatModule } from './codebase-chat/codebase-chat.module';
 import { LegacyModule } from './legacy/legacy.module';
+import { LlmRuntimeModule } from './llm/llm-runtime.module';
 import { RedisStateModule } from './redis-state/redis-state.module';
 import { WorkflowModule } from './workflow/workflow.module';
 
 @Module({
-  imports: [RedisStateModule, WorkflowModule, CodebaseChatModule, LegacyModule],
+  imports: [RedisStateModule, WorkflowModule, LlmRuntimeModule, CodebaseChatModule, LegacyModule],
 })
 /** Módulo principal del Orchestrator. */
 export class AppModule {}

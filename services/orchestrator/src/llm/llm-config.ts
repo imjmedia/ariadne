@@ -1,6 +1,6 @@
 /**
  * LLM (OpenRouter compatible). Alineado con ingest: `llm-config.ts` allí.
- * Prioridad: runtime cacheado desde ingest (Ajustes) → process.env.
+ * API key solo desde runtime cacheado de ingest (Ajustes en BD).
  */
 
 import { getOrchestratorLlmRuntimeSync } from './llm-settings.client';
@@ -8,13 +8,9 @@ import { getOrchestratorLlmRuntimeSync } from './llm-settings.client';
 export const LLM_DEFAULT_BASE = 'https://openrouter.ai/api/v1';
 export const LLM_DEFAULT_CHAT_MODEL = 'google/gemini-2.0-flash-001';
 
-/**
- * Clave LLM. Lee active runtime o LLM_API_KEY.
- */
+/** Clave LLM desde Ajustes (vía GET ingest /internal/llm-runtime). */
 export function resolveLlmApiKey(): string {
-  const rt = getOrchestratorLlmRuntimeSync();
-  if (rt.apiKey) return rt.apiKey;
-  return process.env.LLM_API_KEY?.trim() ?? '';
+  return getOrchestratorLlmRuntimeSync().apiKey?.trim() ?? '';
 }
 
 export function resolveLlmBaseUrl(): string {

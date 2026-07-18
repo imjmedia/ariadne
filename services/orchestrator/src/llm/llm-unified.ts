@@ -1,5 +1,5 @@
 /**
- * LLM vía LLM_PROVIDER env (openrouter por defecto). Variables: LLM_API_KEY, LLM_CHAT_MODEL, etc.
+ * LLM vía LLM_PROVIDER env (openrouter por defecto). API key solo desde Ajustes (ingest).
  * Prioridad: runtime desde ingest (Ajustes) → env.
  * @see llm-config.ts
  */

@@ -26,7 +26,8 @@ if [ ! -f .env ]; then
     echo "⚠️  No hay .env. Copiando desde .env.example..."
     cp .env.example .env
     echo "   Edita .env con tus valores antes de continuar."
-    echo "   Variables requeridas: LLM_API_KEY, JWT_SECRET, CREDENTIALS_ENCRYPTION_KEY"
+    echo "   Variables requeridas: JWT_SECRET, CREDENTIALS_ENCRYPTION_KEY"
+    echo "   LLM: configura la API key en Plataforma → Ajustes → Proveedores IA tras el primer arranque."
   else
     echo "❌ No hay .env ni .env.example"
     exit 1

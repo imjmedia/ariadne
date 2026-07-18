@@ -215,7 +215,30 @@ export class LlmSettingsService implements OnModuleInit {
 
     await this.repo.save(entity);
     const runtime = await this.refreshActiveConfig();
+    await this.notifyOrchestratorLlmRuntimeInvalidate();
     return this.toMasked(runtime, await this.findRow());
+  }
+
+  private orchestratorBaseUrl(): string | null {
+    const url = process.env.ORCHESTRATOR_URL?.trim();
+    return url ? url.replace(/\/$/, '') : null;
+  }
+
+  /** Tras guardar Ajustes, invalida cache LLM del orchestrator para usar la clave de BD. */
+  private async notifyOrchestratorLlmRuntimeInvalidate(): Promise<void> {
+    const base = this.orchestratorBaseUrl();
+    if (!base) return;
+    const url = `${base}/internal/llm-runtime/invalidate`;
+    try {
+      const res = await fetch(url, { method: 'POST' });
+      if (!res.ok) {
+        this.logger.warn(`orchestrator llm-runtime invalidate HTTP ${res.status}`);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `orchestrator llm-runtime invalidate failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async testConnection(dto?: UpdateLlmSettingsDto): Promise<LlmTestConnectionResult> {
@@ -229,10 +252,45 @@ export class LlmSettingsService implements OnModuleInit {
     if (!runtime.apiKey) {
       return {
         ok: false,
-        message: 'API key no configurada. Guarda una clave válida o define LLM_API_KEY en env.',
+        message: 'API key no configurada. Guarda una clave válida en Ajustes → Proveedores IA.',
       };
     }
 
+    const chatResult = await this.probeChatModel(runtime, runtime.chatModel);
+    if (!chatResult.ok) {
+      return chatResult;
+    }
+
+    const routerModel = runtime.orchestratorRouterModel?.trim();
+    if (
+      routerModel &&
+      routerModel !== runtime.chatModel.trim() &&
+      runtime.chatIntentRouterEnabled !== false
+    ) {
+      const routerResult = await this.probeChatModel(runtime, routerModel);
+      if (!routerResult.ok) {
+        return {
+          ok: false,
+          statusCode: routerResult.statusCode,
+          message: `Chat OK (${runtime.chatModel}), pero falló el modelo router \`${routerModel}\`: ${routerResult.message}`,
+          model: routerModel,
+        };
+      }
+      return {
+        ok: true,
+        statusCode: routerResult.statusCode,
+        message: `Conexión correcta (chat: ${runtime.chatModel}, router: ${routerModel}).`,
+        model: runtime.chatModel,
+      };
+    }
+
+    return chatResult;
+  }
+
+  private async probeChatModel(
+    runtime: LlmRuntimeConfig,
+    model: string,
+  ): Promise<LlmTestConnectionResult> {
     const url = `${runtime.baseUrl.replace(/\/$/, '')}/chat/completions`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -246,7 +304,7 @@ export class LlmSettingsService implements OnModuleInit {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model: runtime.chatModel,
+          model,
           messages: [{ role: 'user', content: 'ping' }],
           max_tokens: 8,
           temperature: 0,
@@ -258,20 +316,20 @@ export class LlmSettingsService implements OnModuleInit {
           ok: false,
           statusCode: res.status,
           message: text.slice(0, 500) || res.statusText,
-          model: runtime.chatModel,
+          model,
         };
       }
       return {
         ok: true,
         statusCode: res.status,
         message: 'Conexión correcta con el proveedor LLM.',
-        model: runtime.chatModel,
+        model,
       };
     } catch (err) {
       return {
         ok: false,
         message: err instanceof Error ? err.message : String(err),
-        model: runtime.chatModel,
+        model,
       };
     }
   }
@@ -303,8 +361,6 @@ export class LlmSettingsService implements OnModuleInit {
       } catch {
         apiKey = '';
       }
-    } else {
-      apiKey = process.env.LLM_API_KEY?.trim() ?? '';
     }
 
     const extras = dto.extras ?? existing?.extras ?? {};
@@ -479,7 +535,7 @@ export class LlmSettingsService implements OnModuleInit {
 
     return {
       provider,
-      apiKey: process.env.LLM_API_KEY?.trim() ?? '',
+      apiKey: '',
       baseUrl: process.env.LLM_BASE_URL?.trim() || catalog.defaultBaseUrl || LLM_DEFAULT_BASE,
       chatModel,
       ...tiers,

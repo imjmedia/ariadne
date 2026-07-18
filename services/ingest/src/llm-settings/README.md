@@ -21,11 +21,11 @@ Proxied to the browser via API gateway: `/api/llm-settings/*`.
 
 ## Runtime resolution
 
-Priority: **DB (Ajustes)** → **`LLM_*` env vars**.
+Priority: **DB (Ajustes)** → **`LLM_*` env vars** (solo modelos/URL; **sin API key en env**).
 
 - Ingest: [`active-llm-config.ts`](./active-llm-config.ts) hydrated on module init and after each `PUT`.
 - [`llm/llm-config.ts`](../llm/llm-config.ts) reads the active singleton synchronously for chat and embeddings.
-- Orchestrator: fetches `GET /internal/llm-runtime` with TTL cache — includes `orchestratorRouterModel`, `orchestratorWorkerModel`, `chatIntentRouterEnabled` for the multi-agent chat pipeline.
+- Orchestrator: fetches `GET /internal/llm-runtime` with TTL cache — **única fuente de API key** para chat multi-agente.
 
 ## Chat multi-agente (Ajustes UI)
 

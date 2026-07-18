@@ -3,16 +3,44 @@ import {
   OpenRouterEmbeddingProvider,
   createOpenRouterProviderFromModel,
 } from './openrouter.provider';
+import { setActiveLlmConfig } from '../../llm-settings/active-llm-config';
+import type { LlmRuntimeConfig } from '../../llm-settings/llm-settings.types';
 
 function makeVec(n: number): number[] {
   return Array.from({ length: n }, (_, i) => i * 0.001);
+}
+
+function withAjustesApiKey(apiKey: string | null): void {
+  if (!apiKey) {
+    setActiveLlmConfig(null);
+    return;
+  }
+  const runtime: LlmRuntimeConfig = {
+    provider: 'openrouter',
+    apiKey,
+    baseUrl: 'https://openrouter.ai/api/v1',
+    chatModel: 'google/gemini-2.0-flash-001',
+    orchestratorChatModel: 'google/gemini-2.0-flash-001',
+    orchestratorRouterModel: 'google/gemini-2.0-flash-001',
+    orchestratorWorkerModel: 'google/gemini-2.0-flash-001',
+    chatIntentRouterEnabled: true,
+    temperature: 0.1,
+    embeddingProvider: 'openrouter',
+    embeddingModel: 'openai/text-embedding-3-small',
+    embeddingDimension: 1536,
+    extras: {},
+    httpReferer: null,
+    appTitle: null,
+    source: 'db',
+  };
+  setActiveLlmConfig(runtime);
 }
 
 describe('OpenRouterEmbeddingProvider', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    delete process.env.LLM_API_KEY;
+    withAjustesApiKey(null);
     delete process.env.LLM_BASE_URL;
     delete process.env.LLM_EMBEDDING_MODEL;
     delete process.env.LLM_EMBEDDING_DIM;
@@ -26,12 +54,12 @@ describe('OpenRouterEmbeddingProvider', () => {
   // ── isAvailable ──────────────────────────────────────────────────────────
 
   describe('isAvailable()', () => {
-    it('returns false when LLM_API_KEY missing', () => {
+    it('returns false when API key missing in Ajustes', () => {
       expect(new OpenRouterEmbeddingProvider().isAvailable()).toBe(false);
     });
 
-    it('returns true when LLM_API_KEY set', () => {
-      process.env.LLM_API_KEY = 'sk-test';
+    it('returns true when API key configured in Ajustes', () => {
+      withAjustesApiKey('sk-test');
       expect(new OpenRouterEmbeddingProvider().isAvailable()).toBe(true);
     });
   });
@@ -57,7 +85,7 @@ describe('OpenRouterEmbeddingProvider', () => {
 
   describe('embed()', () => {
     beforeEach(() => {
-      process.env.LLM_API_KEY = 'sk-test';
+      withAjustesApiKey('sk-test');
     });
 
     function mockOk(vec: number[]) {
@@ -67,10 +95,10 @@ describe('OpenRouterEmbeddingProvider', () => {
       } as Response);
     }
 
-    it('throws when LLM_API_KEY missing', async () => {
-      delete process.env.LLM_API_KEY;
+    it('throws when API key missing in Ajustes', async () => {
+      withAjustesApiKey(null);
       const p = new OpenRouterEmbeddingProvider({ dimensions: 1536 });
-      await expect(p.embed('test')).rejects.toThrow('LLM_API_KEY');
+      await expect(p.embed('test')).rejects.toThrow('Ajustes');
     });
 
     it('returns the embedding vector', async () => {
@@ -139,8 +167,26 @@ describe('OpenRouterEmbeddingProvider', () => {
       );
     });
 
-    it('uses LLM_BASE_URL env when set', async () => {
-      process.env.LLM_BASE_URL = 'https://my-proxy.example.com/v1';
+    it('uses base URL from Ajustes when set', async () => {
+      withAjustesApiKey('sk-test');
+      setActiveLlmConfig({
+        provider: 'openrouter',
+        apiKey: 'sk-test',
+        baseUrl: 'https://my-proxy.example.com/v1',
+        chatModel: 'google/gemini-2.0-flash-001',
+        orchestratorChatModel: 'google/gemini-2.0-flash-001',
+        orchestratorRouterModel: 'google/gemini-2.0-flash-001',
+        orchestratorWorkerModel: 'google/gemini-2.0-flash-001',
+        chatIntentRouterEnabled: true,
+        temperature: 0.1,
+        embeddingProvider: 'openrouter',
+        embeddingModel: 'openai/text-embedding-3-small',
+        embeddingDimension: 1536,
+        extras: {},
+        httpReferer: null,
+        appTitle: null,
+        source: 'db',
+      });
       mockOk(makeVec(1536));
       await new OpenRouterEmbeddingProvider({ dimensions: 1536 }).embed('test');
       expect(fetchSpy.mock.calls[0][0] as string).toContain('my-proxy.example.com');
@@ -158,7 +204,7 @@ describe('OpenRouterEmbeddingProvider', () => {
 
   describe('embedBatch()', () => {
     beforeEach(() => {
-      process.env.LLM_API_KEY = 'sk-test';
+      withAjustesApiKey('sk-test');
     });
 
     function mockBatchOk(vecs: number[][]) {
@@ -222,10 +268,10 @@ describe('OpenRouterEmbeddingProvider', () => {
       await expect(p.embedBatch!(['a'])).rejects.toThrow('429');
     });
 
-    it('throws when LLM_API_KEY missing', async () => {
-      delete process.env.LLM_API_KEY;
+    it('throws when API key missing in Ajustes', async () => {
+      withAjustesApiKey(null);
       const p = new OpenRouterEmbeddingProvider({ dimensions: 4 });
-      await expect(p.embedBatch!(['a'])).rejects.toThrow('LLM_API_KEY');
+      await expect(p.embedBatch!(['a'])).rejects.toThrow('Ajustes');
     });
   });
 
@@ -233,20 +279,20 @@ describe('OpenRouterEmbeddingProvider', () => {
 
   describe('createOpenRouterProviderFromModel()', () => {
     it('preserves dimension', () => {
-      process.env.LLM_API_KEY = 'k';
+      withAjustesApiKey('k');
       expect(createOpenRouterProviderFromModel('text-embedding-3-small', 1536).getDimension()).toBe(
         1536,
       );
     });
 
     it('passes through model with slash as-is', () => {
-      process.env.LLM_API_KEY = 'k';
+      withAjustesApiKey('k');
       const p = createOpenRouterProviderFromModel('nomic/nomic-embed-text-v1', 768);
       expect(p.getDimension()).toBe(768);
     });
 
     it('prefixes bare text-embedding model with openai/', async () => {
-      process.env.LLM_API_KEY = 'k';
+      withAjustesApiKey('k');
       fetchSpy.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ data: [{ embedding: makeVec(1536) }] }),

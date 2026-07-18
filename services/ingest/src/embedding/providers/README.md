@@ -2,7 +2,7 @@
 
 | Provider | Env | Dimensión default | API |
 |----------|-----|-------------------|-----|
-| **openrouter** (default) | `LLM_API_KEY`, `LLM_EMBEDDING_MODEL`, `LLM_EMBEDDING_DIM` | 1536 | `POST /v1/embeddings` (OpenAI-compatible) |
+| **openrouter** (default) | Ajustes → API key, `LLM_EMBEDDING_MODEL`, `LLM_EMBEDDING_DIM` | 1536 | `POST /v1/embeddings` (OpenAI-compatible) |
 | **ollama** (local dev) | `OLLAMA_BASE_URL`, `OLLAMA_EMBED_MODEL`, `LLM_EMBEDDING_DIM` | 768 (`nomic-embed-text`) | `POST /api/embeddings` |
 
 ## OpenRouter

@@ -1,6 +1,6 @@
 /**
  * LLM (OpenRouter compatible) — misma convención que The Forge.
- * Prioridad: activeLlmConfig (BD vía Ajustes) → process.env (fallback).
+ * API key solo desde Ajustes (activeLlmConfig hidratado por LlmSettingsService).
  */
 import { getActiveLlmConfig } from '../llm-settings/active-llm-config';
 
@@ -9,9 +9,7 @@ export const LLM_DEFAULT_CHAT_MODEL = 'google/gemini-2.0-flash-001';
 export const LLM_DEFAULT_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
 
 export function resolveLlmApiKey(): string {
-  const active = getActiveLlmConfig();
-  if (active?.apiKey) return active.apiKey;
-  return process.env.LLM_API_KEY?.trim() ?? '';
+  return getActiveLlmConfig()?.apiKey?.trim() ?? '';
 }
 
 export function resolveLlmBaseUrl(): string {

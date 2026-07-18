@@ -8,7 +8,7 @@
  * 2. Chunk de código + contexto → LLM: "Extrae conceptos de dominio y fórmulas"
  * 3. Respuesta estructurada (JSON) → crear nodos Formula, BusinessRule, DomainConcept
  *
- * Requiere LLM_API_KEY. Coste: ~1 LLM call por batch de archivos.
+ * Requiere API key en Ajustes. Coste: ~1 LLM call por batch de archivos.
  * Para activar: importar y llamar desde sync.service tras runCypherBatch.
  */
 export const DOMAIN_EXTRACT_LLM_PLACEHOLDER = true;

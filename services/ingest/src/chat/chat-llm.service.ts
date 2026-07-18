@@ -25,7 +25,7 @@ function chatUrl(): string {
 function authHeaders(): Record<string, string> {
   const key = resolveLlmApiKey();
   if (!key) {
-    throw new Error('LLM_API_KEY no configurada. Necesaria para chat.');
+    throw new Error('API key LLM no configurada. Guarda la clave en Ajustes → Proveedores IA.');
   }
   const extra = llmDefaultHeaders();
   return {

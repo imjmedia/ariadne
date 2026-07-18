@@ -82,7 +82,7 @@ Tras cada sync (normal o resync), se ejecuta automáticamente `embed-index` si h
 - `BITBUCKET_TOKEN` / `BITBUCKET_APP_PASSWORD` — Bitbucket (fallback si no hay credentialsRef). Permisos requeridos: Account: Read, Workspace membership: Read, Repositories: Read (ver [docs/manual/CONFIGURACION_Y_USO.md](../../docs/manual/CONFIGURACION_Y_USO.md))
 - `GITHUB_TOKEN` — GitHub (fallback)
 - `EMBEDDING_PROVIDER` — `openrouter` (default) o `openai` (alias al mismo API en OpenRouter)
-- **`LLM_MODEL`**, **`LLM_API_KEY`**, **`LLM_TEMPERATURE`** — Config homologada de chat (ingest + orchestrator); ver `src/llm/llm-config.ts`, `src/chat/llm-unified.ts` y orchestrator `src/llm/`.
+- **`LLM_MODEL`**, **`LLM_TEMPERATURE`** — Defaults de modelo si no hay fila en Ajustes; ver `src/llm/llm-config.ts`. **API key solo en Ajustes UI.**
 - `OPENROUTER_API_KEY` — Clave principal; alias: `AI_API_KEY`, `OPENAI_API_KEY`.
 - `OPENROUTER_CHAT_MODEL` — Default en código: `nousresearch/hermes-3-llama-3.1-405b` (alineado con The Forge).
 - `OPENROUTER_EMBEDDING_MODEL` — Default `openai/text-embedding-3-small`; `LLM_EMBEDDING_DIM` default 1536.

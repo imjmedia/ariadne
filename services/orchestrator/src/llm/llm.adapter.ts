@@ -5,6 +5,7 @@ import {
   resolveLlmBaseUrl,
   resolveLlmTemperature,
 } from './llm-config';
+import { ensureOrchestratorLlmRuntime } from './llm-settings.client';
 import { LlmAuthError } from './llm-auth.error';
 
 export type LlmMessage =
@@ -37,7 +38,9 @@ function chatCompletionsUrl(): string {
 function buildAuthHeaders(): Record<string, string> {
   const key = resolveLlmApiKey();
   if (!key) {
-    throw new Error('LLM_API_KEY no configurada.');
+    throw new Error(
+      'LLM sin API key. Guarda la clave en Ajustes → Proveedores IA y verifica INGEST_URL en orchestrator.',
+    );
   }
   const extra = llmDefaultHeaders();
   return {
@@ -52,11 +55,13 @@ export async function callLlm(
   maxTokens: number,
   modelOverride?: string,
 ): Promise<string> {
+  await ensureOrchestratorLlmRuntime();
+  const model = modelOverride?.trim() || orchestratorLlmModel();
   const res = await fetch(chatCompletionsUrl(), {
     method: 'POST',
     headers: buildAuthHeaders(),
     body: JSON.stringify({
-      model: modelOverride?.trim() || orchestratorLlmModel(),
+      model,
       messages,
       temperature: resolveLlmTemperature(),
       max_tokens: maxTokens,
@@ -68,7 +73,7 @@ export async function callLlm(
     if (res.status === 401 || res.status === 403) {
       throw new LlmAuthError(
         res.status,
-        `LLM auth failed (${res.status}): revisa la API key en Ajustes → Proveedores IA. ${err.slice(0, 300)}`,
+        `LLM auth failed (${res.status}) en modelo \`${model}\`: revisa API key (Ajustes → Proveedores IA) y que el orchestrator lea ingest (INGEST_URL). ${err.slice(0, 280)}`,
       );
     }
     throw new Error(`OpenRouter API ${res.status}: ${err}`);
@@ -89,11 +94,13 @@ export async function callLlmWithTools(
   reasoning_content?: string | null;
   tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
 }> {
+  await ensureOrchestratorLlmRuntime();
+  const model = modelOverride?.trim() || orchestratorLlmModel();
   const res = await fetch(chatCompletionsUrl(), {
     method: 'POST',
     headers: buildAuthHeaders(),
     body: JSON.stringify({
-      model: modelOverride?.trim() || orchestratorLlmModel(),
+      model,
       messages: stripReasoningFromMessages(messages),
       tools,
       tool_choice: 'auto',
@@ -107,7 +114,7 @@ export async function callLlmWithTools(
     if (res.status === 401 || res.status === 403) {
       throw new LlmAuthError(
         res.status,
-        `LLM auth failed (${res.status}): revisa la API key en Ajustes → Proveedores IA. ${errText.slice(0, 300)}`,
+        `LLM auth failed (${res.status}) en modelo \`${model}\`: revisa API key (Ajustes → Proveedores IA) y que el orchestrator lea ingest (INGEST_URL). ${errText.slice(0, 280)}`,
       );
     }
     throw new Error(`OpenRouter API ${res.status}: ${errText}`);
@@ -147,6 +154,7 @@ export async function chatSimple(
   user: string,
   modelOverride?: string,
 ): Promise<string> {
+  await ensureOrchestratorLlmRuntime();
   const key = resolveLlmApiKey();
   if (!key) return '';
   const res = await fetch(chatCompletionsUrl(), {

@@ -1,8 +1,8 @@
 /**
  * @fileoverview ReviewService — core del pipeline de revisión de cambios legacy.
  *
- * Usa la misma infraestructura LLM que el resto del sistema:
- *   - LLM_API_KEY, LLM_BASE_URL, LLM_MODEL_INGEST/LLM_CHAT_MODEL
+ * Usa la misma infraestructura LLM que el resto del sistema (Ajustes → Proveedores IA):
+ *   resolveLlmApiKey, LLM_BASE_URL, LLM_MODEL_INGEST/LLM_CHAT_MODEL
  *   - OpenAI-compatible fetch() al provider configurado (OpenRouter, LemonData, etc.)
  *   - Sin dependencias de IA externas nuevas
  *
@@ -65,8 +65,8 @@ export class ReviewService {
 
   /**
    * Llama al LLM configurado (OpenRouter, LemonData, etc.) via OpenAI-compatible API.
-   * Usa las mismas env vars que el resto del sistema:
-   *   LLM_API_KEY, LLM_BASE_URL, LLM_MODEL_INGEST, LLM_TEMPERATURE
+   * Usa las mismas fuentes que el resto del sistema (Ajustes → Proveedores IA):
+   *   resolveLlmApiKey, LLM_BASE_URL, LLM_MODEL_INGEST, LLM_TEMPERATURE
    */
   private async callLlm(
     systemPrompt: string,
@@ -80,7 +80,7 @@ export class ReviewService {
     const temp = temperature ?? (parseFloat(process.env.LLM_TEMPERATURE || '0.3') || 0.3);
 
     if (!apiKey) {
-      throw new Error('LLM_API_KEY no configurada. Revisa las variables de entorno.');
+      throw new Error('API key LLM no configurada. Guarda la clave en Ajustes → Proveedores IA.');
     }
 
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -125,7 +125,7 @@ export class ReviewService {
     const temp = parseFloat(process.env.LLM_TEMPERATURE || '0.1') || 0.1;
 
     if (!apiKey) {
-      throw new Error('LLM_API_KEY no configurada.');
+      throw new Error('API key LLM no configurada. Guarda la clave en Ajustes → Proveedores IA.');
     }
 
     const res = await fetch(`${baseUrl}/chat/completions`, {

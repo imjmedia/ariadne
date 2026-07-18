@@ -36,8 +36,8 @@ El **ingest** con `ORCHESTRATOR_URL` delega estos endpoints al orchestrator (el 
 
 - `PORT` — Default 3001.
 - `ARIADNESPEC_API_URL` — API Ariadne (default `http://api:3000/api`).
-- **`LLM_MODEL`**, **`LLM_API_KEY`**, **`LLM_TEMPERATURE`** — Config homologada (ver [src/llm/README.md](src/llm/README.md)).
-- **OpenRouter:** `OPENROUTER_API_KEY` (obligatoria; alias `AI_API_KEY` / `OPENAI_API_KEY`), `OPENROUTER_BASE_URL`, `OPENROUTER_CHAT_MODEL`, `ORCHESTRATOR_LLM_MODEL`, `LLM_CHAT_MODEL`, etc.
+- **`INGEST_URL`** — Obligatoria en Docker para leer Ajustes (`http://ingest:3002`).
+- **`LLM_MODEL`**, **`LLM_TEMPERATURE`** — Defaults de modelo si Ajustes vacío (ver [src/llm/README.md](src/llm/README.md)). **API key solo en Ajustes UI.**
 
 Detalle: [src/llm/README.md](src/llm/README.md).
 
