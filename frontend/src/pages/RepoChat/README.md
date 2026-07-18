@@ -4,7 +4,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 
 ## Layout (rediseño UX)
 
-- **Conversación + historial:** panel izquierdo «Chats» (estilo NotebookLM/Gemini) con conversaciones persistidas por usuario; en móvil se abre con el icono de panel.
+- **Split horizontal:** panel «Chats» fijo a la **izquierda** (scroll interno, ~240px); conversación + composer a la derecha. En móvil el historial va en drawer (icono panel).
 - **Una columna principal:** conversación; sin split permanente de herramientas.
 - **Análisis bajo demanda:** panel lateral (`ChatAnalysisSheet`) con 3 acciones frecuentes + acordeón «Más análisis».
 - **Opciones avanzadas:** popover «Opciones» (modo de respuesta, alcance opcional, memoria compactada).

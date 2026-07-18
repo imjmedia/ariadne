@@ -10,6 +10,10 @@ export { panelIntroClass, sectionHeaderClass, sectionShellClass };
 export const chatPageMaxClass =
   'mx-auto flex w-full max-w-[min(1400px,calc(100vw-2rem))] flex-col gap-3 sm:gap-4';
 
+/** Repo/project chat: historial a la izquierda + conversación a la derecha. */
+export const chatPageSplitClass =
+  'mx-auto flex w-full max-w-[min(1600px,calc(100vw-2rem))] min-h-0 flex-1 flex-row items-stretch gap-3 pb-4 sm:gap-4 xl:h-[min(calc(100dvh-9.25rem),900px)] xl:pb-0';
+
 /** Primary nav pills (back, detail, …). */
 export const chatNavBtnClass =
   'h-10 gap-2 rounded-xl border-[var(--border)] bg-[var(--card)] px-3 text-[var(--foreground)] touch-manipulation';

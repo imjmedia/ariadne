@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { MermaidZoomViewport } from './MermaidZoomViewport';
 
 interface MermaidDiagramProps {
   chart: string;
@@ -78,16 +79,12 @@ export function MermaidDiagram({ chart, className = '' }: MermaidDiagramProps) {
       >
         {svg ? (
           <>
-            <div
-              className="overflow-x-auto p-3 [&_svg]:max-w-full"
-              dangerouslySetInnerHTML={{ __html: svg }}
-              aria-label="Diagrama Mermaid"
-            />
+            <MermaidZoomViewport svg={svg} className="max-h-[min(420px,50vh)] p-2" />
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="absolute right-2 top-2 h-8 gap-1.5 rounded-lg bg-[var(--background)]/90 px-2.5 text-xs shadow-sm backdrop-blur-sm"
+              className="absolute right-2 top-2 z-20 h-8 gap-1.5 rounded-lg bg-[var(--background)]/90 px-2.5 text-xs shadow-sm backdrop-blur-sm"
               onClick={() => setFullscreenOpen(true)}
             >
               <Maximize2 className="size-3.5 shrink-0" aria-hidden />
@@ -112,14 +109,17 @@ export function MermaidDiagram({ chart, className = '' }: MermaidDiagramProps) {
           <DialogHeader className="shrink-0 border-b border-[var(--border)] px-5 py-4 text-left">
             <DialogTitle>Diagrama</DialogTitle>
             <DialogDescription className="sr-only">
-              Vista ampliada del diagrama Mermaid. Cierra con Escape o el botón X.
+              Vista ampliada del diagrama Mermaid. Pinch o Ctrl+rueda para zoom; arrastra para mover.
             </DialogDescription>
           </DialogHeader>
-          <div
-            className="min-h-0 flex-1 overflow-auto p-5 [&_svg]:h-auto [&_svg]:max-w-none"
-            dangerouslySetInnerHTML={{ __html: svg ?? '' }}
-            aria-label="Diagrama Mermaid a pantalla completa"
-          />
+          {svg ? (
+            <MermaidZoomViewport
+              svg={svg}
+              className="min-h-0 flex-1"
+              showZoomHint
+              showReset
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

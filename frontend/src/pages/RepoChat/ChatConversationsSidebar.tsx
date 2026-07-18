@@ -33,7 +33,7 @@ export function ChatConversationsSidebar(props: {
   return (
     <aside
       className={cn(
-        'flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]',
+        'flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)]',
         props.className,
       )}
     >

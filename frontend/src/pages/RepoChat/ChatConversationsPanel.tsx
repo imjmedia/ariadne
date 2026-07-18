@@ -35,7 +35,9 @@ export function ChatConversationsPanel(props: {
 
   return (
     <>
-      <ChatConversationsSidebar {...sidebarProps} className="hidden md:flex" />
+      <div className="hidden min-h-0 w-[min(100%,15rem)] shrink-0 md:flex md:w-60">
+        <ChatConversationsSidebar {...sidebarProps} className="h-full min-h-0 w-full" />
+      </div>
 
       <Dialog open={props.mobileOpen} onOpenChange={props.onMobileOpenChange}>
         <DialogContent

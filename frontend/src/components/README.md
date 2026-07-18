@@ -25,7 +25,7 @@ Componentes basados en el registro Kreo con tema corporate/luxury (negro, carbó
 ## Otros
 
 - **MarkdownBlock** — Renderiza markdown con ReactMarkdown + remarkGfm (tablas, encabezados). Usado en diagnósticos y reingeniería.
-- **MermaidDiagram** — Bloques ```mermaid en chat e informes; botón **Ver a pantalla completa** abre modal con scroll para ERD/flowcharts grandes.
+- **MermaidDiagram** — Bloques ```mermaid en chat e informes; botón **Ver a pantalla completa**; zoom gestual (pinch / Ctrl+rueda / arrastre) **solo dentro del diagrama** (`MermaidZoomViewport`).
 - **StatusBadge** — Badge de estado para jobs/repos (pending, running, completed, error).
 - **ProtectedRoute** — Layout de ruta que renderiza `<Outlet />` cuando hay JWT válido (e2e: `VITE_E2E_AUTH_BYPASS=true`).
 - **DocViewer** — Visor de documentación markdown.

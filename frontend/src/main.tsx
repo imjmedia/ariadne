@@ -12,8 +12,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { applyTheme, getThemePreference } from '@/lib/theme'
+import { installPreventGlobalGestureZoom } from '@/utils/prevent-global-gesture-zoom'
 
 applyTheme(getThemePreference())
+installPreventGlobalGestureZoom()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

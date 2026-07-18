@@ -23,6 +23,7 @@ import { useChatPersistence } from './RepoChat/useChatPersistence';
 import {
   chatNavBtnClass,
   chatPageMaxClass,
+  chatPageSplitClass,
   panelIntroClass,
   sectionHeaderClass,
   sectionShellClass,
@@ -281,12 +282,7 @@ export function RepoChat() {
   const chatBusy = loading || messagesLoading || conversationsLoading;
 
   return (
-    <div
-      className={cn(
-        chatPageMaxClass,
-        'flex min-h-0 flex-1 gap-3 pb-4 xl:h-[min(calc(100dvh-9.25rem),900px)] xl:pb-0',
-      )}
-    >
+    <div className={chatPageSplitClass}>
       <ChatConversationsPanel
         conversations={conversations}
         activeConversationId={activeConversationId}
