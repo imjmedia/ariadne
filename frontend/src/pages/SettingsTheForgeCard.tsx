@@ -64,11 +64,11 @@ export function SettingsTheForgeCard() {
       }
       const saved = await api.updateTheForgeIntegrationSettings(payload);
       setSettings(saved);
-      setForm((prev) => ({
+      setForm({
         ...defaultForgeForm(saved),
         serviceToken: '',
         serviceTokenTouched: false,
-      }));
+      });
       setSuccess(
         saved.enabled
           ? 'Integración The Forge activada. El botón aparecerá en el chat.'
