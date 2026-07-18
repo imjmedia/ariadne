@@ -68,6 +68,7 @@ import {
   schemaStrapiContentTypesCypher,
   schemaStrapiRelationsCypher,
 } from './chat-schema-question.util';
+import { inferTypeOrmRelationsFromModels } from '../pipeline/typeorm-schema.util';
 import {
   computeRiskScore,
   groupDuplicates,
@@ -3067,7 +3068,12 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       lines.push('');
     }
 
-    const mermaid = this.buildErDiagramMermaid(contentTypes, ctRel, models, modelRel);
+    const { diagram: mermaid, usedInference } = this.buildErDiagramMermaid(
+      contentTypes,
+      ctRel,
+      models,
+      modelRel,
+    );
     if (mermaid) {
       lines.push('### Diagrama entidad-relación (Mermaid)');
       lines.push('');
@@ -3075,6 +3081,12 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       lines.push(mermaid);
       lines.push('```');
       lines.push('');
+      if (usedInference) {
+        lines.push(
+          '_Relaciones inferidas desde columnas `*Id` y propiedades de navegación TypeORM (el índice aún no tenía aristas `RELATES_TO`). Haz resync del repo backend para persistirlas en el grafo._',
+        );
+        lines.push('');
+      }
     }
 
     lines.push(
@@ -3121,16 +3133,17 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
 
   /**
    * Genera un bloque `erDiagram` de Mermaid a partir de relaciones indexadas.
-   * Conservador: solo emite si hay al menos una relación (Mermaid exige relaciones o bloques válidos).
+   * Para TypeORM sin aristas `RELATES_TO`, infiere FK desde `fieldSummary` indexado.
    */
   private buildErDiagramMermaid(
     contentTypes: Record<string, unknown>[],
     ctRel: Record<string, unknown>[],
     models: Record<string, unknown>[],
     modelRel: Record<string, unknown>[],
-  ): string | null {
+  ): { diagram: string | null; usedInference: boolean } {
     const rels: string[] = [];
     const seen = new Set<string>();
+    let indexedRelCount = 0;
     const pushRel = (from: unknown, to: unknown, label: string) => {
       const a = this.sanitizeMermaidEntity(String(from ?? ''));
       const b = this.sanitizeMermaidEntity(String(to ?? ''));
@@ -3144,15 +3157,26 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
 
     for (const r of ctRel) {
       pushRel(r.fromEntity, r.toEntity, String(r.relation || r.attribute || 'rel'));
+      indexedRelCount++;
     }
     for (const r of modelRel) {
       pushRel(r.fromEntity, r.toEntity, String(r.field || 'rel'));
+      indexedRelCount++;
     }
 
-    if (rels.length === 0) return null;
+    const beforeInference = rels.length;
+    for (const r of inferTypeOrmRelationsFromModels(models)) {
+      pushRel(r.fromEntity, r.toEntity, r.field);
+    }
+    const usedInference = indexedRelCount === 0 && rels.length > beforeInference;
+
+    if (rels.length === 0) return { diagram: null, usedInference: false };
 
     const maxRel = 200;
-    return ['erDiagram', ...rels.slice(0, maxRel)].join('\n');
+    return {
+      diagram: ['erDiagram', ...rels.slice(0, maxRel)].join('\n'),
+      usedInference,
+    };
   }
 
   /**

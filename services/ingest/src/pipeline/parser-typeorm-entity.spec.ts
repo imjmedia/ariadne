@@ -28,4 +28,21 @@ export abstract class BaseEntity {
     const r = parseSource('src/x.entity.ts', src);
     expect(r?.models?.some((m) => m.name === 'X' && m.source === 'typeorm')).toBe(true);
   });
+
+  it('extrae @ManyToOne como entityRelations', () => {
+    const src = `@Entity()
+export class Attendee {
+  @Column() eventId!: string;
+
+  @ManyToOne(() => EventEntity, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'event_id' })
+  event!: EventEntity;
+}
+`;
+    const r = parseSource('src/entities/attendee.entity.ts', src);
+    const model = r?.models?.find((m) => m.name === 'Attendee');
+    expect(model?.entityRelations).toEqual([
+      { field: 'event', targetType: 'EventEntity', relationKind: 'ManyToOne' },
+    ]);
+  });
 });

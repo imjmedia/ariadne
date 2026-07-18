@@ -13,6 +13,7 @@ import {
   type ResolvedCallInfo,
 } from 'ariadne-common';
 import type { ParsedFile } from './parser';
+import { resolveTypeOrmTargetName } from './typeorm-schema.util';
 import type { TsconfigPaths } from './tsconfig-resolve';
 import { resolveWithTsconfig } from './tsconfig-resolve';
 import type { StorybookDocumentationExtract } from './storybook-documentation';
@@ -296,6 +297,18 @@ export function buildCypherForFile(
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (m:Model {path: ${cypherSafe(path)}, name: ${cypherSafe(m.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(m)`,
     );
+  }
+
+  const modelNamesInFile = (parsed.models ?? []).map((m) => m.name);
+  for (const m of parsed.models ?? []) {
+    for (const rel of m.entityRelations ?? []) {
+      const targetName =
+        resolveTypeOrmTargetName(rel.targetType, modelNamesInFile) ??
+        (rel.targetType.endsWith('Entity') ? rel.targetType.slice(0, -6) : rel.targetType);
+      statements.push(
+        `MATCH (a:Model {path: ${cypherSafe(path)}, name: ${cypherSafe(m.name)}, projectId: ${pid}, repoId: ${rid}}) MATCH (b:Model {name: ${cypherSafe(targetName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (a)-[:RELATES_TO {field: ${cypherSafe(rel.field)}}]->(b)`,
+      );
+    }
   }
 
   for (const targetPath of resolvedImportPaths) {

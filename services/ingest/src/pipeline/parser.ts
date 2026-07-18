@@ -223,6 +223,14 @@ export interface ModelInfo {
   source?: 'heuristic' | 'typeorm' | 'frontend';
   /** Propiedades de columna detectadas en entidades TypeORM. */
   entityFields?: string[];
+  /** Relaciones @ManyToOne/@OneToOne/@ManyToMany detectadas en la entidad. */
+  entityRelations?: TypeOrmRelationInfo[];
+}
+
+export interface TypeOrmRelationInfo {
+  field: string;
+  targetType: string;
+  relationKind: 'ManyToOne' | 'OneToOne' | 'ManyToMany';
 }
 
 /** Heurística: ¿el path corresponde a un DTO/modelo de frontend (no esquema de BD)? */
@@ -817,7 +825,8 @@ export function parseSource(
     if (hasTypeOrmEntityDecorator(node, source)) {
       const description = getPrecedingJSDoc(source, node.startIndex);
       const entityFields = extractTypeOrmColumnPropertyNames(node, source);
-      result.models.push({ name, description, source: 'typeorm', entityFields });
+      const entityRelations = extractTypeOrmEntityRelations(node, source);
+      result.models.push({ name, description, source: 'typeorm', entityFields, entityRelations });
       continue;
     }
     const superClass = node.childForFieldName('superclass');
@@ -1366,6 +1375,62 @@ function extractTypeOrmColumnPropertyNames(classNode: Parser.SyntaxNode, source:
     }
   }
   return names;
+}
+
+const TYPEORM_RELATION_DECORATORS = new Set(['ManyToOne', 'OneToOne', 'ManyToMany']);
+
+function extractTypeOrmEntityRelations(
+  classNode: Parser.SyntaxNode,
+  source: string,
+): TypeOrmRelationInfo[] {
+  const body = classNode.childForFieldName('body');
+  if (!body) return [];
+  const rels: TypeOrmRelationInfo[] = [];
+  for (let i = 0; i < body.childCount; i++) {
+    const ch = body.child(i);
+    if (!ch || ch.type !== 'public_field_definition') continue;
+    const nameNode = ch.childForFieldName('name');
+    if (!nameNode) continue;
+    const field = getNodeText(source, nameNode);
+    for (const dec of findNodesByType(ch, 'decorator')) {
+      const callee = getDecoratorCallExpressionCalleeName(dec, source);
+      if (!callee || !TYPEORM_RELATION_DECORATORS.has(callee)) continue;
+      const targetType = extractTypeOrmRelationTargetType(dec, source);
+      if (!targetType) continue;
+      rels.push({
+        field,
+        targetType,
+        relationKind: callee as TypeOrmRelationInfo['relationKind'],
+      });
+    }
+  }
+  return rels;
+}
+
+/** Primer argumento de @ManyToOne(() => TargetEntity) → TargetEntity */
+function extractTypeOrmRelationTargetType(dec: Parser.SyntaxNode, source: string): string | null {
+  const call = dec.childForFieldName('expression') ?? findNodesByType(dec, 'call_expression')[0];
+  if (!call || call.type !== 'call_expression') return null;
+  const args = call.childForFieldName('arguments');
+  if (!args) return null;
+  for (let i = 0; i < args.childCount; i++) {
+    const arg = args.child(i);
+    if (!arg || arg.type === ',' || arg.type === '(' || arg.type === ')') continue;
+    if (arg.type === 'arrow_function') {
+      const bodyNode = arg.childForFieldName('body') ?? arg.lastNamedChild;
+      if (!bodyNode) return null;
+      if (bodyNode.type === 'identifier') return getNodeText(source, bodyNode);
+      if (bodyNode.type === 'call_expression') {
+        const callee = bodyNode.childForFieldName('function') ?? bodyNode.childForFieldName('callee');
+        if (callee?.type === 'identifier') return getNodeText(source, callee);
+      }
+      const id = findNodesByType(bodyNode, 'identifier')[0];
+      return id ? getNodeText(source, id) : null;
+    }
+    if (arg.type === 'identifier') return getNodeText(source, arg);
+    break;
+  }
+  return null;
 }
 
 /** Callee del decorador: `Roles` en `@Roles()`, `Foo` en `@Foo.bar()`. */
