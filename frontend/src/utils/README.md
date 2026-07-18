@@ -6,4 +6,4 @@ Utilities for chat memory compaction and safe `history` bodies on `POST …/chat
 - **`buildChatHistoryForRequest`** — last 6 turns for the API, per-field truncation.
 - **`formatMemoryCompactionNote`** — short UI hint when compaction ran.
 
-Used by `ProjectChat.tsx` and `RepoChat.tsx` with `ChatConversationToolbar` («Nueva conversación»).
+Used by chat pages via icono «Nueva conversación» en cabecera + nota en popover Opciones (`ChatPageHeader`).

@@ -49,7 +49,7 @@ export function ChatPipelineModeSelect({
     return (
       <div className="space-y-1.5">
         <Label htmlFor={`${baseId}-trigger`} className="text-xs font-medium text-[var(--foreground-muted)]">
-          Modo Ariadne (The Forge)
+          Modo de respuesta
         </Label>
         <Select value={value} onValueChange={(v) => onChange(v as ChatPipelineMode)}>
           <SelectTrigger
@@ -82,7 +82,7 @@ export function ChatPipelineModeSelect({
         'space-y-3 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_12%,var(--card))] p-4 text-xs',
       )}
     >
-      <legend className="px-0.5 text-sm font-semibold text-[var(--foreground)]">Modo Ariadne (The Forge)</legend>
+      <legend className="px-0.5 text-sm font-semibold text-[var(--foreground)]">Modo de respuesta</legend>
       <div className="space-y-3">
         {OPTIONS.map((opt) => (
           <label

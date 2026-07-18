@@ -2,54 +2,37 @@
 
 Página de chat con el repositorio: preguntas en lenguaje natural → Cypher → FalkorDB.
 
+## Layout (rediseño UX)
+
+- **Una sola columna:** conversación a pantalla completa; sin split permanente ni pestañas móvil/chat+tools.
+- **Análisis bajo demanda:** panel lateral (`ChatAnalysisSheet`) con 3 acciones frecuentes + acordeón «Más análisis».
+- **Opciones avanzadas:** popover «Opciones» (modo de respuesta, alcance opcional, memoria compactada).
+- **Cabecera compacta:** volver al repo, badges de modo/alcance, botones Análisis y Nueva conversación.
+
 ## Componentes
 
-- **RepoChat.tsx** — Página principal con layout split: panel de análisis a la izquierda, chat a la derecha.
-- **FullAuditModal.tsx** — Modal de Full Repo Audit (auditoría de estado cero).
+| Archivo | Rol |
+|---------|-----|
+| **RepoChat.tsx** | Estado, envío de chat y orquestación |
+| **ChatPageHeader.tsx** | Cabecera compartida repo/proyecto |
+| **ChatRepoHeader.tsx** | Wrapper repo → ChatPageHeader |
+| **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
+| **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable |
+| **ChatComposer.tsx** | Textarea + Enviar |
+| **ChatAnalysisSheet.tsx** | Panel de análisis e informes |
+| **ChatOptionsPopover.tsx** | Modo pipeline + alcance |
+| **ChatAssistantContent.tsx** | MDD / Markdown / Mermaid |
+| **FullAuditModal.tsx** | Full Repo Audit |
+| **chatConstants.ts** | Etiquetas y acciones de análisis |
 
 ## Alcance opcional
 
-Panel **Alcance opcional**: prefijos de ruta y globs de exclusión (una línea por entrada) se envían como `scope` en `POST /repositories/:id/analyze` **y** en `POST /repositories/:id/chat` (menos tokens / 429). Checkbox **Duplicados cross-boundary** añade `crossPackageDuplicates` en modo duplicados.
+Prefijos y globs en **Opciones** → popover. Se envían como `scope` en chat y analyze.
 
-## Modo Ariadne (The Forge)
+## Modo de respuesta
 
-**ChatPipelineModeSelect** + `ingestOptionsFromChatPipelineMode` (`frontend/src/utils/chat-pipeline-mode.ts`):
+Ver **ChatPipelineModeSelect** y `ingestOptionsFromChatPipelineMode` (`frontend/src/utils/chat-pipeline-mode.ts`).
 
-- **Chat normal** — sin `responseMode` (prosa en backend).
-- **MDD / SDD** — `responseMode: evidence_first`: una respuesta JSON MDD (7 claves); **ChatAssistantContent** lo muestra formateado.
-- **Evidencia bruta** — `responseMode: raw_evidence` + `deterministicRetriever: true`: sin LLM en la fase de retrieve en ingest.
+## Historial
 
-**Historial multi-turno:** `compactChatMessagesInMemory` + `buildChatHistoryForRequest` (`frontend/src/utils/chat-history-payload.ts`): máx. 24 mensajes en UI, truncado de respuestas antiguas, sin `result` en el body, 6 turnos en el POST. **Nueva conversación** (`ChatConversationToolbar`) limpia el historial sin tocar análisis ni alcance.
-
-**MCP `ask_codebase`:** mismos tres comportamientos con `responseMode` = `default` \| `evidence_first` \| `raw_evidence`. **Ojo:** si el agente **omite** `responseMode`, el servidor MCP fuerza `raw_evidence` + `deterministicRetriever: true` (equivalente a “Evidencia bruta”), no a “Chat normal”; para prosa+ReAct hay que pasar **`responseMode: "default"`**. Detalle: [docs/notebooklm/mcp_server_specs.md](../../../docs/notebooklm/mcp_server_specs.md) (subsection *Modo The Forge*).
-
-`api.chat` reintenta hasta 3 veces ante **429** con backoff.
-
-## Componentes de chat
-
-- **ChatAssistantContent.tsx** — Detecta JSON MDD / raw_evidence o Markdown (incl. bloques **Mermaid** vía `MermaidDiagram`).
-- **ChatPromptChips** — Plantillas rápidas (reingeniería, ERD, impacto) en chat proyecto y repo.
-- **ChatConversationToolbar.tsx** — «Nueva conversación» + aviso de memoria compactada.
-- **ChatPipelineModeSelect.tsx** — Radios de modo pipeline.
-
-Tras la respuesta, **badges** bajo el título del informe muestran `reportMeta` (p. ej. **Caché**, **Alcance activo**, huella degradada, capa CALL cache) y la nota de cobertura del grafo si viene en el payload.
-
-## Botones de análisis
-
-- **Diagnóstico** — Deuda técnica, antipatrones, riesgo.
-- **Duplicados** — Código duplicado (embeddings + nombres idénticos).
-- **Reingeniería** — Plan priorizado basado en diagnóstico + duplicados.
-- **Código muerto** — Archivos/funciones/componentes sin referencias.
-- **AGENTS** — Genera `AGENTS.md`: protocolo para agentes AI (protocolo de sesión, herramientas por intención, flujos SDD). Basado en Model Context Protocol Handbook.
-- **SKILL** — Genera `SKILL.md`: skill para Cursor/Claude (YAML frontmatter, instrucciones, ejemplos, troubleshooting). Basado en MCP Handbook.
-- **Full Audit** — Auditoría completa: arquitectura, seguridad, deuda, plan de acción.
-- **Ver índice** — Navegador del grafo FalkorDB.
-
-## Full Audit
-
-El botón "Full Audit" ejecuta `POST /repositories/:id/full-audit` y muestra:
-
-- Executive Summary: score de salud 0-100, top riesgos, horas de deuda estimadas.
-- Critical Findings: tabla con Hallazgo | Impacto | Esfuerzo | Prioridad.
-- Action Plan: pasos recomendados para las próximas 2 semanas.
-- Detalle de seguridad (secretos expuestos), arquitectura (god objects, imports circulares, complejidad) y salud del código (código muerto, duplicados).
+`ChatConversationToolbar` sustituido por icono en cabecera + nota en popover Opciones. Ver `frontend/src/utils/chat-history-payload.ts`.
