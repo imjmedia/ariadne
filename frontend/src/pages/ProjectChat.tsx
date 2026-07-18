@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { ChatAnalysisSheet } from './RepoChat/ChatAnalysisSheet';
+import { ChatAnalysisPanel } from './RepoChat/ChatAnalysisPanel';
 import { ChatComposer } from './RepoChat/ChatComposer';
 import { ChatConversationsMobileToggle } from './RepoChat/ChatConversationsSidebar';
 import { ChatConversationsPanel } from './RepoChat/ChatConversationsPanel';
@@ -52,7 +52,7 @@ export function ProjectChat() {
   const [memoryCompactionNote, setMemoryCompactionNote] = useState<string | null>(null);
   const [allowBroadProjectChat, setAllowBroadProjectChat] = useState(false);
   const [chatPipelineMode, setChatPipelineMode] = useState<ChatPipelineMode>('default');
-  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'chat' | 'analysis'>('chat');
   const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -100,7 +100,7 @@ export function ProjectChat() {
       setLoadingAnalysis(mode);
       setAnalysisError(null);
       setError(null);
-      setAnalysisOpen(true);
+      setViewMode('analysis');
 
       if (mode === 'agents' || mode === 'skill') {
         api
@@ -360,7 +360,8 @@ export function ProjectChat() {
         messageCount={messages.length}
         onNewConversation={handleNewConversation}
         newConversationDisabled={chatBusy}
-        onOpenAnalysis={() => setAnalysisOpen(true)}
+        onToggleViewMode={() => setViewMode((v) => (v === 'chat' ? 'analysis' : 'chat'))}
+        chatViewMode={viewMode}
         analysisPending={analysisPending}
         activeConversationId={activeConversationId}
         forgePromoteDisabled={chatBusy || messages.length === 0}
@@ -388,62 +389,62 @@ export function ProjectChat() {
         }
       />
 
-      <section className={cn(sectionShellClass, 'flex min-h-0 flex-1 flex-col overflow-hidden p-0')}>
-        {error ? (
-          <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : null}
-        {persistenceError ? (
-          <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
-            <AlertTitle>Historial</AlertTitle>
-            <AlertDescription>{persistenceError}</AlertDescription>
-          </Alert>
-        ) : null}
+      {viewMode === 'chat' ? (
+        <section className={cn(sectionShellClass, 'flex min-h-0 flex-1 flex-col overflow-hidden p-0')}>
+          {error ? (
+            <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {persistenceError ? (
+            <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
+              <AlertTitle>Historial</AlertTitle>
+              <AlertDescription>{persistenceError}</AlertDescription>
+            </Alert>
+          ) : null}
 
-        {messagesLoading ? (
-          <div className="flex flex-1 items-center justify-center p-8">
-            <Skeleton className="h-32 w-full max-w-md rounded-xl" />
-          </div>
-        ) : (
-          <ChatMessageThread
-            messages={messages}
-            loading={loading}
-            chatPipelineMode={chatPipelineMode}
-            onPromptSelect={(t) => setInput(t.message)}
-            scrollRef={scrollRef}
-            emptyTitle="Consulta multi-repo"
-            emptyDescription="Pregunta por archivos o flujos en cualquier repositorio del proyecto. Ariadne usa el grafo unificado."
+          {messagesLoading ? (
+            <div className="flex flex-1 items-center justify-center p-8">
+              <Skeleton className="h-32 w-full max-w-md rounded-xl" />
+            </div>
+          ) : (
+            <ChatMessageThread
+              messages={messages}
+              loading={loading}
+              chatPipelineMode={chatPipelineMode}
+              onPromptSelect={(t) => setInput(t.message)}
+              scrollRef={scrollRef}
+              emptyTitle="Consulta multi-repo"
+              emptyDescription="Pregunta por archivos o flujos en cualquier repositorio del proyecto. Ariadne usa el grafo unificado."
+            />
+          )}
+
+          <ChatComposer
+            input={input}
+            onInputChange={setInput}
+            onSend={send}
+            onKeyDown={handleChatKeyDown}
+            loading={chatBusy}
+            placeholder="¿Qué quieres saber del proyecto?"
           />
-        )}
-
-        <ChatComposer
-          input={input}
-          onInputChange={setInput}
-          onSend={send}
-          onKeyDown={handleChatKeyDown}
-          loading={chatBusy}
-          placeholder="¿Qué quieres saber del proyecto?"
+        </section>
+      ) : (
+        <ChatAnalysisPanel
+          title="Análisis del proyecto"
+          description="Informes por repositorio o AGENTS/SKILL a nivel proyecto. Usa el botón Chat para volver."
+          loadingAnalysis={loadingAnalysis}
+          analysisError={analysisError}
+          analysisResult={analysisResult}
+          onRunAnalysis={runAnalysis}
+          codeAnalysisDisabled={codeAnalysisDisabled}
+          projectRepos={project.repositories}
+          selectedRepoId={selectedRepoId}
+          onSelectedRepoIdChange={setSelectedRepoId}
+          indexHref={selectedRepoId ? `/repos/${selectedRepoId}/index` : null}
+          showFullAudit={false}
         />
-      </section>
-
-      <ChatAnalysisSheet
-        open={analysisOpen}
-        onOpenChange={setAnalysisOpen}
-        title="Análisis del proyecto"
-        description="Informes por repositorio o AGENTS/SKILL a nivel proyecto."
-        loadingAnalysis={loadingAnalysis}
-        analysisError={analysisError}
-        analysisResult={analysisResult}
-        onRunAnalysis={runAnalysis}
-        codeAnalysisDisabled={codeAnalysisDisabled}
-        projectRepos={project.repositories}
-        selectedRepoId={selectedRepoId}
-        onSelectedRepoIdChange={setSelectedRepoId}
-        indexHref={selectedRepoId ? `/repos/${selectedRepoId}/index` : null}
-        showFullAudit={false}
-      />
+      )}
       </div>
     </div>
   );

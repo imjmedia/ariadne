@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { ChatAnalysisSheet } from './RepoChat/ChatAnalysisSheet';
+import { ChatAnalysisPanel } from './RepoChat/ChatAnalysisPanel';
 import { ChatComposer } from './RepoChat/ChatComposer';
 import { ChatConversationsMobileToggle } from './RepoChat/ChatConversationsSidebar';
 import { ChatConversationsPanel } from './RepoChat/ChatConversationsPanel';
@@ -46,7 +46,7 @@ export function RepoChat() {
   const [includePrefixesText, setIncludePrefixesText] = useState('');
   const [excludeGlobsText, setExcludeGlobsText] = useState('');
   const [crossPackageDuplicates, setCrossPackageDuplicates] = useState(false);
-  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'chat' | 'analysis'>('chat');
   const [fullAuditOpen, setFullAuditOpen] = useState(false);
   const [fullAuditData, setFullAuditData] = useState<import('../types').FullAuditResult | null>(null);
   const [fullAuditLoading, setFullAuditLoading] = useState(false);
@@ -88,7 +88,7 @@ export function RepoChat() {
       setLoadingAnalysis(mode);
       setAnalysisError(null);
       setError(null);
-      setAnalysisOpen(true);
+      setViewMode('analysis');
       const scope = scopeFromAnalyzeForm(includePrefixesText, excludeGlobsText);
       const opts: { scope?: import('../types').ChatScope; crossPackageDuplicates?: boolean } = {};
       if (scope) opts.scope = scope;
@@ -109,7 +109,7 @@ export function RepoChat() {
 
   const runFullAudit = useCallback(() => {
     if (!id) return;
-    setAnalysisOpen(true);
+    setViewMode('analysis');
     setFullAuditOpen(true);
     setFullAuditLoading(true);
     setFullAuditError(null);
@@ -314,7 +314,8 @@ export function RepoChat() {
           messageCount={messages.length}
           onNewConversation={handleNewConversation}
           newConversationDisabled={chatBusy}
-          onOpenAnalysis={() => setAnalysisOpen(true)}
+          onToggleViewMode={() => setViewMode((v) => (v === 'chat' ? 'analysis' : 'chat'))}
+          chatViewMode={viewMode}
           analysisPending={analysisPending}
           activeConversationId={activeConversationId}
           forgePromoteDisabled={chatBusy || messages.length === 0}
@@ -325,58 +326,58 @@ export function RepoChat() {
           }
         />
 
-        <section className={cn(sectionShellClass, 'flex min-h-0 flex-1 flex-col overflow-hidden p-0')}>
-          {error ? (
-            <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : null}
-          {persistenceError ? (
-            <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
-              <AlertTitle>Historial</AlertTitle>
-              <AlertDescription>{persistenceError}</AlertDescription>
-            </Alert>
-          ) : null}
+        {viewMode === 'chat' ? (
+          <section className={cn(sectionShellClass, 'flex min-h-0 flex-1 flex-col overflow-hidden p-0')}>
+            {error ? (
+              <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
+            {persistenceError ? (
+              <Alert variant="destructive" className="mx-4 mt-4 shrink-0 rounded-xl sm:mx-5">
+                <AlertTitle>Historial</AlertTitle>
+                <AlertDescription>{persistenceError}</AlertDescription>
+              </Alert>
+            ) : null}
 
-          {messagesLoading ? (
-            <div className="flex flex-1 items-center justify-center p-8">
-              <Skeleton className="h-32 w-full max-w-md rounded-xl" />
-            </div>
-          ) : (
-            <ChatMessageThread
-              messages={messages}
-              loading={loading}
-              chatPipelineMode={chatPipelineMode}
-              onPromptSelect={(t) => setInput(t.message)}
-              scrollRef={scrollRef}
+            {messagesLoading ? (
+              <div className="flex flex-1 items-center justify-center p-8">
+                <Skeleton className="h-32 w-full max-w-md rounded-xl" />
+              </div>
+            ) : (
+              <ChatMessageThread
+                messages={messages}
+                loading={loading}
+                chatPipelineMode={chatPipelineMode}
+                onPromptSelect={(t) => setInput(t.message)}
+                scrollRef={scrollRef}
+              />
+            )}
+
+            <ChatComposer
+              input={input}
+              onInputChange={setInput}
+              onSend={send}
+              onKeyDown={handleChatKeyDown}
+              loading={chatBusy}
             />
-          )}
-
-          <ChatComposer
-            input={input}
-            onInputChange={setInput}
-            onSend={send}
-            onKeyDown={handleChatKeyDown}
-            loading={chatBusy}
+          </section>
+        ) : (
+          <ChatAnalysisPanel
+            indexHref={`/repos/${id}/index`}
+            loadingAnalysis={loadingAnalysis}
+            analysisError={analysisError}
+            analysisResult={analysisResult}
+            onRunAnalysis={runAnalysis}
+            onRunFullAudit={runFullAudit}
+            fullAuditOpen={fullAuditOpen}
+            onFullAuditOpenChange={setFullAuditOpen}
+            fullAuditData={fullAuditData}
+            fullAuditLoading={fullAuditLoading}
+            fullAuditError={fullAuditError}
           />
-        </section>
-
-        <ChatAnalysisSheet
-          open={analysisOpen}
-          onOpenChange={setAnalysisOpen}
-          indexHref={`/repos/${id}/index`}
-          loadingAnalysis={loadingAnalysis}
-          analysisError={analysisError}
-          analysisResult={analysisResult}
-          onRunAnalysis={runAnalysis}
-          onRunFullAudit={runFullAudit}
-          fullAuditOpen={fullAuditOpen}
-          onFullAuditOpenChange={setFullAuditOpen}
-          fullAuditData={fullAuditData}
-          fullAuditLoading={fullAuditLoading}
-          fullAuditError={fullAuditError}
-        />
+        )}
       </div>
     </div>
   );

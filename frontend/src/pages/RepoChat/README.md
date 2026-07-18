@@ -4,11 +4,11 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 
 ## Layout (rediseño UX)
 
-- **Split horizontal:** panel «Chats» fijo a la **izquierda** (scroll interno, ~240px); conversación + composer a la derecha. En móvil el historial va en drawer (icono panel).
-- **Una columna principal:** conversación; sin split permanente de herramientas.
-- **Análisis bajo demanda:** panel lateral (`ChatAnalysisSheet`) con 3 acciones frecuentes + acordeón «Más análisis».
+- **Split horizontal:** panel «Chats» fijo a la **izquierda** (scroll interno, ~240px); conversación o análisis a la derecha. En móvil el historial va en drawer (icono panel).
+- **Vista conmutada Chat ↔ Análisis:** el botón de cabecera alterna la columna principal (no drawer estrecho). Al ejecutar un análisis se abre la vista Análisis automáticamente.
+- **Análisis a pantalla completa:** `ChatAnalysisPanel` — acciones a la izquierda (sidebar) + informe ancho a la derecha; semáforos heurísticos sobre el markdown del resultado.
 - **Opciones avanzadas:** popover «Opciones» (modo de respuesta, alcance opcional, memoria compactada).
-- **Cabecera compacta:** volver al repo, badges de modo/alcance, botones Análisis, **The Forge** (solo si integración activa) y Nueva conversación.
+- **Cabecera compacta:** volver al repo, badges de modo/alcance, interruptor Chat/Análisis, **The Forge** (opcional) y Nueva conversación.
 
 ## Promoción a The Forge (opcional)
 
@@ -34,17 +34,20 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **useTheForgeChatPromotion.ts** | Hook: ¿integración Forge activa? (oculta botón si no) |
 | **ChatConversationsSidebar.tsx** | Lista de chats + botón Nuevo |
 | **ChatConversationsPanel.tsx** | Sidebar desktop + drawer móvil |
-| **ChatPageHeader.tsx** | Cabecera compartida repo/proyecto |
+| **ChatPageHeader.tsx** | Cabecera compartida repo/proyecto (interruptor Chat/Análisis) |
 | **ChatRepoHeader.tsx** | Wrapper repo → ChatPageHeader |
 | **ChatForgePromoteDialog.tsx** | Modal promover conversación → etapa The Forge |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
 | **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable |
 | **ChatComposer.tsx** | Textarea + Enviar |
-| **ChatAnalysisSheet.tsx** | Panel de análisis e informes |
+| **ChatAnalysisPanel.tsx** | Vista análisis inline (informes + acciones) |
+| **AnalysisSemaphoreSummary.tsx** | Semáforos heurísticos sobre el informe |
+| **ChatAnalysisSheet.tsx** | Alias legacy del panel (sin drawer) |
 | **ChatOptionsPopover.tsx** | Modo pipeline + alcance |
 | **ChatAssistantContent.tsx** | MDD / Markdown / Mermaid |
 | **FullAuditModal.tsx** | Full Repo Audit |
 | **chatConstants.ts** | Etiquetas y acciones de análisis |
+| **analysis-semaphore.util.ts** | Heurística de severidad en markdown |
 
 ## Alcance opcional
 

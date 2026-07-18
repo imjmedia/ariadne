@@ -17,7 +17,8 @@ export function ChatRepoHeader(props: {
   messageCount: number;
   onNewConversation: () => void;
   newConversationDisabled?: boolean;
-  onOpenAnalysis: () => void;
+  onToggleViewMode: () => void;
+  chatViewMode: 'chat' | 'analysis';
   analysisPending: boolean;
   activeConversationId?: string | null;
   forgePromoteDisabled?: boolean;
@@ -44,7 +45,8 @@ export function ChatRepoHeader(props: {
       messageCount={props.messageCount}
       onNewConversation={props.onNewConversation}
       newConversationDisabled={props.newConversationDisabled}
-      onOpenAnalysis={props.onOpenAnalysis}
+      onToggleViewMode={props.onToggleViewMode}
+      chatViewMode={props.chatViewMode}
       analysisPending={props.analysisPending}
       activeConversationId={props.activeConversationId}
       forgePromoteDisabled={props.forgePromoteDisabled}

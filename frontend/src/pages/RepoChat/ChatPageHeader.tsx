@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, BarChart3, MessageSquarePlus, Settings2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, MessageSquare, MessageSquarePlus, Settings2 } from 'lucide-react';
 import type { ChatPipelineMode } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +34,8 @@ export function ChatPageHeader(props: {
   messageCount: number;
   onNewConversation: () => void;
   newConversationDisabled?: boolean;
-  onOpenAnalysis: () => void;
+  onToggleViewMode: () => void;
+  chatViewMode: 'chat' | 'analysis';
   analysisPending: boolean;
   activeConversationId?: string | null;
   forgePromoteDisabled?: boolean;
@@ -110,14 +111,24 @@ export function ChatPageHeader(props: {
 
         <Button
           type="button"
-          variant="outline"
+          variant={props.chatViewMode === 'analysis' ? 'default' : 'outline'}
           size="sm"
           className={cn(chatNavBtnClass, 'relative gap-2')}
-          onClick={props.onOpenAnalysis}
+          onClick={props.onToggleViewMode}
+          aria-pressed={props.chatViewMode === 'analysis'}
         >
-          <BarChart3 className="size-4 shrink-0" aria-hidden />
-          Análisis
-          {props.analysisPending ? (
+          {props.chatViewMode === 'analysis' ? (
+            <>
+              <MessageSquare className="size-4 shrink-0" aria-hidden />
+              Chat
+            </>
+          ) : (
+            <>
+              <BarChart3 className="size-4 shrink-0" aria-hidden />
+              Análisis
+            </>
+          )}
+          {props.analysisPending && props.chatViewMode === 'chat' ? (
             <span
               className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-[var(--primary)] ring-2 ring-[var(--background)]"
               aria-hidden
