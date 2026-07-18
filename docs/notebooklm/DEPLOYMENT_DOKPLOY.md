@@ -118,7 +118,29 @@ Variables requeridas para Postgres (ingest):
 
 - `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`
 
-## 8. Troubleshooting: 404 en `/` y `/api` pero MCP responde
+## 8. Troubleshooting: 405 en login OTP (`Enviar código`)
+
+Síntoma: al solicitar OTP aparece HTML `405 Not Allowed` de **nginx** (no JSON de Nest).
+
+Causa: en Dokploy solo existe la ruta **`/` → frontend** y no **`/api` → api**. El navegador hace `POST /api/auth/otp/request`; nginx del SPA no acepta POST → 405. Un `GET /api/health` que devuelve **HTML** (`content-type: text/html`) es la misma causa: el SPA sirve `index.html`, no la API.
+
+Solución (elige una o ambas):
+
+1. **Dokploy → Domains** del compose Ariadne: añadir **`/api`** → servicio **`api`**, puerto **3000** (además de **`/` → frontend:80**). Reload Traefik si hace falta.
+2. **Fallback en imagen frontend:** `frontend/nginx.conf` hace `proxy_pass` de `/api/` a `http://api:3000/api/` (funciona aunque Traefik solo apunte al frontend).
+
+Comprobación:
+
+```bash
+curl -sS -o /dev/null -w '%{http_code} %{content_type}\n' https://ariadne.kreoint.mx/api/health
+# Esperado: 200 application/json (no text/html)
+
+curl -sS -X POST https://ariadne.kreoint.mx/api/auth/otp/request \
+  -H 'Content-Type: application/json' -d '{"email":"tu@empresa.com"}'
+# Esperado: JSON (200), no HTML 405
+```
+
+## 9. Troubleshooting: 404 en `/` y `/api` pero MCP responde
 
 Síntoma: `404 page not found` (texto plano de Traefik) en el SPA y en `/api/health`, mientras `/mcp` devuelve 401/JSON.
 
@@ -138,7 +160,7 @@ Healthchecks correctos (imagen actual):
 
 Tras redeploy, ambos deben pasar a **healthy**; si no, **Settings → Reload Traefik** en Dokploy.
 
-## 9. Resumen de comprobaciones
+## 10. Resumen de comprobaciones
 
 - [ ] Postgres con variables `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` en ingest
 - [ ] `CORS_ORIGIN=https://ariadne.kreoint.mx` en API e Ingest

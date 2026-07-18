@@ -79,13 +79,20 @@ export const requestOtp = async (
   if (!res.ok) {
     const text = await res.text();
     let msg = text;
-    try {
-      const json = JSON.parse(text) as { message?: string | string[] };
-      if (json?.message != null) {
-        msg = Array.isArray(json.message) ? json.message.join(', ') : String(json.message);
+    if (/^\s*</.test(text)) {
+      msg =
+        res.status === 405
+          ? 'No se pudo contactar la API (405). Revisa el enrutamiento /api en el despliegue.'
+          : `Error del servidor (${res.status}). Revisa que /api apunte al servicio API.`;
+    } else {
+      try {
+        const json = JSON.parse(text) as { message?: string | string[] };
+        if (json?.message != null) {
+          msg = Array.isArray(json.message) ? json.message.join(', ') : String(json.message);
+        }
+      } catch {
+        /* use text */
       }
-    } catch {
-      /* use text */
     }
     throw new Error(msg);
   }
