@@ -10,11 +10,11 @@ import { maskApiKeyHint } from '../llm-settings/llm-settings.util';
 import { setActiveSystemConfig } from './active-system-config';
 import { SystemSettingsEntity } from './entities/system-settings.entity';
 import { buildSystemSettingsFromEnv } from './system-settings.defaults';
+import { SYSTEM_SETTINGS_SINGLETON_ID } from './system-settings.types';
 import type {
   SystemSettingsEffective,
   SystemSettingsMasked,
   UpdateSystemSettingsDto,
-  SYSTEM_SETTINGS_SINGLETON_ID,
 } from './system-settings.types';
 
 @Injectable()

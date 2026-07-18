@@ -5,7 +5,7 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { SYSTEM_SETTINGS_SINGLETON_ID } from './system-settings.types';
+import { SYSTEM_SETTINGS_SINGLETON_ID } from '../system-settings.types';
 
 @Entity('system_settings')
 export class SystemSettingsEntity {
