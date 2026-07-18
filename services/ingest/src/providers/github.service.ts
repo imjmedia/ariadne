@@ -4,8 +4,12 @@
 
 import { Injectable } from '@nestjs/common';
 import { CredentialsService } from '../credentials/credentials.service';
-import { resolveGitHubTokenFromConfig } from '../system-settings/active-system-config';
 import { shouldSyncIndexPath } from './sync-path-filter';
+
+export function resolveEnvGitHubToken(): string | null {
+  const t = process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim();
+  return t || null;
+}
 
 interface GhContent {
   name: string;
@@ -52,7 +56,7 @@ export class GitHubService {
     const token = credentialsRef
       ? await this.credentials.resolveForGitHub(credentialsRef)
       : null;
-    const t = token ?? (resolveGitHubTokenFromConfig() || null);
+    const t = token ?? resolveEnvGitHubToken();
     const h: Record<string, string> = {
       Accept: 'application/vnd.github.v3+json',
     };
@@ -88,7 +92,7 @@ export class GitHubService {
     if (credentialsRef) {
       token = await this.credentials.resolveForGitHub(credentialsRef);
     }
-    if (!token) token = resolveGitHubTokenFromConfig() || null;
+    if (!token) token = resolveEnvGitHubToken();
     return { cloneUrl, token, ref, tokenUsername: 'x-access-token' };
   }
 

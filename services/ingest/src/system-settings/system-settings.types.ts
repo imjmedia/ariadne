@@ -26,12 +26,6 @@ export interface SystemChatEffective {
   modificationPlanMaxFiles: number;
 }
 
-export interface SystemIntegrationsEffective {
-  githubToken: string | null;
-  ollamaBaseUrl: string | null;
-  ollamaEmbedModel: string | null;
-}
-
 export interface SystemSettingsEffective {
   corsOrigin: string | null;
   emailOtp: string | null;
@@ -41,7 +35,6 @@ export interface SystemSettingsEffective {
   falkor: SystemFalkorEffective;
   observability: SystemObservabilityEffective;
   chat: SystemChatEffective;
-  integrations: SystemIntegrationsEffective;
 }
 
 export interface SystemSettingsMasked {
@@ -60,12 +53,6 @@ export interface SystemSettingsMasked {
   falkor: SystemFalkorEffective;
   observability: SystemObservabilityEffective;
   chat: SystemChatEffective;
-  integrations: {
-    ollamaBaseUrl: string | null;
-    ollamaEmbedModel: string | null;
-    hasGithubToken: boolean;
-    githubTokenHint: string | null;
-  };
 }
 
 export interface UpdateSystemSettingsDto {
@@ -87,7 +74,4 @@ export interface UpdateSystemSettingsDto {
   chatTelemetryLog?: boolean;
   chatTwoPhase?: boolean;
   modificationPlanMaxFiles?: number | null;
-  ollamaBaseUrl?: string | null;
-  ollamaEmbedModel?: string | null;
-  githubToken?: string | null;
 }

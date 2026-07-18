@@ -30,11 +30,6 @@ export interface SystemSettingsRuntime {
     twoPhase: boolean;
     modificationPlanMaxFiles: number;
   };
-  integrations: {
-    githubToken: string | null;
-    ollamaBaseUrl: string | null;
-    ollamaEmbedModel: string | null;
-  };
 }
 
 function buildFromEnv(): SystemSettingsRuntime {
@@ -76,11 +71,6 @@ function buildFromEnv(): SystemSettingsRuntime {
         process.env.CHAT_TWO_PHASE?.toLowerCase() !== 'false' &&
         process.env.CHAT_TWO_PHASE?.toLowerCase() !== 'off',
       modificationPlanMaxFiles: int('MODIFICATION_PLAN_MAX_FILES', 150),
-    },
-    integrations: {
-      githubToken: str('GITHUB_TOKEN') ?? str('GH_TOKEN'),
-      ollamaBaseUrl: str('OLLAMA_BASE_URL'),
-      ollamaEmbedModel: str('OLLAMA_EMBED_MODEL'),
     },
   };
 }

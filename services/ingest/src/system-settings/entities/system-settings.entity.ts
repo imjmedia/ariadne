@@ -66,15 +66,6 @@ export class SystemSettingsEntity {
   @Column({ name: 'modification_plan_max_files', type: 'int', nullable: true })
   modificationPlanMaxFiles!: number | null;
 
-  @Column({ name: 'ollama_base_url', type: 'varchar', length: 512, nullable: true })
-  ollamaBaseUrl!: string | null;
-
-  @Column({ name: 'ollama_embed_model', type: 'varchar', length: 128, nullable: true })
-  ollamaEmbedModel!: string | null;
-
-  @Column({ name: 'github_token_encrypted', type: 'text', nullable: true })
-  githubTokenEncrypted!: string | null;
-
   @Column({ name: 'updated_by', type: 'varchar', length: 64, nullable: true })
   updatedBy!: string | null;
 

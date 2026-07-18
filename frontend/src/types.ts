@@ -538,12 +538,6 @@ export interface SystemSettingsMasked {
     twoPhase: boolean;
     modificationPlanMaxFiles: number;
   };
-  integrations: {
-    ollamaBaseUrl: string | null;
-    ollamaEmbedModel: string | null;
-    hasGithubToken: boolean;
-    githubTokenHint: string | null;
-  };
 }
 
 export interface UpdateSystemSettingsDto {
@@ -565,7 +559,4 @@ export interface UpdateSystemSettingsDto {
   chatTelemetryLog?: boolean;
   chatTwoPhase?: boolean;
   modificationPlanMaxFiles?: number | null;
-  ollamaBaseUrl?: string | null;
-  ollamaEmbedModel?: string | null;
-  githubToken?: string | null;
 }

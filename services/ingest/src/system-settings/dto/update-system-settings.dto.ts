@@ -19,7 +19,4 @@ export class UpdateSystemSettingsBodyDto implements UpdateSystemSettingsDto {
   chatTelemetryLog?: boolean;
   chatTwoPhase?: boolean;
   modificationPlanMaxFiles?: number | null;
-  ollamaBaseUrl?: string | null;
-  ollamaEmbedModel?: string | null;
-  githubToken?: string | null;
 }

@@ -1,5 +1,5 @@
 /**
- * Configuración global del sistema (admin): SMTP, CORS, Falkor, observabilidad, chat, integraciones.
+ * Configuración global del sistema (admin): SMTP, CORS, Falkor, observabilidad y chat.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -7,7 +7,6 @@ import { SlidersHorizontal } from 'lucide-react';
 import { api } from '@/api';
 import type { SystemSettingsMasked, UpdateSystemSettingsDto } from '@/types';
 import { getUser } from '@/utils/auth';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,13 +23,12 @@ import {
   settingsToggleFieldClass,
 } from './settingsUiClasses';
 
-type SystemSettingsTabId = 'auth' | 'network' | 'observability' | 'integrations';
+type SystemSettingsTabId = 'auth' | 'network' | 'observability';
 
 const SYSTEM_SETTINGS_TABS: Array<{ id: SystemSettingsTabId; label: string }> = [
   { id: 'auth', label: 'Auth y correo' },
   { id: 'network', label: 'Red y Falkor' },
   { id: 'observability', label: 'Observabilidad' },
-  { id: 'integrations', label: 'Integraciones' },
 ];
 
 interface FormState {
@@ -53,10 +51,6 @@ interface FormState {
   chatTelemetryLog: boolean;
   chatTwoPhase: boolean;
   modificationPlanMaxFiles: string;
-  ollamaBaseUrl: string;
-  ollamaEmbedModel: string;
-  githubToken: string;
-  githubTokenTouched: boolean;
 }
 
 function defaultForm(settings?: SystemSettingsMasked): FormState {
@@ -80,10 +74,6 @@ function defaultForm(settings?: SystemSettingsMasked): FormState {
     chatTelemetryLog: settings?.observability.chatTelemetryLog ?? false,
     chatTwoPhase: settings?.chat.twoPhase ?? true,
     modificationPlanMaxFiles: String(settings?.chat.modificationPlanMaxFiles ?? 150),
-    ollamaBaseUrl: settings?.integrations.ollamaBaseUrl ?? '',
-    ollamaEmbedModel: settings?.integrations.ollamaEmbedModel ?? 'nomic-embed-text',
-    githubToken: '',
-    githubTokenTouched: false,
   };
 }
 
@@ -141,18 +131,13 @@ export function SystemSettingsPage() {
         chatTelemetryLog: form.chatTelemetryLog,
         chatTwoPhase: form.chatTwoPhase,
         modificationPlanMaxFiles: parseInt(form.modificationPlanMaxFiles, 10) || 150,
-        ollamaBaseUrl: form.ollamaBaseUrl.trim() || null,
-        ollamaEmbedModel: form.ollamaEmbedModel.trim() || null,
       };
       if (form.smtpPassTouched) {
         payload.smtpPass = form.smtpPass.trim() ? form.smtpPass.trim() : null;
       }
-      if (form.githubTokenTouched) {
-        payload.githubToken = form.githubToken.trim() ? form.githubToken.trim() : null;
-      }
       const saved = await api.updateSystemSettings(payload);
       setSettings(saved);
-      setForm({ ...defaultForm(saved), smtpPass: '', smtpPassTouched: false, githubToken: '', githubTokenTouched: false });
+      setForm({ ...defaultForm(saved), smtpPass: '', smtpPassTouched: false });
       setSuccess('Configuración guardada. CORS y métricas pueden requerir reinicio de api/ingest.');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -181,7 +166,11 @@ export function SystemSettingsPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Configuración del sistema</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Valores operativos con defaults en código. Solo quedan en <code className="text-xs">.env</code> las
-            variables de bootstrap (Postgres, Redis, Falkor host, JWT, cifrado).{' '}
+            variables de bootstrap (Postgres, Redis, Falkor host, JWT, cifrado). GitHub y tokens de repo van en{' '}
+            <Link to="/credentials" className="text-primary underline-offset-4 hover:underline">
+              Credenciales
+            </Link>
+            .{' '}
             <Link to="/settings" className="text-primary underline-offset-4 hover:underline">
               Ajustes IA
             </Link>
@@ -222,7 +211,7 @@ export function SystemSettingsPage() {
             ))}
           </nav>
 
-          <section className={cn(sectionShellClass, 'mt-4')} role="tabpanel" aria-label={activeTabMeta.label}>
+          <section className={`${sectionShellClass} mt-4`} role="tabpanel" aria-label={activeTabMeta.label}>
             <div className={sectionHeaderClass}>
               <h2 className="text-lg font-medium">{activeTabMeta.label}</h2>
             </div>
@@ -311,23 +300,6 @@ export function SystemSettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="modPlanMax">Modification plan max files</Label>
                   <Input id="modPlanMax" value={form.modificationPlanMaxFiles} onChange={(e) => setForm({ ...form, modificationPlanMaxFiles: e.target.value })} />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'integrations' && (
-              <div className={`${settingsSectionBodyClass} grid gap-4 md:grid-cols-2`}>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="githubToken">GitHub token (PR review) {settings?.integrations.githubTokenHint ? `(actual: ${settings.integrations.githubTokenHint})` : ''}</Label>
-                  <Input id="githubToken" type="password" value={form.githubToken} onChange={(e) => setForm({ ...form, githubToken: e.target.value, githubTokenTouched: true })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ollamaBase">Ollama base URL</Label>
-                  <Input id="ollamaBase" value={form.ollamaBaseUrl} onChange={(e) => setForm({ ...form, ollamaBaseUrl: e.target.value })} placeholder="http://localhost:11434" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ollamaModel">Ollama embed model</Label>
-                  <Input id="ollamaModel" value={form.ollamaEmbedModel} onChange={(e) => setForm({ ...form, ollamaEmbedModel: e.target.value })} />
                 </div>
               </div>
             )}

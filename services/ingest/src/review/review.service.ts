@@ -24,8 +24,7 @@ import {
   llmDefaultHeaders,
 } from '../llm/llm-config';
 import { queryBatchLegacyImpact } from './falkor-review.helper';
-import { GitHubService } from '../providers/github.service';
-import { resolveGitHubTokenFromConfig } from '../system-settings/active-system-config';
+import { GitHubService, resolveEnvGitHubToken } from '../providers/github.service';
 import {
   ChangedFile,
   DiffHunk,
@@ -343,7 +342,7 @@ export class ReviewService {
 
   /** Obtiene headers de autenticación para GitHub API. */
   private async getGitHubAuthHeaders(): Promise<Record<string, string>> {
-    const token = resolveGitHubTokenFromConfig();
+    const token = resolveEnvGitHubToken() ?? '';
     if (token) return { Authorization: `Bearer ${token}` };
     return {};
   }

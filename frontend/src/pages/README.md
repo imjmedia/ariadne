@@ -29,7 +29,7 @@ Vistas principales de la aplicación Ariadne (shell SaaS: sidebar + header con b
 - **Login.tsx** — Autenticación OTP: email → código de 6 dígitos.
 - **CredentialsList.tsx**, **CreateCredentialForm.tsx**, **EditCredential.tsx** — CRUD de credenciales (alta en modal con `?create=1`).
 - **SettingsPage.tsx** — **Ajustes IA** (admin): LLM global + The Forge opcional. Ruta: `/settings`.
-- **SystemSettingsPage.tsx** — **Sistema** (admin): SMTP, CORS, Falkor, observabilidad, chat, integraciones en **subtabs** (Auth y correo, Red y Falkor, Observabilidad, Integraciones). API: `GET/PUT /api/system-settings`. Ruta: `/settings/system`.
+- **SystemSettingsPage.tsx** — **Sistema** (admin): SMTP, CORS, Falkor, observabilidad y chat en subtabs. GitHub → `/credentials`. API: `GET/PUT /api/system-settings`. Ruta: `/settings/system`.
 - **SettingsTheForgeCard.tsx** — Integración opt-in The Forge: toggle + URL/JWT solo si está activa; notas dev colapsadas.
 - **SettingsDetailsSection.tsx** — Disclosure progresivo reutilizable para secciones avanzadas.
 - **settingsUiClasses.ts** — Clases compartidas de checkbox, toggle y alertas en Ajustes.

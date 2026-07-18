@@ -54,10 +54,5 @@ export function buildSystemSettingsFromEnv(): SystemSettingsEffective {
       twoPhase: falsyEnv('CHAT_TWO_PHASE', true),
       modificationPlanMaxFiles: intEnv('MODIFICATION_PLAN_MAX_FILES', 150),
     },
-    integrations: {
-      githubToken: strEnv('GITHUB_TOKEN') ?? strEnv('GH_TOKEN'),
-      ollamaBaseUrl: strEnv('OLLAMA_BASE_URL'),
-      ollamaEmbedModel: strEnv('OLLAMA_EMBED_MODEL'),
-    },
   };
 }

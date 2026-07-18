@@ -86,12 +86,6 @@ export class SystemSettingsService implements OnModuleInit {
       smtpPassEncrypted = pass ? encrypt(pass) : null;
     }
 
-    let githubTokenEncrypted = existing?.githubTokenEncrypted ?? null;
-    if (dto.githubToken !== undefined) {
-      const token = dto.githubToken?.trim() ?? '';
-      githubTokenEncrypted = token ? encrypt(token) : null;
-    }
-
     const row = this.repo.create({
       id: SYSTEM_SETTINGS_SINGLETON_ID,
       corsOrigin:
@@ -148,15 +142,6 @@ export class SystemSettingsService implements OnModuleInit {
         dto.modificationPlanMaxFiles !== undefined && dto.modificationPlanMaxFiles !== null
           ? dto.modificationPlanMaxFiles
           : existing?.modificationPlanMaxFiles ?? base.chat.modificationPlanMaxFiles,
-      ollamaBaseUrl:
-        dto.ollamaBaseUrl !== undefined
-          ? dto.ollamaBaseUrl?.trim() || null
-          : existing?.ollamaBaseUrl ?? base.integrations.ollamaBaseUrl,
-      ollamaEmbedModel:
-        dto.ollamaEmbedModel !== undefined
-          ? dto.ollamaEmbedModel?.trim() || null
-          : existing?.ollamaEmbedModel ?? base.integrations.ollamaEmbedModel,
-      githubTokenEncrypted,
       updatedBy: userId ?? null,
     });
 
@@ -175,14 +160,6 @@ export class SystemSettingsService implements OnModuleInit {
         smtpPass = decrypt(row.smtpPassEncrypted).trim() || null;
       } catch {
         smtpPass = null;
-      }
-    }
-    let githubToken: string | null = null;
-    if (row.githubTokenEncrypted) {
-      try {
-        githubToken = decrypt(row.githubTokenEncrypted).trim() || null;
-      } catch {
-        githubToken = null;
       }
     }
 
@@ -214,11 +191,6 @@ export class SystemSettingsService implements OnModuleInit {
         modificationPlanMaxFiles:
           row.modificationPlanMaxFiles ?? env.chat.modificationPlanMaxFiles,
       },
-      integrations: {
-        githubToken: githubToken ?? env.integrations.githubToken,
-        ollamaBaseUrl: row.ollamaBaseUrl ?? env.integrations.ollamaBaseUrl,
-        ollamaEmbedModel: row.ollamaEmbedModel ?? env.integrations.ollamaEmbedModel,
-      },
     };
   }
 
@@ -231,12 +203,6 @@ export class SystemSettingsService implements OnModuleInit {
         ? maskApiKeyHint(decrypt(row.smtpPassEncrypted))
         : runtime.smtp.pass
           ? maskApiKeyHint(runtime.smtp.pass)
-          : null;
-    const githubHint =
-      row?.githubTokenEncrypted != null
-        ? maskApiKeyHint(decrypt(row.githubTokenEncrypted))
-        : runtime.integrations.githubToken
-          ? maskApiKeyHint(runtime.integrations.githubToken)
           : null;
 
     return {
@@ -255,12 +221,6 @@ export class SystemSettingsService implements OnModuleInit {
       falkor: runtime.falkor,
       observability: runtime.observability,
       chat: runtime.chat,
-      integrations: {
-        ollamaBaseUrl: runtime.integrations.ollamaBaseUrl,
-        ollamaEmbedModel: runtime.integrations.ollamaEmbedModel,
-        hasGithubToken: Boolean(runtime.integrations.githubToken),
-        githubTokenHint: githubHint,
-      },
     };
   }
 

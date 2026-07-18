@@ -18,13 +18,3 @@ export function setActiveSystemConfig(config: SystemSettingsEffective): void {
 export function getActiveSystemConfig(): SystemSettingsEffective {
   return active;
 }
-
-export function resolveGitHubTokenFromConfig(): string {
-  const cfg = getActiveSystemConfig().integrations.githubToken;
-  return (
-    cfg?.trim() ||
-    process.env.GITHUB_TOKEN?.trim() ||
-    process.env.GH_TOKEN?.trim() ||
-    ''
-  );
-}
