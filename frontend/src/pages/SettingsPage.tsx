@@ -246,9 +246,13 @@ export function SettingsPage() {
   return (
     <div className={settingsPageClass}>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes IA</h1>
         <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">
-          Lo esencial para conectar el LLM. Opciones avanzadas e integraciones quedan colapsadas.
+          Lo esencial para conectar el LLM.{' '}
+          <a href="/settings/system" className="text-[var(--primary)] underline-offset-4 hover:underline">
+            Configuración del sistema
+          </a>{' '}
+          (SMTP, CORS, Falkor, observabilidad).
         </p>
       </header>
 

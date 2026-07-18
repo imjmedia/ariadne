@@ -30,6 +30,7 @@ import { Dashboard } from './pages/Dashboard';
 import { UsersManagement } from './pages/UsersManagement';
 import { ProfilePage } from './pages/ProfilePage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SystemSettingsPage } from './pages/SystemSettingsPage';
 
 /** Marcadores antiguos `/repos/new` y `/repos/new?projectId=` → lista con modal de alta. */
 function LegacyReposNewRedirect() {
@@ -73,6 +74,7 @@ function App() {
             <Route path="domains" element={<DomainsList />} />
             <Route path="users" element={<UsersManagement />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="settings/system" element={<SystemSettingsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="ayuda/*" element={<Ayuda />} />
           </Route>

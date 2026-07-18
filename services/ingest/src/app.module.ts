@@ -41,6 +41,8 @@ import { ChatMessageEntity } from './chat/entities/chat-message.entity';
 import { MddPersistenceModule } from './mdd-persistence/mdd-persistence.module';
 import { BrownfieldModule } from './brownfield/brownfield.module';
 import { TheForgeIntegrationEntity } from './theforge/entities/theforge-integration.entity';
+import { SystemSettingsEntity } from './system-settings/entities/system-settings.entity';
+import { SystemSettingsModule } from './system-settings/system-settings.module';
 
 @Module({
   imports: [
@@ -70,6 +72,7 @@ import { TheForgeIntegrationEntity } from './theforge/entities/theforge-integrat
         ChatConversationEntity,
         ChatMessageEntity,
         TheForgeIntegrationEntity,
+        SystemSettingsEntity,
       ],
       synchronize: true,
       logging: process.env.NODE_ENV === 'development',
@@ -88,6 +91,7 @@ import { TheForgeIntegrationEntity } from './theforge/entities/theforge-integrat
     ReviewModule,
     AnalysisModule,
     LlmSettingsModule,
+    SystemSettingsModule,
     MddPersistenceModule,
     BrownfieldModule,
   ],

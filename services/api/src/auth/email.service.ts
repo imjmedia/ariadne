@@ -4,6 +4,7 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { getSystemSettingsRuntime } from '../system-settings/system-settings.client';
 
 const OTP_VALID_MINUTES = 5;
 
@@ -72,27 +73,29 @@ function buildOtpEmailHtml(params: {
 @Injectable()
 export class EmailService {
   private transporter: Transporter | null = null;
+  private transporterKey: string | null = null;
 
-  private getTransporter(): Transporter | null {
-    const host = process.env.SMTP_HOST;
-    const port = parseInt(process.env.SMTP_PORT ?? '587', 10);
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-
+  private async getTransporter(): Promise<Transporter | null> {
+    const cfg = await getSystemSettingsRuntime();
+    const { host, port, user, pass } = cfg.smtp;
     if (!host || !user || !pass) return null;
 
-    if (!this.transporter) {
-      try {
-        this.transporter = nodemailer.createTransport({
-          host,
-          port,
-          secure: port === 465,
-          auth: { user, pass },
-        });
-      } catch (e) {
-        console.error('[email] createTransport falló:', (e as Error)?.message ?? e);
-        return null;
-      }
+    const key = `${host}:${port}:${user}`;
+    if (this.transporter && this.transporterKey === key) return this.transporter;
+
+    try {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+      });
+      this.transporterKey = key;
+    } catch (e) {
+      console.error('[email] createTransport falló:', (e as Error)?.message ?? e);
+      this.transporter = null;
+      this.transporterKey = null;
+      return null;
     }
 
     return this.transporter;
@@ -100,16 +103,17 @@ export class EmailService {
 
   /** Envía OTP por email. Devuelve true si se envió correctamente. */
   async sendOtp(to: string, code: string): Promise<boolean> {
-    const trans = this.getTransporter();
+    const cfg = await getSystemSettingsRuntime();
+    const trans = await this.getTransporter();
     if (!trans) {
-      console.warn('[email] SMTP no configurado (SMTP_HOST, SMTP_USER, SMTP_PASS)');
+      console.warn('[email] SMTP no configurado (host, user, pass en Ajustes → Sistema)');
       return false;
     }
 
-    const fromName = process.env.SMTP_FROM || 'Ariadne';
-    const fromUser = process.env.SMTP_USER || 'noreply@localhost';
+    const fromName = cfg.smtp.from || 'Ariadne';
+    const fromUser = cfg.smtp.user || 'noreply@localhost';
 
-    const rawHost = (process.env.WEB_APP_HOST || process.env.HOST || '').trim().toLowerCase();
+    const rawHost = (cfg.webAppHost || '').trim().toLowerCase();
     const appHost = rawHost
       ? rawHost.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].replace(/^\./, '')
       : null;

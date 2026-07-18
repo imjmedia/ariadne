@@ -515,4 +515,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(dto ?? {}),
     }),
+
+  getSystemSettings: () => request<import('./types').SystemSettingsMasked>('/system-settings'),
+  updateSystemSettings: (dto: import('./types').UpdateSystemSettingsDto) =>
+    request<import('./types').SystemSettingsMasked>('/system-settings', {
+      method: 'PUT',
+      body: JSON.stringify(dto),
+    }),
 };

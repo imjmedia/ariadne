@@ -5,7 +5,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ## [Unreleased]
 
-## [1.3.0] — 2026-07-09
+## [1.4.0] — 2026-07-18
+
+### Added
+
+- **Configuración del sistema (UI admin):** nueva pantalla `/settings/system` y tabla Postgres `system_settings` (singleton). Persiste SMTP/OTP, CORS, sharding Falkor, observabilidad, chat tuning, GitHub token y Ollama embeddings con defaults en código y fallback env bootstrap.
+- **API interna:** `GET /internal/system-settings` para api/ingest; cliente HTTP en `services/api` (OTP/SMTP/CORS al arranque).
+- **ariadne-common:** `setFalkorRuntimeOverrides` + `isFalkorDebugCypherEnabled` para leer flags Falkor desde configuración persistida.
+
+### Changed
+
+- **docker-compose / `.env.example`:** reducidos a variables indispensables (infra, JWT, cifrado, build frontend). SMTP, CORS, Falkor operativo, LLM y telemetría se gestionan desde Ajustes → Sistema / Ajustes IA.
+- **Sidebar:** «Ajustes IA» (`/settings`) y «Sistema» (`/settings/system`) para administradores.
+
 
 ### Added
 

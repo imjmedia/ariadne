@@ -43,6 +43,26 @@ export interface FalkorConfig {
   port: number;
 }
 
+export interface FalkorRuntimeOverrides {
+  shardByProject?: boolean;
+  shardByDomain?: boolean;
+  autoDomainOverflow?: boolean;
+  graphNodeSoftLimit?: number;
+  debugCypher?: boolean;
+}
+
+let falkorRuntimeOverrides: FalkorRuntimeOverrides | null = null;
+
+/** Overrides desde system_settings (ingest) con fallback a process.env. */
+export function setFalkorRuntimeOverrides(overrides: FalkorRuntimeOverrides | null): void {
+  falkorRuntimeOverrides = overrides;
+}
+
+function envTruthy(name: string): boolean {
+  const v = process.env[name] ?? '';
+  return v === '1' || v.toLowerCase() === 'true';
+}
+
 /** FalkorDB: host/puerto desde env. */
 export function getFalkorConfig(): FalkorConfig {
   return {
@@ -53,6 +73,9 @@ export function getFalkorConfig(): FalkorConfig {
 
 /** Partición por dominio (UUID proyecto en ingest / Falkor projectId). */
 export function isProjectShardingEnabled(): boolean {
+  if (falkorRuntimeOverrides?.shardByProject !== undefined) {
+    return falkorRuntimeOverrides.shardByProject;
+  }
   const v = process.env.FALKOR_SHARD_BY_PROJECT ?? '';
   return v === '1' || v.toLowerCase() === 'true';
 }
@@ -69,6 +92,9 @@ export function isExternalGraphRoutingEnabled(): boolean {
 
 /** Límite orientativo de nodos por grafo Falkor (~100k); usado para activar partición por dominio. */
 export function getGraphNodeSoftLimit(): number {
+  if (falkorRuntimeOverrides?.graphNodeSoftLimit !== undefined) {
+    return falkorRuntimeOverrides.graphNodeSoftLimit;
+  }
   const raw = process.env.FALKOR_GRAPH_NODE_SOFT_LIMIT ?? '100000';
   const n = parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : 100_000;
@@ -76,6 +102,9 @@ export function getGraphNodeSoftLimit(): number {
 
 /** Fuerza partición por primer segmento de ruta en todos los proyectos (además de FALKOR_SHARD_BY_PROJECT). */
 export function isEnvDomainShardingEnabled(): boolean {
+  if (falkorRuntimeOverrides?.shardByDomain !== undefined) {
+    return falkorRuntimeOverrides.shardByDomain;
+  }
   const v = process.env.FALKOR_SHARD_BY_DOMAIN ?? '';
   return v === '1' || v.toLowerCase() === 'true';
 }
@@ -85,8 +114,19 @@ export function isEnvDomainShardingEnabled(): boolean {
  * Requiere resync para repartir datos en los nuevos grafos.
  */
 export function isAutoDomainOverflowEnabled(): boolean {
+  if (falkorRuntimeOverrides?.autoDomainOverflow !== undefined) {
+    return falkorRuntimeOverrides.autoDomainOverflow;
+  }
   const v = process.env.FALKOR_AUTO_DOMAIN_OVERFLOW ?? '';
   return v === '1' || v.toLowerCase() === 'true';
+}
+
+/** Debug Cypher en graph-explorer (API). */
+export function isFalkorDebugCypherEnabled(): boolean {
+  if (falkorRuntimeOverrides?.debugCypher !== undefined) {
+    return falkorRuntimeOverrides.debugCypher;
+  }
+  return envTruthy('FALKOR_DEBUG_CYPHER');
 }
 
 function sanitizeIdPart(s: string): string {

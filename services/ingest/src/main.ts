@@ -14,6 +14,7 @@ import { DataSource } from 'typeorm';
 import { NestFactory } from '@nestjs/core';
 import { FalkorDB } from 'falkordb';
 import { AppModule } from './app.module';
+import { SystemSettingsService } from './system-settings/system-settings.service';
 import { getFalkorConfig, GRAPH_NAME, isProjectShardingEnabled } from './pipeline/falkor';
 import { runFalkorRepoIdBackfill } from './pipeline/producer';
 import * as express from 'express';
@@ -182,7 +183,8 @@ async function bootstrap() {
       },
     }),
   );
-  const corsOrigin = process.env.CORS_ORIGIN;
+  const corsOrigin =
+    (await app.get(SystemSettingsService).getEffective()).corsOrigin ?? process.env.CORS_ORIGIN;
   app.enableCors({
     origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
     credentials: true,

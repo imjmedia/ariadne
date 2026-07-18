@@ -3,6 +3,7 @@
  */
 export function getActiveNavHref(pathname: string): string {
   if (pathname.startsWith('/ayuda')) return '/ayuda';
+  if (pathname.startsWith('/settings/system')) return '/settings/system';
   if (pathname.startsWith('/settings')) return '/settings';
   if (pathname.startsWith('/domains')) return '/domains';
   if (pathname.startsWith('/dashboard')) return '/dashboard';
@@ -43,7 +44,10 @@ export function breadcrumbsForPath(pathname: string): { to: string; label: strin
   if (pathname.startsWith('/graph-explorer')) return [home, { to: '/graph-explorer', label: 'Grafo' }];
   if (pathname.startsWith('/users')) return [home, { to: '/users', label: 'Usuarios' }];
   if (pathname.startsWith('/profile')) return [home, { to: '/profile', label: 'Perfil' }];
-  if (pathname.startsWith('/settings')) return [home, { to: '/settings', label: 'Configuración' }];
+  if (pathname.startsWith('/settings/system')) {
+    return [home, { to: '/settings', label: 'Ajustes' }, { to: '/settings/system', label: 'Sistema' }];
+  }
+  if (pathname.startsWith('/settings')) return [home, { to: '/settings', label: 'Ajustes IA' }];
   if (pathname.startsWith('/ayuda')) return [home, { to: '/ayuda', label: 'Ayuda' }];
 
   return [home, { to: pathname, label: 'Página' }];

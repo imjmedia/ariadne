@@ -16,6 +16,7 @@ import {
   ShareNetwork,
   Question,
   Gear,
+  Faders,
 } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { SidebarModern, type SidebarGroup, type SidebarLink } from './layout/SidebarModern';
@@ -52,7 +53,8 @@ function buildNavigationGroups(user: UserInfo | null): SidebarGroup[] {
       items: [
         { label: 'Grafo', href: '/graph-explorer', icon: ShareNetwork },
         ...(isAdmin ? [{ label: 'Credenciales', href: '/credentials', icon: Key }] : []),
-        ...(isAdmin ? [{ label: 'Ajustes', href: '/settings', icon: Gear }] : []),
+        ...(isAdmin ? [{ label: 'Ajustes IA', href: '/settings', icon: Gear }] : []),
+        ...(isAdmin ? [{ label: 'Sistema', href: '/settings/system', icon: Faders }] : []),
       ],
     },
   ];

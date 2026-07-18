@@ -17,6 +17,7 @@ import { AppModule } from './app.module';
 import { AuthService } from './auth/auth.service';
 import { createOtpAuthMiddleware } from './auth/otp.middleware';
 import { createRbacMiddleware } from './auth/rbac.middleware';
+import { prefetchSystemSettingsRuntime } from './system-settings/system-settings.client';
 import { createLogger, extractRequestId } from 'ariadne-common';
 
 /** Inicia el servidor, configura CORS, prefijo /api, auth OTP, RBAC y proxy a ingest. */
@@ -25,9 +26,8 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // CORS debe registrarse **antes** del middleware OTP: el preflight OPTIONS no lleva Bearer;
-  // si OTP corre primero responde 401 sin cabeceras CORS y el navegador bloquea (Failed to fetch).
-  const corsOrigin = process.env.CORS_ORIGIN;
+  const runtimeCfg = await prefetchSystemSettingsRuntime();
+  const corsOrigin = runtimeCfg.corsOrigin ?? process.env.CORS_ORIGIN;
   app.enableCors({
     origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
     credentials: true,
@@ -65,6 +65,7 @@ async function bootstrap() {
       pathname.startsWith('/api/users') ||
       pathname.startsWith('/api/llm-settings') ||
       pathname.startsWith('/api/theforge-integration') ||
+      pathname.startsWith('/api/system-settings') ||
       pathname.startsWith('/api/internal'),
     target: ingestUrl,
     changeOrigin: true,
