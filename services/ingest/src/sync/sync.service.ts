@@ -142,6 +142,7 @@ export class SyncService {
       payload: { phase: 'queued' },
     });
     await this.syncJobRepo.save(job);
+    await this.repoRepo.update(repositoryId, { status: 'syncing' });
     return job;
   }
 

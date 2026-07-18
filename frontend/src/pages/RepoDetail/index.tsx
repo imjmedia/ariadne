@@ -43,6 +43,7 @@ function getRepoCardProps(state: ReturnType<typeof useRepoDetail>) {
   return {
     repo: state.repo!,
     id: state.id!,
+    displayStatus: state.repoDisplayStatus,
     syncing: state.syncing,
     deleting: state.deleting,
     syncFeedback: state.syncFeedback,

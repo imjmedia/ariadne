@@ -23,6 +23,7 @@ import { DataTable } from "@/components/data-table/DataTable"
 import { CreateRepoDialog, NEW_REPOSITORY_LABEL } from "@/components/repos/CreateRepoDialog"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { cn } from "@/lib/utils"
+import { useActiveSyncJobStatuses } from "@/lib/useActiveSyncJobStatuses"
 
 const REPOSITORIES_MODULE_HELP =
   "Repositorios sincronizados con FalkorSpecs: ingest, webhooks y jobs en segundo plano. Usa la búsqueda sobre la tabla para filtrar por provider, proyecto, slug o ID MCP; las cabeceras ordenan columnas."
@@ -45,6 +46,12 @@ export function RepoList() {
   const [createProjectId, setCreateProjectId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Repository | null>(null)
   const [resyncTarget, setResyncTarget] = useState<Repository | null>(null)
+  const {
+    displayStatus,
+    refresh: refreshActiveJobs,
+    setOptimistic,
+    hasActiveJobs,
+  } = useActiveSyncJobStatuses()
 
   const fetchRepos = useCallback(() => {
     setError(null)
@@ -58,6 +65,14 @@ export function RepoList() {
     setLoading(true)
     void fetchRepos().finally(() => setLoading(false))
   }, [fetchRepos])
+
+  useEffect(() => {
+    if (!hasActiveJobs) return
+    const t = setInterval(() => {
+      void fetchRepos()
+    }, 2000)
+    return () => clearInterval(t)
+  }, [hasActiveJobs, fetchRepos])
 
   /** Deep link from project detail or legacy `/repos/new?projectId=` → `/repos?openCreate=1&projectId=`. */
   useEffect(() => {
@@ -79,6 +94,7 @@ export function RepoList() {
 
   const runResync = (r: Repository) => {
     setResyncingId(r.id)
+    setOptimistic(r.id, "queued")
     api
       .triggerResync(r.id)
       .then((res) => {
@@ -90,6 +106,7 @@ export function RepoList() {
             : "Resync encolado. La reindexación corre en segundo plano.",
         )
         setTimeout(() => setFeedback(null), 6000)
+        void refreshActiveJobs()
         load()
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -148,7 +165,7 @@ export function RepoList() {
         header: "Status",
         cell: ({ row }) => (
           <div className="flex items-center">
-            <StatusBadge status={row.original.status} />
+            <StatusBadge status={displayStatus(row.original.id, row.original.status)} />
           </div>
         ),
       },
@@ -226,7 +243,7 @@ export function RepoList() {
         },
       },
     ],
-    [deletingId, resyncingId],
+    [deletingId, resyncingId, displayStatus],
   );
 
   return (

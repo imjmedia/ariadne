@@ -23,6 +23,7 @@ function isRepoIndexStale(lastSyncAt: string | null | undefined): boolean {
 interface RepoDetailRepoCardProps {
   repo: Repository;
   id: string;
+  displayStatus: string;
   syncing: boolean;
   deleting: boolean;
   syncFeedback: string | null;
@@ -44,6 +45,7 @@ function copyToClipboard(text: string) {
 export function RepoDetailRepoCard({
   repo,
   id,
+  displayStatus,
   syncing,
   deleting,
   syncFeedback,
@@ -83,7 +85,7 @@ export function RepoDetailRepoCard({
           <div className="flex flex-col gap-1">
             <dt className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">Estado</dt>
             <dd>
-              <StatusBadge status={repo.status} />
+              <StatusBadge status={displayStatus} />
             </dd>
           </div>
           <div className="sm:col-span-2 lg:col-span-2">

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Hook con la lógica de datos y acciones de la página de detalle de repo (estado, polling, sync, delete, análisis).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api';
 import type { Repository, SyncJob } from '../../types';
@@ -184,6 +184,11 @@ export function useRepoDetail() {
   }, [load]);
 
   const hasActive = jobs.some((j) => j.status === 'running' || j.status === 'queued');
+  const repoDisplayStatus = useMemo(() => {
+    const active = jobs.find((j) => j.status === 'queued' || j.status === 'running');
+    return active?.status ?? repo?.status ?? 'pending';
+  }, [jobs, repo?.status]);
+
   useEffect(() => {
     if (!hasActive || !id) return;
     const t = setInterval(() => {
@@ -243,6 +248,7 @@ export function useRepoDetail() {
   return {
     id,
     repo,
+    repoDisplayStatus,
     jobs,
     loading,
     error,

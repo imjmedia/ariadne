@@ -18,6 +18,9 @@ const statusVariant: Record<
 };
 
 const statusLabel: Record<string, string> = {
+  pending: 'Pendiente',
+  syncing: 'Sincronizando',
+  ready: 'Listo',
   queued: 'En cola',
   running: 'Procesando',
   completed: 'Completado',

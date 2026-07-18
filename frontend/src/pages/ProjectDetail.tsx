@@ -25,6 +25,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/StatusBadge';
+import { useActiveSyncJobStatuses } from '@/lib/useActiveSyncJobStatuses';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -263,6 +264,12 @@ export function ProjectDetail() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [savingDomain, setSavingDomain] = useState(false);
   const [refreshingProject, setRefreshingProject] = useState(false);
+  const {
+    displayStatus,
+    refresh: refreshActiveJobs,
+    setOptimistic,
+    hasActiveJobs,
+  } = useActiveSyncJobStatuses({ enabled: Boolean(id) });
 
   const fetchProject = useCallback((): Promise<void> => {
     if (!id) return Promise.resolve();
@@ -280,6 +287,14 @@ export function ProjectDetail() {
     setLoading(true);
     void fetchProject().finally(() => setLoading(false));
   }, [id, fetchProject]);
+
+  useEffect(() => {
+    if (!hasActiveJobs || !id) return;
+    const t = setInterval(() => {
+      void fetchProject();
+    }, 2000);
+    return () => clearInterval(t);
+  }, [hasActiveJobs, id, fetchProject]);
 
   const handleRefreshProject = useCallback(() => {
     if (!id) return;
@@ -319,9 +334,13 @@ export function ProjectDetail() {
     if (!id || !project?.repositories.length) return;
     setResyncProjectBusy(true);
     setError(null);
+    for (const r of project.repositories) {
+      setOptimistic(r.id, 'queued');
+    }
     try {
       await Promise.all(project.repositories.map((r) => api.resyncForProject(r.id, id)));
-      fetchProject();
+      await refreshActiveJobs();
+      await fetchProject();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al encolar resync del proyecto');
     } finally {
@@ -852,7 +871,7 @@ export function ProjectDetail() {
                             {r.defaultBranch || '—'}
                           </TableCell>
                           <TableCell>
-                            <StatusBadge status={r.status as 'pending' | 'syncing' | 'ready' | 'error'} />
+                            <StatusBadge status={displayStatus(r.id, r.status)} />
                           </TableCell>
                           <TableCell className="text-[var(--foreground-muted)]">
                             {r.lastSyncAt ? new Date(r.lastSyncAt).toLocaleString() : '—'}
