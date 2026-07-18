@@ -36,7 +36,7 @@ export function ChatMessageThread(props: {
     props.emptyDescription ??
     'Pregunta por componentes, flujos, APIs o impacto de un cambio. Ariadne consulta el grafo indexado.';
   return (
-    <div className="mx-auto min-h-0 w-full max-w-[44rem] flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-1 py-1 sm:px-2">
+    <div className="mx-auto min-h-0 w-full max-w-[44rem] flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-1 py-4 sm:px-2 sm:py-6">
       {props.messages.length === 0 ? (
         <div className={chatEmptyStateClass}>
           <p className="text-base font-medium text-[var(--foreground)]">{emptyTitle}</p>

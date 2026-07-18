@@ -43,7 +43,7 @@ export function ChatPageHeader(props: {
     props.includePrefixesText.trim().length > 0 || props.excludeGlobsText.trim().length > 0;
 
   return (
-    <header className="flex shrink-0 flex-col gap-3 border-b border-[var(--border)] pb-3 sm:flex-row sm:items-center sm:justify-between">
+    <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-start gap-2 sm:items-center">
         <Button variant="outline" size="icon" className={cn(chatNavBtnClass, 'size-10 shrink-0')} asChild>
           <Link to={props.backHref} title={props.backLabel}>
