@@ -26,8 +26,9 @@ export const CHAT_PROMPT_TEMPLATES: ChatPromptTemplate[] = [
   {
     id: 'schema-erd',
     label: 'Diagrama ERD',
-    hint: 'Esquema Strapi/ORM',
-    message: 'Muéstrame el diagrama entidad-relación del esquema de base de datos indexado (content-types Strapi y modelos ORM).',
+    hint: 'ORM · Prisma · SQL',
+    message:
+      'Muéstrame un diagrama entidad-relación (Mermaid erDiagram) del esquema de datos indexado en este repo: modelos ORM/ODM, Prisma, migraciones SQL o schemas OpenAPI. Usa solo lo que exista en el código indexado; no inventes tablas ni asumas Strapi.',
   },
   {
     id: 'flow-impact',
