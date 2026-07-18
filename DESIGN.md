@@ -157,6 +157,57 @@ Escala habitual:
 - Card login: `rounded-3xl`, borde `--primary/25`, `backdrop-blur-md`, sombra profunda
 - Badge outline: “Acceso sin contraseña”
 
+### Arquetipos de página (obligatorio elegir uno)
+
+No mezclar patrones de **marketing/detalle** con **formularios de configuración**.
+
+| Arquetipo | Ejemplos | Densidad | Patrones |
+|---|---|---|---|
+| **Dashboard / KPI** | `/dashboard` | Media | `rounded-3xl`, icon chips, `hover:shadow-md` |
+| **Detalle entidad** | RepoDetail, ProjectDetail, Profile | Media-alta | `panelIntroClass` + `sectionShellClass` (`layoutClasses.ts`) |
+| **Chat / herramienta** | RepoChat, ProjectChat | Compacta horizontal | `chatShellClasses.ts`, split row, `rounded-xl` |
+| **Formulario admin (Settings)** | `/settings`, EditRepo (bloques) | **Alta — compacta** | Ver abajo ⬇ |
+
+#### Formulario admin (Settings) — reglas estrictas
+
+Usar para `/settings`, credenciales, formularios largos de configuración global.
+
+**DO**
+
+- **Una** cabecera de página (`h1` + una línea de descripción), sin card hero duplicada encima del formulario
+- **Una** sección principal por dominio (ej. LLM, The Forge), separadas con `space-y-5` en la página
+- Subsecciones con **título `h3` + `border-t pt-5`**, no cajas anidadas con borde salvo toggles opt-in
+- Grid `sm:grid-cols-2` para campos cortos; temperatura/dimensiones en columna compartida
+- Espaciado vertical del cuerpo: `space-y-4` o `space-y-5` (nunca `space-y-8` en forms)
+- Padding sección: `px-5 py-5 sm:px-6` (no `py-6` + header extra si ya hay título de sección)
+- Clases compartidas: `frontend/src/pages/settingsUiClasses.ts`
+- CTAs al **final de cada sección** o barra sticky; botón primary + outline test
+
+**DON'T**
+
+- ❌ `panelIntroClass` (hero `rounded-3xl p-6`) **+** `sectionShellClass` con otro título repetido
+- ❌ Sub-cards boxed dentro de boxed (`settingsFormSubsectionClass` anidado × N)
+- ❌ Copiar layout de Profile/RepoDetail verbatim en settings (genera scroll excesivo)
+- ❌ `hover:shadow-md` en cada bloque de formulario
+
+**Referencia objetivo:** densidad tipo Linear/Vercel settings — una columna `max-w-3xl`, poco aire vertical muerto.
+
+Clases canónicas (settings):
+
+```tsx
+// Página
+'mx-auto max-w-3xl space-y-5 pb-8'
+
+// Sección (LLM, Forge)
+sectionShellClass + sectionHeaderClass  // solo si el bloque es grande (>6 campos)
+
+// Subsección interna
+'space-y-4 border-t border-[var(--border)] pt-5 first:border-t-0 first:pt-0'
+
+// Toggle opt-in (The Forge, router LLM)
+settingsToggleFieldClass
+```
+
 ---
 
 ## Componentes
