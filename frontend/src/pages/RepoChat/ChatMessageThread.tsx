@@ -5,6 +5,7 @@ import { ChatPromptChips } from '@/components/ChatPromptChips';
 import type { ChatPromptTemplate } from '@/utils/chat-prompt-templates';
 import { cn } from '@/lib/utils';
 import { ChatAssistantContent } from './ChatAssistantContent';
+import { ChatCopyMarkdownButton } from './ChatCopyMarkdownButton';
 import {
   chatBubbleAssistantClass,
   chatBubbleUserClass,
@@ -52,10 +53,26 @@ export function ChatMessageThread(props: {
       ) : null}
 
       {props.messages.map((m, i) => (
-        <div key={i} className={cn('flex flex-col gap-1', m.role === 'user' ? 'items-end' : 'items-start')}>
-          <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-            {m.role === 'user' ? 'Tú' : 'Ariadne'}
-          </span>
+        <div
+          key={i}
+          className={cn(
+            'flex w-full flex-col gap-1',
+            m.role === 'user' ? 'items-end' : 'items-start',
+          )}
+        >
+          <div
+            className={cn(
+              'flex w-full max-w-full items-center gap-2 px-1',
+              m.role === 'user' ? 'justify-end' : 'justify-between',
+            )}
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
+              {m.role === 'user' ? 'Tú' : 'Ariadne'}
+            </span>
+            {m.role === 'assistant' ? (
+              <ChatCopyMarkdownButton content={m.content} cypher={m.cypher} />
+            ) : null}
+          </div>
           <div className={m.role === 'user' ? chatBubbleUserClass : chatBubbleAssistantClass}>
             {m.role === 'assistant' ? (
               <ChatAssistantContent content={m.content} />
