@@ -106,6 +106,7 @@ import {
   extractLikelyRepoRelativePaths,
   prioritizeModificationPlanFiles,
 } from './modification-plan-path-hints.util';
+import { ModificationPlanEvidenceService } from './modification-plan-evidence.service';
 import { observeChatPipelineComplete, recordChatPipelineError } from '../metrics/ingest-metrics';
 import {
   analyzeCacheDisabledFromEnv,
@@ -251,6 +252,10 @@ export interface ModificationPlanResult {
   questionsToRefine: string[];
   warnings?: string[];
   diagnostic?: ModificationPlanDiagnostic;
+  /** Graph-backed evidence per file (symbols, dependents, props, APIs). */
+  graphEvidenceBundle?: import('./modification-plan-evidence.types').GraphEvidenceBundle;
+  /** Deterministic ChangePlan seed for Gate 2 / Forge (tasks pre-populated). */
+  changePlanTemplate?: import('../plan-validation/change-plan-validation.types').ChangePlan;
 }
 
 export type { ModificationPlanDiagnostic } from './modification-plan-resolve.util';
@@ -422,6 +427,7 @@ export class ChatService {
     @InjectRepository(IndexedFile)
     private readonly indexedFileRepo: Repository<IndexedFile>,
     private readonly analyzeDistributedCache: AnalyzeDistributedCacheService,
+    private readonly modificationPlanEvidence: ModificationPlanEvidenceService,
   ) {}
 
   private async getIndexFingerprintForAnalyzeCache(
@@ -965,7 +971,14 @@ Sé conciso en los párrafos pedagógicos. Usa bullet points y tablas. Incluye T
           }),
         });
         if (!res.ok) throw new Error(`orchestrator ${res.status}: ${await res.text()}`);
-        return (await res.json()) as ModificationPlanResult;
+        const data = (await res.json()) as ModificationPlanResult;
+        const resolved = await this.resolveModificationPlanRepositoryId(
+          projectIdOrRepoId,
+          scope,
+          currentFilePath,
+        );
+        const anchorId = resolved.ok ? resolved.repositoryId : projectIdOrRepoId;
+        return this.attachModificationPlanEvidence(anchorId, userDescription, data);
       } catch {
         /* fallback local */
       }
@@ -1103,6 +1116,33 @@ Sé conciso en los párrafos pedagógicos. Usa bullet points y tablas. Incluye T
     if (scope) {
       filesToModify = filesToModify.filter((f) => matchesChatScope(f.path, f.repoId, scope));
     }
+
+    // Impact expansion: CALLS / IMPORTS / RENDERS neighborhood, ranked by blast radius.
+    const expandMax = (() => {
+      const cfgMax = getActiveSystemConfig().chat.modificationPlanMaxFiles;
+      const raw = process.env.MODIFICATION_PLAN_MAX_FILES?.trim();
+      const n = raw ? parseInt(raw, 10) : cfgMax;
+      if (!Number.isFinite(n) || n < 1) return Math.min(cfgMax, 200);
+      return Math.min(n, 2000);
+    })();
+    if (filesToModify.length > 0) {
+      try {
+        const ranked = await this.modificationPlanEvidence.expandAndRankByImpact(
+          projectId,
+          filesToModify,
+          expandMax,
+        );
+        let expanded = ranked.map((r) => ({ path: r.path, repoId: r.repoId }));
+        expanded = expanded.filter((f) => restrictRepos.has(f.repoId));
+        if (scope) {
+          expanded = expanded.filter((f) => matchesChatScope(f.path, f.repoId, scope));
+        }
+        if (expanded.length > 0) filesToModify = expanded;
+      } catch {
+        /* keep term/semantic seeds */
+      }
+    }
+
     return filesToModify;
   }
 
@@ -1174,7 +1214,8 @@ Máximo 6 líneas útiles. En español.`;
           }),
         });
         if (!res.ok) throw new Error(`orchestrator ${res.status}: ${await res.text()}`);
-        return (await res.json()) as ModificationPlanResult;
+        const data = (await res.json()) as ModificationPlanResult;
+        return this.attachModificationPlanEvidence(repositoryId, userDescription, data);
       } catch {
         /* fallback local */
       }
@@ -1224,12 +1265,48 @@ Máximo 6 líneas útiles. En español.`;
       );
     }
 
-    return {
+    return this.attachModificationPlanEvidence(repositoryId, userDescription, {
       filesToModify,
       questionsToRefine,
       ...(warnings.length > 0 ? { warnings } : {}),
       ...(diagnostic ? { diagnostic } : {}),
-    };
+    });
+  }
+
+  /** Attach graphEvidenceBundle + changePlanTemplate when missing (Gate 1 / orch passthrough). */
+  private async attachModificationPlanEvidence(
+    repositoryOrProjectId: string,
+    userDescription: string,
+    base: ModificationPlanResult,
+  ): Promise<ModificationPlanResult> {
+    if (base.filesToModify.length === 0) return base;
+    if (base.graphEvidenceBundle && base.changePlanTemplate) return base;
+    try {
+      const projectId = await this.resolveProjectIdForRepo(repositoryOrProjectId);
+      const rankedHint = base.filesToModify.map((f, i) => ({
+        ...f,
+        impactScore: Math.max(1, base.filesToModify.length - i) * 10,
+      }));
+      const graphEvidenceBundle =
+        base.graphEvidenceBundle ??
+        (await this.modificationPlanEvidence.buildEvidenceBundle(projectId, rankedHint));
+      const changePlanTemplate =
+        base.changePlanTemplate ??
+        this.modificationPlanEvidence.buildChangePlanSeed({
+          projectId,
+          changeDescription: userDescription,
+          source: 'mcp',
+          filesToModify: base.filesToModify,
+          bundle: graphEvidenceBundle,
+          questionsToRefine: base.questionsToRefine,
+        });
+      return { ...base, graphEvidenceBundle, changePlanTemplate };
+    } catch (err) {
+      this.logger.warn(
+        `modification-plan evidence skipped: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return base;
+    }
   }
 
   /** Diagnóstico de deuda técnica (scope opcional; validación de paths vía `DIAGNOSTICO_VALIDATE_PATHS`). */

@@ -18,6 +18,7 @@ import { InternalChatToolsController } from './internal-chat-tools.controller';
 import { InternalProjectToolsController } from './internal-project-tools.controller';
 import { ChangePlanValidationService } from '../plan-validation/change-plan-validation.service';
 import { DesignSystemLinkService } from '../pipeline/design-system-link.service';
+import { ModificationPlanEvidenceService } from './modification-plan-evidence.service';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { ProjectsModule } from '../projects/projects.module';
@@ -60,8 +61,9 @@ import { TheForgeModule } from '../theforge/theforge.module';
     ChangePlanValidationService,
     DesignSystemLinkService,
     ChatConversationService,
+    ModificationPlanEvidenceService,
   ],
-  exports: [ChatService, DesignSystemLinkService],
+  exports: [ChatService, DesignSystemLinkService, ModificationPlanEvidenceService, ChangePlanValidationService],
 })
 /** Módulo del chat con grafo FalkorDB (preguntas en NL, Cypher, análisis). */
 export class ChatModule {}

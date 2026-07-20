@@ -15,6 +15,8 @@ JSON que **Ariadne** envía a The Forge al promover una conversación de chat (`
 | `change` | Intención del cambio desde el hilo |
 | `mdd` | MDD 7§ (evidencia as-is) |
 | `modificationPlan` | `{ filesToModify: [{ path, repoId? }], questionsToRefine? }` |
+| `graphEvidenceBundle` | Evidencia por archivo (símbolos, dependents, props, APIs) |
+| `changePlanSeed` | `ChangePlan` con tasks pre-sembrados (fase/criterio/evidencia) |
 | `deliverablesRequested` | Ver enum abajo |
 
 ### `ariadne`
@@ -54,4 +56,15 @@ JSON que **Ariadne** envía a The Forge al promover una conversación de chat (`
 
 HTTP: `POST /theforge/create-stage-from-ariadne-change-pack` — ver `docs/contracts/theforge-create-stage-from-pack-v1.md`.
 
-El mapper `forge-create-stage.mapper.ts` transforma este JSON interno al `pack.version: "1"` de Forge.
+El mapper `forge-create-stage.mapper.ts` transforma este JSON interno al `pack.version: "1"` de Forge e incluye handoff items:
+
+| `kind` | Contenido |
+|--------|-----------|
+| `mdd_evidence` | MDD JSON |
+| `modification_plan_enriched` | `graphEvidenceBundle` |
+| `change_plan_seed` | `changePlanSeed` |
+| `post_deliverable_gate` | Instrucción + endpoint `validate-tasks-json` (si hay `migration_tasks`) |
+| `deliverable_request` | Cada deliverable pedido |
+| `er_diagram` | Mermaid si existe |
+
+Tras `legacy_generate_deliverables`, Forge debe llamar `POST /projects/:id/validate-tasks-json` y **bloquear** si `verdict === BLOCKED`.

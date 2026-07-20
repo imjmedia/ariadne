@@ -799,6 +799,27 @@ function createMcpServer(): Server {
         additionalProperties: true,
       },
     },
+    {
+      name: "validate_tasks_json",
+      description:
+        "Gate 2 post-deliverable: mapea Forge tasksJson (migration_tasks) a ChangePlan y valida contra el grafo. Si verdict===BLOCKED, no aceptar el deliverable. Usar tras legacy_generate_deliverables.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: {
+            type: "string",
+            description: "ID de proyecto Ariadne o roots[].id",
+          },
+          tasksJson: {
+            type: "object",
+            description: "Payload tasksJson v2 de Forge (o { tasks: [...] })",
+          },
+          changeDescription: { type: "string" },
+        },
+        required: ["projectId", "tasksJson"],
+        additionalProperties: true,
+      },
+    },
     // --- Refactorización segura (árbol de llamadas) ---
     {
       name: "get_definitions",
@@ -2868,35 +2889,48 @@ async function fetchFileFromIngest(
         questionsToRefine: string[];
         warnings?: string[];
         diagnostic?: { code: string; message: string; candidates?: unknown[] };
+        graphEvidenceBundle?: unknown;
+        changePlanTemplate?: {
+          schemaVersion?: string;
+          source?: string;
+          projectId?: string;
+          changeDescription?: string;
+          referencePlan?: unknown;
+          files?: Array<{ path: string; repoId?: string; changeType?: string; symbols?: string[] }>;
+          tasks?: unknown[];
+        };
       };
       const filesToModify = data.filesToModify ?? [];
       const questionsToRefine = data.questionsToRefine ?? [];
+      const changePlanTemplate = data.changePlanTemplate ?? {
+        schemaVersion: "1.0",
+        source: "cursor",
+        projectId,
+        changeDescription: userDescription,
+        referencePlan: { filesToModify, questionsToRefine },
+        files: filesToModify.map((f) => ({
+          path: f.path,
+          repoId: f.repoId,
+          changeType: "modify",
+          symbols: [],
+        })),
+        tasks: [],
+      };
       const text = JSON.stringify(
         {
           filesToModify,
           questionsToRefine,
-          changePlanTemplate: {
-            schemaVersion: "1.0",
-            source: "cursor",
-            projectId,
-            changeDescription: userDescription,
-            referencePlan: { filesToModify, questionsToRefine },
-            files: filesToModify.map((f) => ({
-              path: f.path,
-              repoId: f.repoId,
-              changeType: "modify",
-              symbols: [],
-            })),
-            tasks: [],
-          },
+          changePlanTemplate,
+          ...(data.graphEvidenceBundle ? { graphEvidenceBundle: data.graphEvidenceBundle } : {}),
           ...(data.warnings?.length ? { warnings: data.warnings } : {}),
           ...(data.diagnostic ? { diagnostic: data.diagnostic } : {}),
         },
         null,
         2,
       );
+      const taskCount = Array.isArray(changePlanTemplate.tasks) ? changePlanTemplate.tasks.length : 0;
       const hint = filesToModify.length > 0
-        ? "\n\nUsa `changePlanTemplate` como base para Gate 2 (`validate_change_plan`). Cada archivo en `filesToModify` incluye `path` y `repoId`."
+        ? `\n\nUsa \`changePlanTemplate\` (tasks=${taskCount}, symbols pre-poblados) como base para Gate 2 (\`validate_change_plan\`). Cada archivo incluye \`path\` y \`repoId\`.`
         : "\n\nGate 2: tras editar el plan, llama `validate_change_plan` antes de modificar código.";
       return { content: [{ type: "text", text: text + hint }] };
     } catch (err) {
@@ -2961,6 +2995,51 @@ async function fetchFileFromIngest(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: "text", text: `**Error:** validate_change_plan: ${msg}` }], isError: true };
+    }
+  }
+
+  if (name === "validate_tasks_json") {
+    const projectId = args?.projectId as string | undefined;
+    const tasksJson = args?.tasksJson;
+    if (!projectId) {
+      return {
+        content: [{ type: "text", text: "**Error:** Se requiere `projectId`. Usa list_known_projects." }],
+        isError: true,
+      };
+    }
+    if (tasksJson == null) {
+      return {
+        content: [{ type: "text", text: "**Error:** Se requiere `tasksJson` (objeto Forge o `{ tasks: [...] }`)." }],
+        isError: true,
+      };
+    }
+    const ingestUrl = process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002";
+    const url = `${ingestUrl.replace(/\/$/, "")}/projects/${encodeURIComponent(projectId)}/validate-tasks-json`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tasksJson,
+          changeDescription: args?.changeDescription,
+        }),
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        return { content: [{ type: "text", text: `**Error ${res.status}:** ${msg || res.statusText}` }], isError: true };
+      }
+      const data = await res.json();
+      const verdict = (data as { verdict?: string }).verdict;
+      const hint =
+        verdict === "BLOCKED"
+          ? "\n\n**BLOCKED** — no aceptar migration_tasks; corregir tasksJson y revalidar."
+          : "";
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) + hint }],
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: "text", text: `**Error:** validate_tasks_json: ${msg}` }], isError: true };
     }
   }
 

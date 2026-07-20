@@ -267,6 +267,8 @@ export class ChangePlanValidationService {
       }
     }
 
+    await this.validateTaskSemantics(graphProjectId, plan, checks, warnings, blockers, suggestedFixes);
+
     for (const api of plan.apiChanges ?? []) {
       const method = (api.method ?? 'GET').toUpperCase();
       if (api.changeType === 'remove') {
@@ -330,10 +332,155 @@ export class ChangePlanValidationService {
         symbols: f.symbols,
       })),
       apiChanges: raw.apiChanges,
-      tasks: raw.tasks,
+      tasks: (raw.tasks ?? []).map((t) => ({
+        id: t.id,
+        title: t.title,
+        files: (t.files ?? []).map((f) => normalizePath(f)),
+        symbols: t.symbols,
+        endpoints: t.endpoints,
+        phase: t.phase,
+        criterion: t.criterion,
+        evidence: t.evidence,
+        dependsOn: t.dependsOn,
+      })),
       referencePlan: raw.referencePlan,
       scope: raw.scope,
     };
+  }
+
+  /**
+   * Validates optional task fields: dependsOn refs, evidence citations, criterion presence.
+   */
+  private async validateTaskSemantics(
+    graphProjectId: string,
+    plan: ChangePlan,
+    checks: PlanValidationCheck[],
+    warnings: string[],
+    blockers: string[],
+    suggestedFixes: { checkId: string; action: string }[],
+  ): Promise<void> {
+    const tasks = plan.tasks ?? [];
+    if (tasks.length === 0) return;
+
+    const taskIds = new Set(tasks.map((t) => t.id).filter((id): id is string => Boolean(id)));
+    const missingDepends: string[] = [];
+    for (const t of tasks) {
+      for (const dep of t.dependsOn ?? []) {
+        if (!taskIds.has(dep)) missingDepends.push(`${t.id ?? t.title}→${dep}`);
+      }
+    }
+    if (missingDepends.length > 0) {
+      checks.push({
+        id: 'TASK_DEPENDS_ON',
+        status: 'fail',
+        message: `dependsOn references unknown task id(s): ${missingDepends.slice(0, 5).join(', ')}`,
+      });
+      blockers.push('TASK_DEPENDS_ON: unknown task ids in dependsOn');
+      suggestedFixes.push({
+        checkId: 'TASK_DEPENDS_ON',
+        action: 'Align dependsOn with existing task.id values.',
+      });
+    } else if (tasks.some((t) => (t.dependsOn?.length ?? 0) > 0)) {
+      checks.push({
+        id: 'TASK_DEPENDS_ON',
+        status: 'pass',
+        message: 'All dependsOn references resolve to task ids',
+      });
+    }
+
+    const withoutCriterion = tasks.filter((t) => !t.criterion?.trim());
+    if (withoutCriterion.length > 0) {
+      checks.push({
+        id: 'TASK_CRITERION',
+        status: 'warn',
+        message: `${withoutCriterion.length} task(s) missing criterion`,
+      });
+      warnings.push('Some tasks lack acceptance criteria (criterion)');
+    } else {
+      checks.push({
+        id: 'TASK_CRITERION',
+        status: 'pass',
+        message: 'All tasks include criterion',
+      });
+    }
+
+    const withoutPhase = tasks.filter((t) => !t.phase?.trim());
+    if (withoutPhase.length > 0) {
+      checks.push({
+        id: 'TASK_PHASE',
+        status: 'warn',
+        message: `${withoutPhase.length} task(s) missing phase`,
+      });
+      warnings.push('Some tasks lack phase');
+    }
+
+    const unresolvedEvidence: string[] = [];
+    const indexedPaths =
+      tasks.some((t) => (t.evidence ?? []).some((e) => e.kind === 'path'))
+        ? await this.loadIndexedPaths(graphProjectId)
+        : new Set<string>();
+    for (const t of tasks) {
+      for (const ev of t.evidence ?? []) {
+        const ref = (ev.ref ?? '').trim();
+        if (!ref) continue;
+        if (ev.kind === 'path') {
+          if (!this.pathExistsInIndex(normalizePath(ref), indexedPaths)) {
+            unresolvedEvidence.push(`path:${ref}`);
+          }
+        } else if (ev.kind === 'symbol') {
+          const ok = await this.symbolExistsInProject(graphProjectId, ref);
+          if (!ok) unresolvedEvidence.push(`symbol:${ref}`);
+        } else if (ev.kind === 'endpoint') {
+          const parts = ref.split(/\s+/);
+          const method = (parts[0] ?? 'GET').toUpperCase();
+          const path = parts.slice(1).join(' ') || parts[0] || '';
+          if (path) {
+            const exists = await this.endpointExists(graphProjectId, method, path);
+            if (!exists) unresolvedEvidence.push(`endpoint:${ref}`);
+          }
+        } else if (ev.kind === 'prop') {
+          const [comp, propName] = ref.split('.');
+          if (comp && propName) {
+            const ok = await this.propExists(graphProjectId, comp, propName);
+            if (!ok) unresolvedEvidence.push(`prop:${ref}`);
+          }
+        }
+      }
+    }
+
+    if (unresolvedEvidence.length > 0) {
+      checks.push({
+        id: 'TASK_EVIDENCE',
+        status: 'warn',
+        message: `${unresolvedEvidence.length} evidence ref(s) not found in graph`,
+        paths: unresolvedEvidence.slice(0, 10),
+      });
+      warnings.push(`Unresolved task evidence: ${unresolvedEvidence.slice(0, 3).join(', ')}`);
+      suggestedFixes.push({
+        checkId: 'TASK_EVIDENCE',
+        action: 'Cite only paths/symbols/endpoints/props present in the index, or refresh sync.',
+      });
+    } else if (tasks.some((t) => (t.evidence?.length ?? 0) > 0)) {
+      checks.push({
+        id: 'TASK_EVIDENCE',
+        status: 'pass',
+        message: 'Task evidence refs resolve in graph',
+      });
+    }
+  }
+
+  private async propExists(projectId: string, component: string, propName: string): Promise<boolean> {
+    try {
+      const rows = (await this.cypher.executeCypher(
+        projectId,
+        `MATCH (c:Component {name: $component, projectId: $projectId})-[:HAS_PROP]->(p:Prop {name: $propName})
+         RETURN p.name AS name LIMIT 1`,
+        { component, propName },
+      )) as Array<{ name: string }>;
+      return rows.length > 0;
+    } catch {
+      return false;
+    }
   }
 
   private async resolveGraphProjectId(projectOrRepoId: string): Promise<string | null> {

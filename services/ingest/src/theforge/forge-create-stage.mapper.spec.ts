@@ -37,7 +37,7 @@ function samplePack(): ChangePromotionPackV1 {
       filesToModify: [{ path: 'src/db/schema.ts', repoId: 'repo-1' }],
       questionsToRefine: ['¿Soft delete en medios?'],
     },
-    deliverablesRequested: ['change_spec', 'data_model'],
+    deliverablesRequested: ['change_spec', 'data_model', 'migration_tasks'],
   };
 }
 
@@ -50,6 +50,46 @@ describe('forge-create-stage.mapper', () => {
     expect(forgePack.filesToModify).toHaveLength(1);
     expect(forgePack.questionsToRefine).toEqual(['¿Soft delete en medios?']);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'mdd_evidence')).toBe(true);
+  });
+
+  it('includes enriched evidence and post_deliverable_gate for migration_tasks', () => {
+    const pack = samplePack();
+    pack.graphEvidenceBundle = {
+      schemaVersion: '1.0',
+      generatedAt: '2026-07-20T00:00:00.000Z',
+      projectId: 'proj-1',
+      files: [
+        {
+          path: 'src/db/schema.ts',
+          repoId: 'repo-1',
+          symbols: ['Media'],
+          dependents: [{ symbol: 'Media', count: 2, breakingRisk: 'low' }],
+          props: [],
+          apiTouches: [],
+          impactScore: 10,
+        },
+      ],
+    };
+    pack.changePlanSeed = {
+      schemaVersion: '1.0',
+      projectId: 'proj-1',
+      source: 'theforge',
+      files: [{ path: 'src/db/schema.ts', changeType: 'modify', symbols: ['Media'] }],
+      tasks: [
+        {
+          id: 'T1',
+          title: 'Actualizar Media',
+          files: ['src/db/schema.ts'],
+          symbols: ['Media'],
+          phase: '1-core',
+          criterion: 'Keep Media contract',
+        },
+      ],
+    };
+    const forgePack = toForgeChangePackV1(pack);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'modification_plan_enriched')).toBe(true);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'change_plan_seed')).toBe(true);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'post_deliverable_gate')).toBe(true);
   });
 
   it('buildForgeChangeDescription includes decisions and ERD', () => {

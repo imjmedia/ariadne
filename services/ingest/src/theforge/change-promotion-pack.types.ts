@@ -48,6 +48,10 @@ export interface ChangePromotionPackV1 {
     filesToModify: ChangePromotionPlanFile[];
     questionsToRefine?: string[];
   };
+  /** Per-file graph evidence for Forge task generation (P0). */
+  graphEvidenceBundle?: import('../chat/modification-plan-evidence.types').GraphEvidenceBundle;
+  /** Pre-seeded ChangePlan (tasks with phase/criterion/evidence). */
+  changePlanSeed?: import('../plan-validation/change-plan-validation.types').ChangePlan;
   deliverablesRequested: ForgeDeliverableKind[];
 }
 

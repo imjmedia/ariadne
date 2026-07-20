@@ -26,6 +26,10 @@ const report = await validate_change_plan({
 });
 // if report.verdict === "BLOCKED" → STOP
 
+// Tras Forge legacy_generate_deliverables:
+// await validate_tasks_json({ projectId, tasksJson })
+// if BLOCKED → no aceptar migration_tasks
+
 await validate_before_edit({ nodeName: "Foo", projectId: "<repo-id>" });
 await get_references({ symbolName: "Foo", projectId: "<repo-id>" });
 // edit …
