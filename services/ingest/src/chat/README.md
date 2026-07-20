@@ -71,6 +71,7 @@ Sin `ORCHESTRATOR_URL`, el pipeline unificado legacy sigue en este servicio (`ru
 | `ORCHESTRATOR_LLM_MODEL` | No | `LLM_CHAT_MODEL` → default | Modelo específico para orchestrator |
 | `LLM_TEMPERATURE` | No | `0.1` | Temperatura del modelo |
 | `CHAT_TOOL_CALL_MAX_TOKENS` | No | `8192` | Máx tokens en fase tool calling |
+| `FALKOR_QUERY_CONCURRENCY` | No | `6` | Máx Cypher concurrentes en ingest (chat); evita `Max pending queries exceeded` |
 
 **Grounding (pipeline unificado `runUnifiedPipeline`):** el Synthesizer exige sección **## Evidencia** cuando se citan rutas; sin datos en contexto → mensaje **sin datos en índice para este alcance**. Si el retriever devuelve texto con un bloque fenced `cypher` pero sin `tool_calls`, se intenta **una ejecución fallback** de esa consulta antes de pasar al sintetizador. Fase 1→2: bloque JSON `retrieval_summary` antes del contexto bruto (`CHAT_TWO_PHASE`, desactivar con `0|false|off`). Filtros multi-root: `chat-scope.util.ts` (`hasExplicitChatScopeNarrowing`). Telemetría: `CHAT_TELEMETRY_LOG=1` o `true` — log JSON por request con `pathGroundingRatio`, `chat_scope_effective` (`preflightPathRepoApplied`, `inferred`, `scopeFilterActive`, etc.); ver **`docs/notebooklm/metricas-alcance-chat.md`**. Plan de modificación: tope `MODIFICATION_PLAN_MAX_FILES` (default 150).
 

@@ -1,7 +1,6 @@
 /**
  * @fileoverview Helper para consultar el grafo Ariadne (FalkorDB) desde el Review Engine.
- * Implementa lazy connect: la conexión se abre bajo demanda y se cierra tras la consulta.
- * Reutiliza las mismas configs de ariadne-common que el resto del sistema.
+ * Cliente compartido + semáforo (evita Max pending queries / crash por socket sin listener).
  */
 import { FalkorDB } from 'falkordb';
 import {
@@ -9,30 +8,61 @@ import {
   GRAPH_NAME,
   isProjectShardingEnabled,
   graphNameForProject,
-  listGraphNamesForProjectRouting,
 } from 'ariadne-common';
 import { LegacyImpact } from './types';
+import { AsyncSemaphore } from '../pipeline/async-semaphore';
+
+type FalkorClient = Awaited<ReturnType<typeof FalkorDB.connect>>;
+
+let sharedClient: FalkorClient | null = null;
+let connecting: Promise<FalkorClient> | null = null;
+const impactSemaphore = new AsyncSemaphore(4);
+
+async function getSharedClient(): Promise<FalkorClient | null> {
+  const config = getFalkorConfig();
+  if (!config.host) return null;
+  if (sharedClient) return sharedClient;
+  if (connecting) return connecting;
+  connecting = (async () => {
+    const c = await FalkorDB.connect({
+      pingInterval: 30_000,
+      socket: {
+        host: config.host,
+        port: config.port,
+        ...({
+          reconnectStrategy: (retries: number) => {
+            if (retries > 100) return new Error('[ingest-review] FalkorDB reconnection limit exceeded');
+            return Math.min(retries * 50, 2_000);
+          },
+        } as object),
+      },
+    });
+    c.on('error', (err: Error) => {
+      console.error('[ingest-review] FalkorDB client error:', err?.message ?? err);
+    });
+    sharedClient = c;
+    return c;
+  })();
+  try {
+    return await connecting;
+  } finally {
+    connecting = null;
+  }
+}
 
 /**
  * Consulta el impacto legacy de un nombre de nodo (componente, función, hook, modelo).
- * @param nodeName - Nombre del nodo a consultar.
- * @param projectId - UUID del proyecto Ariadne (opcional, para filtrar).
- * @returns Información de impacto legacy.
  */
 export async function queryLegacyImpact(
   nodeName: string,
   projectId?: string,
 ): Promise<LegacyImpact> {
-  const config = getFalkorConfig();
-  if (!config.host) {
-    return { dependents: 0, files: [], breakingRisk: 'low' };
-  }
-
-  try {
-    const client = await FalkorDB.connect({
-      socket: { host: config.host, port: config.port },
-    });
+  return impactSemaphore.run(async () => {
     try {
+      const client = await getSharedClient();
+      if (!client) {
+        return { dependents: 0, files: [], breakingRisk: 'low' };
+      }
       const allDependents = new Map<string, string>();
       const graphNames = resolveGraphNames(projectId);
 
@@ -40,7 +70,6 @@ export async function queryLegacyImpact(
         const graph = client.selectGraph(gName);
         const params: Record<string, string> = { nodeName };
 
-        // Construir WHERE dinámico
         const whereClauses: string[] = [];
         if (projectId) {
           params.projectId = projectId;
@@ -51,9 +80,8 @@ export async function queryLegacyImpact(
         }
         const whereStr = whereClauses.length > 0 ? ` WHERE ${whereClauses.join(' AND ')}` : '';
 
-        // Query principal: dependientes directos (CALLS, RENDERS, IMPORTS)
         const q = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS|IMPORTS*]-(dependent)${whereStr} RETURN dependent.name AS name, labels(dependent) AS labels LIMIT 50`;
-        const result = await graph.query(q, { params }) as { data?: unknown[][] };
+        const result = (await graph.query(q, { params })) as { data?: unknown[][] };
         const rows = result.data ?? [];
 
         for (const row of rows) {
@@ -63,11 +91,10 @@ export async function queryLegacyImpact(
           }
         }
 
-        // Query adicional: hooks usados por componentes
         if (!projectId) {
           const hookQ = `MATCH (h:Hook {name: $nodeName})<-[:USES_HOOK]-(consumer:Component) RETURN consumer.name AS name, labels(consumer) AS labels LIMIT 20`;
-          const hookResult = await graph.query(hookQ, { params }) as { data?: unknown[][] };
-          for (const row of (hookResult.data ?? [])) {
+          const hookResult = (await graph.query(hookQ, { params })) as { data?: unknown[][] };
+          for (const row of hookResult.data ?? []) {
             const name = String(row[0] ?? '');
             if (name && !allDependents.has(name)) {
               allDependents.set(name, String(row[1] ?? ''));
@@ -84,49 +111,37 @@ export async function queryLegacyImpact(
         files,
         breakingRisk: count > 10 ? 'high' : count > 3 ? 'medium' : 'low',
       };
-    } finally {
-      await client.close();
+    } catch {
+      return { dependents: 0, files: [], breakingRisk: 'low' };
     }
-  } catch (err) {
-    // Falkor no disponible — retornar sin impacto
-    return { dependents: 0, files: [], breakingRisk: 'low' };
-  }
+  });
 }
 
-/**
- * Resuelve los nombres de los grafos Falkor a consultar.
- * Con sharding: todos los shards del proyecto. Sin sharding: el grafo principal.
- */
 function resolveGraphNames(projectId?: string): string[] {
   if (isProjectShardingEnabled() && projectId) {
     return [graphNameForProject(projectId)];
-  }
-  if (isProjectShardingEnabled() && !projectId) {
-    return [GRAPH_NAME];
   }
   return [GRAPH_NAME];
 }
 
 /**
- * Consulta el impacto legacy para MÚLTIPLES nombres de nodo.
- * Útil cuando un diff modifica varios archivos — ejecuta en paralelo.
+ * Impacto legacy para varios nombres — secuencial por lotes (no Promise.all masivo).
  */
 export async function queryBatchLegacyImpact(
   nodeNames: string[],
   projectId?: string,
 ): Promise<Map<string, LegacyImpact>> {
-  const results = await Promise.allSettled(
-    nodeNames.map(async (name) => {
-      const impact = await queryLegacyImpact(name, projectId);
-      return { name, impact };
-    }),
-  );
-
   const map = new Map<string, LegacyImpact>();
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      map.set(r.value.name, r.value.impact);
-    }
+  const batchSize = 4;
+  for (let i = 0; i < nodeNames.length; i += batchSize) {
+    const batch = nodeNames.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map(async (name) => {
+        const impact = await queryLegacyImpact(name, projectId);
+        return { name, impact };
+      }),
+    );
+    for (const r of results) map.set(r.name, r.impact);
   }
   return map;
 }

@@ -8,7 +8,10 @@ services:
     container_name: ariadnespecs-db
     # Evita MISCONF durante reindex pesado: BGSAVE falla si el grafo no está sincronizado (matrices GraphBLAS).
     environment:
+      # Evita MISCONF durante reindex pesado: BGSAVE falla si el grafo no está sincronizado (matrices GraphBLAS).
       REDIS_ARGS: '--save "" --stop-writes-on-bgsave-error no'
+      # Tras arrancar, si hay ráfagas de Cypher: redis-cli GRAPH.CONFIG SET MAX_QUEUED_QUERIES 2048
+
     volumes:
       - falkordb_data:/data
     networks:

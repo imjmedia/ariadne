@@ -32,6 +32,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { ReviewModule } from './review/review.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { SharedBullModule } from './shared-bull/shared-bull.module';
+import { FalkorClientModule } from './pipeline/falkor-client.module';
 import { AnalysisModule } from './analysis/analysis.module';
 import { LlmSettingsModule } from './llm-settings/llm-settings.module';
 import { LlmSettingsEntity } from './llm-settings/entities/llm-settings.entity';
@@ -48,6 +49,7 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
   imports: [
     MetricsModule,
     EmbeddingModule,
+    FalkorClientModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.PGHOST ?? 'localhost',

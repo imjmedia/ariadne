@@ -21,9 +21,9 @@ import type {
 import type { ChangePlan, ChangePlanTask } from '../plan-validation/change-plan-validation.types';
 import { CHANGE_PLAN_SCHEMA_VERSION } from '../plan-validation/change-plan-validation.types';
 
-const DEFAULT_EVIDENCE_MAX = 40;
-const DEFAULT_EXPAND_SEED_LIMIT = 25;
-const SYMBOLS_PER_FILE = 8;
+const DEFAULT_EVIDENCE_MAX = 20;
+const DEFAULT_EXPAND_SEED_LIMIT = 15;
+const SYMBOLS_PER_FILE = 6;
 
 function envInt(name: string, fallback: number, max: number): number {
   const raw = process.env[name]?.trim();
