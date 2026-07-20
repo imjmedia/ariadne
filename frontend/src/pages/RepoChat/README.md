@@ -38,7 +38,9 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **ChatRepoHeader.tsx** | Wrapper repo → ChatPageHeader |
 | **ChatForgePromoteDialog.tsx** | Modal promover conversación → etapa The Forge |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
-| **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable |
+| **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable, **Copiar Markdown** en respuestas |
+| **ChatCopyMarkdownButton.tsx** | Copia la respuesta cruda (GFM + fences `mermaid`/`cypher`) al portapapeles |
+| **chat-markdown-export.util.ts** | Arma el texto Markdown exportable (contenido + Cypher opcional) |
 | **ChatComposer.tsx** | Textarea + Enviar |
 | **ChatAnalysisPanel.tsx** | Vista análisis inline (informes + acciones) |
 | **AnalysisSemaphoreSummary.tsx** | Resumen agregado de semáforos |
