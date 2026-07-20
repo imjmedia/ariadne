@@ -3,7 +3,7 @@
  */
 import type { MddEvidenceDocument } from './mdd-document.types';
 
-const MODEL_PATH_RE = /\/Models\/[^/]+\.(tsx?|ts)$/i;
+const MODEL_PATH_RE = /\/(?:Models|modelsType)\/[^/]+\.(tsx?|ts)$/i;
 /** Cliente OBP: src/api/*.tsx y src/api/queries/*.tsx (excluye árbol Strapi controllers/services/routes). */
 const FRONTEND_API_MODULE_PATH_RE = /\/api\/(?:queries\/)?[^/]+\.(tsx?|ts)$/i;
 const STRAPI_API_TREE_RE = /\/api\/[^/]+\/(content-types|controllers|routes|services)\//i;

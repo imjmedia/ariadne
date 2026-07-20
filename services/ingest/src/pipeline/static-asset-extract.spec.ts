@@ -50,6 +50,35 @@ $primary: blue;
     expect(asset?.htmlDetail?.landmarks).toContain('main');
   });
 
+  it('indexa barrels Sass (@forward/@use) y no omite CSS sin selectores', () => {
+    const barrel = `
+@forward 'buttons';
+@use 'tokens' as *;
+@mixin card { padding: 1rem; }
+`;
+    const r = parseCssSource('src/sass/components/_index.scss', barrel);
+    const asset = r.staticAssets[0];
+    expect(asset?.kind).toBe('css');
+    expect(asset?.cssDetail?.sassDirectives).toEqual(
+      expect.arrayContaining(['@forward buttons', '@use tokens', '@mixin card']),
+    );
+    expect(asset?.tokens).toContain('_index.scss');
+
+    const scrollbar = `
+::-webkit-scrollbar { width: 8px; }
+:root { --scroll: #333; }
+`;
+    const s = parseCssSource('src/styles/scrollbar.scss', scrollbar);
+    expect(s.staticAssets[0]?.cssDetail?.pseudos).toEqual(
+      expect.arrayContaining(['::-webkit-scrollbar', ':root']),
+    );
+    expect(s.staticAssets[0]?.cssDetail?.customProperties).toContain('--scroll');
+
+    const emptyVendor = parseCssSource('src/sass/vendors/_prime-react.scss', '/* prime overrides */\n');
+    expect(emptyVendor.staticAssets).toHaveLength(1);
+    expect(emptyVendor.staticAssets[0]?.tokens).toContain('_prime-react.scss');
+  });
+
   it('parseStaticAssetSource enruta por extensión', () => {
     expect(parseStaticAssetSource('a.css', '.x {}')?.staticAssets[0]?.kind).toBe('css');
     expect(parseStaticAssetSource('a.html', '<div></div>')?.staticAssets[0]?.kind).toBe('html');

@@ -12,6 +12,10 @@ export interface CssIndexDetail {
   imports: string[];
   fontFaces: string[];
   scssVariables: string[];
+  /** `@use` / `@forward` / `@mixin` / `@include` (barrels Sass y partials). */
+  sassDirectives: string[];
+  /** Pseudo-elementos / clases (`::-webkit-scrollbar`, `:root`, …). */
+  pseudos: string[];
 }
 
 export interface HtmlIndexDetail {
@@ -48,6 +52,11 @@ const CSS_KEYFRAMES_RE = /@(?:-webkit-)?keyframes\s+([a-zA-Z0-9_-]+)/g;
 const CSS_LAYER_RE = /@layer\s+([a-zA-Z0-9_.-]+)/g;
 const CSS_IMPORT_RE = /@import\s+(?:url\()?['"]?([^'")\s;]+)/g;
 const CSS_FONT_FACE_RE = /@font-face\s*\{[^}]*font-family\s*:\s*['"]?([^;'"]+)/gi;
+/** Sass module / mixin: `@use 'x'`, `@forward "y"`, `@mixin foo`, `@include bar`. */
+const CSS_SASS_DIRECTIVE_RE =
+  /@(use|forward)\s+['"]([^'"]+)['"]|@(mixin|include)\s+([a-zA-Z_][\w-]*)/g;
+/** `:root`, `::before`, `::-webkit-scrollbar`, etc. */
+const CSS_PSEUDO_RE = /(:{1,2}-?[a-zA-Z_][\w-]*)/g;
 
 const HTML_TAG_RE = /<\/?([a-zA-Z][\w-]*)\b/g;
 const HTML_ID_RE = /\bid\s*=\s*['"]([^'"]+)['"]/gi;
@@ -89,6 +98,8 @@ export function parseCssSource(path: string, source: string): StaticAssetParseRe
   const layers: string[] = [];
   const imports: string[] = [];
   const fontFaces: string[] = [];
+  const sassDirectives: string[] = [];
+  const pseudos: string[] = [];
 
   for (const m of text.matchAll(CSS_CUSTOM_PROP_RE)) {
     if (m[1]) customProperties.push(`--${m[1]}`);
@@ -121,6 +132,13 @@ export function parseCssSource(path: string, source: string): StaticAssetParseRe
   for (const m of text.matchAll(CSS_FONT_FACE_RE)) {
     if (m[1]) fontFaces.push(m[1].trim().slice(0, 80));
   }
+  for (const m of text.matchAll(CSS_SASS_DIRECTIVE_RE)) {
+    if (m[1] && m[2]) sassDirectives.push(`@${m[1]} ${m[2]}`.slice(0, 160));
+    else if (m[3] && m[4]) sassDirectives.push(`@${m[3]} ${m[4]}`.slice(0, 120));
+  }
+  for (const m of text.matchAll(CSS_PSEUDO_RE)) {
+    if (m[1]) pseudos.push(m[1].slice(0, 80));
+  }
 
   const cssDetail: CssIndexDetail = {
     customProperties: uniqSorted(customProperties),
@@ -132,9 +150,13 @@ export function parseCssSource(path: string, source: string): StaticAssetParseRe
     imports: uniqSorted(imports),
     fontFaces: uniqSorted(fontFaces),
     scssVariables: uniqSorted(scssVariables),
+    sassDirectives: uniqSorted(sassDirectives),
+    pseudos: uniqSorted(pseudos),
   };
 
+  const base = path.replace(/\\/g, '/').split('/').pop() ?? path;
   const tokens = uniqSorted([
+    base,
     ...cssDetail.customProperties,
     ...cssDetail.scssVariables,
     ...cssDetail.selectors,
@@ -144,10 +166,12 @@ export function parseCssSource(path: string, source: string): StaticAssetParseRe
     ...cssDetail.layers.map((l) => `@layer ${l}`),
     ...cssDetail.imports.map((i) => `@import ${i}`),
     ...cssDetail.fontFaces.map((f) => `font-face:${f}`),
+    ...cssDetail.sassDirectives,
+    ...cssDetail.pseudos,
   ]);
 
-  if (tokens.length === 0) return { staticAssets: [] };
-
+  // Siempre indexar el stylesheet (barrels `@forward`/`@use`, overrides vendor, etc.).
+  // Antes `tokens.length === 0` → sync lo marcaba como omitido (parse null).
   return {
     staticAssets: [
       {
@@ -155,7 +179,10 @@ export function parseCssSource(path: string, source: string): StaticAssetParseRe
         summary: [
           `CSS ${path}`,
           `${cssDetail.customProperties.length} vars, ${cssDetail.selectors.length} class/id, ${cssDetail.mediaQueries.length} media`,
-        ].join(' · '),
+          cssDetail.sassDirectives.length ? `${cssDetail.sassDirectives.length} sass` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         tokens,
         cssDetail,
       },
@@ -232,7 +259,19 @@ export function parseHtmlSource(path: string, source: string): StaticAssetParseR
     ...(title ? [`title:${title}`] : []),
   ]);
 
-  if (tokens.length === 0) return { staticAssets: [] };
+  if (tokens.length === 0) {
+    const base = path.replace(/\\/g, '/').split('/').pop() ?? path;
+    return {
+      staticAssets: [
+        {
+          kind: 'html',
+          summary: `HTML ${path} · empty/minimal`,
+          tokens: [base],
+          htmlDetail,
+        },
+      ],
+    };
+  }
 
   return {
     staticAssets: [

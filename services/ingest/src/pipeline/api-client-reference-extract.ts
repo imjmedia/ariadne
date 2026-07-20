@@ -1,12 +1,12 @@
 /**
- * Referencias a rutas REST del backend en código frontend (`api/...`, `apiDirection=`, axiosQuery).
+ * Referencias a rutas REST del backend en código frontend (`api/...`, `apiDirection=|:`, axiosQuery).
  * Soporta literales estáticos y prefijos dinámicos (`'api/users/' + id`).
  * Detecta APIs externas SSO/tasks (`tasks.imjmedia.com.mx`, `sso.imjmedia.com.mx`).
  */
 
-/** Literales `'api/foo'`, `"api/bar"`, apiDirection="api/..." */
+/** Literales `'api/foo'`, `"api/bar"`, apiDirection="api/..." | apiDirection: 'api/...' */
 const API_PATH_LITERAL_RE =
-  /(?:apiDirection\s*=\s*|(?:axiosQuery|queryApi)\s*\([^)]*['"]|['"`])(api\/[a-zA-Z0-9_\-/.:{}]+)['"`]/g;
+  /(?:apiDirection\s*[:=]\s*|(?:axiosQuery|queryApi)\s*\([^)]*['"]|['"`])(api\/[a-zA-Z0-9_\-/.:{}]+)['"`]/g;
 
 const STANDALONE_API_LITERAL_RE = /['"`](api\/[a-zA-Z0-9_\-/.:{}]+)['"`]/g;
 
@@ -21,13 +21,20 @@ const CONST_BASE_API_RE = /const\s+[A-Z_][A-Z0-9_]*\s*=\s*['"`](\/api\/[a-zA-Z0-
 
 /** Prefijo dinámico: `'api/users/' + id`, axiosQuery('PUT', 'api/cotizadores/' + x) */
 const API_PATH_PREFIX_CONCAT_RE =
-  /(?:apiDirection\s*=\s*|(?:axiosQuery|queryApi)\s*\([^)]*['"]|['"`])(api\/[a-zA-Z0-9_\-/.]+)\/\s*['"`]\s*\+/g;
+  /(?:apiDirection\s*[:=]\s*|(?:axiosQuery|queryApi)\s*\([^)]*['"]|['"`])(api\/[a-zA-Z0-9_\-/.]+)\/\s*['"`]\s*\+/g;
 
 const API_PATH_PREFIX_NO_SLASH_RE =
-  /(?:apiDirection\s*=\s*|(?:axiosQuery|queryApi)\s*\([^)]*['"]|['"`])(api\/[a-zA-Z0-9_\-/.]+)['"`]\s*\+/g;
+  /(?:apiDirection\s*[:=]\s*|(?:axiosQuery|queryApi)\s*\([^)]*['"]|['"`])(api\/[a-zA-Z0-9_\-/.]+)['"`]\s*\+/g;
 
 /** Template literal parcial: `api/medios/${id}` */
 const API_PATH_TEMPLATE_RE = /`((?:api\/[a-zA-Z0-9_\-/.]+)\/\$\{[^}]+\}[^`]*)`/g;
+
+/** `const path = 'api/foo'` / `let dir = "api/bar"` (bindings locales OBP). */
+const CONST_API_BINDING_RE =
+  /(?:const|let)\s+([A-Za-z_][\w]*)\s*=\s*['"`](api\/[a-zA-Z0-9_\-/.:{}]+)['"`]/g;
+
+/** `apiDirection: someConst` / `apiDirection={someConst}` cuando someConst es binding local. */
+const API_DIRECTION_IDENTIFIER_RE = /apiDirection\s*[:=]\s*\{?\s*([A-Za-z_][\w]*)\s*\}?/g;
 
 const EXTERNAL_HOST_RE =
   /https:\/\/((?:tasks(?:dev)?|sso(?:dev)?)\.imjmedia\.com\.mx)\/?['"`]?\s*\)\s*\+\s*['"`](api\/[^'"`]+)['"`]/gi;
@@ -94,6 +101,28 @@ function pushApiRef(
   });
 }
 
+/** Bindings locales `const x = 'api/...'` usados luego como `apiDirection: x`. */
+function resolveApiDirectionIdentifiers(
+  source: string,
+  seen: Set<string>,
+  out: ApiClientReferenceParsed[],
+): void {
+  const bindings = new Map<string, string>();
+  CONST_API_BINDING_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = CONST_API_BINDING_RE.exec(source)) !== null) {
+    bindings.set(m[1]!, m[2]!);
+  }
+  if (bindings.size === 0) return;
+
+  API_DIRECTION_IDENTIFIER_RE.lastIndex = 0;
+  while ((m = API_DIRECTION_IDENTIFIER_RE.exec(source)) !== null) {
+    const id = m[1]!;
+    const bound = bindings.get(id);
+    if (bound) pushApiRef(seen, out, bound);
+  }
+}
+
 /** Extrae paths `api/...` únicos del código fuente (TS/JS/TSX). */
 export function extractApiClientReferences(source: string): ApiClientReferenceParsed[] {
   const seen = new Set<string>();
@@ -115,6 +144,7 @@ export function extractApiClientReferences(source: string): ApiClientReferencePa
   collect(API_PATH_PREFIX_CONCAT_RE, true);
   collect(API_PATH_PREFIX_NO_SLASH_RE, true);
   collect(API_PATH_TEMPLATE_RE, true);
+  resolveApiDirectionIdentifiers(source, seen, out);
   return out;
 }
 

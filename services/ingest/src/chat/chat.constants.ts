@@ -7,7 +7,7 @@ Grafo FalkorDB (Cypher). Nodos:
 - File {path, projectId, repoId, openApiTruth?, fileRole? (tsconfig|env_example|strapi_config|strapi_plugin), specKind?}
 - Component {name, projectId, repoId}
 - Function {path, name, projectId, repoId, complexity, nestingDepth, loc, description}
-- Model {path, name, projectId, repoId, source (prisma|typeorm), fieldSummary?}
+- Model {path, name, projectId, repoId, source (prisma|typeorm|frontend|heuristic), fieldSummary?}
 - OpenApiOperation {pathTemplate, method, specPath, projectId, repoId, docSource}
 - StrapiContentType {path, name, projectId, repoId, apiName, strapiUid, attributesSummary, displayName, collectionName}
 - StrapiController, StrapiService {path, name, projectId, repoId, apiName?}
