@@ -1,19 +1,31 @@
 /**
  * Servicio de ejecución Cypher y formateo de resultados para el chat.
- * Centraliza conexión a FalkorDB y presentación de datos para reducir complejidad en ChatService.
+ * Usa cliente Falkor compartido + semáforo de concurrencia (evita Max pending queries exceeded).
  */
 
-import { Injectable } from '@nestjs/common';
-import { FalkorDB } from 'falkordb';
-import { getFalkorConfig, graphNameForProject, isProjectShardingEnabled } from '../pipeline/falkor';
+import { Injectable, Logger } from '@nestjs/common';
+import { graphNameForProject, isProjectShardingEnabled } from '../pipeline/falkor';
+import { FalkorClientService } from '../pipeline/falkor-client.service';
+import { AsyncSemaphore } from '../pipeline/async-semaphore';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { ProjectsService } from '../projects/projects.service';
 
+function falkorQueryConcurrency(): number {
+  const raw = process.env.FALKOR_QUERY_CONCURRENCY?.trim();
+  const n = raw ? parseInt(raw, 10) : 6;
+  if (!Number.isFinite(n) || n < 1) return 6;
+  return Math.min(n, 32);
+}
+
 @Injectable()
 export class ChatCypherService {
+  private readonly logger = new Logger(ChatCypherService.name);
+  private readonly querySemaphore = new AsyncSemaphore(falkorQueryConcurrency());
+
   constructor(
     private readonly repos: RepositoriesService,
     private readonly projects: ProjectsService,
+    private readonly falkor: FalkorClientService,
   ) {}
 
   /**
@@ -158,11 +170,23 @@ export class ChatCypherService {
     counts: Record<string, number>;
     samples: Record<string, unknown[]>;
   }> {
+    // Hold one concurrency slot for the whole summary (many sequential GRAPH.QUERY).
+    return this.querySemaphore.run(() =>
+      this.runGraphSummaryInternal(projectId, full, repoIdFilter, sampleCap),
+    );
+  }
 
-    const config = getFalkorConfig();
-    const client = await FalkorDB.connect({
-      socket: { host: config.host, port: config.port },
-    });
+  private async runGraphSummaryInternal(
+    projectId: string,
+    full = true,
+    repoIdFilter?: string,
+    sampleCap?: number,
+  ): Promise<{
+    counts: Record<string, number>;
+    samples: Record<string, unknown[]>;
+  }> {
+
+    const client = await this.falkor.getClient();
 
     const defaultRowLimit = full ? '' : ' LIMIT 12';
     const rowLimit =
@@ -322,8 +346,11 @@ export class ChatCypherService {
           }
         }
       }
-    } finally {
-      await client.close();
+    } catch (err) {
+      this.logger.warn(
+        `getGraphSummaryInternal failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw err;
     }
 
     for (const k of Object.keys(samples)) {
@@ -339,11 +366,8 @@ export class ChatCypherService {
     cypher: string,
     extraParams?: Record<string, unknown>,
   ): Promise<unknown[]> {
-    const config = getFalkorConfig();
-    const client = await FalkorDB.connect({
-      socket: { host: config.host, port: config.port },
-    });
-    try {
+    return this.querySemaphore.run(async () => {
+      const client = await this.falkor.getClient();
       const contexts = await this.projects.getCypherShardContexts(projectId);
       const shards =
         contexts.length > 0
@@ -356,42 +380,53 @@ export class ChatCypherService {
             ];
       const merged: unknown[] = [];
       const seen = new Set<string>();
-      for (const s of shards) {
-        const graph = client.selectGraph(s.graphName);
-        const params = { projectId: s.cypherProjectId, ...extraParams };
-        const res = await graph.query(cypher, { params });
-        const rows = (res as { data?: Record<string, unknown>[] })?.data ?? [];
-        for (const row of rows) {
-          const key = JSON.stringify(row);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          merged.push(row);
+      try {
+        for (const s of shards) {
+          const graph = client.selectGraph(s.graphName);
+          const params = { projectId: s.cypherProjectId, ...extraParams };
+          const res = await graph.query(cypher, { params });
+          const rows = (res as { data?: Record<string, unknown>[] })?.data ?? [];
+          for (const row of rows) {
+            const key = JSON.stringify(row);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            merged.push(row);
+          }
         }
+        return merged;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/max pending queries/i.test(msg) || /socket closed/i.test(msg)) {
+          this.logger.warn(`Falkor query pressure (${msg}); resetting client`);
+          await this.falkor.reset();
+        }
+        throw err;
       }
-      return merged;
-    } finally {
-      await client.close();
-    }
+    });
   }
 
   /** Ejecuta Cypher sin params (para vector query con vecf32 inline). */
   /** Cypher sin params (p. ej. vector). Con sharding, indica el projectId del shard. */
   async executeCypherRaw(cypher: string, shardProjectId?: string): Promise<unknown[]> {
-    const config = getFalkorConfig();
-    const client = await FalkorDB.connect({
-      socket: { host: config.host, port: config.port },
+    return this.querySemaphore.run(async () => {
+      const client = await this.falkor.getClient();
+      try {
+        const graph = client.selectGraph(
+          graphNameForProject(
+            isProjectShardingEnabled() && shardProjectId ? shardProjectId : undefined,
+          ),
+        );
+        const res = await graph.query(cypher);
+        return (res as { data?: Record<string, unknown>[] })?.data ?? [];
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/max pending queries/i.test(msg) || /socket closed/i.test(msg)) {
+          this.logger.warn(`Falkor raw query pressure (${msg}); resetting client`);
+          await this.falkor.reset();
+        }
+        throw err;
+      }
     });
-    try {
-      const graph = client.selectGraph(
-        graphNameForProject(
-          isProjectShardingEnabled() && shardProjectId ? shardProjectId : undefined,
-        ),
-      );
-      const res = await graph.query(cypher);
-      return (res as { data?: Record<string, unknown>[] })?.data ?? [];
-    } finally {
-      await client.close();
-    }
   }
 
   /** Formatea resultados para lectura humana (sin JSON crudo). Sin `max`: todas las filas (comportamiento por defecto en chat/MCP). */

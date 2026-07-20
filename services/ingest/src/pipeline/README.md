@@ -22,6 +22,8 @@
 - **ROADMAP_INDEX_LANGUAGES.md** — Python, Rust, SQL suelto (fuera de alcance P0).
 - **INDEX_COVERAGE.md** — Matriz de cobertura orientativa por lenguaje/fuente (no hay % automático por repo).
 - **schema-relational-rag-doc.ts** — Tras Prisma/OpenAPI en `runFullSync`, genera un `:MarkdownDoc` sintético en path reservado `graph-internal/relational-schema-rag-index.md` (virtual; no en `indexed_files`): prosa tipo «esquema relacional» (Prisma DMMF, entidades TypeORM, **Strapi content-types y routes**, lista de operaciones OpenAPI) para RAG. El path evita prefijos tratados como no-evidencia de código (`ariadne-internal/`, `docs/`, …) alineados con **`../chat/chat-evidence-path-filter.ts`**.
+- **falkor-client.service.ts** / **falkor-client.module.ts** — Cliente FalkorDB **compartido** (ping + reconnect + listener `error` para no tumbar el proceso). Import global vía `AppModule`.
+- **async-semaphore.ts** — Límite de concurrencia Cypher (`FALKOR_QUERY_CONCURRENCY`, default 6) usado por `ChatCypherService`.
 - **project.ts**, **falkor.ts**, **domain-*** — Proyecto Falkor y dominio.
 
 Shadow y sync comparten producer + resolución de imports; Prisma y tsconfig virtual se aplican también en `POST /shadow`.

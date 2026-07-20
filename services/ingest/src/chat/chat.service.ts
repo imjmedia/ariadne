@@ -6,10 +6,10 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FalkorDB } from 'falkordb';
 import { IndexedFile } from '../repositories/entities/indexed-file.entity';
 import { cypherSafe } from 'ariadne-common';
-import { getFalkorConfig, graphNameForProject, isProjectShardingEnabled } from '../pipeline/falkor';
+import { graphNameForProject, isProjectShardingEnabled } from '../pipeline/falkor';
+import { FalkorClientService } from '../pipeline/falkor-client.service';
 import { SCHEMA_RELATIONAL_RAG_SOURCE_PATH } from '../pipeline/schema-relational-rag-doc';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { FileContentService } from '../repositories/file-content.service';
@@ -428,6 +428,7 @@ export class ChatService {
     private readonly indexedFileRepo: Repository<IndexedFile>,
     private readonly analyzeDistributedCache: AnalyzeDistributedCacheService,
     private readonly modificationPlanEvidence: ModificationPlanEvidenceService,
+    private readonly falkor: FalkorClientService,
   ) {}
 
   private async getIndexFingerprintForAnalyzeCache(
@@ -1384,8 +1385,7 @@ Máximo 6 líneas útiles. En español.`;
     const embedForRead = readBinding.provider;
     const vProp = readBinding.graphProperty;
     if (embedForRead?.isAvailable()) {
-      const config = getFalkorConfig();
-      const client = await FalkorDB.connect({ socket: { host: config.host, port: config.port } });
+      const client = await this.falkor.getClient();
       const graph = client.selectGraph(
         graphNameForProject(isProjectShardingEnabled() ? projectId : undefined),
       );
@@ -1410,8 +1410,6 @@ Máximo 6 líneas útiles. En español.`;
       if (scopeActive) {
         funcs = funcs.filter((f) => inF(f.path));
       }
-      await client.close();
-
       const seen = new Set<string>();
       for (const f of funcs) {
         try {
