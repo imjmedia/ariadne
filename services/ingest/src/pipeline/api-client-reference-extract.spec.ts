@@ -29,6 +29,20 @@ describe('api-client-reference-extract', () => {
     expect(paths).toContain('api/provider-instances');
   });
 
+  it('extrae apiDirection: (objeto) y bindings const locales', () => {
+    const src = `
+      queryApi({ apiDirection: 'api/agencias', method: 'GET' });
+      const mediosPath = 'api/medios/search-medios';
+      queryApi({ apiDirection: mediosPath, method: 'POST' });
+      apiDirection: "api/ubicacions"
+    `;
+    const refs = extractApiClientReferences(src);
+    const paths = refs.map((r) => r.apiPath);
+    expect(paths).toContain('api/agencias');
+    expect(paths).toContain('api/medios/search-medios');
+    expect(paths).toContain('api/ubicacions');
+  });
+
   it('extrae prefijos dinámicos api/users/ + id', () => {
     const src = `
       axiosQuery('PUT', 'api/users/' + data.id, null, {});

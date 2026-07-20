@@ -219,15 +219,15 @@ export interface RouteInfo {
   isPublicEntry?: boolean;
 }
 
-/** Modelo de datos (clase con propiedades, sin JSX). */
+/** Modelo de datos (clase, interface o type object en paths de dominio frontend). */
 export interface ModelInfo {
   name: string;
   /** JSDoc/TSDoc si existe */
   description?: string;
   /**
    * Origen del modelo. Solo `typeorm` (y `prisma` vía prisma-extract) representan esquema de
-   * persistencia real. `frontend` (DTOs en `src/Models/*`) y `heuristic` (clase PascalCase sin
-   * JSX) se etiquetan para poder excluirlos de respuestas de esquema/diagrama de BD.
+   * persistencia real. `frontend` (DTOs en `src/Models/*` / `src/modelsType/*`) y `heuristic`
+   * (clase PascalCase sin JSX) se etiquetan para poder excluirlos de respuestas de esquema/diagrama de BD.
    */
   source?: 'heuristic' | 'typeorm' | 'frontend';
   /** Nombre físico de tabla (@Entity('…')). */
@@ -236,7 +236,7 @@ export interface ModelInfo {
   embeddable?: boolean;
   /** `@Index` / `@Unique` a nivel entidad (JSON array serializado). */
   indexSummary?: string;
-  /** Propiedades de columna detectadas en entidades TypeORM / SQL. */
+  /** Propiedades (TypeORM columns, o fields de interface/type/class frontend). */
   entityFields?: string[];
   /** Relaciones @ManyToOne/@OneToOne/@ManyToMany/@OneToMany detectadas en la entidad. */
   entityRelations?: TypeOrmRelationInfo[];
@@ -255,10 +255,52 @@ function mergeStaticAssetsIntoParsed(result: ParsedFile, assets: StaticAssetInfo
   result.staticAssets.push(...assets);
 }
 
+/** Carpetas de DTOs de dominio en SPAs (OBP: Models + modelsType). */
+function isFrontendDomainModelPath(filePath: string): boolean {
+  const norm = filePath.replace(/\\/g, '/').toLowerCase();
+  return /\/models\//.test(norm) || /\/modelstype\//.test(norm);
+}
+
 /** Heurística: ¿el path corresponde a un DTO/modelo de frontend (no esquema de BD)? */
 function isFrontendModelPath(filePath: string, hasJsx: boolean): boolean {
   const norm = filePath.replace(/\\/g, '/').toLowerCase();
-  return hasJsx || norm.endsWith('.tsx') || /\/models\//.test(norm);
+  return hasJsx || norm.endsWith('.tsx') || isFrontendDomainModelPath(filePath);
+}
+
+/** Interfaces/types de props React: no indexar como :Model. */
+function isReactPropsTypeName(name: string): boolean {
+  return (
+    name.endsWith('Props') ||
+    name.endsWith('PropsWithChildren') ||
+    /^(FC|FunctionComponent|ReactNode|PropsWithChildren|ComponentProps)$/.test(name)
+  );
+}
+
+/** ¿Indexar interface/type object como modelo de dominio frontend? */
+function shouldIndexFrontendTypeAsModel(name: string, filePath: string): boolean {
+  if (!isFrontendDomainModelPath(filePath)) return false;
+  if (!isPascalCase(name)) return false;
+  if (isReactPropsTypeName(name)) return false;
+  return true;
+}
+
+/** Fields de interface_body / object_type → `name` o `name:type`. */
+function extractTypeBodyFieldSummaries(body: Parser.SyntaxNode, source: string): string[] {
+  const fields: string[] = [];
+  for (const child of body.namedChildren) {
+    if (child.type !== 'property_signature') continue;
+    const nameNode = child.childForFieldName('name');
+    if (!nameNode || nameNode.type !== 'property_identifier') continue;
+    const name = getNodeText(source, nameNode);
+    if (!/^[\w$]+$/.test(name)) continue;
+    const typeNode = child.childForFieldName('type');
+    const typeText = typeNode
+      ? getNodeText(source, typeNode).replace(/\s+/g, ' ').trim().slice(0, 80)
+      : '';
+    fields.push(typeText ? `${name}:${typeText}` : name);
+    if (fields.length >= 40) break;
+  }
+  return fields;
 }
 
 /** Rol de archivo de configuración indexado (alias, env). */
@@ -313,7 +355,7 @@ export interface ParsedFile {
   graphQlClientReferences: GraphQlClientReferenceInfo[];
   /** React Router Route definitions (path -> component). */
   routes: RouteInfo[];
-  /** Modelos de datos (clases sin JSX, path Models/, nombre *Model). */
+  /** Modelos de datos (clases TypeORM/Prisma; interface/type/class en Models|modelsType). */
   models: ModelInfo[];
   /** CSS/HTML indexados como activos estáticos. */
   staticAssets?: StaticAssetInfo[];
@@ -451,8 +493,7 @@ function inferComponentNameFromPath(filePath: string): string | null {
 /** Clase PascalCase sin JSX ni React.Component → modelo de datos. */
 function isDataModelClass(name: string, filePath: string, hasJsx: boolean, extendsReact: boolean): boolean {
   if (extendsReact) return false;
-  const normPath = filePath.replace(/\\/g, '/').toLowerCase();
-  if (name.endsWith('Model') || normPath.includes('/models/')) return true;
+  if (name.endsWith('Model') || isFrontendDomainModelPath(filePath)) return true;
   if (!hasJsx) return true;
   return false;
 }
@@ -706,7 +747,8 @@ export function parseSource(
       stubParser.setLanguage(LANG_TS as Parameters<Parser['setLanguage']>[0]);
       return { parsed: result, root: stubParser.parse('').rootNode, source };
     }
-    return result.staticAssets?.length ? result : null;
+    // CSS/SCSS/HTML siempre entran al grafo (aunque el extract no halle tokens).
+    return result;
   }
 
   const normPathEarly = path.replace(/\\/g, '/');
@@ -886,7 +928,16 @@ export function parseSource(
     const description = getPrecedingJSDoc(source, node.startIndex);
     if (isDataModelClass(name, path, hasJsx, extendsReact)) {
       const modelSource = isFrontendModelPath(path, hasJsx) ? 'frontend' : 'heuristic';
-      result.models.push({ name, description, source: modelSource });
+      const entityFields =
+        modelSource === 'frontend'
+          ? extractTypeOrmColumnPropertyNames(node, source)
+          : undefined;
+      result.models.push({
+        name,
+        description,
+        source: modelSource,
+        ...(entityFields?.length ? { entityFields } : {}),
+      });
     } else if (isReactComponentName(name)) {
       const allowClassAsReactComponent = hasJsx || normPath.endsWith('.tsx') || extendsReact;
       if (allowClassAsReactComponent) {
@@ -894,6 +945,8 @@ export function parseSource(
       }
     }
   }
+
+  collectFrontendDomainTypeModels(root, source, path, result);
 
   const funcNodes = findNodesByType(root, ['function_declaration', 'function']);
   for (const node of funcNodes) {
@@ -1402,6 +1455,74 @@ function hasTypeOrmEntityDecorator(classNode: Parser.SyntaxNode, source: string)
     if (name === 'Entity') return true;
   }
   return false;
+}
+
+/** Propiedades de clase/abstract class (sin métodos). Usado para DTOs frontend. */
+function extractTypeOrmColumnPropertyNames(classNode: Parser.SyntaxNode, source: string): string[] {
+  const body = classNode.childForFieldName('body');
+  if (!body) return [];
+  const names: string[] = [];
+  for (let i = 0; i < body.childCount; i++) {
+    const ch = body.child(i);
+    if (!ch) continue;
+    if (ch.type === 'public_field_definition') {
+      const nameNode = ch.childForFieldName('name');
+      if (nameNode) names.push(getNodeText(source, nameNode));
+    } else if (ch.type === 'property_signature') {
+      const nameNode = ch.childForFieldName('name');
+      if (nameNode) names.push(getNodeText(source, nameNode));
+    }
+  }
+  return names;
+}
+
+/**
+ * Interfaces y type aliases object en `src/Models` / `src/modelsType` → `:Model` source=frontend.
+ * No indexa *Props ni unions/aliases sin cuerpo object.
+ */
+function collectFrontendDomainTypeModels(
+  root: Parser.SyntaxNode,
+  source: string,
+  filePath: string,
+  result: ParsedFile,
+): void {
+  if (!isFrontendDomainModelPath(filePath)) return;
+  const seen = new Set(result.models.map((m) => m.name));
+
+  for (const node of findNodesByType(root, 'interface_declaration')) {
+    const nameNode = node.childForFieldName('name');
+    if (!nameNode) continue;
+    const name = getNodeText(source, nameNode);
+    if (!shouldIndexFrontendTypeAsModel(name, filePath) || seen.has(name)) continue;
+    const body = node.childForFieldName('body');
+    if (!body || (body.type !== 'interface_body' && body.type !== 'object_type')) continue;
+    const entityFields = extractTypeBodyFieldSummaries(body, source);
+    if (entityFields.length === 0) continue;
+    const description = getPrecedingJSDoc(source, node.startIndex);
+    result.models.push({ name, description, source: 'frontend', entityFields });
+    seen.add(name);
+  }
+
+  for (const node of findNodesByType(root, 'type_alias_declaration')) {
+    const nameNode = node.childForFieldName('name');
+    if (!nameNode) continue;
+    const name = getNodeText(source, nameNode);
+    if (!shouldIndexFrontendTypeAsModel(name, filePath) || seen.has(name)) continue;
+    let objectBody: Parser.SyntaxNode | null = null;
+    for (let i = 0; i < node.namedChildCount; i++) {
+      const c = node.namedChildren[i];
+      if (c.type === 'object_type') {
+        objectBody = c;
+        break;
+      }
+    }
+    if (!objectBody) continue;
+    const entityFields = extractTypeBodyFieldSummaries(objectBody, source);
+    if (entityFields.length === 0) continue;
+    const description = getPrecedingJSDoc(source, node.startIndex);
+    result.models.push({ name, description, source: 'frontend', entityFields });
+    seen.add(name);
+  }
 }
 
 /** Callee del decorador: `Roles` en `@Roles()`, `Foo` en `@Foo.bar()`. */

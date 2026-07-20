@@ -267,6 +267,7 @@ export async function buildMddEvidenceDocument(params: {
     apiFromSwagger,
     apiFromAst,
     apiFromStrapi,
+    apiFromClientRefs,
     entitiesFromModels,
     entitiesFromStrapi,
     business,
@@ -391,6 +392,35 @@ export async function buildMddEvidenceDocument(params: {
       return [];
     })(),
 
+    // 5c. apiFromClientRefs (ApiClientReference — literales api/ en frontend)
+    (async (): Promise<MddEvidenceDocument['api_contracts']> => {
+      try {
+        const rs = cypherRepoScope(scopedRepoIds, 'acr');
+        const refs = (await executeCypher(
+          projectId,
+          `MATCH (acr:ApiClientReference {projectId: $projectId})${rs.clause}
+           RETURN DISTINCT acr.apiPath AS apiPath LIMIT ${L.nestControllers}`,
+          { projectId, ...rs.params },
+        )) as Array<{ apiPath?: string }>;
+        const byRoute = new Map<string, true>();
+        const result: MddEvidenceDocument['api_contracts'] = [];
+        for (const row of refs) {
+          const raw = typeof row.apiPath === 'string' ? row.apiPath.trim() : '';
+          if (!raw) continue;
+          const trimmed = raw.replace(/^\/+/, '');
+          const route = trimmed.startsWith('api/') ? `/${trimmed}` : `/api/${trimmed}`;
+          if (byRoute.has(route)) continue;
+          byRoute.set(route, true);
+          // Métodos desconocidos en el grafo; GET como placeholder (mismo criterio que fallback path).
+          result.push({ route, methods: ['GET'], doc_source: 'ast' });
+        }
+        return result;
+      } catch {
+        /* grafo sin ApiClientReference */
+      }
+      return [];
+    })(),
+
     // 6. entitiesFromModels (Model nodes)
     (async (): Promise<MddEvidenceDocument['entities']> => {
       try {
@@ -404,8 +434,11 @@ export async function buildMddEvidenceDocument(params: {
         const result: MddEvidenceDocument['entities'] = [];
         for (const row of models) {
           if (!row.name) continue;
-          if (row.source !== 'prisma' && row.source !== 'typeorm' && !row.fs) continue;
-          const source = row.source === 'typeorm' ? 'typeorm' : 'prisma';
+          const src = typeof row.source === 'string' ? row.source : '';
+          const isOrm = src === 'prisma' || src === 'typeorm';
+          const isFrontend = src === 'frontend';
+          // ORM siempre; frontend solo con fieldSummary (DTOs indexados). Excluye heuristic.
+          if (!isOrm && !(isFrontend && row.fs)) continue;
           let fields: string[] = [];
           if (row.fs) {
             try {
@@ -414,6 +447,11 @@ export async function buildMddEvidenceDocument(params: {
               fields = [];
             }
           }
+          const source: MddEvidenceDocument['entities'][number]['source'] = isFrontend
+            ? 'frontend'
+            : src === 'typeorm'
+              ? 'typeorm'
+              : 'prisma';
           result.push({ name: row.name, source, fields });
         }
         return result;
@@ -516,7 +554,11 @@ export async function buildMddEvidenceDocument(params: {
     );
   }
 
-  const entities = [...entitiesFromModels, ...entitiesFromStrapiResolved];
+  const entitiesRaw = [...entitiesFromModels, ...entitiesFromStrapiResolved];
+  // Preguntas de esquema/BD: no mezclar DTOs frontend con tablas de persistencia.
+  const entities = wantsSchemaDatabaseQuestion(message)
+    ? entitiesRaw.filter((e) => e.source !== 'frontend')
+    : entitiesRaw;
 
   // envVars from cached envContent
   const envVars: string[] = envContent ? parseEnvExampleKeys(envContent) : [];
@@ -601,7 +643,9 @@ export async function buildMddEvidenceDocument(params: {
   if (
     hasFrontendEvidencePaths &&
     !hasStrapiEvidencePaths &&
-    (entitiesFinal.length === 0 || apiFromAst.length === 0 || businessFinal.length === 0)
+    (entitiesFinal.length === 0 ||
+      (apiFromAst.length === 0 && apiFromClientRefs.length === 0) ||
+      businessFinal.length === 0)
   ) {
     const fb = await inferFrontendMddFromEvidencePaths({
       evidencePaths: mergedEvidencePaths,
@@ -618,11 +662,17 @@ export async function buildMddEvidenceDocument(params: {
       if (allowFrontendEntities && entitiesFinal.length === 0 && fb.entities.length > 0) {
         entitiesFinal = fb.entities;
       }
-      if (fb.api_contracts.length > 0) apiFromFrontendFinal = fb.api_contracts;
+      if (apiFromClientRefs.length === 0 && fb.api_contracts.length > 0) {
+        apiFromFrontendFinal = fb.api_contracts;
+      }
       if (businessFinal.length === 0 && fb.business_logic.length > 0) {
         businessFinal = fb.business_logic;
       }
     }
+  }
+
+  if (apiFromClientRefs.length > 0 && apiFromFrontendFinal.length === 0) {
+    apiFromFrontendFinal = apiFromClientRefs;
   }
 
   const supplementaryDocPaths = pickSupplementaryApiDocPaths(mergedEvidencePaths);
@@ -632,7 +682,7 @@ export async function buildMddEvidenceDocument(params: {
       : [];
   const swaggerDeps = inferSwaggerDependencies(manifestDepKeys);
 
-  // Decide which API contracts to use: OpenAPI > Strapi routes > Nest AST
+  // Decide which API contracts to use: OpenAPI > Strapi > client refs / frontend fallback > Nest AST
   const api_contracts = apiFromSwagger.length
     ? apiFromSwagger
     : apiFromStrapiFinal.length
@@ -643,6 +693,9 @@ export async function buildMddEvidenceDocument(params: {
 
   const trust: MddEvidenceDocument['openapi_spec']['trust_level'] =
     openapiPath && apiFromSwagger.length ? 'high' : openapiPath ? 'medium' : 'low';
+
+  const frontendModelCount = entitiesFromModels.filter((e) => e.source === 'frontend').length;
+  const ormModelCount = entitiesFromModels.length - frontendModelCount;
 
   const summaryParts = [
     `Consulta: ${message.slice(0, L.summaryMessageChars)}`,
@@ -655,7 +708,7 @@ export async function buildMddEvidenceDocument(params: {
           ? `${entitiesFinal.length} entidad(es) Strapi inferida(s) desde schema.json en evidence_paths (grafo vacío).`
           : usedGraphViaFileLink
             ? `${entitiesFinal.length} entidad(es) Strapi vía grafo (File→StrapiContentType).`
-            : `${entitiesFinal.length} entidad(es) en grafo (${entitiesFromModels.length} ORM, ${entitiesFromStrapiResolved.length} Strapi).`
+            : `${entitiesFinal.length} entidad(es) en grafo (${ormModelCount} ORM, ${frontendModelCount} frontend, ${entitiesFromStrapiResolved.length} Strapi).`
       : 'Sin nodos Model ni StrapiContentType en grafo para este alcance.',
   ];
   if (!openapiPath && (swaggerDeps || swaggerRelatedPaths.length > 0)) {
@@ -682,7 +735,9 @@ export async function buildMddEvidenceDocument(params: {
   }
   if (apiFromFrontendFinal.length > 0 && apiFromSwagger.length === 0 && apiFromStrapiFinal.length === 0) {
     summaryParts.push(
-      `${apiFromFrontendFinal.length} contrato(s) API cliente inferido(s) desde apiDirection / src/api en evidence_paths.`,
+      apiFromClientRefs.length > 0
+        ? `${apiFromFrontendFinal.length} contrato(s) API cliente desde ApiClientReference en grafo.`
+        : `${apiFromFrontendFinal.length} contrato(s) API cliente inferido(s) desde apiDirection / src/api en evidence_paths.`,
     );
   }
   const summary = summaryParts.join(' ');
