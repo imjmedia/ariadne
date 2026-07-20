@@ -32,7 +32,9 @@
  * | `get_project_analysis` | POST análisis ingest (`diagnostico`, `duplicados`, `reingenieria`, `codigo_muerto`, `seguridad`). |
  * | `generate_legacy_documentation` | **Doc. legacy única:** MDD 7§ determinista (`evidence_first` fijo). TheForge doc. partida. |
  * | `ask_codebase` | Pregunta NL (Q&A); **no** doc. legacy de partida — usar `generate_legacy_documentation`. |
- * | `get_modification_plan` | Plan legacy: `filesToModify` + preguntas; preferir `roots[].id` en multi-root. |
+ * | `get_modification_plan` | Plan legacy: `filesToModify` + `changePlanTemplate` (tasks/symbols) + `graphEvidenceBundle`; preferir `roots[].id` en multi-root. |
+ * | `validate_change_plan` | Gate 2: audita ChangePlan (files/symbols/tasks/evidence/dependsOn). |
+ * | `validate_tasks_json` | Gate 2 post-Forge: `tasksJson` → ChangePlan → validate; bloquear si `BLOCKED`. |
  * | `get_definitions` | Definición de símbolo (archivo + líneas). |
  * | `get_references` | Usos de símbolo (refactor seguro). |
  * | `get_implementation_details` | Firma, props, endpoints asociados al símbolo. |

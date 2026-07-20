@@ -40,6 +40,24 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
     });
   }
 
+  if (pack.graphEvidenceBundle) {
+    items.push({
+      kind: 'modification_plan_enriched',
+      title: 'Modification plan graph evidence',
+      content: JSON.stringify(pack.graphEvidenceBundle),
+      mimeType: 'application/json',
+    });
+  }
+
+  if (pack.changePlanSeed) {
+    items.push({
+      kind: 'change_plan_seed',
+      title: 'ChangePlan seed (tasks + symbols)',
+      content: JSON.stringify(pack.changePlanSeed),
+      mimeType: 'application/json',
+    });
+  }
+
   if (pack.change.erDiagramMermaid?.trim()) {
     items.push({
       kind: 'er_diagram',
@@ -57,7 +75,37 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
     });
   }
 
+  // P2: Forge must validate migration_tasks against Ariadne Gate 2 after generation.
+  if (pack.deliverablesRequested.includes('migration_tasks')) {
+    items.push({
+      kind: 'post_deliverable_gate',
+      title: 'Validate tasksJson via Ariadne Gate 2',
+      content: JSON.stringify({
+        required: true,
+        blockOnVerdict: 'BLOCKED',
+        endpoint: `/projects/${pack.ariadne.projectId}/validate-tasks-json`,
+        method: 'POST',
+        bodyHint: {
+          tasksJson: '<Forge tasksJson v2 after legacy_generate_deliverables>',
+          changeDescription: pack.change.userDescription.slice(0, 500),
+        },
+        mcpTool: 'validate_change_plan',
+        note: 'After legacy_generate_deliverables, POST tasksJson to Ariadne. If verdict===BLOCKED, do not mark migration_tasks complete.',
+      }),
+      mimeType: 'application/json',
+    });
+  }
+
   return items;
+}
+
+/** Default tools after create-stage — includes Ariadne Gate 2 after deliverables. */
+export function defaultRecommendedNextTools(pack: ChangePromotionPackV1): string[] {
+  const tools = ['legacy_answer', 'legacy_generate_mdd', 'legacy_generate_deliverables'];
+  if (pack.deliverablesRequested.includes('migration_tasks')) {
+    tools.push('validate_change_plan_via_ariadne');
+  }
+  return tools;
 }
 
 export function toForgeChangePackV1(pack: ChangePromotionPackV1): ForgeChangePackV1 {

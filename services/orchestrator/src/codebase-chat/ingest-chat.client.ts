@@ -101,13 +101,29 @@ export class IngestChatClient {
     userDescription: string,
     scope?: ChatScope,
   ): Promise<ModificationPlanResult['filesToModify']> {
-    const url = `${this.ingestBase()}/internal/repositories/${encodeURIComponent(repositoryId)}/modification-plan-files`;
-    const data = await fetchIngestJson<{ filesToModify: ModificationPlanResult['filesToModify'] }>(url, {
+    const full = await this.fetchModificationPlanRepository(repositoryId, userDescription, scope);
+    return full.filesToModify;
+  }
+
+  async fetchModificationPlanRepository(
+    repositoryId: string,
+    userDescription: string,
+    scope?: ChatScope,
+  ): Promise<ModificationPlanResult> {
+    const url = `${this.ingestBase()}/repositories/${encodeURIComponent(repositoryId)}/modification-plan`;
+    const data = await fetchIngestJson<ModificationPlanResult>(url, {
       body: { userDescription, scope },
-      timeoutMs: 90_000,
-      label: 'modification-plan-files',
+      timeoutMs: 120_000,
+      label: 'modification-plan',
     });
-    return Array.isArray(data.filesToModify) ? data.filesToModify : [];
+    return {
+      filesToModify: Array.isArray(data.filesToModify) ? data.filesToModify : [],
+      questionsToRefine: Array.isArray(data.questionsToRefine) ? data.questionsToRefine : [],
+      ...(data.warnings ? { warnings: data.warnings } : {}),
+      ...(data.diagnostic ? { diagnostic: data.diagnostic } : {}),
+      ...(data.graphEvidenceBundle ? { graphEvidenceBundle: data.graphEvidenceBundle } : {}),
+      ...(data.changePlanTemplate ? { changePlanTemplate: data.changePlanTemplate } : {}),
+    };
   }
 
   async fetchMddEvidence(
@@ -138,13 +154,29 @@ export class IngestChatClient {
     userDescription: string,
     scope?: ChatScope,
   ): Promise<ModificationPlanResult['filesToModify']> {
-    const url = `${this.ingestBase()}/internal/projects/${encodeURIComponent(projectId)}/modification-plan-files`;
-    const data = await fetchIngestJson<{ filesToModify: ModificationPlanResult['filesToModify'] }>(url, {
+    const full = await this.fetchModificationPlanProject(projectId, userDescription, scope);
+    return full.filesToModify;
+  }
+
+  async fetchModificationPlanProject(
+    projectId: string,
+    userDescription: string,
+    scope?: ChatScope,
+  ): Promise<ModificationPlanResult> {
+    const url = `${this.ingestBase()}/projects/${encodeURIComponent(projectId)}/modification-plan`;
+    const data = await fetchIngestJson<ModificationPlanResult>(url, {
       body: { userDescription, scope },
-      timeoutMs: 90_000,
-      label: 'modification-plan-files',
+      timeoutMs: 120_000,
+      label: 'modification-plan-project',
     });
-    return Array.isArray(data.filesToModify) ? data.filesToModify : [];
+    return {
+      filesToModify: Array.isArray(data.filesToModify) ? data.filesToModify : [],
+      questionsToRefine: Array.isArray(data.questionsToRefine) ? data.questionsToRefine : [],
+      ...(data.warnings ? { warnings: data.warnings } : {}),
+      ...(data.diagnostic ? { diagnostic: data.diagnostic } : {}),
+      ...(data.graphEvidenceBundle ? { graphEvidenceBundle: data.graphEvidenceBundle } : {}),
+      ...(data.changePlanTemplate ? { changePlanTemplate: data.changePlanTemplate } : {}),
+    };
   }
 
   async fetchUnusedApiEndpointsProject(

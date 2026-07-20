@@ -91,4 +91,28 @@ describe('ChangePlanValidationService', () => {
     const report = await svc.validate('proj-1', plan);
     expect(report.coverage.missingFromPlan).toContain('src/api/bar.ts');
   });
+
+  it('BLOCKED when dependsOn references unknown task id', async () => {
+    const svc = buildService({
+      indexedPaths: ['src/components/Foo.tsx'],
+      symbols: { Foo: true },
+    });
+    const plan: ChangePlan = {
+      ...basePlan(),
+      tasks: [
+        {
+          id: 'T1',
+          title: 'Update Foo',
+          files: ['src/components/Foo.tsx'],
+          symbols: ['Foo'],
+          phase: '1-core',
+          criterion: 'Keep Foo props',
+          dependsOn: ['T99'],
+        },
+      ],
+    };
+    const report = await svc.validate('proj-1', plan);
+    expect(report.verdict).toBe('BLOCKED');
+    expect(report.checks.some((c) => c.id === 'TASK_DEPENDS_ON' && c.status === 'fail')).toBe(true);
+  });
 });

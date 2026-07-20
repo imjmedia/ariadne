@@ -29,4 +29,8 @@ export type AnalyzeOrchestratorPrepDto =
 export interface ModificationPlanResult {
   filesToModify: Array<{ path: string; repoId: string }>;
   questionsToRefine: string[];
+  warnings?: string[];
+  diagnostic?: { code: string; message: string };
+  graphEvidenceBundle?: unknown;
+  changePlanTemplate?: Record<string, unknown>;
 }

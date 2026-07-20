@@ -60,6 +60,9 @@ export class TheForgeClientMock extends TheForgeClient {
         'legacy_answer',
         'legacy_generate_mdd',
         'legacy_generate_deliverables',
+        ...(input.pack.deliverablesRequested.includes('migration_tasks')
+          ? ['validate_change_plan_via_ariadne']
+          : []),
       ],
       deliverablesCreated: input.pack.deliverablesRequested,
     };

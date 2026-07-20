@@ -41,12 +41,27 @@ export interface ChangePlanApiChange {
   dtoFields?: string[];
 }
 
+export type ChangePlanEvidenceKind = 'path' | 'symbol' | 'endpoint' | 'prop';
+
+export interface ChangePlanTaskEvidence {
+  kind: ChangePlanEvidenceKind;
+  ref: string;
+}
+
 export interface ChangePlanTask {
   id?: string;
   title: string;
   files: string[];
   symbols?: string[];
   endpoints?: string[];
+  /** Suggested implementation phase (e.g. 1-core, 2-integrate). */
+  phase?: string;
+  /** Acceptance criterion grounded in graph evidence. */
+  criterion?: string;
+  /** Citations that must resolve in the indexed graph when present. */
+  evidence?: ChangePlanTaskEvidence[];
+  /** Task ids this item depends on. */
+  dependsOn?: string[];
 }
 
 export interface ChangePlanReferencePlan {

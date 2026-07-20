@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { ChatConversationEntity } from '../chat/entities/chat-conversation.entity';
 import { ChatMessageEntity } from '../chat/entities/chat-message.entity';
 import { ChatService } from '../chat/chat.service';
+import { ModificationPlanEvidenceService } from '../chat/modification-plan-evidence.service';
 import { MddPersistenceService } from '../mdd-persistence/mdd-persistence.service';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { RepositoryEntity } from '../repositories/entities/repository.entity';
@@ -57,6 +58,7 @@ export class ChangePromotionPackService {
     private readonly repos: RepositoriesService,
     private readonly mddPersistence: MddPersistenceService,
     private readonly chat: ChatService,
+    private readonly modificationPlanEvidence: ModificationPlanEvidenceService,
   ) {}
 
   async buildPreview(options: BuildChangePromotionPackOptions): Promise<ChangePromotionPreview> {
@@ -139,6 +141,38 @@ export class ChangePromotionPackService {
       repository ? { repoIds: [repository.id] } : undefined,
     );
 
+    const filesToModify = modFiles.slice(0, 80).map((f) => ({
+      path: f.path,
+      ...(f.repoId ? { repoId: f.repoId } : {}),
+    }));
+
+    let graphEvidenceBundle: ChangePromotionPackV1['graphEvidenceBundle'];
+    let changePlanSeed: ChangePromotionPackV1['changePlanSeed'];
+    if (filesToModify.length > 0) {
+      try {
+        graphEvidenceBundle = await this.modificationPlanEvidence.buildEvidenceBundle(
+          falkorProjectId,
+          filesToModify.map((f, i) => ({
+            path: f.path,
+            repoId: f.repoId ?? repository?.id ?? falkorProjectId,
+            impactScore: Math.max(1, filesToModify.length - i) * 10,
+          })),
+        );
+        changePlanSeed = this.modificationPlanEvidence.buildChangePlanSeed({
+          projectId: falkorProjectId,
+          changeDescription: userDescription,
+          source: 'theforge',
+          filesToModify: filesToModify.map((f) => ({
+            path: f.path,
+            repoId: f.repoId ?? repository?.id ?? falkorProjectId,
+          })),
+          bundle: graphEvidenceBundle,
+        });
+      } catch {
+        /* promote still works without evidence */
+      }
+    }
+
     const idempotencyKey = buildPromotionIdempotencyKey(
       conversation.id,
       stageKey,
@@ -172,11 +206,10 @@ export class ChangePromotionPackService {
       },
       mdd,
       modificationPlan: {
-        filesToModify: modFiles.slice(0, 80).map((f) => ({
-          path: f.path,
-          ...(f.repoId ? { repoId: f.repoId } : {}),
-        })),
+        filesToModify,
       },
+      ...(graphEvidenceBundle ? { graphEvidenceBundle } : {}),
+      ...(changePlanSeed ? { changePlanSeed } : {}),
       deliverablesRequested: options.deliverablesRequested,
     };
   }

@@ -25,6 +25,7 @@ import { AnalyticsService } from './analytics.service';
 import { ChangePlanValidationService } from '../plan-validation/change-plan-validation.service';
 import type { ChangePlan } from '../plan-validation/change-plan-validation.types';
 import type { PlanValidationReport } from '../plan-validation/change-plan-validation.types';
+import { changePlanFromForgeTasksJson } from '../plan-validation/forge-tasks-json.mapper';
 
 @Controller('projects')
 export class ProjectChatController {
@@ -136,5 +137,35 @@ export class ProjectChatController {
     @Body() body: ChangePlan,
   ): Promise<PlanValidationReport> {
     return this.planValidation.validate(projectId, body);
+  }
+
+  /**
+   * Post-deliverable Gate 2: map Forge tasksJson → ChangePlan and validate.
+   * Forge MUST call this after legacy_generate_deliverables when migration_tasks was requested.
+   * If verdict === BLOCKED, do not accept the tasks deliverable.
+   */
+  @Post(':projectId/validate-tasks-json')
+  async validateTasksJson(
+    @Param('projectId') projectId: string,
+    @Body()
+    body: {
+      tasksJson?: unknown;
+      tasks?: unknown;
+      changeDescription?: string;
+    },
+  ): Promise<PlanValidationReport & { changePlan?: ChangePlan }> {
+    const raw = body?.tasksJson ?? body?.tasks ?? body;
+    try {
+      const plan = changePlanFromForgeTasksJson(projectId, raw, {
+        changeDescription: body?.changeDescription,
+        source: 'theforge',
+      });
+      const report = await this.planValidation.validate(projectId, plan);
+      return { ...report, changePlan: plan };
+    } catch (err) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Invalid tasksJson payload',
+      );
+    }
   }
 }
