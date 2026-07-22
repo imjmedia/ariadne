@@ -44,6 +44,7 @@ export interface CreateUserDialogProps {
 
 export function CreateUserDialog({ open, onOpenChange, onUserCreatedWithToken }: CreateUserDialogProps) {
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [role, setRole] = useState<"admin" | "developer">("developer")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,12 +52,14 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreatedWithToken }:
   useEffect(() => {
     if (!open) return
     setEmail("")
+    setPassword("")
     setRole("developer")
     setError(null)
   }, [open])
 
   const emailTrimmed = email.trim()
   const emailValid = isValidEmailFormat(emailTrimmed)
+  const passwordOk = !password || password.length >= 8
 
   const handleClose = () => {
     if (loading) return
@@ -65,11 +68,15 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreatedWithToken }:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!emailValid) return
+    if (!emailValid || !passwordOk) return
     setError(null)
     setLoading(true)
     try {
-      const created = (await api.createUser(emailTrimmed, role)) as { id: string }
+      const created = (await api.createUser(
+        emailTrimmed,
+        role,
+        password.trim() || undefined,
+      )) as { id: string }
       const tokenResult = await api.regenerateMcpToken(created.id)
       onUserCreatedWithToken({ token: tokenResult.token, email: emailTrimmed })
       onOpenChange(false)
@@ -86,8 +93,8 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreatedWithToken }:
         <DialogHeader>
           <DialogTitle className="text-[var(--foreground)]">{CREATE_USER_LABEL}</DialogTitle>
           <DialogDescription className="text-[var(--foreground-muted)]">
-            El usuario podrá iniciar sesión con OTP en el correo indicado. Tras crear, se genera un token MCP de un
-            solo uso que debes copiar y entregar de forma segura.
+            Crea usuario con correo, rol y contraseña opcional (login básico). Tras crear, se genera un token MCP de
+            un solo uso.
           </DialogDescription>
         </DialogHeader>
 
@@ -117,6 +124,23 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreatedWithToken }:
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="create-user-password" className="text-xs font-medium text-[var(--foreground-muted)]">
+              Contraseña (opcional, mín. 8)
+            </Label>
+            <Input
+              id="create-user-password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className={inputClass}
+              disabled={loading}
+              aria-invalid={password.length > 0 && !passwordOk}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="create-user-role" className="text-xs font-medium text-[var(--foreground-muted)]">
               Rol
             </Label>
@@ -142,7 +166,12 @@ export function CreateUserDialog({ open, onOpenChange, onUserCreatedWithToken }:
           >
             Cancelar
           </Button>
-          <Button type="submit" form="create-user-form" className="h-11 rounded-xl" disabled={loading || !emailValid}>
+          <Button
+            type="submit"
+            form="create-user-form"
+            className="h-11 rounded-xl"
+            disabled={loading || !emailValid || !passwordOk}
+          >
             {loading ? "Creando…" : CREATE_USER_LABEL}
           </Button>
         </DialogFooter>

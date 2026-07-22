@@ -10,6 +10,7 @@ const SKIP_PATHS = [
   '/api/openapi.json',
   '/api/auth/otp/request',
   '/api/auth/otp/verify',
+  '/api/auth/login',
   '/api/auth/sso/login',
   '/api/auth/has-users',
   '/api/auth/register-first-admin',

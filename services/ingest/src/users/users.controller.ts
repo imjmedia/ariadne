@@ -76,12 +76,25 @@ export class UsersController {
 
   /** POST /internal/users/register-first-admin — crea el primer admin si no hay usuarios. */
   @Post('internal/users/register-first-admin')
-  async registerFirstAdmin(@Body() body: { email?: string; name?: string }) {
+  async registerFirstAdmin(
+    @Body() body: { email?: string; name?: string; password?: string },
+  ) {
     if (!body?.email) {
       return { error: 'email requerido' };
     }
-    const result = await this.service.registerFirstAdmin(body.email, body.name);
-    return result;
+    return this.service.registerFirstAdmin(body.email, body.name, body.password);
+  }
+
+  /**
+   * POST /internal/users/login-password
+   * Valida email+password. Usado por API AuthService.
+   */
+  @Post('internal/users/login-password')
+  async loginPassword(@Body() body: { email?: string; password?: string }) {
+    if (!body?.email || !body?.password) {
+      return { error: 'email y password requeridos' };
+    }
+    return this.service.validatePasswordLogin(body.email, body.password);
   }
 
   // ─── Públicos (protegidos por JWT + roles desde API) ───
@@ -132,9 +145,18 @@ export class UsersController {
 
   /** POST /users — Crear usuario manualmente */
   @Post('users')
-  create(@Body() body: { email?: string; name?: string; role?: UserRole }) {
+  create(
+    @Body() body: { email?: string; name?: string; role?: UserRole; password?: string },
+  ) {
     if (!body?.email) throw new Error('email requerido');
-    return this.service.create(body.email, body.name, body.role);
+    return this.service.create(body.email, body.name, body.role, body.password);
+  }
+
+  /** PATCH /users/:id/password — Establecer/cambiar contraseña */
+  @Patch('users/:id/password')
+  setPassword(@Param('id') id: string, @Body() body: { password?: string }) {
+    if (!body?.password) throw new Error('password requerido');
+    return this.service.setPassword(id, body.password);
   }
 
   /** DELETE /users/:id — Eliminar usuario */

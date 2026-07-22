@@ -99,6 +99,31 @@ export const requestOtp = async (
   return res.json();
 };
 
+/** Login básico email+password. */
+export const loginWithPassword = async (
+  email: string,
+  password: string,
+): Promise<{ valid: boolean; token?: string; user?: UserInfo }> => {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  return {
+    valid: data?.valid === true,
+    token: data?.token,
+    user: data?.user
+      ? {
+          id: data.user.id,
+          email: data.user.email,
+          role: data.user.role === 'admin' ? 'admin' : 'developer',
+          name: data.user.name || null,
+        }
+      : undefined,
+  };
+};
+
 /** Verifica OTP y devuelve token + user si es válido. */
 export const verifyOtp = async (
   email: string,

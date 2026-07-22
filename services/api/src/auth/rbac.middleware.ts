@@ -15,6 +15,11 @@ const BLOCKED_PATTERNS: Array<{ pattern: RegExp; methods: string[]; reason: stri
   { pattern: /^\/api\/projects\/[\w-]+\/?$/, methods: ['DELETE'], reason: 'Eliminar proyectos requiere admin' },
   // Proveedores: solo lectura (GET OK)
   { pattern: /^\/api\/providers/, methods: ['POST', 'PATCH', 'DELETE'], reason: 'Gestión de proveedores requiere admin' },
+  // Usuarios: CRUD admin
+  { pattern: /^\/api\/users\/?$/, methods: ['GET', 'POST'], reason: 'Gestión de usuarios requiere admin' },
+  { pattern: /^\/api\/users\/[\w-]+\/role\/?$/, methods: ['PATCH'], reason: 'Cambiar rol requiere admin' },
+  { pattern: /^\/api\/users\/[\w-]+\/password\/?$/, methods: ['PATCH'], reason: 'Cambiar contraseña de otro usuario requiere admin' },
+  { pattern: /^\/api\/users\/[\w-]+\/?$/, methods: ['DELETE'], reason: 'Eliminar usuarios requiere admin' },
 ];
 
 /**

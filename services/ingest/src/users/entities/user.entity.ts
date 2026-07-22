@@ -25,6 +25,10 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 32, default: 'developer' })
   role!: UserRole;
 
+  /** bcrypt hash de contraseña (login básico email+password). */
+  @Column({ name: 'password_hash', type: 'varchar', length: 512, nullable: true })
+  passwordHash!: string | null;
+
   /** bcrypt hash del token MCP para validación. */
   @Column({ name: 'mcp_token_hash', type: 'varchar', length: 512, nullable: true })
   mcpTokenHash!: string | null;

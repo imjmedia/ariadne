@@ -38,7 +38,7 @@ function buildNavigationGroups(user: UserInfo | null): SidebarGroup[] {
         { label: 'Dashboard', href: '/dashboard', icon: SquaresFour },
         { label: 'Dominios', href: '/domains', icon: Stack },
         { label: 'Proyectos', href: '/projects', icon: Kanban },
-        ...(isAdmin ? [{ label: 'Usuarios', href: '/users', icon: ShieldCheck }] : []),
+        ...(isAdmin ? [{ label: 'Usuarios', href: '/admin', icon: ShieldCheck }] : []),
       ],
     },
     {

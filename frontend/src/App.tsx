@@ -73,6 +73,8 @@ function App() {
             <Route path="graph-explorer" element={<ComponentGraphExplorer />} />
             <Route path="domains" element={<DomainsList />} />
             <Route path="users" element={<UsersManagement />} />
+            <Route path="admin" element={<UsersManagement />} />
+            <Route path="admin/users" element={<Navigate to="/admin" replace />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="settings/system" element={<SystemSettingsPage />} />
             <Route path="settings" element={<SettingsPage />} />

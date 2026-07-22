@@ -321,13 +321,18 @@ export class AuthService {
   async registerFirstAdmin(
     email: string,
     name?: string,
+    password?: string,
   ): Promise<{ created: boolean; message: string; user?: { id: string; email: string; role: string; name: string | null } }> {
     const normalized = email.trim().toLowerCase();
     try {
       const res = await fetch(`${INGEST_URL}/internal/users/register-first-admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalized, name: name?.trim() || null }),
+        body: JSON.stringify({
+          email: normalized,
+          name: name?.trim() || null,
+          password: password?.trim() || null,
+        }),
       });
       if (res.ok) {
         const user = await res.json() as { id: string; email: string; role: string; name: string | null };
@@ -337,6 +342,62 @@ export class AuthService {
       return { created: false, message: err.message ?? 'Error al crear administrador' };
     } catch {
       return { created: false, message: 'No se pudo conectar con el servicio de usuarios' };
+    }
+  }
+
+  /**
+   * POST /auth/login — login básico email+password.
+   * Emite el mismo JWT de sesión que OTP/SSO.
+   */
+  async loginWithPassword(
+    email: string,
+    password: string,
+  ): Promise<VerifyResult> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized || !password) {
+      return { valid: false };
+    }
+    try {
+      const res = await fetch(`${INGEST_URL}/internal/users/login-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalized, password }),
+      });
+      if (!res.ok) {
+        return { valid: false };
+      }
+      const user = (await res.json()) as {
+        id?: string;
+        email?: string;
+        role?: string;
+        name?: string | null;
+        error?: string;
+        statusCode?: number;
+        message?: string;
+      };
+      if (!user?.id || !user?.email) {
+        return { valid: false };
+      }
+      const payload: Record<string, unknown> = {
+        sub: user.email,
+        email: user.email,
+        userId: user.id,
+        role: user.role ?? 'developer',
+      };
+      if (user.name) payload.name = user.name;
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_SEC });
+      return {
+        valid: true,
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role ?? 'developer',
+          name: user.name ?? null,
+        },
+      };
+    } catch {
+      return { valid: false };
     }
   }
 }

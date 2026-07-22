@@ -494,10 +494,15 @@ export const api = {
     }),
   getMcpSecret: (id: string) =>
     request<{ mcpSecret: string; email: string; prefix: string }>(`/users/${id}/mcp-secret`),
-  createUser: (email: string, role: string) =>
+  createUser: (email: string, role: string, password?: string) =>
     request<Record<string, unknown>>('/users', {
       method: 'POST',
-      body: JSON.stringify({ email, role }),
+      body: JSON.stringify({ email, role, ...(password ? { password } : {}) }),
+    }),
+  setUserPassword: (id: string, password: string) =>
+    request<Record<string, unknown>>(`/users/${id}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ password }),
     }),
   deleteUser: (id: string) =>
     request<void>(`/users/${id}`, { method: 'DELETE' }),

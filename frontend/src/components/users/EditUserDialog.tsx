@@ -43,6 +43,7 @@ export interface EditUserDialogProps {
 
 export function EditUserDialog({ user, open, onOpenChange, onRoleSaved, onShowToken }: EditUserDialogProps) {
   const [role, setRole] = useState<"admin" | "developer">("developer")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [regenLoading, setRegenLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +51,7 @@ export function EditUserDialog({ user, open, onOpenChange, onRoleSaved, onShowTo
   useEffect(() => {
     if (!user || !open) return
     setRole(user.role)
+    setPassword("")
     setError(null)
   }, [user, open])
 
@@ -58,20 +60,33 @@ export function EditUserDialog({ user, open, onOpenChange, onRoleSaved, onShowTo
     onOpenChange(false)
   }
 
+  const passwordOk = !password || password.length >= 8
+
   const handleSaveRole = async () => {
     if (!user) return
-    if (role === user.role) {
+    if (!passwordOk) {
+      setError("Contraseña mínimo 8 caracteres")
+      return
+    }
+    const roleChanged = role !== user.role
+    const passwordSet = password.trim().length >= 8
+    if (!roleChanged && !passwordSet) {
       onOpenChange(false)
       return
     }
     setError(null)
     setLoading(true)
     try {
-      await api.updateUserRole(user.id, role)
-      onRoleSaved(user.id, role)
+      if (roleChanged) {
+        await api.updateUserRole(user.id, role)
+        onRoleSaved(user.id, role)
+      }
+      if (passwordSet) {
+        await api.setUserPassword(user.id, password.trim())
+      }
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar rol")
+      setError(err instanceof Error ? err.message : "Error al guardar")
     } finally {
       setLoading(false)
     }
@@ -100,7 +115,7 @@ export function EditUserDialog({ user, open, onOpenChange, onRoleSaved, onShowTo
         <DialogHeader>
           <DialogTitle className="text-[var(--foreground)]">Editar usuario</DialogTitle>
           <DialogDescription className="text-[var(--foreground-muted)]">
-            El correo no se puede cambiar desde aquí. Ajusta el rol o genera un nuevo token MCP (invalida el anterior).
+            Ajusta rol, contraseña o regenera token MCP.
           </DialogDescription>
         </DialogHeader>
 
@@ -141,6 +156,23 @@ export function EditUserDialog({ user, open, onOpenChange, onRoleSaved, onShowTo
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="edit-user-password" className="text-xs font-medium text-[var(--foreground-muted)]">
+              Nueva contraseña (opcional, mín. 8)
+            </Label>
+            <Input
+              id="edit-user-password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Dejar vacío para no cambiar"
+              className={cn(inputClass, "bg-[var(--card)]")}
+              disabled={loading || regenLoading}
+              aria-invalid={password.length > 0 && !passwordOk}
+            />
+          </div>
+
           <div
             className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklch,var(--muted)_42%,var(--card))] p-4 shadow-[inset_0_1px_0_0_color-mix(in_oklch,var(--foreground)_4%,transparent)]"
           >
@@ -176,7 +208,12 @@ export function EditUserDialog({ user, open, onOpenChange, onRoleSaved, onShowTo
           >
             Cancelar
           </Button>
-          <Button type="button" className="h-11 rounded-xl" disabled={loading || regenLoading} onClick={() => void handleSaveRole()}>
+          <Button
+            type="button"
+            className="h-11 rounded-xl"
+            disabled={loading || regenLoading || !passwordOk}
+            onClick={() => void handleSaveRole()}
+          >
             {loading ? "Guardando…" : "Guardar cambios"}
           </Button>
         </DialogFooter>

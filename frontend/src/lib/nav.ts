@@ -9,7 +9,7 @@ export function getActiveNavHref(pathname: string): string {
   if (pathname.startsWith('/dashboard')) return '/dashboard';
   if (pathname.startsWith('/graph-explorer')) return '/graph-explorer';
   if (pathname.startsWith('/credentials')) return '/credentials';
-  if (pathname.startsWith('/users')) return '/users';
+  if (pathname.startsWith('/users') || pathname.startsWith('/admin')) return '/admin';
   if (pathname.startsWith('/profile')) return '/profile';
   if (pathname.startsWith('/jobs')) return '/jobs';
   if (pathname.startsWith('/repos')) return '/repos';
@@ -42,7 +42,9 @@ export function breadcrumbsForPath(pathname: string): { to: string; label: strin
   if (pathname.startsWith('/repos')) return [home, { to: '/repos', label: 'Repositorios' }];
   if (pathname.startsWith('/credentials')) return [home, { to: '/credentials', label: 'Credenciales' }];
   if (pathname.startsWith('/graph-explorer')) return [home, { to: '/graph-explorer', label: 'Grafo' }];
-  if (pathname.startsWith('/users')) return [home, { to: '/users', label: 'Usuarios' }];
+  if (pathname.startsWith('/users') || pathname.startsWith('/admin')) {
+    return [home, { to: '/admin', label: 'Usuarios' }];
+  }
   if (pathname.startsWith('/profile')) return [home, { to: '/profile', label: 'Perfil' }];
   if (pathname.startsWith('/settings/system')) {
     return [home, { to: '/settings', label: 'Ajustes' }, { to: '/settings/system', label: 'Sistema' }];

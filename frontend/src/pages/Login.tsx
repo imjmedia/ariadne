@@ -1,10 +1,10 @@
 /**
- * Página de login con OTP: email → código.
+ * Login básico (email+password) + OTP opcional.
  * Si no hay usuarios registrados, redirige a /setup.
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Mail, Shield, CircleCheck } from 'lucide-react';
+import { Mail, Shield, CircleCheck, Lock, KeyRound } from 'lucide-react';
 import { AriadneLogo } from '@/components/brand/AriadneLogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LoginPageFooter } from '@/components/login/LoginPageFooter';
@@ -24,6 +24,7 @@ import {
 import {
   requestOtp,
   verifyOtp,
+  loginWithPassword,
   setToken,
   getToken,
   isTokenExpired,
@@ -32,13 +33,14 @@ import { getApiBase } from '@/lib/api-base';
 
 const API_BASE = getApiBase();
 
-type Step = 'email' | 'code' | 'sso';
+type Step = 'password' | 'otp-email' | 'otp-code';
 
 export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [step, setStep] = useState<Step>('email');
+  const [step, setStep] = useState<Step>('password');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +103,43 @@ export function Login() {
     }
   };
 
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError('Email requerido');
+      return;
+    }
+    if (!isValidEmailFormat(trimmed)) {
+      setError('Introduce un correo válido (incluye dominio, ej. empresa.com)');
+      return;
+    }
+    if (!password) {
+      setError('Contraseña requerida');
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await loginWithPassword(trimmed, password);
+      if (result.valid && result.token) {
+        if (result.user) {
+          setToken(result.token);
+          localStorage.setItem('ariadne_user', JSON.stringify(result.user));
+        } else {
+          setToken(result.token);
+        }
+        navigate('/dashboard', { replace: true });
+      } else {
+        setError('Email o contraseña incorrectos');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -117,7 +156,7 @@ export function Login() {
     try {
       const result = await requestOtp(trimmed);
       if (result.devCode) setDevCode(result.devCode);
-      setStep('code');
+      setStep('otp-code');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al solicitar OTP');
     } finally {
@@ -151,13 +190,6 @@ export function Login() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleBack = () => {
-    setStep('email');
-    setCode('');
-    setError(null);
-    setDevCode(null);
   };
 
   const token = getToken();
@@ -194,7 +226,7 @@ export function Login() {
               </p>
             </div>
 
-            {step === 'email' ? (
+            {step === 'password' ? (
               <>
                 <div className="relative w-full max-w-md">
                   <div
@@ -204,35 +236,31 @@ export function Login() {
                   <Card className="relative overflow-hidden rounded-3xl border-[var(--primary)]/25 bg-[var(--card)]/85 shadow-[0_0_0_1px_color-mix(in_oklch,var(--primary)_12%,transparent),0_25px_50px_-12px_rgba(0,0,0,0.45)] backdrop-blur-md">
                     <CardHeader className="flex flex-col items-center gap-3 border-0 px-6 pb-2 pt-8 text-center">
                       <CardTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
-                        Acceso seguro
+                        Iniciar sesión
                       </CardTitle>
                       <CardDescription className="max-w-[22rem] text-balance text-base leading-relaxed">
-                        Ingresa tu correo registrado para recibir el código de acceso.
+                        Accede con tu correo y contraseña.
                       </CardDescription>
                       <Badge
                         variant="outline"
                         className="mx-auto w-fit gap-1.5 rounded-full border-[var(--primary)]/35 px-3 py-1 text-[var(--foreground)]"
                       >
-                        <Shield className="size-3.5 shrink-0" aria-hidden />
-                        Acceso sin contraseña
+                        <Lock className="size-3.5 shrink-0" aria-hidden />
+                        Login básico
                       </Badge>
                     </CardHeader>
                     <CardContent className="flex flex-col items-center gap-5 px-6 pb-8 pt-4">
-                      <div
-                        className="h-px w-16 max-w-full bg-gradient-to-r from-transparent via-[var(--primary)]/40 to-transparent"
-                        aria-hidden
-                      />
                       <form
-                        id="login-email-form"
-                        onSubmit={handleRequestOtp}
-                        className="flex w-full max-w-sm flex-col items-center gap-5"
+                        id="login-password-form"
+                        onSubmit={handlePasswordLogin}
+                        className="flex w-full max-w-sm flex-col items-center gap-4"
                       >
-                        <div className="flex w-full flex-col items-center gap-2">
+                        <div className="flex w-full flex-col gap-2">
                           <Label
                             htmlFor="email"
-                            className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--foreground-muted)]"
+                            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--foreground-muted)]"
                           >
-                            Correo corporativo
+                            Correo
                           </Label>
                           <div className="relative w-full">
                             <Mail
@@ -263,10 +291,31 @@ export function Login() {
                             ) : null}
                           </div>
                         </div>
-                        <p className="w-full max-w-sm rounded-2xl border border-[var(--border)]/50 bg-[var(--muted)]/30 px-4 py-3 text-center text-xs leading-relaxed text-[var(--foreground-muted)] text-balance">
-                          Solo cuentas autorizadas reciben un código. Revisa spam si
-                          no ves el correo en unos minutos.
-                        </p>
+                        <div className="flex w-full flex-col gap-2">
+                          <Label
+                            htmlFor="password"
+                            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--foreground-muted)]"
+                          >
+                            Contraseña
+                          </Label>
+                          <div className="relative w-full">
+                            <KeyRound
+                              strokeWidth={2.5}
+                              className="pointer-events-none absolute left-3.5 top-1/2 z-[1] size-5 -translate-y-1/2 text-[var(--foreground)] dark:text-[var(--primary)]"
+                              aria-hidden
+                            />
+                            <Input
+                              id="password"
+                              type="password"
+                              placeholder="••••••••"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              disabled={loading}
+                              className="h-12 border-[var(--border)]/80 bg-[var(--background)]/40 pl-11 text-left text-base backdrop-blur-sm placeholder:text-[var(--foreground-muted)]"
+                              autoComplete="current-password"
+                            />
+                          </div>
+                        </div>
                         {error && (
                           <p className="text-center text-sm text-[var(--destructive)]">
                             {error}
@@ -278,11 +327,23 @@ export function Login() {
                 </div>
                 <Button
                   type="submit"
-                  form="login-email-form"
+                  form="login-password-form"
                   className="h-12 w-full max-w-sm rounded-xl text-base font-semibold shadow-lg shadow-[var(--primary)]/15"
-                  disabled={loading || !emailValid}
+                  disabled={loading || !emailValid || !password}
                 >
-                  {loading ? 'Enviando…' : 'Enviar código'}
+                  {loading ? 'Entrando…' : 'Entrar'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 w-full max-w-sm text-sm text-[var(--foreground-muted)]"
+                  onClick={() => {
+                    setStep('otp-email');
+                    setError(null);
+                  }}
+                  disabled={loading}
+                >
+                  Usar código por correo (OTP)
                 </Button>
                 {ssoEnabled && (
                   <div className="flex w-full max-w-sm flex-col gap-3">
@@ -304,6 +365,101 @@ export function Login() {
                     </Button>
                   </div>
                 )}
+              </>
+            ) : step === 'otp-email' ? (
+              <>
+                <div className="relative w-full max-w-md">
+                  <div
+                    className="pointer-events-none absolute -inset-px rounded-[1.35rem] bg-gradient-to-b from-[var(--primary)]/35 via-[var(--primary)]/8 to-transparent opacity-70 blur-md"
+                    aria-hidden
+                  />
+                  <Card className="relative overflow-hidden rounded-3xl border-[var(--primary)]/25 bg-[var(--card)]/85 shadow-[0_0_0_1px_color-mix(in_oklch,var(--primary)_12%,transparent),0_25px_50px_-12px_rgba(0,0,0,0.45)] backdrop-blur-md">
+                    <CardHeader className="flex flex-col items-center gap-3 border-0 px-6 pb-2 pt-8 text-center">
+                      <CardTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+                        Acceso con código
+                      </CardTitle>
+                      <CardDescription className="max-w-[22rem] text-balance text-base leading-relaxed">
+                        Ingresa tu correo registrado para recibir el código de acceso.
+                      </CardDescription>
+                      <Badge
+                        variant="outline"
+                        className="mx-auto w-fit gap-1.5 rounded-full border-[var(--primary)]/35 px-3 py-1 text-[var(--foreground)]"
+                      >
+                        <Shield className="size-3.5 shrink-0" aria-hidden />
+                        OTP
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center gap-5 px-6 pb-8 pt-4">
+                      <form
+                        id="login-email-form"
+                        onSubmit={handleRequestOtp}
+                        className="flex w-full max-w-sm flex-col items-center gap-5"
+                      >
+                        <div className="flex w-full flex-col items-center gap-2">
+                          <Label
+                            htmlFor="otp-email"
+                            className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--foreground-muted)]"
+                          >
+                            Correo corporativo
+                          </Label>
+                          <div className="relative w-full">
+                            <Mail
+                              strokeWidth={2.5}
+                              className="pointer-events-none absolute left-3.5 top-1/2 z-[1] size-5 -translate-y-1/2 text-[var(--foreground)] dark:text-[var(--primary)]"
+                              aria-hidden
+                            />
+                            <Input
+                              id="otp-email"
+                              type="email"
+                              placeholder="tu@empresa.com"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              disabled={loading}
+                              autoFocus
+                              className={cn(
+                                'h-12 border-[var(--border)]/80 bg-[var(--background)]/40 pl-11 text-left text-base backdrop-blur-sm placeholder:text-[var(--foreground-muted)]',
+                                emailValid ? 'pr-11' : 'pr-3.5',
+                              )}
+                              autoComplete="email"
+                              aria-invalid={emailTrimmed.length > 0 && !emailValid}
+                            />
+                            {emailValid ? (
+                              <CircleCheck
+                                className="pointer-events-none absolute right-3.5 top-1/2 size-[1.125rem] -translate-y-1/2 text-[var(--success)]"
+                                aria-hidden
+                              />
+                            ) : null}
+                          </div>
+                        </div>
+                        {error && (
+                          <p className="text-center text-sm text-[var(--destructive)]">
+                            {error}
+                          </p>
+                        )}
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Button
+                  type="submit"
+                  form="login-email-form"
+                  className="h-12 w-full max-w-sm rounded-xl text-base font-semibold shadow-lg shadow-[var(--primary)]/15"
+                  disabled={loading || !emailValid}
+                >
+                  {loading ? 'Enviando…' : 'Enviar código'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full max-w-sm rounded-xl border-[var(--border)]/80"
+                  onClick={() => {
+                    setStep('password');
+                    setError(null);
+                  }}
+                  disabled={loading}
+                >
+                  Volver a contraseña
+                </Button>
               </>
             ) : (
               <>
@@ -387,7 +543,12 @@ export function Login() {
                     type="button"
                     variant="outline"
                     className="h-11 w-full rounded-xl border-[var(--border)]/80"
-                    onClick={handleBack}
+                    onClick={() => {
+                      setStep('otp-email');
+                      setCode('');
+                      setError(null);
+                      setDevCode(null);
+                    }}
                     disabled={loading}
                   >
                     Volver al correo

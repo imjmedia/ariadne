@@ -46,6 +46,31 @@ export class AuthController {
   }
 
   /**
+   * POST /auth/login — login básico (email + password).
+   */
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(
+    @Body() body: { email?: string; password?: string },
+  ): Promise<{
+    valid: boolean;
+    token?: string;
+    user?: { id: string; email: string; role: string; name: string | null };
+  }> {
+    const email = body?.email;
+    const password = body?.password;
+    if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+      return { valid: false };
+    }
+    const result = await this.authService.loginWithPassword(email, password);
+    return {
+      valid: result.valid,
+      token: result.token,
+      user: result.user,
+    };
+  }
+
+  /**
    * POST /auth/sso/login
    * Login mediante SSO externo. El SSO debe proporcionar un token que la API valida
    * contra SSO_URL/verify. El SSO_URL debe devolver { email, role, name }.
@@ -89,12 +114,12 @@ export class AuthController {
   @Post('register-first-admin')
   @HttpCode(HttpStatus.CREATED)
   async registerFirstAdmin(
-    @Body() body: { email?: string; name?: string },
+    @Body() body: { email?: string; name?: string; password?: string },
   ) {
     const email = body?.email;
     if (!email || typeof email !== 'string') {
       throw new BadRequestException('email es requerido');
     }
-    return this.authService.registerFirstAdmin(email, body?.name);
+    return this.authService.registerFirstAdmin(email, body?.name, body?.password);
   }
 }

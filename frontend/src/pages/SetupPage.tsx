@@ -17,6 +17,7 @@ export function SetupPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -48,13 +49,21 @@ export function SetupPage() {
       setError('Email requerido');
       return;
     }
+    if (!password.trim() || password.trim().length < 8) {
+      setError('Contraseña mínimo 8 caracteres');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`${API_BASE}/auth/register-first-admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), name: name.trim() || undefined }),
+        body: JSON.stringify({
+          email: email.trim(),
+          name: name.trim() || undefined,
+          password: password.trim(),
+        }),
       });
       const data = await res.json();
       if (data?.created && data?.user) {
@@ -91,8 +100,7 @@ export function SetupPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Ahora inicia sesión con tu email para acceder al sistema.
-              Recibirás un código OTP en tu correo.
+              Ahora inicia sesión con tu email y contraseña.
             </p>
             <Button
               type="button"
@@ -147,6 +155,19 @@ export function SetupPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={loading}
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <Label htmlFor="setup-password">Contraseña (mín. 8)</Label>
+              <Input
+                id="setup-password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                autoComplete="new-password"
                 className="mt-2"
               />
             </div>
