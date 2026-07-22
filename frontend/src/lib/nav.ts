@@ -47,7 +47,7 @@ export function breadcrumbsForPath(pathname: string): { to: string; label: strin
   if (pathname.startsWith('/settings/system')) {
     return [home, { to: '/settings', label: 'Ajustes' }, { to: '/settings/system', label: 'Sistema' }];
   }
-  if (pathname.startsWith('/settings')) return [home, { to: '/settings', label: 'Ajustes IA' }];
+  if (pathname.startsWith('/settings')) return [home, { to: '/settings', label: 'Ajustes' }];
   if (pathname.startsWith('/ayuda')) return [home, { to: '/ayuda', label: 'Ayuda' }];
 
   return [home, { to: pathname, label: 'Página' }];

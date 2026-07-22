@@ -172,7 +172,7 @@ export function SystemSettingsPage() {
             </Link>
             .{' '}
             <Link to="/settings" className="text-primary underline-offset-4 hover:underline">
-              Ajustes IA
+              Ajustes
             </Link>
           </p>
         </div>

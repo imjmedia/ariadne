@@ -53,7 +53,7 @@ function buildNavigationGroups(user: UserInfo | null): SidebarGroup[] {
       items: [
         { label: 'Grafo', href: '/graph-explorer', icon: ShareNetwork },
         ...(isAdmin ? [{ label: 'Credenciales', href: '/credentials', icon: Key }] : []),
-        ...(isAdmin ? [{ label: 'Ajustes IA', href: '/settings', icon: Gear }] : []),
+        ...(isAdmin ? [{ label: 'Ajustes', href: '/settings', icon: Gear }] : []),
         ...(isAdmin ? [{ label: 'Sistema', href: '/settings/system', icon: Faders }] : []),
       ],
     },

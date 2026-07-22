@@ -31,9 +31,18 @@ import {
   settingsCheckboxClass,
   settingsPageClass,
   settingsSectionBodyClass,
+  settingsTabListClass,
+  settingsTabPillClass,
   settingsToggleFieldClass,
 } from './settingsUiClasses';
 import { SettingsTheForgeCard } from './SettingsTheForgeCard';
+
+type SettingsTabId = 'llm' | 'theforge';
+
+const SETTINGS_TABS: Array<{ id: SettingsTabId; label: string }> = [
+  { id: 'llm', label: 'Ajustes IA' },
+  { id: 'theforge', label: 'Integración The Forge' },
+];
 
 interface FormState {
   provider: LlmProviderId;
@@ -93,6 +102,7 @@ export function SettingsPage() {
   const user = getUser();
   const isAdmin = user?.role === 'admin';
 
+  const [activeTab, setActiveTab] = useState<SettingsTabId>('llm');
   const [catalog, setCatalog] = useState<LlmProviderCatalogEntry[]>([]);
   const [settings, setSettings] = useState<LlmSettingsMasked | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
@@ -226,11 +236,44 @@ export function SettingsPage() {
     );
   }
 
-  if (loading || !form) {
-    return (
-      <div className={settingsPageClass}>
-        <Skeleton className="h-12 w-full max-w-md rounded-lg" />
-        <section className={sectionShellClass} aria-busy="true" aria-label="Cargando ajustes">
+  const activeTabMeta = SETTINGS_TABS.find((t) => t.id === activeTab)!;
+  const llmLoading = loading || !form;
+
+  return (
+    <div className={settingsPageClass}>
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes</h1>
+        <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">
+          Proveedor de IA e integraciones opcionales.{' '}
+          <a href="/settings/system" className="text-[var(--primary)] underline-offset-4 hover:underline">
+            Configuración del sistema
+          </a>{' '}
+          (SMTP, CORS, Falkor, observabilidad).
+        </p>
+      </header>
+
+      <nav className={settingsTabListClass} aria-label="Secciones de ajustes">
+        {SETTINGS_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={settingsTabPillClass(activeTab === tab.id)}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      {activeTab === 'llm' && llmLoading ? (
+        <section
+          className={sectionShellClass}
+          role="tabpanel"
+          aria-label={activeTabMeta.label}
+          aria-busy="true"
+        >
           <div className={sectionHeaderClass}>
             <Skeleton className="h-6 w-40" />
           </div>
@@ -239,46 +282,38 @@ export function SettingsPage() {
             <Skeleton className="h-10 w-full rounded-xl" />
           </div>
         </section>
-      </div>
-    );
-  }
-
-  return (
-    <div className={settingsPageClass}>
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Ajustes IA</h1>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--foreground-muted)]">
-          Lo esencial para conectar el LLM.{' '}
-          <a href="/settings/system" className="text-[var(--primary)] underline-offset-4 hover:underline">
-            Configuración del sistema
-          </a>{' '}
-          (SMTP, CORS, Falkor, observabilidad).
-        </p>
-      </header>
-
-      {error ? (
-        <Alert variant="destructive" className={settingsAlertClass}>
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
-      {success ? (
-        <Alert className={settingsAlertClass}>
-          <AlertTitle>Guardado</AlertTitle>
-          <AlertDescription>{success}</AlertDescription>
-        </Alert>
-      ) : null}
-      {testResult ? (
-        <Alert variant={testResult.ok ? 'default' : 'destructive'} className={settingsAlertClass}>
-          <AlertTitle>{testResult.ok ? 'Conexión OK' : 'Conexión fallida'}</AlertTitle>
-          <AlertDescription className="whitespace-pre-wrap break-words text-xs">
-            {testResult.message}
-            {testResult.model ? `\nModelo: ${testResult.model}` : ''}
-          </AlertDescription>
-        </Alert>
       ) : null}
 
-      <section className={sectionShellClass} aria-labelledby="llm-settings-heading">
+      {activeTab === 'llm' && !llmLoading && form ? (
+        <>
+          {error ? (
+            <Alert variant="destructive" className={settingsAlertClass}>
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {success ? (
+            <Alert className={settingsAlertClass}>
+              <AlertTitle>Guardado</AlertTitle>
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          ) : null}
+          {testResult ? (
+            <Alert variant={testResult.ok ? 'default' : 'destructive'} className={settingsAlertClass}>
+              <AlertTitle>{testResult.ok ? 'Conexión OK' : 'Conexión fallida'}</AlertTitle>
+              <AlertDescription className="whitespace-pre-wrap break-words text-xs">
+                {testResult.message}
+                {testResult.model ? `\nModelo: ${testResult.model}` : ''}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <section
+            className={sectionShellClass}
+            role="tabpanel"
+            aria-labelledby="llm-settings-heading"
+            aria-label={activeTabMeta.label}
+          >
         <div className={sectionHeaderClass}>
           <h2 id="llm-settings-heading" className="text-base font-semibold text-[var(--foreground)]">
             Proveedor de IA
@@ -523,9 +558,15 @@ export function SettingsPage() {
             Fallback: variables <code className="text-xs">LLM_*</code> en el entorno hasta guardar aquí.
           </p>
         </div>
-      </section>
+          </section>
+        </>
+      ) : null}
 
-      <SettingsTheForgeCard />
+      {activeTab === 'theforge' ? (
+        <div role="tabpanel" aria-label={activeTabMeta.label}>
+          <SettingsTheForgeCard />
+        </div>
+      ) : null}
     </div>
   );
 }
