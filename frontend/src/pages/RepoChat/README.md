@@ -47,8 +47,9 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **AnalysisMarkdownReport.tsx** | Markdown del informe con semáforo por fila/sección |
 | **ChatAnalysisSheet.tsx** | Alias legacy del panel (sin drawer) |
 | **ChatOptionsPopover.tsx** | Modo pipeline + alcance |
-| **ChatAssistantContent.tsx** | MDD / Markdown / Mermaid; sección **Archivos a tocar** en `<details>` colapsado |
-| **chat-archivos-section.util.ts** | Parte el markdown para aislar `##`/`### Archivos a tocar` |
+| **ChatAssistantContent.tsx** | MDD / Markdown / Mermaid; sección **Archivos a tocar** colapsada |
+| **ArchivosATocarSection.tsx** | `<details>` + tabla (Archivo, Repo, **Qué tocar/modificar**, Símbolo) |
+| **chat-archivos-section.util.ts** | Parte el markdown y parsea tablas/viñetas de «Archivos a tocar» |
 | **FullAuditModal.tsx** | Full Repo Audit |
 | **chatConstants.ts** | Etiquetas y acciones de análisis |
 | **analysis-semaphore.util.ts** | Heurística de severidad en markdown |

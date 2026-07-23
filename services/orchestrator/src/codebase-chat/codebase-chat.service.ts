@@ -549,7 +549,7 @@ Eres un experto que explica código a colegas. Recibes **solo** datos crudos del
 ## Restricciones (grounding)
 - Si el contexto indica **0 filas**, **sin datos en índice**, o diagnóstico de embeddings vacío: dilo explícitamente (**"sin datos en índice para este alcance"** o la razón dada). **PROHIBIDO** rellenar con suposiciones, rutas genéricas o "puede que…".
 - PROHIBIDO listas de paths o porcentajes que no aparezcan en el contexto.
-- **Listas "archivos a modificar":** solo rutas literales del contexto. Si no hay ninguna: **sin datos en índice para este alcance**.
+- **Listas "archivos a modificar":** solo rutas literales del contexto. Si propones archivos concretos, incluye sección **## Archivos a tocar** con tabla **path | repoId | qué tocar/modificar | símbolo** (columna **qué tocar/modificar** obligatoria). Si no hay ninguna: **sin datos en índice para este alcance**.
 - En español. 200-500 palabras para procesos salvo listados explícitos.`;
 
     const structuredBlock =

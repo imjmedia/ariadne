@@ -5,10 +5,9 @@
 import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
-import { cn } from '@/lib/utils';
+import { ArchivosATocarSection } from './ArchivosATocarSection';
 import { splitArchivosATocarSection } from './chat-archivos-section.util';
 
 function tryParseJsonObject(s: string): Record<string, unknown> | null {
@@ -76,29 +75,11 @@ function AssistantMarkdown({ content }: { content: string }) {
 
 function ArchivosATocarDetails(props: { title: string; body: string }) {
   return (
-    <details
-      className={cn(
-        'group my-2 rounded-lg border border-[var(--border)]',
-        'bg-[color-mix(in_oklch,var(--muted)_20%,var(--card))]',
-      )}
-    >
-      <summary
-        className={cn(
-          'flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-2',
-          'text-[11px] font-medium text-[var(--foreground-muted)]',
-          '[&::-webkit-details-marker]:hidden',
-        )}
-      >
-        <span className="text-[var(--foreground)]">{props.title}</span>
-        <ChevronDown
-          className="size-3.5 shrink-0 transition-transform group-open:rotate-180"
-          aria-hidden
-        />
-      </summary>
-      <div className="border-t border-[var(--border)] px-2.5 py-2">
-        <AssistantMarkdown content={props.body || '_Sin detalle._'} />
-      </div>
-    </details>
+    <ArchivosATocarSection
+      title={props.title}
+      body={props.body}
+      renderPreamble={(preamble) => <AssistantMarkdown content={preamble} />}
+    />
   );
 }
 
