@@ -1195,6 +1195,11 @@ Máximo 6 líneas útiles. En español.`;
     return lines.slice(0, mode === 'both' ? 6 : 5);
   }
 
+  /**
+   * Plan completo (archivos + preguntas). Con `ORCHESTRATOR_URL`, delega preguntas al orch;
+   * el orch debe pedir archivos solo a `POST /internal/.../modification-plan-files` (nunca a este
+   * endpoint público) para evitar el bucle ingest↔orchestrator.
+   */
   async getModificationPlan(
     repositoryId: string,
     userDescription: string,

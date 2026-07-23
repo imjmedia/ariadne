@@ -21,8 +21,8 @@ START → route_intent (modelo router en Ajustes)
 - **`POST /codebase/chat/project/:projectId`** — Igual, alcance proyecto multi-repo. Preguntas de **endpoints Strapi no usados** → early-return a ingest **`POST /internal/projects/:projectId/unused-api-endpoints`** (sin LangGraph). El ingest, en **`execute_cypher`**, usa los **cypherShardContexts** del proyecto (whitelist de dominios) para unir resultados de varios grafos Falkor con el `projectId` correcto por nodo.
 - **`POST /codebase/analyze/repository/:repositoryId`** — Body `{ mode }`. Llama a ingest `internal/.../analyze-prep` (sin LLM en ingest salvo recopilar datos) y ejecuta la síntesis LLM aquí si `kind === 'llm'`.
 - **`POST /codebase/analyze/project/:projectId`** — Body `{ mode: 'agents' | 'skill' }` para AGENTS.md / SKILL.md vía prep por proyecto.
-- **`POST /codebase/modification-plan/repository/:repositoryId`** — Body `{ userDescription, scope? }`. Lista de archivos desde ingest (`modification-plan-files`); preguntas de afinación generadas con LLM en orchestrator.
-- **`POST /codebase/modification-plan/project/:projectId`** — Igual; `projectId` puede ser proyecto Ariadne o `roots[].id` (repo).
+- **`POST /codebase/modification-plan/repository/:repositoryId`** — Body `{ userDescription, scope? }`. Lista de archivos desde ingest **`POST /internal/repositories/:id/modification-plan-files`** (solo grafo; **no** el endpoint público `…/modification-plan`, que reenvía al orchestrator y provocaría un bucle + timeout 120s). Preguntas de afinación con LLM aquí.
+- **`POST /codebase/modification-plan/project/:projectId`** — Igual vía **`POST /internal/projects/:id/modification-plan-files`**; `projectId` puede ser proyecto Ariadne o `roots[].id` (repo).
 
 Variables: `INGEST_URL`, y **`LLM_*`** (u opciones legacy) — preguntas de modification-plan y síntesis de analyze/chat. **`CHAT_TOOL_CALL_MAX_TOKENS`** (default 8192): `max_tokens` en la fase retrieve con tools (misma semántica que en ingest). Ver [../llm/README.md](../llm/README.md).
 

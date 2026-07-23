@@ -96,34 +96,36 @@ export class IngestChatClient {
     });
   }
 
+  /**
+   * Solo archivos (Cypher + RAG). Usa el endpoint interno para no reentrar en
+   * ingest `GET/POST .../modification-plan` → orchestrator → ingest (bucle + timeout 120s).
+   */
   async fetchModificationPlanFilesRepository(
     repositoryId: string,
     userDescription: string,
     scope?: ChatScope,
   ): Promise<ModificationPlanResult['filesToModify']> {
-    const full = await this.fetchModificationPlanRepository(repositoryId, userDescription, scope);
-    return full.filesToModify;
+    const url = `${this.ingestBase()}/internal/repositories/${encodeURIComponent(repositoryId)}/modification-plan-files`;
+    const data = await fetchIngestJson<{ filesToModify?: ModificationPlanResult['filesToModify'] }>(url, {
+      body: { userDescription, scope },
+      timeoutMs: 120_000,
+      label: 'modification-plan-files',
+    });
+    return Array.isArray(data.filesToModify) ? data.filesToModify : [];
   }
 
+  /** Archivos del plan sin preguntas LLM (el orchestrator las genera aparte). */
   async fetchModificationPlanRepository(
     repositoryId: string,
     userDescription: string,
     scope?: ChatScope,
   ): Promise<ModificationPlanResult> {
-    const url = `${this.ingestBase()}/repositories/${encodeURIComponent(repositoryId)}/modification-plan`;
-    const data = await fetchIngestJson<ModificationPlanResult>(url, {
-      body: { userDescription, scope },
-      timeoutMs: 120_000,
-      label: 'modification-plan',
-    });
-    return {
-      filesToModify: Array.isArray(data.filesToModify) ? data.filesToModify : [],
-      questionsToRefine: Array.isArray(data.questionsToRefine) ? data.questionsToRefine : [],
-      ...(data.warnings ? { warnings: data.warnings } : {}),
-      ...(data.diagnostic ? { diagnostic: data.diagnostic } : {}),
-      ...(data.graphEvidenceBundle ? { graphEvidenceBundle: data.graphEvidenceBundle } : {}),
-      ...(data.changePlanTemplate ? { changePlanTemplate: data.changePlanTemplate } : {}),
-    };
+    const filesToModify = await this.fetchModificationPlanFilesRepository(
+      repositoryId,
+      userDescription,
+      scope,
+    );
+    return { filesToModify, questionsToRefine: [] };
   }
 
   async fetchMddEvidence(
@@ -154,8 +156,13 @@ export class IngestChatClient {
     userDescription: string,
     scope?: ChatScope,
   ): Promise<ModificationPlanResult['filesToModify']> {
-    const full = await this.fetchModificationPlanProject(projectId, userDescription, scope);
-    return full.filesToModify;
+    const url = `${this.ingestBase()}/internal/projects/${encodeURIComponent(projectId)}/modification-plan-files`;
+    const data = await fetchIngestJson<{ filesToModify?: ModificationPlanResult['filesToModify'] }>(url, {
+      body: { userDescription, scope },
+      timeoutMs: 120_000,
+      label: 'modification-plan-files-project',
+    });
+    return Array.isArray(data.filesToModify) ? data.filesToModify : [];
   }
 
   async fetchModificationPlanProject(
@@ -163,20 +170,12 @@ export class IngestChatClient {
     userDescription: string,
     scope?: ChatScope,
   ): Promise<ModificationPlanResult> {
-    const url = `${this.ingestBase()}/projects/${encodeURIComponent(projectId)}/modification-plan`;
-    const data = await fetchIngestJson<ModificationPlanResult>(url, {
-      body: { userDescription, scope },
-      timeoutMs: 120_000,
-      label: 'modification-plan-project',
-    });
-    return {
-      filesToModify: Array.isArray(data.filesToModify) ? data.filesToModify : [],
-      questionsToRefine: Array.isArray(data.questionsToRefine) ? data.questionsToRefine : [],
-      ...(data.warnings ? { warnings: data.warnings } : {}),
-      ...(data.diagnostic ? { diagnostic: data.diagnostic } : {}),
-      ...(data.graphEvidenceBundle ? { graphEvidenceBundle: data.graphEvidenceBundle } : {}),
-      ...(data.changePlanTemplate ? { changePlanTemplate: data.changePlanTemplate } : {}),
-    };
+    const filesToModify = await this.fetchModificationPlanFilesProject(
+      projectId,
+      userDescription,
+      scope,
+    );
+    return { filesToModify, questionsToRefine: [] };
   }
 
   async fetchUnusedApiEndpointsProject(
