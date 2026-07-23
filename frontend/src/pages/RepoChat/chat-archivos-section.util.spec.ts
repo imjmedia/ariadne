@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { splitArchivosATocarSection } from './chat-archivos-section.util';
+import {
+  parseArchivosATocarSection,
+  splitArchivosATocarSection,
+} from './chat-archivos-section.util';
 
 describe('splitArchivosATocarSection', () => {
   it('returns null section when heading is absent', () => {
@@ -70,5 +73,59 @@ describe('splitArchivosATocarSection', () => {
       section: { title: 'Archivos a tocar', body: '- solo.ts' },
       after: '',
     });
+  });
+});
+
+describe('parseArchivosATocarSection', () => {
+  it('parses GFM table with qué tocar/modificar column aliases', () => {
+    const body = [
+      '| path | repoId | qué tocar/modificar | símbolo |',
+      '| --- | --- | --- | --- |',
+      '| src/a.ts | repo-1 | Extraer validación | validate |',
+      '| src/b.ts | repo-1 | Añadir tests | — |',
+    ].join('\n');
+
+    const parsed = parseArchivosATocarSection(body);
+    expect(parsed.rows).toHaveLength(2);
+    expect(parsed.rows[0]).toEqual({
+      path: 'src/a.ts',
+      repoId: 'repo-1',
+      queTocar: 'Extraer validación',
+      simbolo: 'validate',
+    });
+    expect(parsed.rows[1]?.queTocar).toBe('Añadir tests');
+  });
+
+  it('maps motivo column to queTocar', () => {
+    const body = ['| path | motivo |', '| --- | --- |', '| a.ts | refactor hook |'].join('\n');
+    expect(parseArchivosATocarSection(body).rows[0]).toEqual({
+      path: 'a.ts',
+      queTocar: 'refactor hook',
+    });
+  });
+
+  it('parses bullet list with repo inline and change hint', () => {
+    const body = [
+      '- `frontend/src/App.tsx` (repo: abc-123) — conectar nuevo endpoint',
+      '- `backend/handler.ts` · mover lógica de dominio',
+    ].join('\n');
+    const parsed = parseArchivosATocarSection(body);
+    expect(parsed.rows).toEqual([
+      {
+        path: 'frontend/src/App.tsx',
+        repoId: 'abc-123',
+        queTocar: 'conectar nuevo endpoint',
+      },
+      {
+        path: 'backend/handler.ts',
+        queTocar: 'mover lógica de dominio',
+      },
+    ]);
+  });
+
+  it('returns empty rows and preamble when body is plain prose', () => {
+    const parsed = parseArchivosATocarSection('Sin archivos concretos en el índice.');
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.preamble).toContain('Sin archivos');
   });
 });

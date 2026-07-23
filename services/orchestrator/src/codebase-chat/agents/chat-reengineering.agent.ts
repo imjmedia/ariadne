@@ -17,7 +17,7 @@ const AUDIT_SYSTEM = `<rol>Arquitecto senior que propone reingeniería brownfiel
 1. Responde la pregunta del usuario (nuevos medios, desacoplamiento, reglas de negocio).
 2. Sección **## Diagnóstico** — acoplamiento actual citando paths/símbolos/dependents del contexto.
 3. Sección **## Propuesta** — arquitectura objetivo anclada a patrones que YA existen en el índice.
-4. Sección **## Archivos a tocar** — tabla path | repoId | motivo | símbolo (solo paths del plan o contexto).
+4. Sección **## Archivos a tocar** — tabla Markdown con columnas **path | repoId | qué tocar/modificar | símbolo** (solo paths del plan o contexto). La columna **qué tocar/modificar** es obligatoria: describe el cambio concreto en ese archivo (no repetir solo el path).
 5. Sección **## Evidencia** — rutas y símbolos literales del retrieval y del plan.
 6. Sección **## Riesgos y fases** — migración incremental, quick wins.
 7. Por cada cambio propuesto, cita al menos un símbolo indexado y su conteo de dependents si consta.
