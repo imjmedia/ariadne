@@ -1,10 +1,13 @@
 # Git y IDE
 .git
 .gitignore
-.cursor
 .vscode
 *.swp
 *.swo
+# .cursor except skills copied into frontend ayuda
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
 
 # Dependencies (se reinstalan en build)
 **/node_modules
@@ -16,5 +19,15 @@
 .tmp
 .cache
 
-# Otros servicios (solo necesitamos frontend, mcp-ariadne, docs)
-# Se incluye todo pero se excluye lo pesado de arriba
+# Tests y artefactos CI (no necesarios en imágenes)
+**/coverage
+**/.playwright
+**/playwright-report
+**/test-results
+**/__tests__
+**/*.spec.ts
+**/*.test.ts
+frontend/e2e
+
+# Servicios no incluidos en docker-compose producción
+services/cartographer
