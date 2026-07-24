@@ -22,9 +22,9 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
-# Ayuda in-app (prebuild → copy-docs)
+# Ayuda in-app (prebuild → copy-docs; SKILLS.md en raíz, no .cursor/ que no va al repo)
 COPY docs ./docs
-COPY .cursor/skills ./.cursor/skills
+COPY SKILLS.md ./SKILLS.md
 
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
