@@ -13,6 +13,7 @@ import type {
 } from './theforge-converge.types';
 import type { TheForgeIntegrationEffective } from './theforge-integration.types';
 import { TheForgeIntegrationService } from './theforge-integration.service';
+import { normalizeForgeApiBase } from './forge-http.util';
 
 const VALID_MODES = new Set<TheForgeConvergeTriggerMode>(['off', 'full', 'incremental', 'all']);
 
@@ -84,10 +85,15 @@ export class TheForgeConvergeService {
     }
 
     const cfg = await this.integration.getEffective();
-    const apiBase = cfg.apiUrl?.trim();
+    const apiBase =
+      cfg.transport === 'rest'
+        ? cfg.apiUrl?.trim()
+        : cfg.configuredUrl
+          ? normalizeForgeApiBase(cfg.configuredUrl)
+          : null;
     if (!apiBase) {
       this.logger.warn(
-        `TheForge converge skipped for repo ${repositoryId}: URL API no configurada (Ajustes → The Forge o THEFORGE_API_URL)`,
+        `TheForge converge skipped for repo ${repositoryId}: URL API REST no configurada (modo MCP no soporta converge/trigger; usa …/api + JWT REST)`,
       );
       return { triggered: false, reason: 'no_theforge_api_url', mode, theforgeProjectId };
     }

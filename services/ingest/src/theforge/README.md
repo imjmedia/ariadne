@@ -14,10 +14,19 @@ Per-repository config on `repositories`:
 
 **URL y JWT (servidor):**
 
-- **Ajustes → The Forge → URL API** — base REST usada por catálogo brownfield, promoción chat y **converge post-sync**
-- **Ajustes → JWT de servicio** — Bearer por defecto (fallback `THEFORGE_SERVICE_JWT`)
+- **Ajustes → The Forge → URL** — base REST (`…/api`) o MCP Streamable HTTP (`…/mcp`)
+- **Ajustes → Token/JWT** — Secret MCP o JWT sesión (modo `/mcp`); JWT servicio REST (modo `/api`)
 - `THEFORGE_API_URL` — fallback de URL si no hay valor guardado en Ajustes
 - Token por repo (`theforge_service_token_encrypted`) — override opcional del JWT global
+
+**Modos de transporte**
+
+| URL configurada | Transporte | Catálogo brownfield / promoción chat |
+|-----------------|------------|--------------------------------------|
+| `…/mcp` | MCP (`tools/call`) | `list_projects`, `resolve_forge_project_for_ariadne`, `create_stage_from_ariadne_change_pack` |
+| `…/api` | REST HTTP | `GET /projects`, `POST /theforge/*` |
+
+Brownfield **converge** post-sync sigue usando REST (`POST …/projects/:id/converge/trigger`); en modo MCP solo requiere JWT REST si se activa converge por repo.
 
 **Hook points:** `SyncService.runFullSync` (full/resync) and `WebhooksService.handleBitbucketPush` (incremental) call `TheForgeConvergeService.triggerAfterSync` after a successful job. Failures are logged only; they do not fail the sync.
 
@@ -37,18 +46,19 @@ Integración **opt-in** en **Ajustes (admin)**. Ariadne OSS no requiere The Forg
 **Endpoints (ingest):**
 
 - `GET /theforge-integration/status` — UI chat / proyectos (¿mostrar botón?)
-- `GET /theforge-integration/brownfield-projects` — Selector LEGACY para vincular proyecto Ariadne (REST a The Forge `GET /projects` Workshop; detecta LEGACY por `projectType`, alias `BROWNFIELD`, o `stages[].isLegacy`)
+- `GET /theforge-integration/brownfield-projects` — Selector LEGACY (MCP `list_projects` si URL termina en `/mcp`; si no REST `GET /projects`)
 
 **Troubleshooting selector vacío**
 
 | Síntoma | Causa habitual |
 |---------|----------------|
-| `503` + Method Not Allowed | `THEFORGE_API_URL` apuntaba a `/mcp`; Ariadne normaliza a `…/api` |
-| `FORGE_WRONG_API_URL` | URL devuelve HTML (SPA) o apunta a Ariadne; usar base Nest `…/api` |
-| Lista vacía | JWT sin acceso a Workshop o filas sin `projectType`/`stages[].isLegacy` |
-| `503 FORGE_NO_SERVICE_TOKEN` | Falta JWT en Ajustes o `THEFORGE_SERVICE_JWT` |
+| `401` en `/api/projects` con URL `/mcp` | Versión antigua reescribía a REST; actualiza ingest: con `/mcp` debe usar MCP |
+| `503` + Method Not Allowed | URL `/mcp` usada como REST directo (legacy) |
+| `FORGE_WRONG_API_URL` | URL devuelve HTML (SPA) o apunta a Ariadne |
+| Lista vacía | Token sin acceso a Workshop o filas sin `projectType`/`stages[].isLegacy` |
+| `503 FORGE_NO_SERVICE_TOKEN` | Falta token en Ajustes o `THEFORGE_SERVICE_JWT` |
 
-La vinculación usa **HTTP** (URL API de Ajustes + Bearer servicio), no el MCP de The Forge en Cursor.
+La vinculación usa **MCP** (`…/mcp` + Secret MCP/JWT) o **REST** (`…/api` + JWT servicio), según la URL en Ajustes.
 
 **Endpoints (ingest, cont.):**
 - `GET/PUT /theforge-integration` — admin (Ajustes)

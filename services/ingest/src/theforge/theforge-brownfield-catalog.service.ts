@@ -20,7 +20,9 @@ import {
   readForgeProjectName,
   readForgeProjectType,
 } from './forge-project-list.util';
+import { forgeMcpCallToolJson } from './forge-mcp.util';
 import { TheForgeIntegrationService } from './theforge-integration.service';
+import type { TheForgeIntegrationEffective } from './theforge-integration.types';
 
 export interface ForgeBrownfieldProjectOption {
   id: string;
@@ -33,11 +35,13 @@ export interface ForgeBrownfieldListResult {
   projects: ForgeBrownfieldProjectOption[];
   hint?: string;
   diagnostics?: {
-    pathsTried: string[];
-    apiBasesTried: string[];
-    totalRowsSeen: number;
-    sampleTypes: string[];
-    htmlResponses: number;
+    transport?: 'rest' | 'mcp';
+    mcpUrl?: string | null;
+    pathsTried?: string[];
+    apiBasesTried?: string[];
+    totalRowsSeen?: number;
+    sampleTypes?: string[];
+    htmlResponses?: number;
   };
 }
 
@@ -65,7 +69,11 @@ export class TheForgeBrownfieldCatalogService {
     }
 
     const cfg = await this.integration.getEffective();
-    const configuredUrl = cfg.apiUrl?.trim() ?? '';
+    if (cfg.transport === 'mcp' && cfg.mcpUrl) {
+      return this.listBrownfieldProjectsViaMcp(cfg);
+    }
+
+    const configuredUrl = cfg.apiUrl?.trim() ?? cfg.configuredUrl?.trim() ?? '';
     const apiBases = collectForgeApiBaseCandidates(configuredUrl);
     let lastError: { status: number; message: string } | null = null;
     const pathsTried: string[] = [];
@@ -192,6 +200,69 @@ export class TheForgeBrownfieldCatalogService {
             ? 'THEFORGE_API_URL respondió HTML en lugar de JSON. Usa la base de la API REST (p. ej. https://tu-dominio/api), no /mcp ni la URL del frontend.'
             : 'The Forge respondió sin proyectos Workshop en GET /projects. Verifica THEFORGE_API_URL y permisos del JWT de servicio.',
       diagnostics,
+    };
+  }
+
+  private async listBrownfieldProjectsViaMcp(
+    cfg: TheForgeIntegrationEffective,
+  ): Promise<ForgeBrownfieldListResult> {
+    this.logger.log(`Forge brownfield list via MCP (${cfg.mcpUrl})`);
+    const body = await forgeMcpCallToolJson<unknown>(cfg, 'list_projects', {});
+    const rows = extractForgeProjectRows(body);
+
+    if (rows.length === 0) {
+      return {
+        projects: [],
+        hint: 'The Forge MCP list_projects no devolvió proyectos Workshop.',
+        diagnostics: { transport: 'mcp', mcpUrl: cfg.mcpUrl },
+      };
+    }
+
+    if (isLikelyAriadneProjectList(rows)) {
+      throw new ServiceUnavailableException({
+        code: 'FORGE_WRONG_API_URL',
+        message:
+          'list_projects devolvió repos Ariadne, no proyectos Workshop. Verifica la URL MCP de The Forge.',
+      });
+    }
+
+    if (isForgeAriadneIndexedProjectList(rows)) {
+      return {
+        projects: [],
+        hint: 'list_theforge_projects devuelve índice Ariadne; usa list_projects (Workshop) para vincular LEGACY.',
+        diagnostics: { transport: 'mcp', mcpUrl: cfg.mcpUrl, totalRowsSeen: rows.length },
+      };
+    }
+
+    const sampleTypes = new Set<string>();
+    for (const row of rows.slice(0, 8)) {
+      sampleTypes.add(readForgeProjectType(row) || '(sin projectType)');
+    }
+
+    const legacy = rows
+      .filter((row) => isForgeLegacyProject(row))
+      .map((row) => ({
+        id: readForgeProjectId(row),
+        name: readForgeProjectName(row),
+        groupName: readForgeGroupName(row),
+        projectType: 'LEGACY' as const,
+      }))
+      .filter((row) => row.id.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+    if (legacy.length > 0) {
+      return { projects: legacy };
+    }
+
+    return {
+      projects: [],
+      hint: `The Forge MCP devolvió ${rows.length} proyecto(s) pero ninguno LEGACY (tipos: ${[...sampleTypes].join(', ') || '—'}).`,
+      diagnostics: {
+        transport: 'mcp',
+        mcpUrl: cfg.mcpUrl,
+        totalRowsSeen: rows.length,
+        sampleTypes: [...sampleTypes],
+      },
     };
   }
 }

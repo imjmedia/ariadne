@@ -7,6 +7,8 @@ import { Repository } from 'typeorm';
 import { decrypt, encrypt } from '../credentials/crypto.util';
 import { maskApiKeyHint } from '../llm-settings/llm-settings.util';
 import { normalizeForgeApiBase } from './forge-http.util';
+import { isForgeMcpEndpointUrl, normalizeForgeMcpUrl } from './forge-mcp.util';
+import type { TheForgeTransport } from './theforge-integration.types';
 import {
   THEFORGE_INTEGRATION_SINGLETON_ID,
   TheForgeIntegrationEntity,
@@ -39,7 +41,9 @@ export class TheForgeIntegrationService {
       return { chatPromotionAvailable: true, mock: true, enabled: true };
     }
     const effective = await this.getEffective();
-    const chatPromotionAvailable = effective.enabled && Boolean(effective.apiUrl?.trim());
+    const chatPromotionAvailable =
+      effective.enabled &&
+      Boolean((effective.mcpUrl ?? effective.apiUrl ?? effective.configuredUrl)?.trim());
     return {
       chatPromotionAvailable,
       mock: false,
@@ -53,10 +57,10 @@ export class TheForgeIntegrationService {
 
   async getMasked(): Promise<TheForgeIntegrationMasked> {
     const row = await this.findRow();
-    const envApiUrl = this.envApiUrl();
+    const envApiUrl = this.envRawApiUrl();
     return {
       enabled: row?.enabled === true,
-      apiUrl: row?.apiUrl ?? envApiUrl ?? null,
+      apiUrl: row?.apiUrl ?? this.envRawApiUrl() ?? null,
       hasServiceToken: Boolean(row?.serviceTokenEncrypted) || Boolean(this.envServiceToken()),
       serviceTokenHint: row?.serviceTokenEncrypted
         ? maskApiKeyHint(decrypt(row.serviceTokenEncrypted))
@@ -84,11 +88,11 @@ export class TheForgeIntegrationService {
     const enabled = dto.enabled ?? existing?.enabled ?? false;
     let apiUrl = dto.apiUrl !== undefined ? dto.apiUrl?.trim() || null : existing?.apiUrl ?? null;
     if (!apiUrl && enabled) {
-      apiUrl = this.envApiUrl();
+      apiUrl = this.envRawApiUrl();
     }
     if (enabled && !apiUrl) {
       throw new ForbiddenException(
-        'Indica la URL de la API de The Forge o define THEFORGE_API_URL en el entorno.',
+        'Indica la URL de The Forge (REST …/api o MCP …/mcp) o define THEFORGE_API_URL en el entorno.',
       );
     }
 
@@ -118,13 +122,22 @@ export class TheForgeIntegrationService {
 
   private buildEffective(row: TheForgeIntegrationEntity | null): TheForgeIntegrationEffective {
     const enabled = row?.enabled === true;
-    const rawApiUrl = (row?.apiUrl ?? this.envApiUrl() ?? '').trim() || null;
-    const apiUrl = rawApiUrl ? normalizeForgeApiBase(rawApiUrl) : null;
-    if (enabled && rawApiUrl && apiUrl !== rawApiUrl.replace(/\/$/, '')) {
-      this.logger.warn(
-        `THEFORGE_API_URL "${rawApiUrl}" apunta al MCP (/mcp); usando REST "${apiUrl}" para integración HTTP`,
-      );
+    const configuredUrl = (row?.apiUrl ?? this.envRawApiUrl() ?? '').trim() || null;
+    let transport: TheForgeTransport = 'rest';
+    let apiUrl: string | null = null;
+    let mcpUrl: string | null = null;
+
+    if (configuredUrl) {
+      if (isForgeMcpEndpointUrl(configuredUrl)) {
+        transport = 'mcp';
+        mcpUrl = normalizeForgeMcpUrl(configuredUrl);
+        this.logger.log(`The Forge integración en modo MCP (${mcpUrl})`);
+      } else {
+        transport = 'rest';
+        apiUrl = normalizeForgeApiBase(configuredUrl);
+      }
     }
+
     let serviceToken: string | null = null;
     if (row?.serviceTokenEncrypted) {
       try {
@@ -138,15 +151,17 @@ export class TheForgeIntegrationService {
     }
     return {
       enabled,
-      apiUrl: enabled ? apiUrl : null,
+      configuredUrl: enabled ? configuredUrl : null,
+      transport: enabled ? transport : 'rest',
+      apiUrl: enabled && transport === 'rest' ? apiUrl : null,
+      mcpUrl: enabled && transport === 'mcp' ? mcpUrl : null,
       serviceToken: enabled ? serviceToken : null,
     };
   }
 
-  private envApiUrl(): string | null {
+  private envRawApiUrl(): string | null {
     const v = (process.env.THEFORGE_API_URL ?? '').trim();
-    if (!v) return null;
-    return normalizeForgeApiBase(v);
+    return v || null;
   }
 
   private envServiceToken(): string | null {

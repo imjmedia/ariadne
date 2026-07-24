@@ -15,7 +15,9 @@ import {
 } from './change-promotion-pack.types';
 import { toForgeCreateStageApiBody } from './forge-create-stage.mapper';
 import { forgeErrorMessage, forgeIntegrationFetch, readForgeJsonBody } from './forge-http.util';
+import { forgeMcpCallToolJson } from './forge-mcp.util';
 import { TheForgeIntegrationService } from './theforge-integration.service';
+import type { TheForgeIntegrationEffective } from './theforge-integration.types';
 
 export abstract class TheForgeClient {
   abstract resolveProjectForAriadne(
@@ -81,6 +83,9 @@ export class TheForgeClientHttp extends TheForgeClient {
     input: ResolveForgeProjectInput,
   ): Promise<ResolveForgeProjectResult> {
     const cfg = await this.integration.getEffective();
+    if (cfg.transport === 'mcp' && cfg.mcpUrl) {
+      return this.resolveProjectViaMcp(cfg, input);
+    }
     const res = await forgeIntegrationFetch(cfg, '/theforge/resolve-forge-project-for-ariadne', {
       method: 'POST',
       body: JSON.stringify(input),
@@ -117,6 +122,9 @@ export class TheForgeClientHttp extends TheForgeClient {
     input: CreateStageFromPackInput,
   ): Promise<CreateStageFromPackResult> {
     const cfg = await this.integration.getEffective();
+    if (cfg.transport === 'mcp' && cfg.mcpUrl) {
+      return this.createStageViaMcp(cfg, input);
+    }
     const payload = toForgeCreateStageApiBody(input);
     const res = await forgeIntegrationFetch(cfg, '/theforge/create-stage-from-ariadne-change-pack', {
       method: 'POST',
@@ -133,7 +141,51 @@ export class TheForgeClientHttp extends TheForgeClient {
       });
     }
 
-    return this.parseCreateStageResponse(body, input, cfg.apiUrl ?? '');
+    return this.parseCreateStageResponse(body, input, cfg.apiUrl ?? cfg.mcpUrl ?? '');
+  }
+
+  private async resolveProjectViaMcp(
+    cfg: TheForgeIntegrationEffective,
+    input: ResolveForgeProjectInput,
+  ): Promise<ResolveForgeProjectResult> {
+    const body = await forgeMcpCallToolJson<Record<string, unknown>>(
+      cfg,
+      'resolve_forge_project_for_ariadne',
+      { ...input },
+    );
+
+    const status = typeof body.status === 'number' ? body.status : undefined;
+    if (status === 404) {
+      throw new ForgeResolveNotFoundError(
+        typeof body.message === 'string' ? body.message : 'No Forge project linked',
+      );
+    }
+    if (status === 409) {
+      const candidates = (body.candidates as ForgeProjectCandidate[] | undefined) ?? [];
+      throw new ForgeResolveAmbiguousError(candidates);
+    }
+
+    const data = body as unknown as ResolveForgeProjectResult;
+    if (!data.forgeProjectId) {
+      throw new ServiceUnavailableException({
+        code: 'FORGE_RESOLVE_INVALID',
+        message: 'Forge MCP resolve response missing forgeProjectId',
+      });
+    }
+    return data;
+  }
+
+  private async createStageViaMcp(
+    cfg: TheForgeIntegrationEffective,
+    input: CreateStageFromPackInput,
+  ): Promise<CreateStageFromPackResult> {
+    const payload = toForgeCreateStageApiBody(input);
+    const body = await forgeMcpCallToolJson<unknown>(
+      cfg,
+      'create_stage_from_ariadne_change_pack',
+      payload as unknown as Record<string, unknown>,
+    );
+    return this.parseCreateStageResponse(body, input, cfg.mcpUrl ?? '');
   }
 
   private parseCreateStageResponse(
