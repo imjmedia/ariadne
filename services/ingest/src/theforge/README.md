@@ -35,13 +35,13 @@ Integración **opt-in** en **Ajustes (admin)**. Ariadne OSS no requiere The Forg
 **Endpoints (ingest):**
 
 - `GET /theforge-integration/status` — UI chat / proyectos (¿mostrar botón?)
-- `GET /theforge-integration/brownfield-projects` — Selector LEGACY para vincular proyecto Ariadne (REST a The Forge `GET /projects`; no usa MCP)
+- `GET /theforge-integration/brownfield-projects` — Selector LEGACY para vincular proyecto Ariadne (REST a The Forge `GET /projects` Workshop; detecta LEGACY por `projectType`, alias `BROWNFIELD`, o `stages[].isLegacy`)
 
 **Troubleshooting selector vacío**
 
 | Síntoma | Causa habitual |
 |---------|----------------|
-| Lista vacía sin error | `THEFORGE_API_URL` apunta a Ariadne en lugar de The Forge, o JWT de servicio sin proyectos LEGACY visibles |
+| Lista vacía sin error | `THEFORGE_API_URL` incorrecta, JWT sin acceso a `GET /projects` Workshop, o respuesta sin `projectType`/`stages[].isLegacy`. **No** usar `GET /theforge/projects` (índice Ariadne, ids distintos al Workshop). |
 | `503 FORGE_WRONG_API_URL` | URL base incorrecta (ingest devolvió repos multi-root) |
 | `503 FORGE_NO_SERVICE_TOKEN` | Falta JWT en Ajustes o `THEFORGE_SERVICE_JWT` |
 
