@@ -14,11 +14,14 @@ import { Repository } from 'typeorm';
 import type { CredentialActor } from '../credentials/credential-actor';
 import { ChatConversationEntity } from '../chat/entities/chat-conversation.entity';
 import { ChatMessageEntity } from '../chat/entities/chat-message.entity';
+import { ProjectEntity } from '../projects/entities/project.entity';
+import { RepositoryEntity } from '../repositories/entities/repository.entity';
 import { ChangePromotionPackService } from './change-promotion-pack.service';
-import type { ForgeDeliverableKind } from './change-promotion-pack.types';
+import type { ChangePromotionPackV1, ForgeDeliverableKind } from './change-promotion-pack.types';
 import {
   ForgeResolveAmbiguousError,
   ForgeResolveNotFoundError,
+  type ResolveForgeProjectResult,
 } from './change-promotion-pack.types';
 import { CursorTasksDocumentService } from './cursor-tasks-document.service';
 import { TheForgeClient } from './theforge-client.service';
@@ -51,6 +54,10 @@ export class TheForgePromotionService {
     private readonly conversations: Repository<ChatConversationEntity>,
     @InjectRepository(ChatMessageEntity)
     private readonly messages: Repository<ChatMessageEntity>,
+    @InjectRepository(ProjectEntity)
+    private readonly projects: Repository<ProjectEntity>,
+    @InjectRepository(RepositoryEntity)
+    private readonly repositories: Repository<RepositoryEntity>,
     private readonly packService: ChangePromotionPackService,
     private readonly cursorTasks: CursorTasksDocumentService,
     private readonly forgeClient: TheForgeClient,
@@ -86,6 +93,10 @@ export class TheForgePromotionService {
       stageKey: body.stageKey,
       deliverablesRequested: deliverables,
     });
+    const linkedForge = await this.findLinkedForgeProject(
+      preview.pack.ariadne.projectId,
+      preview.pack.ariadne.repositoryId,
+    );
     return {
       preview: {
         changeTitle: preview.changeTitle,
@@ -100,6 +111,7 @@ export class TheForgePromotionService {
         warnings: preview.warnings,
         messageCount: preview.messageCount,
       },
+      linkedForgeProject: linkedForge,
       promoteEnabled: await this.isPromoteEnabled(),
     };
   }
@@ -145,19 +157,7 @@ export class TheForgePromotionService {
     });
 
     try {
-      const resolved = body.forgeProjectId
-        ? {
-            forgeProjectId: body.forgeProjectId,
-            forgeProjectName: body.forgeProjectId,
-            linkKind: 'primary' as const,
-            warnings: [] as string[],
-          }
-        : await this.forgeClient.resolveProjectForAriadne({
-            ariadneProjectId: pack.ariadne.projectId,
-            ariadneRepositoryId: pack.ariadne.repositoryId ?? undefined,
-            projectKey: pack.ariadne.projectKey ?? undefined,
-            repoSlug: pack.ariadne.repoSlug ?? undefined,
-          });
+      const resolved = await this.resolveForgeProjectForPromotion(pack, body.forgeProjectId);
 
       const created = await this.forgeClient.createStageFromChangePack({
         forgeProjectId: resolved.forgeProjectId,
@@ -228,6 +228,75 @@ export class TheForgePromotionService {
     ];
     if (!input?.length) return defaults;
     return input;
+  }
+
+  private async resolveForgeProjectForPromotion(
+    pack: ChangePromotionPackV1,
+    explicitForgeProjectId?: string,
+  ): Promise<ResolveForgeProjectResult> {
+    const trimmed = explicitForgeProjectId?.trim();
+    if (trimmed) {
+      return {
+        forgeProjectId: trimmed,
+        forgeProjectName: trimmed,
+        linkKind: 'primary',
+        warnings: [],
+      };
+    }
+
+    const linked = await this.findLinkedForgeProject(
+      pack.ariadne.projectId,
+      pack.ariadne.repositoryId,
+    );
+    if (linked) {
+      return linked;
+    }
+
+    return this.forgeClient.resolveProjectForAriadne({
+      ariadneProjectId: pack.ariadne.projectId,
+      ariadneRepositoryId: pack.ariadne.repositoryId ?? undefined,
+      projectKey: pack.ariadne.projectKey ?? undefined,
+      repoSlug: pack.ariadne.repoSlug ?? undefined,
+    });
+  }
+
+  private async findLinkedForgeProject(
+    ariadneProjectId: string,
+    ariadneRepositoryId?: string | null,
+  ): Promise<ResolveForgeProjectResult | null> {
+    const project = await this.projects.findOne({
+      where: { id: ariadneProjectId },
+      select: ['id', 'theforgeProjectId', 'theforgeProjectName'],
+    });
+    const projectForgeId = project?.theforgeProjectId?.trim();
+    if (projectForgeId) {
+      return {
+        forgeProjectId: projectForgeId,
+        forgeProjectName: project.theforgeProjectName?.trim() || projectForgeId,
+        linkKind: 'primary',
+        warnings: [],
+      };
+    }
+
+    const repoId = ariadneRepositoryId?.trim();
+    if (!repoId) return null;
+
+    const repo = await this.repositories.findOne({
+      where: { id: repoId },
+      select: ['id', 'theforgeProjectId', 'projectKey', 'repoSlug'],
+    });
+    const repoForgeId = repo?.theforgeProjectId?.trim();
+    if (!repoForgeId) return null;
+
+    return {
+      forgeProjectId: repoForgeId,
+      forgeProjectName:
+        repo.projectKey && repo.repoSlug
+          ? `${repo.projectKey}/${repo.repoSlug}`
+          : repoForgeId,
+      linkKind: 'primary',
+      warnings: [],
+    };
   }
 
   private toStateDto(row: ChatConversationEntity): ForgePromotionStateDto {

@@ -58,6 +58,8 @@ export function ChatForgePromoteDialog(props: {
   const [candidates, setCandidates] = useState<ForgeProjectCandidate[] | null>(null);
   const [selectedForgeProjectId, setSelectedForgeProjectId] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<PromoteToTheForgeResponse | null>(null);
+  const [linkedForgeProjectId, setLinkedForgeProjectId] = useState<string | null>(null);
+  const [linkedForgeProjectName, setLinkedForgeProjectName] = useState<string | null>(null);
 
   const resetState = useCallback(() => {
     setPreview(null);
@@ -65,6 +67,8 @@ export function ChatForgePromoteDialog(props: {
     setCandidates(null);
     setSelectedForgeProjectId(null);
     setSuccessResult(null);
+    setLinkedForgeProjectId(null);
+    setLinkedForgeProjectName(null);
     setPreviewLoading(false);
     setPromoteLoading(false);
   }, []);
@@ -89,6 +93,13 @@ export function ChatForgePromoteDialog(props: {
         deliverables,
       });
       setPreview(res);
+      if (res.linkedForgeProject?.forgeProjectId) {
+        setLinkedForgeProjectId(res.linkedForgeProject.forgeProjectId);
+        setLinkedForgeProjectName(res.linkedForgeProject.forgeProjectName ?? null);
+      } else {
+        setLinkedForgeProjectId(null);
+        setLinkedForgeProjectName(null);
+      }
       if (!stageName.trim() && res.preview.changeTitle) {
         setStageName(res.preview.changeTitle);
       }
@@ -134,7 +145,11 @@ export function ChatForgePromoteDialog(props: {
         stageKey: preview?.preview.stageKeySuggested,
         deliverables,
         activate: false,
-        ...(forgeProjectId ? { forgeProjectId } : {}),
+        ...(forgeProjectId
+          ? { forgeProjectId }
+          : linkedForgeProjectId
+            ? { forgeProjectId: linkedForgeProjectId }
+            : {}),
       });
       setSuccessResult(result);
       props.onSuccess?.(result);
@@ -264,6 +279,13 @@ export function ChatForgePromoteDialog(props: {
                       <li key={w}>{w}</li>
                     ))}
                   </ul>
+                ) : null}
+                {linkedForgeProjectId ? (
+                  <p className="text-[var(--foreground-muted)]">
+                    <span className="font-medium text-[var(--foreground)]">Proyecto Forge vinculado:</span>{' '}
+                    {linkedForgeProjectName ?? linkedForgeProjectId}{' '}
+                    <code className="font-mono text-[10px]">{linkedForgeProjectId}</code>
+                  </p>
                 ) : null}
               </div>
             ) : null}
