@@ -9,10 +9,14 @@ import {
 import { actorFromHeaders, isAdmin } from '../credentials/credential-actor';
 import type { UpdateTheForgeIntegrationDto } from './theforge-integration.types';
 import { TheForgeIntegrationService } from './theforge-integration.service';
+import { TheForgeBrownfieldCatalogService } from './theforge-brownfield-catalog.service';
 
 @Controller('theforge-integration')
 export class TheForgeIntegrationController {
-  constructor(private readonly integration: TheForgeIntegrationService) {}
+  constructor(
+    private readonly integration: TheForgeIntegrationService,
+    private readonly brownfieldCatalog: TheForgeBrownfieldCatalogService,
+  ) {}
 
   private requireAuth(headers: Record<string, string | string[] | undefined>): void {
     const actor = actorFromHeaders(headers);
@@ -28,11 +32,25 @@ export class TheForgeIntegrationController {
     }
   }
 
-  /** Estado público para UI (chat): ¿mostrar promoción? */
+  /** Estado público para UI (chat / vinculación proyecto): ¿Forge configurado? */
   @Get('status')
   getStatus(@Headers() headers: Record<string, string | string[] | undefined>) {
     this.requireAuth(headers);
     return this.integration.getStatus();
+  }
+
+  /** Proyectos brownfield (LEGACY) en The Forge para el selector de vinculación. */
+  @Get('brownfield-projects')
+  async listBrownfieldProjects(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    this.requireAuth(headers);
+    const status = await this.integration.getStatus();
+    if (!status.enabled || (!status.chatPromotionAvailable && !status.mock)) {
+      return { projects: [] as const };
+    }
+    const projects = await this.brownfieldCatalog.listBrownfieldProjects();
+    return { projects };
   }
 
   @Get()

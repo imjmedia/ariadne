@@ -378,6 +378,25 @@ export const api = {
   getTheForgeIntegrationStatus: () =>
     request<import('./types').TheForgeIntegrationStatus>('/theforge-integration/status'),
 
+  listTheForgeBrownfieldProjects: () =>
+    request<{ projects: import('./types').ForgeBrownfieldProjectOption[] }>(
+      '/theforge-integration/brownfield-projects',
+    ),
+
+  linkProjectToTheForge: (
+    projectId: string,
+    body: { forgeProjectId: string; forgeProjectName?: string | null },
+  ) =>
+    request<import('./types').Project>(`/projects/${encodeURIComponent(projectId)}/theforge-link`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  unlinkProjectFromTheForge: (projectId: string) =>
+    request<import('./types').Project>(`/projects/${encodeURIComponent(projectId)}/theforge-link`, {
+      method: 'DELETE',
+    }),
+
   getTheForgeIntegrationSettings: () =>
     request<import('./types').TheForgeIntegrationSettings>('/theforge-integration'),
 

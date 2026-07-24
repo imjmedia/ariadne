@@ -41,6 +41,8 @@ export interface ProjectWithRepos {
   domainId: string | null;
   domainName: string | null;
   domainColor: string | null;
+  theforgeProjectId: string | null;
+  theforgeProjectName: string | null;
   createdAt: string;
   updatedAt: string;
   repositories: Array<{
@@ -113,6 +115,8 @@ export class ProjectsService {
       domainId: p.domainId ?? null,
       domainName: p.domainId ? domMeta.get(p.domainId)?.name ?? null : null,
       domainColor: p.domainId ? domMeta.get(p.domainId)?.color ?? null : null,
+      theforgeProjectId: p.theforgeProjectId ?? null,
+      theforgeProjectName: p.theforgeProjectName ?? null,
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
       repositories: (repoIdsByProject.get(p.id) ?? [])
@@ -367,6 +371,8 @@ export class ProjectsService {
       domainId: project.domainId ?? null,
       domainName,
       domainColor,
+      theforgeProjectId: project.theforgeProjectId ?? null,
+      theforgeProjectName: project.theforgeProjectName ?? null,
       createdAt: project.createdAt.toISOString(),
       updatedAt: project.updatedAt.toISOString(),
       repositories: repositories.map((r) => ({

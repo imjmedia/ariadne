@@ -39,6 +39,7 @@ import { Link2Off, Pencil, RefreshCw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { ArchitecturePanel } from './ProjectDetail/ArchitecturePanel';
+import { ProjectTheForgeLinkSection } from './ProjectDetail/ProjectTheForgeLinkSection';
 
 const panelIntroClass = cn(
   'rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm',
@@ -748,6 +749,13 @@ export function ProjectDetail() {
             onCancelEdit={cancelEditDescription}
             onDraftChange={setDescriptionDraft}
             onSave={saveDescription}
+          />
+
+          <ProjectTheForgeLinkSection
+            projectId={id}
+            theforgeProjectId={project.theforgeProjectId}
+            theforgeProjectName={project.theforgeProjectName}
+            onLinked={(updated) => setProject(updated)}
           />
 
           <section className={sectionShellClass} aria-labelledby="project-domain-heading">

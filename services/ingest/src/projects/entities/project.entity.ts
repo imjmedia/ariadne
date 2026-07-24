@@ -39,6 +39,13 @@ export class ProjectEntity {
   @JoinColumn({ name: 'domain_id' })
   domain!: DomainEntity | null;
 
+  /** Vínculo opcional con proyecto brownfield (LEGACY) en The Forge. */
+  @Column({ name: 'theforge_project_id', type: 'varchar', length: 64, nullable: true })
+  theforgeProjectId!: string | null;
+
+  @Column({ name: 'theforge_project_name', type: 'varchar', length: 512, nullable: true })
+  theforgeProjectName!: string | null;
+
   @OneToMany(() => ProjectRepositoryEntity, (pr) => pr.project)
   projectRepos!: ProjectRepositoryEntity[];
 
