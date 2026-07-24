@@ -41,11 +41,13 @@ Integración **opt-in** en **Ajustes (admin)**. Ariadne OSS no requiere The Forg
 
 | Síntoma | Causa habitual |
 |---------|----------------|
-| Lista vacía sin error | `THEFORGE_API_URL` incorrecta, JWT sin acceso a `GET /projects` Workshop, o respuesta sin `projectType`/`stages[].isLegacy`. **No** usar `GET /theforge/projects` (índice Ariadne, ids distintos al Workshop). |
-| `503 FORGE_WRONG_API_URL` | URL base incorrecta (ingest devolvió repos multi-root) |
+| `FORGE_WRONG_API_URL` | URL devuelve HTML (SPA/`/mcp`) o apunta a Ariadne; usar base API Nest (`…/api`), no MCP Cursor |
+| Lista vacía | JWT sin acceso a Workshop o filas sin `projectType`/`stages[].isLegacy` |
 | `503 FORGE_NO_SERVICE_TOKEN` | Falta JWT en Ajustes o `THEFORGE_SERVICE_JWT` |
 
 La vinculación usa **HTTP** (`THEFORGE_API_URL` + Bearer servicio), no el MCP de The Forge en Cursor.
+
+**Endpoints (ingest, cont.):**
 - `GET/PUT /theforge-integration` — admin (Ajustes)
 - `PUT /projects/:id/theforge-link` — Vincula proyecto Ariadne ↔ Forge (propaga `theforge_project_id` a repos)
 - `DELETE /projects/:id/theforge-link` — Desvincula
