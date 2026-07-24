@@ -2,7 +2,7 @@
  * Catálogo de proyectos brownfield (LEGACY) en The Forge para vincular desde Ariadne.
  */
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { forgeIntegrationFetch, forgeErrorMessage, readForgeJsonBody } from './forge-http.util';
+import { forgeIntegrationFetch, forgeErrorMessage, normalizeForgeApiBase, readForgeJsonBody } from './forge-http.util';
 import {
   extractForgeProjectRows,
   isForgeAriadneIndexedProjectList,
@@ -128,6 +128,19 @@ export class TheForgeBrownfieldCatalogService {
     };
 
     if (lastError) {
+      const isMethodNotAllowed =
+        lastError.status === 405 || /method not allowed/i.test(lastError.message);
+      if (isMethodNotAllowed) {
+        const configured = cfg.apiUrl?.trim() ?? '';
+        throw new ServiceUnavailableException({
+          code: 'FORGE_WRONG_API_URL',
+          message:
+            'THEFORGE_API_URL apunta al endpoint MCP (/mcp), que no acepta GET /projects. Usa la base REST de The Forge (p. ej. …/api), no la URL del MCP de Cursor.',
+          configuredApiUrl: configured,
+          suggestedApiUrl: normalizeForgeApiBase(configured),
+          diagnostics,
+        });
+      }
       throw new ServiceUnavailableException({
         code: 'FORGE_LIST_PROJECTS_FAILED',
         message: lastError.message,

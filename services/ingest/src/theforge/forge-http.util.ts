@@ -6,6 +6,17 @@ import type { TheForgeIntegrationEffective } from './theforge-integration.types'
 
 const logger = new Logger('TheForgeHttp');
 
+/** REST base for service JWT. MCP Streamable HTTP lives at …/mcp (POST only). */
+export function normalizeForgeApiBase(apiUrl: string): string {
+  const trimmed = apiUrl.trim().replace(/\/$/, '');
+  if (!trimmed) return trimmed;
+  if (trimmed.endsWith('/mcp')) {
+    const root = trimmed.slice(0, -'/mcp'.length).replace(/\/$/, '');
+    return `${root}/api`;
+  }
+  return trimmed;
+}
+
 export async function forgeIntegrationFetch(
   cfg: TheForgeIntegrationEffective,
   path: string,
@@ -25,7 +36,8 @@ export async function forgeIntegrationFetch(
     });
   }
 
-  const url = `${cfg.apiUrl.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
+  const base = normalizeForgeApiBase(cfg.apiUrl);
+  const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
   return fetch(url, {
     ...init,
     headers: {
