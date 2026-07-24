@@ -324,6 +324,11 @@ export interface TheForgePackPreview {
 
 export interface PreviewTheForgePackResponse {
   preview: TheForgePackPreview;
+  linkedForgeProject?: {
+    forgeProjectId: string;
+    forgeProjectName: string;
+    linkKind: 'primary' | 'alias' | 'inferred';
+  } | null;
   promoteEnabled: boolean;
 }
 
