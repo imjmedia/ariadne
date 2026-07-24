@@ -53,6 +53,6 @@ Proyecto en la raíz del repo (`frontend/`), independiente de `services/`. UI pa
 
 ## Docker
 
-El `Dockerfile` construye el bundle y lo sirve con nginx. La URL de la API se inyecta en build time con `VITE_API_URL` (por defecto `http://localhost:3002`). En producción, usa la URL pública del ingest (p. ej. `https://ingest.tudominio.com`).
+El `Dockerfile` construye el bundle y lo sirve con nginx. La URL de la API se inyecta en build time con `VITE_API_URL` (build-arg en Compose). Capas cacheadas: lockfile → `pnpm install` → fuentes; el tarball MCP se copia desde un stage aparte (no rebuild completo en cada deploy).
 
-Desde la raíz del repo: el servicio `frontend` en `docker-compose` expone el puerto **5173** (o el que definas).
+Desde la raíz del repo: `docker compose -f docker-compose.yml build frontend`. Detalles de caché BuildKit: [docker/README.md](../docker/README.md).
