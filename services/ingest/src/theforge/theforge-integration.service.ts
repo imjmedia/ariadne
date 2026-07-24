@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { decrypt, encrypt } from '../credentials/crypto.util';
 import { maskApiKeyHint } from '../llm-settings/llm-settings.util';
+import { normalizeForgeApiBase } from './forge-http.util';
 import {
   THEFORGE_INTEGRATION_SINGLETON_ID,
   TheForgeIntegrationEntity,
@@ -117,7 +118,13 @@ export class TheForgeIntegrationService {
 
   private buildEffective(row: TheForgeIntegrationEntity | null): TheForgeIntegrationEffective {
     const enabled = row?.enabled === true;
-    const apiUrl = (row?.apiUrl ?? this.envApiUrl() ?? '').trim() || null;
+    const rawApiUrl = (row?.apiUrl ?? this.envApiUrl() ?? '').trim() || null;
+    const apiUrl = rawApiUrl ? normalizeForgeApiBase(rawApiUrl) : null;
+    if (enabled && rawApiUrl && apiUrl !== rawApiUrl.replace(/\/$/, '')) {
+      this.logger.warn(
+        `THEFORGE_API_URL "${rawApiUrl}" apunta al MCP (/mcp); usando REST "${apiUrl}" para integración HTTP`,
+      );
+    }
     let serviceToken: string | null = null;
     if (row?.serviceTokenEncrypted) {
       try {
@@ -137,8 +144,9 @@ export class TheForgeIntegrationService {
   }
 
   private envApiUrl(): string | null {
-    const v = (process.env.THEFORGE_API_URL ?? '').trim().replace(/\/$/, '');
-    return v || null;
+    const v = (process.env.THEFORGE_API_URL ?? '').trim();
+    if (!v) return null;
+    return normalizeForgeApiBase(v);
   }
 
   private envServiceToken(): string | null {

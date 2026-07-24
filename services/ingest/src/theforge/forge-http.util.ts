@@ -6,12 +6,23 @@ import type { TheForgeIntegrationEffective } from './theforge-integration.types'
 
 const logger = new Logger('TheForgeHttp');
 
+/** REST base for service JWT. MCP Streamable HTTP lives at …/mcp (POST only). */
+export function normalizeForgeApiBase(apiUrl: string): string {
+  const trimmed = apiUrl.trim().replace(/\/$/, '');
+  if (!trimmed) return trimmed;
+  if (trimmed.endsWith('/mcp')) {
+    const root = trimmed.slice(0, -'/mcp'.length).replace(/\/$/, '');
+    return `${root}/api`;
+  }
+  return trimmed;
+}
+
 export function isLikelyHtmlBody(text: string): boolean {
   const head = text.trim().slice(0, 120).toLowerCase();
   return head.startsWith('<!doctype') || head.startsWith('<html') || head.includes('<html');
 }
 
-/** Bases to try when THEFORGE_API_URL points at SPA root or /mcp instead of Nest API. */
+/** Bases to try when THEFORGE_API_URL points at SPA root instead of Nest /api. Never probes …/mcp. */
 export function collectForgeApiBaseCandidates(apiUrl: string): string[] {
   const raw = apiUrl.trim().replace(/\/$/, '');
   if (!raw) return [];
@@ -20,20 +31,22 @@ export function collectForgeApiBaseCandidates(apiUrl: string): string[] {
     const normalized = candidate.replace(/\/$/, '');
     if (normalized && !out.includes(normalized)) out.push(normalized);
   };
-  add(raw);
-  if (raw.endsWith('/mcp')) {
-    const withoutMcp = raw.slice(0, -'/mcp'.length).replace(/\/$/, '');
-    add(withoutMcp);
-    add(`${withoutMcp}/api`);
-  } else if (!raw.endsWith('/api')) {
+
+  add(normalizeForgeApiBase(raw));
+
+  if (!raw.endsWith('/api') && !raw.endsWith('/mcp')) {
     add(`${raw}/api`);
+    add(raw);
+  } else if (raw.endsWith('/mcp')) {
+    const root = raw.slice(0, -'/mcp'.length).replace(/\/$/, '');
+    add(root);
   }
+
   return out;
 }
 
 export function suggestForgeApiUrl(apiUrl: string): string {
-  const candidates = collectForgeApiBaseCandidates(apiUrl);
-  return candidates.find((c) => c.endsWith('/api')) ?? candidates[candidates.length - 1] ?? apiUrl;
+  return normalizeForgeApiBase(apiUrl);
 }
 
 export async function forgeIntegrationFetch(
@@ -56,7 +69,7 @@ export async function forgeIntegrationFetch(
     });
   }
 
-  const base = (options?.apiBase ?? cfg.apiUrl).replace(/\/$/, '');
+  const base = normalizeForgeApiBase(options?.apiBase ?? cfg.apiUrl ?? '');
   const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
   return fetch(url, {
     ...init,
@@ -109,6 +122,6 @@ export function forgeHtmlApiUrlError(configuredUrl: string): ServiceUnavailableE
     message:
       'THEFORGE_API_URL devuelve HTML (frontend SPA o endpoint /mcp), no JSON de la API REST de The Forge. Configura la base del backend Nest (p. ej. …/api), no la URL del MCP ni la raíz del sitio.',
     configuredApiUrl: configuredUrl,
-    suggestedApiUrl: suggested === configuredUrl ? `${configuredUrl.replace(/\/$/, '')}/api` : suggested,
+    suggestedApiUrl: suggested,
   });
 }
