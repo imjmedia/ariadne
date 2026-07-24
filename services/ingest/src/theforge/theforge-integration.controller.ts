@@ -60,15 +60,11 @@ export class TheForgeIntegrationController {
           'Falta la URL de la API de The Forge o el JWT de servicio. Configúralos en Ajustes → The Forge (o THEFORGE_API_URL / THEFORGE_SERVICE_JWT).',
       });
     }
-    const projects = await this.brownfieldCatalog.listBrownfieldProjects();
+    const result = await this.brownfieldCatalog.listBrownfieldProjects();
     return {
-      projects,
-      ...(projects.length === 0
-        ? {
-            hint:
-              'The Forge respondió pero no hay proyectos LEGACY visibles para el JWT de servicio. Verifica permisos del token o crea un proyecto brownfield en The Forge.',
-          }
-        : {}),
+      projects: result.projects,
+      ...(result.hint ? { hint: result.hint } : {}),
+      ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
     };
   }
 

@@ -32,9 +32,46 @@ export function isLikelyAriadneProjectList(rows: Record<string, unknown>[]): boo
   );
 }
 
+const FORGE_LEGACY_TYPE_TOKENS = new Set(['LEGACY', 'BROWNFIELD', 'BROWN_FIELD']);
+
 export function readForgeProjectType(row: Record<string, unknown>): string {
-  const raw = row.projectType ?? row.project_type ?? row.type ?? '';
-  return String(raw).trim().toUpperCase();
+  const raw = row.projectType ?? row.project_type ?? row.type ?? row.kind ?? row.category ?? '';
+  return String(raw)
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+/** Workshop LEGACY row (UI tag "Legacy"). Not Ariadne multi-root ids from GET /theforge/projects. */
+export function isForgeLegacyProject(row: Record<string, unknown>): boolean {
+  const type = readForgeProjectType(row);
+  if (FORGE_LEGACY_TYPE_TOKENS.has(type)) return true;
+  if (type.includes('LEGACY') || type.includes('BROWNFIELD')) return true;
+
+  if (row.isLegacy === true || row.is_legacy === true) return true;
+
+  const stages = row.stages;
+  if (Array.isArray(stages)) {
+    for (const stage of stages) {
+      if (stage && typeof stage === 'object' && (stage as Record<string, unknown>).isLegacy === true) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** GET /theforge/projects — proyectos indexados Ariadne (roots[]), no Workshop LEGACY. */
+export function isForgeAriadneIndexedProjectList(rows: Record<string, unknown>[]): boolean {
+  if (rows.length === 0) return false;
+  return rows.every(
+    (row) =>
+      Array.isArray(row.roots) &&
+      !Array.isArray(row.repositories) &&
+      !('projectType' in row) &&
+      !('project_type' in row) &&
+      !('stages' in row),
+  );
 }
 
 export function readForgeProjectId(row: Record<string, unknown>): string {
