@@ -15,6 +15,7 @@ import { ProjectsService } from './projects.service';
 import { SyncStatusService } from './sync-status.service';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { DomainsModule } from '../domains/domains.module';
+import { TheForgeModule } from '../theforge/theforge.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { DomainsModule } from '../domains/domains.module';
     ]),
     RepositoriesModule,
     DomainsModule,
+    TheForgeModule,
   ],
   controllers: [ProjectsController],
   providers: [ProjectsService, SyncStatusService],

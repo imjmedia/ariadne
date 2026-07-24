@@ -9,11 +9,15 @@ import { ChatModule } from '../chat/chat.module';
 import { MddPersistenceModule } from '../mdd-persistence/mdd-persistence.module';
 import { RepositoriesModule } from '../repositories/repositories.module';
 import { RepositoryEntity } from '../repositories/entities/repository.entity';
+import { ProjectRepositoryEntity } from '../repositories/entities/project-repository.entity';
+import { ProjectEntity } from '../projects/entities/project.entity';
 import { ChangePromotionPackService } from './change-promotion-pack.service';
+import { TheForgeBrownfieldCatalogService } from './theforge-brownfield-catalog.service';
 import { TheForgeIntegrationEntity } from './entities/theforge-integration.entity';
 import { TheForgeConvergeService } from './theforge-converge.service';
 import { TheForgeIntegrationController } from './theforge-integration.controller';
 import { TheForgeIntegrationService } from './theforge-integration.service';
+import { TheForgeProjectLinkService } from './theforge-project-link.service';
 import { TheForgePromotionService } from './theforge-promotion.service';
 import {
   TheForgeClient,
@@ -25,6 +29,8 @@ import {
   imports: [
     TypeOrmModule.forFeature([
       RepositoryEntity,
+      ProjectEntity,
+      ProjectRepositoryEntity,
       ChatConversationEntity,
       ChatMessageEntity,
       TheForgeIntegrationEntity,
@@ -37,6 +43,8 @@ import {
   providers: [
     TheForgeConvergeService,
     TheForgeIntegrationService,
+    TheForgeBrownfieldCatalogService,
+    TheForgeProjectLinkService,
     ChangePromotionPackService,
     TheForgePromotionService,
     TheForgeClientMock,
@@ -53,6 +61,8 @@ import {
   exports: [
     TheForgeConvergeService,
     TheForgeIntegrationService,
+    TheForgeBrownfieldCatalogService,
+    TheForgeProjectLinkService,
     ChangePromotionPackService,
     TheForgePromotionService,
   ],

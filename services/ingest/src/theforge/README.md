@@ -34,8 +34,11 @@ Integración **opt-in** en **Ajustes (admin)**. Ariadne OSS no requiere The Forg
 
 **Endpoints (ingest):**
 
-- `GET /theforge-integration/status` — UI chat (¿mostrar botón?)
+- `GET /theforge-integration/status` — UI chat / proyectos (¿mostrar botón?)
+- `GET /theforge-integration/brownfield-projects` — Selector LEGACY para vincular proyecto Ariadne
 - `GET/PUT /theforge-integration` — admin (Ajustes)
+- `PUT /projects/:id/theforge-link` — Vincula proyecto Ariadne ↔ Forge (propaga `theforge_project_id` a repos)
+- `DELETE /projects/:id/theforge-link` — Desvincula
 - `GET /conversations/:id/forge-promotion`, preview, promote — solo si integración activa
 
 **Contratos:** `docs/contracts/theforge-create-stage-from-pack-v1.md`, `docs/contracts/theforge-resolve-ariadne-link-v1.md`, `docs/contracts/change-promotion-pack-v1.md`.

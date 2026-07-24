@@ -50,6 +50,9 @@ export interface Project {
   domainId?: string | null;
   domainName?: string | null;
   domainColor?: string | null;
+  /** Proyecto brownfield (LEGACY) vinculado en The Forge. */
+  theforgeProjectId?: string | null;
+  theforgeProjectName?: string | null;
   createdAt: string;
   updatedAt: string;
   repositories: Array<{
@@ -354,6 +357,14 @@ export interface ForgeProjectCandidate {
   forgeProjectId: string;
   forgeProjectName: string;
   linkKind: string;
+}
+
+/** Proyecto brownfield (LEGACY) listado desde The Forge. */
+export interface ForgeBrownfieldProjectOption {
+  id: string;
+  name: string;
+  groupName?: string | null;
+  projectType: 'LEGACY';
 }
 
 /** Estado público: ¿mostrar promoción chat → The Forge? */

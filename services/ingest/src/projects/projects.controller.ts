@@ -5,10 +5,13 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
@@ -17,6 +20,9 @@ import { JobAnalysisService } from '../repositories/job-analysis.service';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { DomainsService } from '../domains/domains.service';
 import { SyncStatusService } from './sync-status.service';
+import { actorFromHeaders } from '../credentials/credential-actor';
+import { TheForgeProjectLinkService } from '../theforge/theforge-project-link.service';
+import { TheForgeIntegrationService } from '../theforge/theforge-integration.service';
 
 @Controller('projects')
 export class ProjectsController {
@@ -27,6 +33,8 @@ export class ProjectsController {
     private readonly reposService: RepositoriesService,
     private readonly domains: DomainsService,
     private readonly syncStatus: SyncStatusService,
+    private readonly forgeLink: TheForgeProjectLinkService,
+    private readonly forgeIntegration: TheForgeIntegrationService,
   ) {}
 
   @Get()
@@ -126,6 +134,35 @@ export class ProjectsController {
     @Body() body: { name?: string | null; description?: string | null; domainId?: string | null },
   ) {
     return this.service.update(id, body);
+  }
+
+  /** Vincula este proyecto Ariadne con un proyecto brownfield (LEGACY) en The Forge. */
+  @Put(':id/theforge-link')
+  async linkTheForge(
+    @Param('id') id: string,
+    @Body() body: { forgeProjectId: string; forgeProjectName?: string | null },
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    const actor = actorFromHeaders(headers);
+    if (!actor.userId) throw new ForbiddenException('Usuario no identificado');
+    const status = await this.forgeIntegration.getStatus();
+    if (!status.enabled && !status.mock) {
+      throw new ForbiddenException('The Forge no está configurado. Actívalo en Ajustes.');
+    }
+    await this.forgeLink.linkProject(id, body.forgeProjectId, body.forgeProjectName);
+    return this.service.findOne(id);
+  }
+
+  /** Quita el vínculo con The Forge (proyecto y repos asociados con el mismo forgeProjectId). */
+  @Delete(':id/theforge-link')
+  async unlinkTheForge(
+    @Param('id') id: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    const actor = actorFromHeaders(headers);
+    if (!actor.userId) throw new ForbiddenException('Usuario no identificado');
+    await this.forgeLink.unlinkProject(id);
+    return this.service.findOne(id);
   }
 
   /** Rol opcional del repo en el proyecto (chat multi-root: inferencia de alcance). */
