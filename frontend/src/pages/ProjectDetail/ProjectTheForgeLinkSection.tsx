@@ -2,7 +2,7 @@
  * Vinculación opcional proyecto Ariadne ↔ The Forge (brownfield LEGACY).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Hammer, Link2Off } from 'lucide-react';
+import { Hammer, Link2Off, PlusCircle } from 'lucide-react';
 import { api } from '@/api';
 import type { ForgeBrownfieldProjectOption, Project } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { ProjectTheForgeStageDialog } from './ProjectTheForgeStageDialog';
 
 const sectionShellClass = cn(
   'overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm',
@@ -51,6 +52,7 @@ export function ProjectTheForgeLinkSection(props: {
   const [selectedId, setSelectedId] = useState('');
   const [saving, setSaving] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
+  const [stageDialogOpen, setStageDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -141,8 +143,8 @@ export function ProjectTheForgeLinkSection(props: {
             The Forge
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)] sm:text-sm">
-            Vincula este proyecto Ariadne con un proyecto brownfield (LEGACY) en The Forge para promoción de chat,
-            converge y flujos legacy.
+            Vincula este proyecto Ariadne con un proyecto brownfield (LEGACY) en The Forge. Desde aquí puedes crear
+            etapas con documentación de trabajo y tareas Cursor (# Tasks) para modificaciones.
           </p>
         </div>
         <div className="space-y-4 px-5 py-5 sm:px-6 sm:py-6">
@@ -164,6 +166,15 @@ export function ProjectTheForgeLinkSection(props: {
                 </code>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="h-10 rounded-xl"
+                  onClick={() => setStageDialogOpen(true)}
+                  disabled={unlinking}
+                >
+                  <PlusCircle className="mr-1.5 size-4" aria-hidden />
+                  Crear etapa
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -252,6 +263,13 @@ export function ProjectTheForgeLinkSection(props: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ProjectTheForgeStageDialog
+        projectId={props.projectId}
+        forgeProjectName={props.theforgeProjectName}
+        open={stageDialogOpen}
+        onOpenChange={setStageDialogOpen}
+      />
     </>
   );
 }

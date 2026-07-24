@@ -9,11 +9,13 @@ import { ChatMessageEntity } from '../chat/entities/chat-message.entity';
 import { ChatService } from '../chat/chat.service';
 import { ModificationPlanEvidenceService } from '../chat/modification-plan-evidence.service';
 import { MddPersistenceService } from '../mdd-persistence/mdd-persistence.service';
+import { ProjectEntity } from '../projects/entities/project.entity';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { RepositoryEntity } from '../repositories/entities/repository.entity';
 import type { ForgeDeliverableKind } from './change-promotion-pack.types';
 import {
   buildPromotionIdempotencyKey,
+  buildProjectStageIdempotencyKey,
   computeIndexFreshness,
   slugifyStageKey,
   type ChangePromotionPackV1,
@@ -24,12 +26,22 @@ import {
   extractLastMermaidDiagram,
   extractUserMigrationNotes,
   synthesizeUserDescription,
+  type ConversationMessageSlice,
 } from './conversation-change-synthesizer';
 
 export interface BuildChangePromotionPackOptions {
   conversationId: string;
   stageName?: string;
   stageKey?: string;
+  deliverablesRequested: ForgeDeliverableKind[];
+}
+
+export interface BuildProjectChangePromotionPackOptions {
+  projectId: string;
+  changeDescription: string;
+  stageName: string;
+  stageKey?: string;
+  conversationId?: string;
   deliverablesRequested: ForgeDeliverableKind[];
 }
 
@@ -55,6 +67,8 @@ export class ChangePromotionPackService {
     private readonly conversations: Repository<ChatConversationEntity>,
     @InjectRepository(ChatMessageEntity)
     private readonly messages: Repository<ChatMessageEntity>,
+    @InjectRepository(ProjectEntity)
+    private readonly projects: Repository<ProjectEntity>,
     private readonly repos: RepositoriesService,
     private readonly mddPersistence: MddPersistenceService,
     private readonly chat: ChatService,
@@ -146,33 +160,6 @@ export class ChangePromotionPackService {
       ...(f.repoId ? { repoId: f.repoId } : {}),
     }));
 
-    let graphEvidenceBundle: ChangePromotionPackV1['graphEvidenceBundle'];
-    let changePlanSeed: ChangePromotionPackV1['changePlanSeed'];
-    if (filesToModify.length > 0) {
-      try {
-        graphEvidenceBundle = await this.modificationPlanEvidence.buildEvidenceBundle(
-          falkorProjectId,
-          filesToModify.map((f, i) => ({
-            path: f.path,
-            repoId: f.repoId ?? repository?.id ?? falkorProjectId,
-            impactScore: Math.max(1, filesToModify.length - i) * 10,
-          })),
-        );
-        changePlanSeed = this.modificationPlanEvidence.buildChangePlanSeed({
-          projectId: falkorProjectId,
-          changeDescription: userDescription,
-          source: 'theforge',
-          filesToModify: filesToModify.map((f) => ({
-            path: f.path,
-            repoId: f.repoId ?? repository?.id ?? falkorProjectId,
-          })),
-          bundle: graphEvidenceBundle,
-        });
-      } catch {
-        /* promote still works without evidence */
-      }
-    }
-
     const idempotencyKey = buildPromotionIdempotencyKey(
       conversation.id,
       stageKey,
@@ -208,10 +195,169 @@ export class ChangePromotionPackService {
       modificationPlan: {
         filesToModify,
       },
-      ...(graphEvidenceBundle ? { graphEvidenceBundle } : {}),
-      ...(changePlanSeed ? { changePlanSeed } : {}),
+      ...(await this.buildEvidenceForFiles(falkorProjectId, repository, filesToModify, userDescription)),
       deliverablesRequested: options.deliverablesRequested,
     };
+  }
+
+  async buildFromProject(options: BuildProjectChangePromotionPackOptions): Promise<ChangePromotionPackV1> {
+    const project = await this.projects.findOne({ where: { id: options.projectId } });
+    if (!project) throw new NotFoundException('Proyecto no encontrado');
+
+    const changeDescription = options.changeDescription.trim();
+    if (!changeDescription) {
+      throw new BadRequestException('La descripción del cambio es obligatoria');
+    }
+
+    const stageName = options.stageName.trim();
+    if (!stageName) throw new BadRequestException('El nombre de etapa es obligatorio');
+
+    const changeTitle = buildChangeTitle(stageName, project.name, changeDescription);
+    const stageKey = (options.stageKey?.trim() || slugifyStageKey(changeTitle)).slice(0, 48);
+
+    const repoList = await this.repos.findAll(options.projectId);
+    const repository = repoList[0] ?? null;
+    const freshness = computeIndexFreshness(repository?.lastSyncAt ?? null);
+
+    let slices: ConversationMessageSlice[] = [];
+    let conversationId = options.conversationId?.trim() || '';
+    let conversationTitle: string | null = null;
+
+    if (conversationId) {
+      const conversation = await this.conversations.findOne({ where: { id: conversationId } });
+      if (conversation) {
+        conversationTitle = conversation.title;
+        const messageRows = await this.messages.find({
+          where: { conversationId },
+          order: { createdAt: 'ASC' },
+          take: 500,
+        });
+        slices = messageRows.map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+      } else {
+        conversationId = '';
+      }
+    }
+
+    const userDescription =
+      slices.length > 0
+        ? synthesizeUserDescription(conversationTitle, slices)
+        : changeDescription;
+
+    let mdd: Record<string, unknown>;
+    const repoId = repository?.id ?? repoList[0]?.id;
+    if (repoId) {
+      const snap = await this.mddPersistence.getLatest(repoId);
+      if (snap?.mddJson) {
+        mdd = snap.mddJson;
+      } else {
+        const doc = await this.chat.buildMddEvidenceForRepository(
+          repoId,
+          options.projectId,
+          userDescription,
+          '',
+          [],
+          false,
+        );
+        mdd = doc as unknown as Record<string, unknown>;
+      }
+    } else {
+      mdd = { summary: userDescription, evidence_paths: [] };
+    }
+
+    const modFiles = await this.chat.getModificationPlanFilesOnlyByProject(
+      options.projectId,
+      userDescription.slice(0, 2000),
+      repoList.length ? { repoIds: repoList.map((r) => r.id) } : undefined,
+    );
+
+    const filesToModify = modFiles.slice(0, 80).map((f) => ({
+      path: f.path,
+      ...(f.repoId ? { repoId: f.repoId } : {}),
+    }));
+
+    const idempotencyKey = buildProjectStageIdempotencyKey(
+      options.projectId,
+      stageKey,
+      repository?.lastCommitSha ?? null,
+    );
+
+    const evidence = await this.buildEvidenceForFiles(
+      options.projectId,
+      repository,
+      filesToModify,
+      userDescription,
+    );
+
+    return {
+      schemaVersion: '1.1',
+      source: 'ariadne',
+      kind: 'change_promotion',
+      generatedAt: new Date().toISOString(),
+      idempotencyKey,
+      ariadne: {
+        conversationId: conversationId || `project:${options.projectId}`,
+        conversationTitle,
+        repositoryId: repository?.id ?? null,
+        projectId: options.projectId,
+        projectKey: repository?.projectKey ?? null,
+        repoSlug: repository?.repoSlug ?? null,
+        commitSha: repository?.lastCommitSha ?? null,
+        indexFresh: freshness.indexFresh,
+        indexStaleHours: freshness.indexStaleHours,
+      },
+      change: {
+        title: changeTitle,
+        stageKey,
+        userDescription: changeDescription,
+        decisions: extractDecisionBullets(slices),
+        erDiagramMermaid: extractLastMermaidDiagram(slices),
+        migrationNotes: extractUserMigrationNotes(slices),
+      },
+      mdd,
+      modificationPlan: {
+        filesToModify,
+      },
+      ...evidence,
+      deliverablesRequested: options.deliverablesRequested,
+    };
+  }
+
+  private async buildEvidenceForFiles(
+    projectId: string,
+    repository: RepositoryEntity | null,
+    filesToModify: Array<{ path: string; repoId?: string }>,
+    changeDescription: string,
+  ): Promise<{
+    graphEvidenceBundle?: ChangePromotionPackV1['graphEvidenceBundle'];
+    changePlanSeed?: ChangePromotionPackV1['changePlanSeed'];
+  }> {
+    if (filesToModify.length === 0) return {};
+    try {
+      const graphEvidenceBundle = await this.modificationPlanEvidence.buildEvidenceBundle(
+        projectId,
+        filesToModify.map((f, i) => ({
+          path: f.path,
+          repoId: f.repoId ?? repository?.id ?? projectId,
+          impactScore: Math.max(1, filesToModify.length - i) * 10,
+        })),
+      );
+      const changePlanSeed = this.modificationPlanEvidence.buildChangePlanSeed({
+        projectId,
+        changeDescription,
+        source: 'theforge',
+        filesToModify: filesToModify.map((f) => ({
+          path: f.path,
+          repoId: f.repoId ?? repository?.id ?? projectId,
+        })),
+        bundle: graphEvidenceBundle,
+      });
+      return { graphEvidenceBundle, changePlanSeed };
+    } catch {
+      return {};
+    }
   }
 
   private async resolveRepositoryContext(

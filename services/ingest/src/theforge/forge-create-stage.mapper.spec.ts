@@ -99,6 +99,15 @@ describe('forge-create-stage.mapper', () => {
     expect(desc).toContain('erDiagram');
   });
 
+  it('includes cursor handoff items when present', () => {
+    const pack = samplePack();
+    pack.changeWorkDescription = '# Trabajo\n\nDetalle';
+    pack.cursorTasksMarkdown = '# Tasks\n\n## Backend tasks\n### Fase 1\n---\nid: T-001\nsection: Backend\ntitle: x\nstatus: pending\nchange_type: modify\nparallel: true\ndepends_on: []\ncontext:\n  mdd_ref: x\n  story_ref: ""\n  why: x\nscope:\n  include:\n    - a.ts\n  exclude: []\nrequirements:\n  - x\nverification:\n  - run: echo ok\n    expect_exit: 0\ndone_when:\n  - ok\n---\n- [ ] T-001 — x';
+    const forgePack = toForgeChangePackV1(pack);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'change_work_description')).toBe(true);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'cursor_tasks_markdown')).toBe(true);
+  });
+
   it('sets runLegacyStart false when files present', () => {
     const body = toForgeCreateStageApiBody({
       forgeProjectId: 'forge-1',

@@ -22,7 +22,9 @@ import { DomainsService } from '../domains/domains.service';
 import { SyncStatusService } from './sync-status.service';
 import { actorFromHeaders } from '../credentials/credential-actor';
 import { TheForgeProjectLinkService } from '../theforge/theforge-project-link.service';
+import { TheForgeProjectStageService } from '../theforge/theforge-project-stage.service';
 import { TheForgeIntegrationService } from '../theforge/theforge-integration.service';
+import type { ProjectTheForgeStageBody } from '../theforge/theforge-project-stage.service';
 
 @Controller('projects')
 export class ProjectsController {
@@ -34,6 +36,7 @@ export class ProjectsController {
     private readonly domains: DomainsService,
     private readonly syncStatus: SyncStatusService,
     private readonly forgeLink: TheForgeProjectLinkService,
+    private readonly forgeStage: TheForgeProjectStageService,
     private readonly forgeIntegration: TheForgeIntegrationService,
   ) {}
 
@@ -163,6 +166,28 @@ export class ProjectsController {
     if (!actor.userId) throw new ForbiddenException('Usuario no identificado');
     await this.forgeLink.unlinkProject(id);
     return this.service.findOne(id);
+  }
+
+  /** Vista previa de documentos (descripción + # Tasks) antes de crear etapa en The Forge. */
+  @Post(':id/theforge-stage/preview')
+  async previewTheForgeStage(
+    @Param('id') id: string,
+    @Body() body: ProjectTheForgeStageBody,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    const actor = actorFromHeaders(headers);
+    return this.forgeStage.preview(actor, id, body);
+  }
+
+  /** Crea etapa en The Forge con documentos generados por Ariadne (proyecto vinculado). */
+  @Post(':id/theforge-stage')
+  async createTheForgeStage(
+    @Param('id') id: string,
+    @Body() body: ProjectTheForgeStageBody,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    const actor = actorFromHeaders(headers);
+    return this.forgeStage.createStage(actor, id, body);
   }
 
   /** Rol opcional del repo en el proyecto (chat multi-root: inferencia de alcance). */

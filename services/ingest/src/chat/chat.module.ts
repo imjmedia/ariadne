@@ -63,7 +63,7 @@ import { TheForgeModule } from '../theforge/theforge.module';
     ChatConversationService,
     ModificationPlanEvidenceService,
   ],
-  exports: [ChatService, DesignSystemLinkService, ModificationPlanEvidenceService, ChangePlanValidationService],
+  exports: [ChatService, ChatLlmService, DesignSystemLinkService, ModificationPlanEvidenceService, ChangePlanValidationService],
 })
 /** Módulo del chat con grafo FalkorDB (preguntas en NL, Cypher, análisis). */
 export class ChatModule {}
