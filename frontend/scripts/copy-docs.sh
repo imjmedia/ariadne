@@ -3,7 +3,11 @@
 cd "$(dirname "$0")/.."
 mkdir -p public
 cp ../docs/notebooklm/MCP_AYUDA.md public/ayuda-mcp.md 2>/dev/null
-cp ../.cursor/skills/ariadnespecs-mcp/SKILL.md public/ayuda-skills.md 2>/dev/null
+if [ -f ../SKILLS.md ]; then
+  cp ../SKILLS.md public/ayuda-skills.md
+elif [ -f ../.cursor/skills/ariadnespecs-mcp/SKILL.md ]; then
+  cp ../.cursor/skills/ariadnespecs-mcp/SKILL.md public/ayuda-skills.md
+fi
 cp ../docs/manual/README.md public/ayuda-manual.md 2>/dev/null
 cp ../docs/manual/CONFIGURACION_Y_USO.md public/ayuda-manual-configuracion.md 2>/dev/null
 cp ../docs/README.md public/ayuda-manual-indice.md 2>/dev/null

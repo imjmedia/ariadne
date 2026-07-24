@@ -1,13 +1,10 @@
 # Git y IDE
 .git
 .gitignore
+.cursor
 .vscode
 *.swp
 *.swo
-# .cursor except skills copied into frontend ayuda
-.cursor/*
-!.cursor/skills/
-!.cursor/skills/**
 
 # Dependencies (se reinstalan en build)
 **/node_modules

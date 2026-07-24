@@ -6,7 +6,7 @@ Los `Dockerfile` usan **BuildKit** (`# syntax=docker/dockerfile:1.4`) con:
 
 - Capas por dependencias (`package.json` / lockfile antes que `src`)
 - `--mount=type=cache` para npm/pnpm (no re-descarga en cada deploy)
-- Frontend **sin** `COPY . .` ni `buildstamp` anti-caché
+- Frontend **sin** `COPY . .` ni `buildstamp` anti-caché; ayuda in-app desde `docs/` + `SKILLS.md` (no `.cursor/`, gitignored)
 - Tarball MCP en stage aparte (solo se reconstruye si cambia `mcp-ariadne` o `ariadne-common`)
 
 Requisito en el servidor: `DOCKER_BUILDKIT=1` (default en Docker 23+).
