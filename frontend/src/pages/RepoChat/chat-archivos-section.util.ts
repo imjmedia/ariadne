@@ -67,7 +67,7 @@ function mapTableColumns(headers: string[]): {
   });
   if (map.path < 0 && headers.length > 0) map.path = 0;
   if (map.queTocar == null && headers.length >= 2) {
-    const fallback = headers.findIndex((h, i) => i !== map.path && i !== map.repoId && i !== map.simbolo);
+    const fallback = headers.findIndex((_, i) => i !== map.path && i !== map.repoId && i !== map.simbolo);
     if (fallback >= 0) map.queTocar = fallback;
   }
   return map;
