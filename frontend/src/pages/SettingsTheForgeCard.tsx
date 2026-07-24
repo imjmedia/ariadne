@@ -158,7 +158,8 @@ export function SettingsTheForgeCard() {
                 placeholder="https://maxprime.obp.mx/api"
               />
               <p className="text-xs text-[var(--foreground-muted)]">
-                API REST Nest (…/api). No uses la URL del MCP (<code className="text-xs">…/mcp</code>).
+                Base REST Nest (…/api). No uses la URL del MCP (<code className="text-xs">…/mcp</code>)
+                ni la raíz del frontend SPA.
               </p>
               {settings?.envApiUrlConfigured ? (
                 <p className="text-xs text-[var(--foreground-muted)]">
