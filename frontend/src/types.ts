@@ -353,6 +353,49 @@ export interface PromoteToTheForgeResponse {
   linkKind?: string;
 }
 
+export interface ProjectTheForgeStageRequest {
+  stageName: string;
+  changeDescription: string;
+  stageKey?: string;
+  conversationId?: string;
+  deliverables?: ForgeDeliverableKind[];
+  activate?: boolean;
+}
+
+export interface ProjectTheForgeStagePreview {
+  stageName: string;
+  stageKeySuggested: string;
+  changeDescription: string;
+  changeWorkDescription: string;
+  cursorTasksMarkdown: string;
+  cursorTasksSource: 'llm' | 'fallback';
+  modificationPlanFileCount: number;
+  modificationPlanSample: string[];
+  indexFresh: boolean;
+  indexStaleHours: number | null;
+  warnings: string[];
+  forgeProjectId: string;
+  forgeProjectName: string | null;
+}
+
+export interface CreateProjectTheForgeStageResponse {
+  status: 'success';
+  forgeProjectId: string;
+  forgeProjectName: string | null;
+  forgeStageId: string;
+  stageKey?: string;
+  stageName?: string;
+  stageUrl?: string;
+  importMode?: 'create' | 'import';
+  legacyStart?: { triggered?: boolean; skipped?: boolean; reason?: string };
+  ariadneWire?: { linked?: boolean; linkKind?: string; warnings?: string[] };
+  recommendedNextTools?: string[];
+  deliverablesCreated?: string[];
+  changeWorkDescription?: string;
+  cursorTasksMarkdown?: string;
+  warnings?: string[];
+}
+
 export interface ForgeProjectCandidate {
   forgeProjectId: string;
   forgeProjectName: string;

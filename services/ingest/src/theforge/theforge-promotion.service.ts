@@ -20,6 +20,7 @@ import {
   ForgeResolveAmbiguousError,
   ForgeResolveNotFoundError,
 } from './change-promotion-pack.types';
+import { CursorTasksDocumentService } from './cursor-tasks-document.service';
 import { TheForgeClient } from './theforge-client.service';
 import { TheForgeIntegrationService } from './theforge-integration.service';
 
@@ -51,6 +52,7 @@ export class TheForgePromotionService {
     @InjectRepository(ChatMessageEntity)
     private readonly messages: Repository<ChatMessageEntity>,
     private readonly packService: ChangePromotionPackService,
+    private readonly cursorTasks: CursorTasksDocumentService,
     private readonly forgeClient: TheForgeClient,
     private readonly integration: TheForgeIntegrationService,
   ) {}
@@ -115,12 +117,13 @@ export class TheForgePromotionService {
     }
 
     const deliverables = this.normalizeDeliverables(body.deliverables);
-    const pack = await this.packService.build({
+    const basePack = await this.packService.build({
       conversationId,
       stageName: body.stageName,
       stageKey: body.stageKey,
       deliverablesRequested: deliverables,
     });
+    const { pack } = await this.cursorTasks.enrichPack(basePack);
 
     if (
       conversation.forgePromotionStatus === 'success' &&

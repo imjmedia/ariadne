@@ -397,6 +397,24 @@ export const api = {
       method: 'DELETE',
     }),
 
+  previewProjectTheForgeStage: (
+    projectId: string,
+    body: import('./types').ProjectTheForgeStageRequest,
+  ) =>
+    request<import('./types').ProjectTheForgeStagePreview>(
+      `/projects/${encodeURIComponent(projectId)}/theforge-stage/preview`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  createProjectTheForgeStage: (
+    projectId: string,
+    body: import('./types').ProjectTheForgeStageRequest,
+  ) =>
+    request<import('./types').CreateProjectTheForgeStageResponse>(
+      `/projects/${encodeURIComponent(projectId)}/theforge-stage`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   getTheForgeIntegrationSettings: () =>
     request<import('./types').TheForgeIntegrationSettings>('/theforge-integration'),
 

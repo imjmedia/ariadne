@@ -63,6 +63,8 @@ El mapper `forge-create-stage.mapper.ts` transforma este JSON interno al `pack.v
 | `mdd_evidence` | MDD JSON |
 | `modification_plan_enriched` | `graphEvidenceBundle` |
 | `change_plan_seed` | `changePlanSeed` |
+| `change_work_description` | Markdown descripción completa del trabajo (Ariadne) |
+| `cursor_tasks_markdown` | Documento `# Tasks` (YAML + checklist; Backend/Frontend/Infra/Testing/Deploy) |
 | `post_deliverable_gate` | Instrucción + endpoint `validate-tasks-json` (si hay `migration_tasks`) |
 | `deliverable_request` | Cada deliverable pedido |
 | `er_diagram` | Mermaid si existe |

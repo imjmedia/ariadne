@@ -58,6 +58,24 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
     });
   }
 
+  if (pack.changeWorkDescription?.trim()) {
+    items.push({
+      kind: 'change_work_description',
+      title: 'Descripción del trabajo (Ariadne)',
+      content: pack.changeWorkDescription.trim(),
+      mimeType: 'text/markdown',
+    });
+  }
+
+  if (pack.cursorTasksMarkdown?.trim()) {
+    items.push({
+      kind: 'cursor_tasks_markdown',
+      title: 'Tareas Cursor (# Tasks)',
+      content: pack.cursorTasksMarkdown.trim(),
+      mimeType: 'text/markdown',
+    });
+  }
+
   if (pack.change.erDiagramMermaid?.trim()) {
     items.push({
       kind: 'er_diagram',

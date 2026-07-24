@@ -52,6 +52,10 @@ export interface ChangePromotionPackV1 {
   graphEvidenceBundle?: import('../chat/modification-plan-evidence.types').GraphEvidenceBundle;
   /** Pre-seeded ChangePlan (tasks with phase/criterion/evidence). */
   changePlanSeed?: import('../plan-validation/change-plan-validation.types').ChangePlan;
+  /** Markdown descripción completa del trabajo (handoff Cursor / Forge). */
+  changeWorkDescription?: string;
+  /** Documento # Tasks para Cursor Agent (YAML + checklist). */
+  cursorTasksMarkdown?: string;
   deliverablesRequested: ForgeDeliverableKind[];
 }
 
@@ -184,6 +188,17 @@ export function buildPromotionIdempotencyKey(
 ): string {
   return createHash('sha256')
     .update(`${conversationId}:${stageKey}:${commitSha ?? ''}`)
+    .digest('hex')
+    .slice(0, 32);
+}
+
+export function buildProjectStageIdempotencyKey(
+  projectId: string,
+  stageKey: string,
+  commitSha: string | null,
+): string {
+  return createHash('sha256')
+    .update(`project:${projectId}:${stageKey}:${commitSha ?? ''}`)
     .digest('hex')
     .slice(0, 32);
 }

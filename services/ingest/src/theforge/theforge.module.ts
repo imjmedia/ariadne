@@ -12,12 +12,14 @@ import { RepositoryEntity } from '../repositories/entities/repository.entity';
 import { ProjectRepositoryEntity } from '../repositories/entities/project-repository.entity';
 import { ProjectEntity } from '../projects/entities/project.entity';
 import { ChangePromotionPackService } from './change-promotion-pack.service';
+import { CursorTasksDocumentService } from './cursor-tasks-document.service';
 import { TheForgeBrownfieldCatalogService } from './theforge-brownfield-catalog.service';
 import { TheForgeIntegrationEntity } from './entities/theforge-integration.entity';
 import { TheForgeConvergeService } from './theforge-converge.service';
 import { TheForgeIntegrationController } from './theforge-integration.controller';
 import { TheForgeIntegrationService } from './theforge-integration.service';
 import { TheForgeProjectLinkService } from './theforge-project-link.service';
+import { TheForgeProjectStageService } from './theforge-project-stage.service';
 import { TheForgePromotionService } from './theforge-promotion.service';
 import {
   TheForgeClient,
@@ -46,7 +48,9 @@ import {
     TheForgeBrownfieldCatalogService,
     TheForgeProjectLinkService,
     ChangePromotionPackService,
+    CursorTasksDocumentService,
     TheForgePromotionService,
+    TheForgeProjectStageService,
     TheForgeClientMock,
     TheForgeClientHttp,
     {
@@ -64,7 +68,9 @@ import {
     TheForgeBrownfieldCatalogService,
     TheForgeProjectLinkService,
     ChangePromotionPackService,
+    CursorTasksDocumentService,
     TheForgePromotionService,
+    TheForgeProjectStageService,
   ],
 })
 export class TheForgeModule {}
