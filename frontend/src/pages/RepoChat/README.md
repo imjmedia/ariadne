@@ -17,6 +17,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 - API: `GET /theforge-integration/status`, endpoints de conversación bajo demanda.
 - Contrato pack: `docs/contracts/change-promotion-pack-v1.md`.
 - Dev: `THEFORGE_PROMOTE_MOCK=true` simula promoción E2E.
+- Durante **Enviar a The Forge**, barra de progreso con pasos estimados (pack → # Tasks → resolve → create stage).
 
 ## Persistencia (por usuario)
 
@@ -37,6 +38,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **ChatPageHeader.tsx** | Cabecera compartida repo/proyecto (interruptor Chat/Análisis) |
 | **ChatRepoHeader.tsx** | Wrapper repo → ChatPageHeader |
 | **ChatForgePromoteDialog.tsx** | Modal promover conversación → etapa The Forge |
+| **forgePromoteProgress.tsx** | Barra de progreso estimada durante promote/create-stage |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
 | **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable, **Copiar Markdown** en respuestas |
 | **ChatCopyMarkdownButton.tsx** | Copia la respuesta cruda (GFM + fences `mermaid`/`cypher`) al portapapeles |
