@@ -410,6 +410,11 @@ export interface ForgeBrownfieldProjectOption {
   projectType: 'LEGACY';
 }
 
+export interface ForgeBrownfieldProjectsResponse {
+  projects: ForgeBrownfieldProjectOption[];
+  hint?: string;
+}
+
 /** Estado público: ¿mostrar promoción chat → The Forge? */
 export interface TheForgeIntegrationStatus {
   chatPromotionAvailable: boolean;

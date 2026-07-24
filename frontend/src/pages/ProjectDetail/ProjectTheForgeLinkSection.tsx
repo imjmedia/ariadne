@@ -53,6 +53,7 @@ export function ProjectTheForgeLinkSection(props: {
   const [saving, setSaving] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
+  const [emptyHint, setEmptyHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,12 +68,15 @@ export function ProjectTheForgeLinkSection(props: {
   const loadOptions = useCallback(async () => {
     setLoadingOptions(true);
     setError(null);
+    setEmptyHint(null);
     try {
       const res = await api.listTheForgeBrownfieldProjects();
       setOptions(res.projects);
+      setEmptyHint(res.hint ?? null);
       if (res.projects.length === 1) setSelectedId(res.projects[0].id);
     } catch (e) {
       setOptions([]);
+      setEmptyHint(null);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingOptions(false);
@@ -232,9 +236,18 @@ export function ProjectTheForgeLinkSection(props: {
               {loadingOptions ? (
                 <p className="text-sm text-[var(--foreground-muted)]">Cargando proyectos…</p>
               ) : options.length === 0 ? (
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  No hay proyectos LEGACY en The Forge o no se pudo consultar la API.
-                </p>
+                <div className="space-y-2 text-sm text-[var(--foreground-muted)]">
+                  <p>
+                    No se encontraron proyectos brownfield (LEGACY) en The Forge.
+                  </p>
+                  {emptyHint ? <p className="text-[var(--foreground)]">{emptyHint}</p> : null}
+                  {!error && !emptyHint ? (
+                    <p>
+                      Revisa en <strong>Ajustes → The Forge</strong>: URL de la API de The Forge (no la de
+                      Ariadne) y JWT de servicio con permiso para listar proyectos.
+                    </p>
+                  ) : null}
+                </div>
               ) : (
                 <Select value={selectedId || undefined} onValueChange={setSelectedId}>
                   <SelectTrigger id="forge-project-select" className={selectTriggerClass}>

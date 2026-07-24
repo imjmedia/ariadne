@@ -5,6 +5,7 @@ import {
   Get,
   Headers,
   Put,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { actorFromHeaders, isAdmin } from '../credentials/credential-actor';
 import type { UpdateTheForgeIntegrationDto } from './theforge-integration.types';
@@ -46,11 +47,29 @@ export class TheForgeIntegrationController {
   ) {
     this.requireAuth(headers);
     const status = await this.integration.getStatus();
-    if (!status.enabled || (!status.chatPromotionAvailable && !status.mock)) {
-      return { projects: [] as const };
+    if (!status.enabled && !status.mock) {
+      throw new ServiceUnavailableException({
+        code: 'FORGE_NOT_CONFIGURED',
+        message: 'The Forge no está activado. Habilítalo en Ajustes (admin).',
+      });
+    }
+    if (!status.chatPromotionAvailable && !status.mock) {
+      throw new ServiceUnavailableException({
+        code: 'FORGE_NOT_CONFIGURED',
+        message:
+          'Falta la URL de la API de The Forge o el JWT de servicio. Configúralos en Ajustes → The Forge (o THEFORGE_API_URL / THEFORGE_SERVICE_JWT).',
+      });
     }
     const projects = await this.brownfieldCatalog.listBrownfieldProjects();
-    return { projects };
+    return {
+      projects,
+      ...(projects.length === 0
+        ? {
+            hint:
+              'The Forge respondió pero no hay proyectos LEGACY visibles para el JWT de servicio. Verifica permisos del token o crea un proyecto brownfield en The Forge.',
+          }
+        : {}),
+    };
   }
 
   @Get()
