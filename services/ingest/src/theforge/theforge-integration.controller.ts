@@ -57,7 +57,7 @@ export class TheForgeIntegrationController {
       throw new ServiceUnavailableException({
         code: 'FORGE_NOT_CONFIGURED',
         message:
-          'Falta la URL de la API de The Forge o el JWT de servicio. Configúralos en Ajustes → The Forge (o THEFORGE_API_URL / THEFORGE_SERVICE_JWT).',
+          'Falta la URL de The Forge o el token. Configúralos en Ajustes → The Forge (REST …/api o MCP …/mcp + token; env THEFORGE_API_URL / THEFORGE_SERVICE_JWT).',
       });
     }
     const result = await this.brownfieldCatalog.listBrownfieldProjects();

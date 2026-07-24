@@ -150,16 +150,16 @@ export function SettingsTheForgeCard() {
         {form.enabled ? (
           <div className="grid gap-4 sm:grid-cols-1">
             <div className="space-y-2">
-              <Label htmlFor="theforge-api-url">URL API</Label>
+              <Label htmlFor="theforge-api-url">URL The Forge</Label>
               <Input
                 id="theforge-api-url"
                 value={form.apiUrl}
                 onChange={(e) => setForm({ ...form, apiUrl: e.target.value })}
-                placeholder="https://tu-dominio/api"
+                placeholder="https://tu-dominio/mcp o …/api"
               />
               <p className="text-xs text-[var(--foreground-muted)]">
-                Base REST Nest (…/api). No uses la URL del MCP (<code className="text-xs">…/mcp</code>)
-                ni la raíz del frontend SPA.
+                MCP Streamable HTTP (<code className="text-xs">…/mcp</code>) con Secret MCP o JWT de sesión,
+                o REST Nest (<code className="text-xs">…/api</code>) con JWT de servicio.
               </p>
               {settings?.envApiUrlConfigured ? (
                 <p className="text-xs text-[var(--foreground-muted)]">
@@ -168,7 +168,7 @@ export function SettingsTheForgeCard() {
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="theforge-service-token">JWT de servicio</Label>
+              <Label htmlFor="theforge-service-token">Token / JWT</Label>
               <Input
                 id="theforge-service-token"
                 type="password"
@@ -179,7 +179,7 @@ export function SettingsTheForgeCard() {
                 placeholder={
                   settings?.hasServiceToken
                     ? `Configurado (${settings.serviceTokenHint ?? '••••'})`
-                    : 'Bearer JWT Ariadne ↔ The Forge'
+                    : 'Secret MCP, JWT sesión o JWT servicio REST'
                 }
                 autoComplete="off"
               />

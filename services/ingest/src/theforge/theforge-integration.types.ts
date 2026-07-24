@@ -1,6 +1,14 @@
+export type TheForgeTransport = 'rest' | 'mcp';
+
 export interface TheForgeIntegrationEffective {
   enabled: boolean;
+  /** URL guardada o de env (p. ej. …/api o …/mcp). */
+  configuredUrl: string | null;
+  transport: TheForgeTransport;
+  /** Base REST Nest; null en modo MCP puro. */
   apiUrl: string | null;
+  /** Endpoint Streamable HTTP MCP; null en modo REST. */
+  mcpUrl: string | null;
   serviceToken: string | null;
 }
 
