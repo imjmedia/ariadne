@@ -379,7 +379,7 @@ export const api = {
     request<import('./types').TheForgeIntegrationStatus>('/theforge-integration/status'),
 
   listTheForgeBrownfieldProjects: () =>
-    request<{ projects: import('./types').ForgeBrownfieldProjectOption[] }>(
+    request<import('./types').ForgeBrownfieldProjectsResponse>(
       '/theforge-integration/brownfield-projects',
     ),
 
