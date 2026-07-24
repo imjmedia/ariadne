@@ -155,7 +155,7 @@ export function SettingsTheForgeCard() {
                 id="theforge-api-url"
                 value={form.apiUrl}
                 onChange={(e) => setForm({ ...form, apiUrl: e.target.value })}
-                placeholder="https://maxprime.obp.mx/api"
+                placeholder="https://tu-dominio/api"
               />
               <p className="text-xs text-[var(--foreground-muted)]">
                 Base REST Nest (…/api). No uses la URL del MCP (<code className="text-xs">…/mcp</code>)

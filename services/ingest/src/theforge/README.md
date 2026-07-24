@@ -12,10 +12,12 @@ Per-repository config on `repositories`:
 | `theforge_converge_trigger_mode` | `off` \| `full` \| `incremental` \| `all` |
 | `theforge_service_token_encrypted` | Optional Bearer JWT (encrypted); fallback `THEFORGE_SERVICE_JWT` |
 
-**Env (server):**
+**URL y JWT (servidor):**
 
-- `THEFORGE_API_URL` — base URL of The Forge API (e.g. `https://api.example.com`)
-- `THEFORGE_SERVICE_JWT` — default service token when per-repo token is empty
+- **Ajustes → The Forge → URL API** — base REST usada por catálogo brownfield, promoción chat y **converge post-sync**
+- **Ajustes → JWT de servicio** — Bearer por defecto (fallback `THEFORGE_SERVICE_JWT`)
+- `THEFORGE_API_URL` — fallback de URL si no hay valor guardado en Ajustes
+- Token por repo (`theforge_service_token_encrypted`) — override opcional del JWT global
 
 **Hook points:** `SyncService.runFullSync` (full/resync) and `WebhooksService.handleBitbucketPush` (incremental) call `TheForgeConvergeService.triggerAfterSync` after a successful job. Failures are logged only; they do not fail the sync.
 
@@ -46,7 +48,7 @@ Integración **opt-in** en **Ajustes (admin)**. Ariadne OSS no requiere The Forg
 | Lista vacía | JWT sin acceso a Workshop o filas sin `projectType`/`stages[].isLegacy` |
 | `503 FORGE_NO_SERVICE_TOKEN` | Falta JWT en Ajustes o `THEFORGE_SERVICE_JWT` |
 
-La vinculación usa **HTTP** (`THEFORGE_API_URL` + Bearer servicio), no el MCP de The Forge en Cursor.
+La vinculación usa **HTTP** (URL API de Ajustes + Bearer servicio), no el MCP de The Forge en Cursor.
 
 **Endpoints (ingest, cont.):**
 - `GET/PUT /theforge-integration` — admin (Ajustes)

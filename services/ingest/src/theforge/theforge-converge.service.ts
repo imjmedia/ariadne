@@ -11,6 +11,8 @@ import type {
   TheForgeConvergeTriggerMode,
   TheForgeConvergeTriggerResult,
 } from './theforge-converge.types';
+import type { TheForgeIntegrationEffective } from './theforge-integration.types';
+import { TheForgeIntegrationService } from './theforge-integration.service';
 
 const VALID_MODES = new Set<TheForgeConvergeTriggerMode>(['off', 'full', 'incremental', 'all']);
 
@@ -37,6 +39,7 @@ export class TheForgeConvergeService {
   constructor(
     @InjectRepository(RepositoryEntity)
     private readonly repoRepo: Repository<RepositoryEntity>,
+    private readonly integration: TheForgeIntegrationService,
   ) {}
 
   /**
@@ -80,18 +83,19 @@ export class TheForgeConvergeService {
       return { triggered: false, reason: 'mode_skip', mode, theforgeProjectId };
     }
 
-    const apiBase = (process.env.THEFORGE_API_URL ?? '').trim().replace(/\/$/, '');
+    const cfg = await this.integration.getEffective();
+    const apiBase = cfg.apiUrl?.trim();
     if (!apiBase) {
       this.logger.warn(
-        `TheForge converge skipped for repo ${repositoryId}: THEFORGE_API_URL not set`,
+        `TheForge converge skipped for repo ${repositoryId}: URL API no configurada (Ajustes → The Forge o THEFORGE_API_URL)`,
       );
       return { triggered: false, reason: 'no_theforge_api_url', mode, theforgeProjectId };
     }
 
-    const token = this.resolveServiceToken(repo);
+    const token = this.resolveServiceToken(repo, cfg);
     if (!token) {
       this.logger.warn(
-        `TheForge converge skipped for repo ${repositoryId}: no service JWT (env THEFORGE_SERVICE_JWT or per-repo token)`,
+        `TheForge converge skipped for repo ${repositoryId}: no service JWT (Ajustes, THEFORGE_SERVICE_JWT o token por repo)`,
       );
       return { triggered: false, reason: 'no_service_token', mode, theforgeProjectId };
     }
@@ -135,7 +139,10 @@ export class TheForgeConvergeService {
     };
   }
 
-  private resolveServiceToken(repo: RepositoryEntity): string | null {
+  private resolveServiceToken(
+    repo: RepositoryEntity,
+    cfg: TheForgeIntegrationEffective,
+  ): string | null {
     if (repo.theforgeServiceTokenEncrypted) {
       try {
         const decrypted = decrypt(repo.theforgeServiceTokenEncrypted).trim();
@@ -144,6 +151,6 @@ export class TheForgeConvergeService {
         return null;
       }
     }
-    return (process.env.THEFORGE_SERVICE_JWT ?? '').trim() || null;
+    return this.integration.resolveServiceToken(cfg);
   }
 }
