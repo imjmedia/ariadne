@@ -5,7 +5,7 @@
 Los `Dockerfile` usan **BuildKit** (`# syntax=docker/dockerfile:1.4`) con:
 
 - Capas por dependencias (`package.json` / lockfile antes que `src`)
-- `--mount=type=cache` para npm/pnpm (no re-descarga en cada deploy)
+- `--mount=type=cache` para npm/pnpm (no re-descarga en cada deploy). **No** ejecutar `npm cache clean` sobre `/root/.npm` con el mount activo (falla `ENOTEMPTY` en CI).
 - Frontend **sin** `COPY . .` ni `buildstamp` anti-caché; ayuda in-app desde `docs/` + `SKILLS.md` (no `.cursor/`, gitignored)
 - Tarball MCP en stage aparte (solo se reconstruye si cambia `mcp-ariadne` o `ariadne-common`)
 

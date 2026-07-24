@@ -14,7 +14,7 @@ WORKDIR /app
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --omit=dev --ignore-scripts && npm cache clean --force
+    npm install --omit=dev --ignore-scripts
 COPY --from=builder /app/dist ./dist
 COPY docs_mcp /docs_mcp
 
