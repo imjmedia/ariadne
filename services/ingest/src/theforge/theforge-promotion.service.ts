@@ -269,7 +269,7 @@ export class TheForgePromotionService {
       select: ['id', 'theforgeProjectId', 'theforgeProjectName'],
     });
     const projectForgeId = project?.theforgeProjectId?.trim();
-    if (projectForgeId) {
+    if (projectForgeId && project) {
       return {
         forgeProjectId: projectForgeId,
         forgeProjectName: project.theforgeProjectName?.trim() || projectForgeId,
@@ -286,7 +286,7 @@ export class TheForgePromotionService {
       select: ['id', 'theforgeProjectId', 'projectKey', 'repoSlug'],
     });
     const repoForgeId = repo?.theforgeProjectId?.trim();
-    if (!repoForgeId) return null;
+    if (!repoForgeId || !repo) return null;
 
     return {
       forgeProjectId: repoForgeId,
