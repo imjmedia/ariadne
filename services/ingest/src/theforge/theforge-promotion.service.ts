@@ -268,14 +268,16 @@ export class TheForgePromotionService {
       where: { id: ariadneProjectId },
       select: ['id', 'theforgeProjectId', 'theforgeProjectName'],
     });
-    const projectForgeId = project?.theforgeProjectId?.trim();
-    if (projectForgeId) {
-      return {
-        forgeProjectId: projectForgeId,
-        forgeProjectName: project.theforgeProjectName?.trim() || projectForgeId,
-        linkKind: 'primary',
-        warnings: [],
-      };
+    if (project) {
+      const projectForgeId = project.theforgeProjectId?.trim();
+      if (projectForgeId) {
+        return {
+          forgeProjectId: projectForgeId,
+          forgeProjectName: project.theforgeProjectName?.trim() || projectForgeId,
+          linkKind: 'primary',
+          warnings: [],
+        };
+      }
     }
 
     const repoId = ariadneRepositoryId?.trim();
@@ -285,7 +287,9 @@ export class TheForgePromotionService {
       where: { id: repoId },
       select: ['id', 'theforgeProjectId', 'projectKey', 'repoSlug'],
     });
-    const repoForgeId = repo?.theforgeProjectId?.trim();
+    if (!repo) return null;
+
+    const repoForgeId = repo.theforgeProjectId?.trim();
     if (!repoForgeId) return null;
 
     return {
