@@ -19,6 +19,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import {
+  ForgePromoteProgressPanel,
+  useForgePromoteProgress,
+} from '../RepoChat/forgePromoteProgress';
 
 export function ProjectTheForgeStageDialog(props: {
   projectId: string;
@@ -36,6 +40,7 @@ export function ProjectTheForgeStageDialog(props: {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<CreateProjectTheForgeStageResponse | null>(null);
   const [activeDoc, setActiveDoc] = useState<'work' | 'tasks'>('tasks');
+  const forgeProgress = useForgePromoteProgress(creating);
 
   const reset = useCallback(() => {
     setPreview(null);
@@ -103,6 +108,8 @@ export function ProjectTheForgeStageDialog(props: {
         changeDescription: desc,
         activate: true,
       });
+      forgeProgress.finish();
+      await new Promise((r) => window.setTimeout(r, 350));
       setSuccess(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -272,6 +279,14 @@ export function ProjectTheForgeStageDialog(props: {
                 Escribe la descripción del cambio para generar la vista previa.
               </p>
             )}
+
+            {creating ? (
+              <ForgePromoteProgressPanel
+                progress={forgeProgress.progress}
+                stepLabel={forgeProgress.stepLabel}
+                hint="Generando documentos y creando la etapa en The Forge…"
+              />
+            ) : null}
           </div>
         )}
 

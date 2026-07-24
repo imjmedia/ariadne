@@ -24,6 +24,10 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { chatNavBtnClass } from '../chat/chatShellClasses';
+import {
+  ForgePromoteProgressPanel,
+  useForgePromoteProgress,
+} from './forgePromoteProgress';
 
 const DELIVERABLE_OPTIONS: { id: ForgeDeliverableKind; label: string }[] = [
   { id: 'change_spec', label: 'Especificación del cambio' },
@@ -60,6 +64,7 @@ export function ChatForgePromoteDialog(props: {
   const [successResult, setSuccessResult] = useState<PromoteToTheForgeResponse | null>(null);
   const [linkedForgeProjectId, setLinkedForgeProjectId] = useState<string | null>(null);
   const [linkedForgeProjectName, setLinkedForgeProjectName] = useState<string | null>(null);
+  const forgeProgress = useForgePromoteProgress(promoteLoading);
 
   const resetState = useCallback(() => {
     setPreview(null);
@@ -151,6 +156,8 @@ export function ChatForgePromoteDialog(props: {
             ? { forgeProjectId: linkedForgeProjectId }
             : {}),
       });
+      forgeProgress.finish();
+      await new Promise((r) => window.setTimeout(r, 350));
       setSuccessResult(result);
       props.onSuccess?.(result);
     } catch (e) {
@@ -308,6 +315,14 @@ export function ChatForgePromoteDialog(props: {
                   ))}
                 </div>
               </div>
+            ) : null}
+
+            {promoteLoading ? (
+              <ForgePromoteProgressPanel
+                progress={forgeProgress.progress}
+                stepLabel={forgeProgress.stepLabel}
+                hint="Puede tardar varios minutos si el plan incluye muchos archivos o tareas LLM."
+              />
             ) : null}
 
             {error ? (
