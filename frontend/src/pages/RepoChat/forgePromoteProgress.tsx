@@ -35,7 +35,6 @@ export function useForgePromoteProgress(active: boolean) {
       setStepIndex(idx);
 
       const stepStart = idx * STEP_MS;
-      const stepSpan = STEP_MS * FORGE_PROMOTE_STEPS.length;
       const withinStep = Math.min(STEP_MS, elapsed - stepStart);
       const raw =
         ((idx + withinStep / STEP_MS) / FORGE_PROMOTE_STEPS.length) * 100;
