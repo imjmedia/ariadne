@@ -171,6 +171,7 @@ import {
 } from './resolve-chat-scope-from-message.util';
 import { buildMddEvidenceDocument } from './mdd-document.builder';
 import { buildMddMultiRootBlock } from './mdd-multi-root.util';
+import { enrichBusinessLogicFromEvidencePaths, MDD_BUSINESS_LOGIC_FILE_PATH_CYPHER } from './mdd-business-logic.util';
 import { getMddPhysicalEvidenceLimits } from './mdd-limits';
 import type { MddEvidenceDocument, MddMultiRootBlock } from './mdd-document.types';
 
@@ -4086,6 +4087,35 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
         chunks.push(
           `[Índice Falkor: ${fileCount} nodos File; muestra de paths]\n${paths.map((x) => x.path).filter(Boolean).join('\n')}`,
         );
+      } catch {
+        /* ignore */
+      }
+      try {
+        const bizParams: Record<string, unknown> = { projectId };
+        let bizRepoClause = '';
+        if (!projectScope && repositoryId) {
+          bizRepoClause = ' AND f.repoId = $repoId';
+          bizParams.repoId = repositoryId;
+        }
+        const bizLimit = Math.min(fbLim.graphFilePaths, 500);
+        const bizPaths = (await this.cypher.executeCypher(
+          projectId,
+          `MATCH (f:File {projectId: $projectId})
+           WHERE (${MDD_BUSINESS_LOGIC_FILE_PATH_CYPHER})${bizRepoClause}
+           RETURN f.path AS path LIMIT ${bizLimit}`,
+          bizParams,
+        )) as Array<{ path?: string }>;
+        for (const p of bizPaths) {
+          if (p.path) results.push({ path: p.path, source: 'graph_business_logic_sample' });
+        }
+        if (bizPaths.length > 0) {
+          chunks.push(
+            `[Paths Falkor (servicios/API para business_logic): ${bizPaths.length}]\n${bizPaths
+              .map((x) => x.path)
+              .filter(Boolean)
+              .join('\n')}`,
+          );
+        }
       } catch {
         /* ignore */
       }

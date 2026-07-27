@@ -125,7 +125,9 @@ Volcado **casi completo** por defecto (OpenAPI ops, Model, **StrapiContentType /
 | `MDD_MAX_MODELS` | Nodos `Model` (default 50000) |
 | `MDD_MAX_STRAPI_CONTENT_TYPES` | Nodos `StrapiContentType` (default 50000) |
 | `MDD_MAX_STRAPI_ROUTES` | Nodos `StrapiRoute` (default 100000) |
-| `MDD_MAX_NEST_SERVICES` | `NestService` en business_logic (default 20000) |
+| `MDD_MAX_NEST_SERVICES` | `NestService` / `StrapiService` / módulos `src/api` en business_logic (default 20000) |
+
+**Multi-root:** `business_logic` fusiona servicios Strapi (`strapi:…`) y módulos frontend (`frontend:…`) cuando coexisten en evidencia; ver `mdd-business-logic.util.ts`. Post-sync sin retriever, el fallback incluye paths Falkor de `src/api/`, `/services/`, routes y content-types.
 | `MDD_MAX_EVIDENCE_PATHS` | Recorte final de `evidence_paths` (default 50000) |
 | `MDD_SUMMARY_MESSAGE_CHARS` | Prefijo de consulta en `summary` (default 16000) |
 | `MDD_MAX_OPENAPI_FILE_CANDIDATES` | Ficheros `File` con `openApiTruth` (default 25) |
