@@ -16,7 +16,7 @@ import { ProjectsModule } from '../projects/projects.module';
   imports: [
     TypeOrmModule.forFeature([MddSnapshotEntity, RepositoryEntity]),
     forwardRef(() => ChatModule),
-    ProjectsModule,
+    forwardRef(() => ProjectsModule),
   ],
   controllers: [MddPersistenceController, MddProjectInternalController],
   providers: [MddPersistenceService, MddProjectMergeService],
