@@ -1,6 +1,33 @@
 /**
- * Contrato MDD (7 secciones) para ask_codebase con responseMode evidence_first — consumo por The Forge / LegacyCoordinator.
+ * Contrato MDD (7 secciones + `multi_root`) para ask_codebase con responseMode evidence_first — consumo por The Forge / LegacyCoordinator.
  */
+export interface MddMultiRootRepository {
+  repoId: string;
+  slug: string;
+  role: string | null;
+  status: string;
+  lastSyncAt: string | null;
+  in_mdd_scope: boolean;
+  is_primary: boolean;
+}
+
+export interface MddMultiRootBlock {
+  projectId: string;
+  projectName: string | null;
+  repository_count: number;
+  is_multi_root: boolean;
+  repositories: MddMultiRootRepository[];
+  mdd_scope_repo_ids: string[];
+  cross_repo_links: {
+    calls_api: number;
+    calls_strapi_route: number;
+    calls_nest_route: number;
+    calls_graphql_query: number;
+    total: number;
+  };
+  notes?: string;
+}
+
 export interface MddEvidenceDocument {
   summary: string;
   openapi_spec: {
@@ -29,4 +56,6 @@ export interface MddEvidenceDocument {
   infrastructure: { orm: string; env_vars: string[] };
   risk_report: { complexity: number; anti_patterns: string[] };
   evidence_paths: string[];
+  /** Composición del workspace Ariadne y enlaces cross-repo (presente si el repo pertenece a un proyecto). */
+  multi_root?: MddMultiRootBlock;
 }

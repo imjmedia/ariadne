@@ -1,7 +1,8 @@
 /**
  * Construye el JSON MDD de 7 secciones desde Falkor + archivos físicos (sin inventar paths).
  */
-import type { MddEvidenceDocument } from './mdd-document.types';
+import type { MddEvidenceDocument, MddMultiRootBlock } from './mdd-document.types';
+import { mddSummaryScopeLabel } from './mdd-multi-root.util';
 import { getMddBuilderLimits } from './mdd-limits';
 import { wantsSchemaDatabaseQuestion } from './chat-schema-question.util';
 import { inferStrapiMddFromEvidencePaths, collectStrapiBusinessLogicFromEvidencePaths } from './mdd-strapi-path-fallback';
@@ -253,8 +254,10 @@ export async function buildMddEvidenceDocument(params: {
     params?: Record<string, unknown>,
   ) => Promise<unknown[]>;
   getFileSnippet: (relPath: string) => Promise<string | null>;
+  /** Bloque multi-root del workspace Ariadne (opcional; lo construye ChatService). */
+  multiRoot?: MddMultiRootBlock;
 }): Promise<MddEvidenceDocument> {
-  const { projectId, message, gatheredContext, collectedResults, executeCypher, getFileSnippet } =
+  const { projectId, message, gatheredContext, collectedResults, executeCypher, getFileSnippet, multiRoot } =
     params;
   const scopedRepoIds = resolveMddRepoIds(params);
   const L = getMddBuilderLimits();
@@ -699,7 +702,7 @@ export async function buildMddEvidenceDocument(params: {
 
   const summaryParts = [
     `Consulta: ${message.slice(0, L.summaryMessageChars)}`,
-    `Evidencia anclada a ${mergedEvidencePaths.length} ruta(s) verificada(s) en el repositorio indexado.`,
+    `Evidencia anclada a ${mergedEvidencePaths.length} ruta(s) verificada(s) en ${mddSummaryScopeLabel(multiRoot)}.`,
     openapiPath ? `Contrato OpenAPI priorizado: \`${openapiPath}\`.` : 'Sin spec OpenAPI indexado; rutas vía AST si aplica.',
     entitiesFinal.length
       ? usedFrontendFallback && entitiesFromModels.length === 0 && entitiesFromStrapiResolved.length === 0
@@ -739,6 +742,9 @@ export async function buildMddEvidenceDocument(params: {
         ? `${apiFromFrontendFinal.length} contrato(s) API cliente desde ApiClientReference en grafo.`
         : `${apiFromFrontendFinal.length} contrato(s) API cliente inferido(s) desde apiDirection / src/api en evidence_paths.`,
     );
+  }
+  if (multiRoot?.notes) {
+    summaryParts.push(multiRoot.notes);
   }
   const summary = summaryParts.join(' ');
 
@@ -793,5 +799,6 @@ export async function buildMddEvidenceDocument(params: {
             : [],
     },
     evidence_paths: mergedEvidencePaths.slice(0, L.evidencePaths),
+    ...(multiRoot ? { multi_root: multiRoot } : {}),
   };
 }

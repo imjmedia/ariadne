@@ -30,8 +30,11 @@
  * | `validate_before_edit` | Precondición SDD: impacto + contrato antes de editar nodo. |
  * | `semantic_search` | Búsqueda híbrida vector+keyword; `projectId` puede ser repo o proyecto. |
  * | `get_project_analysis` | POST análisis ingest (`diagnostico`, `duplicados`, `reingenieria`, `codigo_muerto`, `seguridad`). |
- * | `generate_legacy_documentation` | **Doc. legacy única:** MDD 7§ determinista (`evidence_first` fijo). TheForge doc. partida. |
- * | `ask_codebase` | Pregunta NL (Q&A); **no** doc. legacy de partida — usar `generate_legacy_documentation`. |
+ * | `generate_legacy_documentation` | MDD determinista de **un repo** o scope acotado. No sustituye merge multi-root Forge. |
+ * | `generate_merged_project_mdd` | MDD fusionado de todos los `roots[]` + `multi_root`. `projectId` = UUID proyecto. |
+ * | `export_brownfield_parity_pack` | Parity pack mono-repo (`repositoryId`) o legacy `mergeProject:true`. |
+ * | `export_brownfield_project_parity_pack` | **Import Forge multi-root:** parity pack fusionado. `projectId` = UUID proyecto. |
+ * | `ask_codebase` | Pregunta NL (Q&A); **no** doc. legacy de partida — usar tools brownfield arriba. |
  * | `get_modification_plan` | Plan legacy: `filesToModify` + `changePlanTemplate` (tasks/symbols) + `graphEvidenceBundle`; preferir `roots[].id` en multi-root. |
  * | `validate_change_plan` | Gate 2: audita ChangePlan (files/symbols/tasks/evidence/dependsOn). |
  * | `validate_tasks_json` | Gate 2 post-Forge: `tasksJson` → ChangePlan → validate; bloquear si `BLOCKED`. |
@@ -53,10 +56,11 @@
  *
  * @see {@link ./index.ts} registro `ListToolsRequestSchema` y despacho `CallToolRequestSchema`
  * @see Documentación de producto: `docs/notebooklm/mcp_server_specs.md`
+ * @see Brownfield Forge: `docs_mcp/guias/brownfield-forge-mcp.md` → `docs://guias/brownfield-forge-mcp`
  */
 
 /**
  * Revisión del catálogo documentado; subir si se añade/elimina una tool en `index.ts`.
  * @constant
  */
-export const MCP_ARIADNE_TOOLS_DOC_REVISION = 1;
+export const MCP_ARIADNE_TOOLS_DOC_REVISION = 2;

@@ -50,6 +50,7 @@ export class LegacyCoordinatorService {
       section_6_infrastructure: mdd.infrastructure,
       section_7_risk: mdd.risk_report,
       evidence_paths: mdd.evidence_paths,
+      ...(mdd.multi_root ? { multi_root: mdd.multi_root } : {}),
     };
   }
 

@@ -24,7 +24,7 @@ npm publish
 ## Herramientas
 
 ### Core
-- **list_known_projects** — Proyectos indexados (`id` = proyecto Ariadne, `roots[]` = repos). El texto de respuesta indica que para **`get_modification_plan`** en multi-root conviene usar `roots[].id` del repo donde está el código (p. ej. frontend).
+- **list_known_projects** — Workspaces indexados: `id` = UUID **proyecto** Ariadne; `roots[]` = repos (`roots[].id`). Para Forge multi-root ver **export_brownfield_project_parity_pack**. Guía: `docs://guias/brownfield-forge-mcp`.
 - **get_component_graph** — Por defecto intenta **`GET /api/graph/component/:name`** (mismo grafo que el explorador: RENDERS, USES_HOOK, IMPORTS, `graphHints`, fusión multi-shard). Requiere **`ARIADNE_API_URL`** y **`Authorization: Bearer`** en Cursor (Secret MCP `ari_…` o JWT web); el proceso lo reenvía al Nest **sin variables `ARIADNE_API_*`** en `.env`. Sin Bearer válido, **fallback** Falkor genérico `-[*1..depth]->`.
 - **get_legacy_impact** — Preferencia: **`GET /api/graph/impact/:nodeId`** (`GraphService.getImpact`). Misma regla Bearer reenviable que `get_component_graph`. Fallback: Falkor `CALLS|RENDERS*` en un shard.
 - **get_contract_specs** — Props (con `description` JSDoc si existe); sigue siendo solo Falkor.
@@ -32,8 +32,11 @@ npm publish
 - **get_file_content** — Contenido crudo del archivo desde Bitbucket/GitHub (requiere INGEST_URL).
 - **validate_before_edit** — OBLIGATORIO antes de editar: impacto + contrato en un llamado.
 - **semantic_search** — Búsqueda por palabra clave en componentes, funciones y archivos.
-- **generate_legacy_documentation** — **Modo único** para documentación legacy (TheForge SDD): MDD de partida con retrieve determinista + `buildMddEvidenceDocument` (JSON 7 claves, sin prosa LLM). Parámetros: `projectId`, opcional `scope`, `currentFilePath`. Timeout: **`MCP_LEGACY_DOCUMENTATION_TIMEOUT_MS`** (default 900s). **No usar `ask_codebase` con distintos `responseMode` para doc. de partida.**
-- **ask_codebase** — Preguntas en NL (Q&A humano). Parámetro **`responseMode`:** `default`, **`evidence_first`**, **`raw_evidence`**. **Doc. legacy:** usar **`generate_legacy_documentation`**. Si omites `responseMode`, el MCP envía **`default`** (prosa + ReAct).
+- **generate_legacy_documentation** — MDD determinista de **un repo** o scope acotado (`scope.repoIds`). Timeout: **`MCP_LEGACY_DOCUMENTATION_TIMEOUT_MS`** (default 900s).
+- **generate_merged_project_mdd** — MDD **fusionado** de todos los roots del proyecto + `multi_root`. **`projectId`** = UUID del **proyecto** (`list_known_projects[].id`). The Forge / Cursor multi-root.
+- **export_brownfield_parity_pack** — Parity pack **mono-repo** (`repositoryId` = `roots[].id`). Legacy: `mergeProject: true`.
+- **export_brownfield_project_parity_pack** — **Import Forge multi-root:** MDD fusionado + modificationPlanSeed + scaffold. **`projectId`** obligatorio = UUID del **proyecto**. Ver `docs_mcp/guias/brownfield-forge-mcp.md`.
+- **ask_codebase** — Preguntas NL (Q&A). **Doc. legacy:** usar tools brownfield arriba, no `ask_codebase`.
 - **get_project_analysis** — Deuda técnica, duplicados, reingeniería, código muerto o **seguridad** (heurística; requiere INGEST_URL). `projectId` puede ser id de **proyecto** o **`roots[].id`** (repo); si es proyecto multi-root, usa **`currentFilePath`** o pasa el id del repo. Opcional: **`scope`** (mismo shape que `ask_codebase`), **`crossPackageDuplicates`** (modo duplicados). El MCP llama a `POST /projects/.../analyze` o `POST /repositories/.../analyze`. Si la respuesta trae **`reportMeta`**, se añade un bloque JSON al final del markdown.
 - **get_modification_plan** — Plan vía `POST /projects/:id/modification-plan` (`userDescription`, opcional **`scope`**, **`currentFilePath`**, **`questionsMode`**: `business` | `technical` | `both`). Respuesta puede incluir **`warnings`** y **`diagnostic`**. `projectId` = proyecto o `roots[].id`.
 
