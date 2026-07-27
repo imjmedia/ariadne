@@ -38,7 +38,7 @@ import {
       TheForgeIntegrationEntity,
     ]),
     RepositoriesModule,
-    MddPersistenceModule,
+    forwardRef(() => MddPersistenceModule),
     forwardRef(() => ChatModule),
   ],
   controllers: [TheForgeIntegrationController],

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Módulo de proyectos (multi-root): CRUD, listado con repos, file por proyecto.
  */
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProjectEntity } from './entities/project.entity';
 import { RepositoryEntity } from '../repositories/entities/repository.entity';
@@ -30,7 +30,7 @@ import { TheForgeModule } from '../theforge/theforge.module';
     ]),
     RepositoriesModule,
     DomainsModule,
-    TheForgeModule,
+    forwardRef(() => TheForgeModule),
   ],
   controllers: [ProjectsController],
   providers: [ProjectsService, SyncStatusService],
