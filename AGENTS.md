@@ -72,7 +72,10 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 ### Planning & review
 - **`get_modification_plan`** — Returns `filesToModify` + business questions. Multi-root: pass `roots[].id`.
 - **`validate_change_plan`** — Gate 2: audit structured ChangePlan JSON; returns `APPROVED` | `APPROVED_WITH_WARNINGS` | `BLOCKED`. **Mandatory** before multi-file edits.
-- **`export_brownfield_parity_pack`** — MDD + modification-plan seed + scaffold preview for The Forge brownfield import.
+- **`export_brownfield_project_parity_pack`** — **Forge multi-root:** MDD fusionado + seeds + scaffold (`projectId` = UUID proyecto Ariadne).
+- **`generate_merged_project_mdd`** — MDD fusionado multi-root sin parity pack completo.
+- **`export_brownfield_parity_pack`** — Parity pack mono-repo (`repositoryId` = `roots[].id`).
+- **`generate_legacy_documentation`** — MDD de un repo / scope acotado.
 - **`generate_scaffold_from_mdd`** — Nest/React/Prisma skeleton files from persisted MDD (no business logic).
 - **`detect_changes`** — Pre-commit blast radius: `mode` staged|unstaged|all, returns JSON (`changedFiles`, `affectedSymbols`, risk summary).
 - **`analyze_local_changes`** — Deprecated alias of `detect_changes` (Markdown output, default `mode=staged`).

@@ -170,8 +170,9 @@ import {
   type ProjectRepoRoleCandidate,
 } from './resolve-chat-scope-from-message.util';
 import { buildMddEvidenceDocument } from './mdd-document.builder';
+import { buildMddMultiRootBlock } from './mdd-multi-root.util';
 import { getMddPhysicalEvidenceLimits } from './mdd-limits';
-import type { MddEvidenceDocument } from './mdd-document.types';
+import type { MddEvidenceDocument, MddMultiRootBlock } from './mdd-document.types';
 
 /** Mensaje del historial de chat (usuario o asistente). */
 export interface ChatMessage {
@@ -3977,6 +3978,12 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
         cr = [...cr, ...fb.results];
       }
     }
+    const multiRoot = await this.resolveMddMultiRootBlock(
+      projectId,
+      repositoryId,
+      projectScope,
+      projectScope ? undefined : [repositoryId],
+    );
     return buildMddEvidenceDocument({
       projectId,
       repositoryId,
@@ -3989,7 +3996,62 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
         projectScope
           ? this.fileContent.getFileContentSafeByProject(projectId, relPath)
           : this.fileContent.getFileContentSafe(repositoryId, relPath),
+      multiRoot,
     });
+  }
+
+  private async resolveMddMultiRootBlock(
+    projectId: string,
+    repositoryId: string,
+    projectScope: boolean,
+    scopeRepoIds?: string[],
+  ) {
+    try {
+      const project = await this.projects.findOne(projectId);
+      if (project.repositories.length === 0) return undefined;
+      return buildMddMultiRootBlock(
+        {
+          projectId: project.id,
+          projectName: project.name,
+          repositories: project.repositories,
+          mddScopeRepoIds: scopeRepoIds?.length
+            ? scopeRepoIds
+            : projectScope
+              ? undefined
+              : [repositoryId],
+          primaryRepositoryId: repositoryId,
+        },
+        (pid, q, p) => this.cypher.executeCypher(pid, q, p),
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Bloque `multi_root` para todos los repos del proyecto (alcance explícito opcional). */
+  async buildMultiRootBlockForProject(
+    projectId: string,
+    mddScopeRepoIds?: string[],
+  ): Promise<MddMultiRootBlock | undefined> {
+    try {
+      const project = await this.projects.findOne(projectId);
+      if (project.repositories.length === 0) return undefined;
+      const scope =
+        mddScopeRepoIds?.length && mddScopeRepoIds.length > 0
+          ? mddScopeRepoIds
+          : project.repositories.map((r) => r.id);
+      return buildMddMultiRootBlock(
+        {
+          projectId: project.id,
+          projectName: project.name,
+          repositories: project.repositories,
+          mddScopeRepoIds: scope,
+        },
+        (pid, q, p) => this.cypher.executeCypher(pid, q, p),
+      );
+    } catch {
+      return undefined;
+    }
   }
 
   private async injectPhysicalEvidenceFallback(
@@ -4498,15 +4560,21 @@ ${SCHEMA}${EXAMPLES}
     }
 
     if (evidenceFirst) {
+      const scopeRepoIds = options?.scope?.repoIds?.length
+        ? options.scope.repoIds
+        : options?.projectScope
+          ? undefined
+          : [repositoryId];
+      const multiRoot = await this.resolveMddMultiRootBlock(
+        projectId,
+        repositoryId,
+        options?.projectScope === true,
+        scopeRepoIds,
+      );
       const mdd = await buildMddEvidenceDocument({
         projectId,
         repositoryId,
-        repoIds:
-          options?.scope?.repoIds?.length
-            ? options.scope.repoIds
-            : options?.projectScope
-              ? undefined
-              : [repositoryId],
+        repoIds: scopeRepoIds,
         message,
         gatheredContext: effectiveGathered,
         collectedResults: effectiveResults,
@@ -4515,6 +4583,7 @@ ${SCHEMA}${EXAMPLES}
           options?.projectScope
             ? this.fileContent.getFileContentSafeByProject(projectId, relPath)
             : this.fileContent.getFileContentSafe(repositoryId, relPath),
+        multiRoot,
       });
       const jsonAnswer = JSON.stringify(mdd, null, 2);
       const durationSec = Number(process.hrtime.bigint() - pipelineStarted) / 1e9;

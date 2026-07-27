@@ -33,6 +33,11 @@ import { mcpLimits } from "./mcp-tool-limits.js";
 import { resolveGraphScopeFromProjectOrRepoId, whereProjectRepo } from "./resolve-graph-scope.js";
 import { invokeIngestLegacyDocumentation, type LegacyDocumentationScope } from "./legacy-documentation.js";
 import {
+  fetchBrownfieldParityPack,
+  fetchMergedProjectMdd,
+  formatBrownfieldMcpEnvelope,
+} from "./brownfield-mcp.util.js";
+import {
   analyzeDiffImpact,
   emptyDiffMessage,
   formatDetectChangesMarkdown,
@@ -427,7 +432,21 @@ Si existe \`.ariadne-project\` en la raíz del workspace, **léelo primero** y u
 
 Formato: \`{ "projectId": "uuid" }\`
 
-Si no hay .ariadne-project: el servidor puede inferir el proyecto vía ingest (heurística \`projectKey\`/\`repoSlug\` en la ruta del IDE) o vía el grafo Falkor. Ejecuta \`list_known_projects\` cuando necesites elegir explícitamente. Nunca inventes ni asumas IDs.`;
+Si no hay .ariadne-project: el servidor puede inferir el proyecto vía ingest (heurística \`projectKey\`/\`repoSlug\` en la ruta del IDE) o vía el grafo Falkor. Ejecuta \`list_known_projects\` cuando necesites elegir explícitamente. Nunca inventes ni asumas IDs.
+
+## Brownfield / The Forge (multi-root)
+
+\`list_known_projects\` devuelve \`id\` = **UUID del proyecto Ariadne** (workspace) y \`roots[]\` = repos Git indexados (\`roots[].id\`).
+
+| Escenario | Tool MCP |
+|-----------|----------|
+| Import Forge con **varios repos** (front+back) | **\`export_brownfield_project_parity_pack\`** — \`projectId\` = UUID del **proyecto** (\`id\`, no \`roots[].id\`) |
+| Solo MDD fusionado multi-root | **\`generate_merged_project_mdd\`** — mismo \`projectId\` |
+| Un solo repo / MDD acotado | \`export_brownfield_parity_pack\` (\`repositoryId\`) o \`generate_legacy_documentation\` (\`scope.repoIds\`) |
+
+El MDD incluye \`multi_root\` (repos, roles, \`cross_repo_links\`). Multi-repo en Git **no** implica deploy runtime independiente.
+
+Guía completa: \`docs://guias/brownfield-forge-mcp\` (Docs MCP).`;
 
 /**
  * Ensambla el servidor MCP con handlers para cada nombre de herramienta.
@@ -458,7 +477,7 @@ function createMcpServer(): Server {
     {
       name: "list_known_projects",
       description:
-        "Lista los proyectos indexados en el grafo (ID, nombre, ruta, rama). Ejecutar al inicio de sesión para mapear IDs a nombres y ver la rama sincronizada de cada uno (Legacy vs Moderno, oohbp2/main vs oohbp2/develop).",
+        "Lista workspaces indexados en Ariadne. Cada entrada: `id` = UUID **proyecto** Ariadne (usar en export_brownfield_project_parity_pack / generate_merged_project_mdd); `roots[]` = repos Git (`roots[].id` = UUID repo para tools mono-repo). Ejecutar al inicio de sesión Forge/Cursor. Ver docs://guias/brownfield-forge-mcp para import multi-root.",
       inputSchema: {
         type: "object" as const,
         properties: {},
@@ -655,7 +674,7 @@ function createMcpServer(): Server {
     {
       name: "generate_legacy_documentation",
       description:
-        "**Modo único para documentación legacy (TheForge SDD).** Genera el MDD de partida desde el índice Falkor con máxima fidelidad al código: retrieve determinista + `buildMddEvidenceDocument` (sin prosa LLM). Devuelve JSON con las 7 claves MDD (`summary`, `openapi_spec`, `entities`, `api_contracts`, `business_logic`, `infrastructure`, `risk_report`, `evidence_paths`) y metadatos. **Usar esta tool** en lugar de `ask_codebase` con `responseMode` distintos para doc. de partida. Requiere INGEST_URL. En multi-root pasa `scope.repoIds` (roots[].id) o `projectId` del workspace; opcional `currentFilePath` para inferir repo.",
+        "**MDD de un repo o scope acotado** (TheForge SDD). Retrieve determinista + JSON MDD (`summary`, `openapi_spec`, `entities`, `api_contracts`, `business_logic`, `infrastructure`, `risk_report`, `evidence_paths`, opcional `multi_root`). **No uses esta tool para import Forge multi-root completo** — usa `export_brownfield_project_parity_pack` con el UUID del **proyecto** Ariadne. Requiere INGEST_URL. Parámetros: `projectId` (proyecto o `roots[].id`), opcional `scope.repoIds`, `currentFilePath`.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -1089,14 +1108,70 @@ function createMcpServer(): Server {
     {
       name: "export_brownfield_parity_pack",
       description:
-        "Exporta JSON brownfield parity pack (MDD + seeds modification-plan + scaffold preview) para import en The Forge. Requiere repo indexado; usa MDD persistido post-sync si existe.",
+        "Parity pack brownfield **mono-repo** (MDD + modificationPlanSeed + scaffold) para The Forge. Usa `repositoryId` = `roots[].id`. Para proyectos **multi-root** (front+back), preferir **`export_brownfield_project_parity_pack`** con UUID del proyecto. Alternativa legacy: `mergeProject: true` + `projectId` del proyecto. Snapshots post-sync por defecto (`preferSnapshots`); `live: true` fuerza rebuild.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          projectId: { type: "string", description: "roots[].id del repo o UUID proyecto" },
-          repositoryId: { type: "string", description: "UUID repositorio (alternativa a projectId=repo)" },
+          projectId: {
+            type: "string",
+            description: "UUID proyecto Ariadne (solo con mergeProject:true) o roots[].id si se usa como repo",
+          },
+          repositoryId: { type: "string", description: "UUID repositorio (roots[].id) — modo mono-repo" },
+          mergeProject: {
+            type: "boolean",
+            description: "Legacy: true fusiona todos los roots. Preferir export_brownfield_project_parity_pack.",
+          },
+          preferSnapshots: {
+            type: "boolean",
+            description: "Usar snapshots MDD post-sync por repo (default true). false fuerza rebuild live.",
+          },
+          live: { type: "boolean", description: "Alias de preferSnapshots=false" },
           userDescription: { type: "string", description: "Descripción opcional para seed del modification-plan" },
         },
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "export_brownfield_project_parity_pack",
+      description:
+        "**Import brownfield The Forge — proyecto multi-root.** Fusiona MDD de todos los repos del workspace Ariadne (front+back), incluye `multi_root`, `mddSources[]`, `mergeMode: project_multi_root`, modificationPlanSeed y scaffoldPreview. **Obligatorio:** `projectId` = UUID del **proyecto** (`list_known_projects[].id`, NO `roots[].id`). Consumidores: The Forge MCP, Cursor. Ver docs://guias/brownfield-forge-mcp.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: {
+            type: "string",
+            description: "UUID del proyecto Ariadne (campo id en list_known_projects, no roots[].id)",
+          },
+          userDescription: {
+            type: "string",
+            description: "Descripción para seed del modification-plan (default: brownfield baseline)",
+          },
+          preferSnapshots: {
+            type: "boolean",
+            description: "true (default): MDD persistido post-sync por repo. false: rebuild live por repo.",
+          },
+          live: { type: "boolean", description: "Si true, ignora snapshots y regenera MDD live por cada repo" },
+        },
+        required: ["projectId"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "generate_merged_project_mdd",
+      description:
+        "**MDD fusionado multi-root** sin parity pack completo. Une snapshots/live de cada repo + bloque `multi_root` con roles y enlaces cross-repo Falkor. **Obligatorio:** `projectId` = UUID del **proyecto** Ariadne. Usar cuando The Forge solo necesita el JSON MDD inicial (sin modificationPlanSeed). Ver docs://guias/brownfield-forge-mcp.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: {
+            type: "string",
+            description: "UUID del proyecto Ariadne (list_known_projects[].id)",
+          },
+          userDescription: { type: "string", description: "Texto de consulta en summary del MDD por repo" },
+          preferSnapshots: { type: "boolean", description: "Default true — snapshots post-sync" },
+          live: { type: "boolean", description: "true — rebuild live, ignora snapshots" },
+        },
+        required: ["projectId"],
         additionalProperties: false,
       },
     },
@@ -1631,7 +1706,7 @@ async function fetchFileFromIngest(
           }
         }
         const json = JSON.stringify(projects, null, 2);
-        const projText = `## Proyectos indexados (multi-root)\n\nCada elemento tiene \`id\` (proyecto Ariadne) y \`roots[]\` (repos). Para **get_modification_plan** con varios repos, pasa como \`projectId\` el \`roots[].id\` del repositorio donde está el código (p. ej. frontend), no solo el \`id\` global del proyecto.\n\n\`\`\`json\n${json}\n\`\`\``;
+        const projText = `## Proyectos indexados (multi-root)\n\nCada elemento tiene:\n- \`id\` — UUID **proyecto** Ariadne → usar en **\`export_brownfield_project_parity_pack\`** / **\`generate_merged_project_mdd\`** (The Forge multi-root)\n- \`roots[]\` — repos Git; \`roots[].id\` → mono-repo (\`export_brownfield_parity_pack\`, \`get_modification_plan\`, etc.)\n\nGuía Forge: \`docs://guias/brownfield-forge-mcp\`\n\n\`\`\`json\n${json}\n\`\`\``;
         await cache.set(cacheKeyProjects, projText, 60);
         return {
           content: [
@@ -3979,35 +4054,117 @@ async function fetchFileFromIngest(
 
   // --- export_brownfield_parity_pack ---
   if (name === "export_brownfield_parity_pack") {
+    const mergeProject = args?.mergeProject === true;
     let repoId = (args?.repositoryId as string) ?? "";
     let projectId = args?.projectId as string | undefined;
     const currentFilePath = args?.currentFilePath as string | undefined;
-    if (!repoId && projectId) repoId = projectId;
-    if (!repoId && currentFilePath) {
-      repoId = (await applyShardingInference(undefined, currentFilePath)) ?? "";
+    if (!repoId && projectId && !mergeProject) repoId = projectId;
+    if (!repoId && !projectId && currentFilePath) {
+      projectId = (await applyShardingInference(undefined, currentFilePath)) ?? undefined;
+      if (projectId && !mergeProject) repoId = projectId;
     }
-    if (!repoId) {
+    if (mergeProject) {
+      if (!projectId?.trim()) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "**Error:** `mergeProject: true` requiere `projectId` UUID del proyecto Ariadne. Preferir `export_brownfield_project_parity_pack`.",
+            },
+          ],
+          isError: true,
+        };
+      }
+    } else if (!repoId) {
       return { content: [{ type: "text", text: "**Error:** Se requiere `repositoryId` o `projectId`." }], isError: true };
     }
-    const ingestUrl = (process.env.INGEST_URL ?? "http://localhost:3002").replace(/\/$/, "");
-    try {
-      const res = await fetch(`${ingestUrl}/internal/repositories/${repoId}/brownfield-parity-pack`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          userDescription: args?.userDescription,
-        }),
-      });
-      if (!res.ok) {
-        return { content: [{ type: "text", text: `**Error ${res.status}:** ${await res.text()}` }], isError: true };
-      }
-      const data = await res.json();
-      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: "text", text: `**Error:** ${msg}` }], isError: true };
+    const body = {
+      userDescription: args?.userDescription as string | undefined,
+      preferSnapshots: args?.preferSnapshots as boolean | undefined,
+      live: args?.live as boolean | undefined,
+    };
+    const result = await fetchBrownfieldParityPack({
+      mode: mergeProject ? "project" : "repo",
+      projectId: mergeProject ? projectId! : projectId ?? repoId,
+      repositoryId: mergeProject ? undefined : repoId,
+      body,
+    });
+    if (!result.ok) {
+      return {
+        content: [{ type: "text", text: `**Error ${result.status ?? ""}:** ${result.error}` }],
+        isError: true,
+      };
     }
+    return {
+      content: [{ type: "text", text: formatBrownfieldMcpEnvelope("export_brownfield_parity_pack", result.data) }],
+    };
+  }
+
+  if (name === "export_brownfield_project_parity_pack") {
+    const projectId = (args?.projectId as string)?.trim() ?? "";
+    if (!projectId) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "**Error:** Se requiere `projectId` = UUID del **proyecto** Ariadne (`list_known_projects[].id`, no `roots[].id`).",
+          },
+        ],
+        isError: true,
+      };
+    }
+    const result = await fetchBrownfieldParityPack({
+      mode: "project",
+      projectId,
+      body: {
+        userDescription: args?.userDescription as string | undefined,
+        preferSnapshots: args?.preferSnapshots as boolean | undefined,
+        live: args?.live as boolean | undefined,
+      },
+    });
+    if (!result.ok) {
+      return {
+        content: [{ type: "text", text: `**Error ${result.status ?? ""}:** ${result.error}` }],
+        isError: true,
+      };
+    }
+    return {
+      content: [
+        { type: "text", text: formatBrownfieldMcpEnvelope("export_brownfield_project_parity_pack", result.data) },
+      ],
+    };
+  }
+
+  if (name === "generate_merged_project_mdd") {
+    const projectId = (args?.projectId as string)?.trim() ?? "";
+    if (!projectId) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "**Error:** Se requiere `projectId` = UUID del proyecto Ariadne. Ejecuta `list_known_projects` primero.",
+          },
+        ],
+        isError: true,
+      };
+    }
+    const result = await fetchMergedProjectMdd({
+      projectId,
+      body: {
+        userDescription: args?.userDescription as string | undefined,
+        preferSnapshots: args?.preferSnapshots as boolean | undefined,
+        live: args?.live as boolean | undefined,
+      },
+    });
+    if (!result.ok) {
+      return {
+        content: [{ type: "text", text: `**Error ${result.status ?? ""}:** ${result.error}` }],
+        isError: true,
+      };
+    }
+    return {
+      content: [{ type: "text", text: formatBrownfieldMcpEnvelope("generate_merged_project_mdd", result.data) }],
+    };
   }
 
   // --- extract_design_tokens ---

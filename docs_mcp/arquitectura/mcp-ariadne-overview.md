@@ -15,7 +15,9 @@ last_updated: 2026-06-29
 // 1) Descubrir proyectos indexados (siempre primero):
 //    tool list_known_projects()  ->  [{ id, name, roots: [{ id, name, branch? }] }]
 
-// 2) En multi-root, pasa roots[].id como projectId (no el UUID del proyecto).
+// 2) IDs: list_known_projects → `id` = UUID proyecto; `roots[].id` = UUID repo.
+//    Mono-repo / chat: suele ir roots[].id.
+//    Forge multi-root: export_brownfield_project_parity_pack({ projectId: "<id proyecto>" }).
 
 // 3) Flujo típico antes de editar:
 //    semantic_search("…")  ->  get_file_context(path)  ->  validate_before_edit("ComponentName")
@@ -35,6 +37,8 @@ last_updated: 2026-06-29
 | `get_component_graph`         | Árbol de dependencias (RENDERS, IMPORTS, USES_HOOK).       |
 | `get_legacy_impact`           | Quién depende de un nodo (blast radius inverso).          |
 | `get_modification_plan`       | Plan de archivos a modificar + preguntas de negocio.       |
+| `export_brownfield_project_parity_pack` | Import The Forge multi-root (MDD fusionado).   |
+| `generate_merged_project_mdd` | MDD fusionado sin parity pack completo.                    |
 | `analyze_local_changes`       | Pre-commit: diff vs grafo.                                 |
 
 **Capacidades MCP:** solo `tools` (no expone `resources` MCP). Para documentación estática del repo Ariadne usa `services/mcp-docs`.
@@ -45,3 +49,4 @@ last_updated: 2026-06-29
 - **Regla 2:** Con `FALKOR_SHARD_BY_PROJECT=true`, `semantic_search` exige `projectId` explícito.
 - **Regla 3:** Preferir herramientas baratas (`get_definitions`, `get_references`) cuando ya conoces el símbolo; reservar `ask_codebase` para preguntas abiertas.
 - **Regla 4:** Verificar frescura con `get_sync_status` si los resultados parecen desactualizados.
+- **Regla 5 (Forge multi-root):** Usar `export_brownfield_project_parity_pack` con UUID del **proyecto** (`id`), no `roots[].id`. Guía: `docs://guias/brownfield-forge-mcp`.

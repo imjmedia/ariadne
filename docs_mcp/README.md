@@ -17,7 +17,7 @@ Structured documentation corpus served to AI agents by **`services/mcp-docs`**
 ## Sections
 
 - `arquitectura/` — platform layout (`services-layout`), `mcp-ariadne-overview` vs `docs-mcp-server`, `ingest-y-sharding`, `navigation-map`.
-- `guias/` — agent workflows (`agent-workflow`), consuming the Docs MCP (`consumir-docs-mcp`), graph tool catalog (`graph-tools-catalog`), safe refactor (`refactor-seguro`).
+- `guias/` — agent workflows (`agent-workflow`), brownfield Forge MCP (`brownfield-forge-mcp`), consuming the Docs MCP (`consumir-docs-mcp`), graph tool catalog (`graph-tools-catalog`), safe refactor (`refactor-seguro`).
 
 ## Relation to other docs
 

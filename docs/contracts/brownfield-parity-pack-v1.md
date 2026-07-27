@@ -9,13 +9,26 @@ JSON bundle produced by **`export_brownfield_parity_pack`** (MCP + `POST /intern
 | `schemaVersion` | `"1.0"` |
 | `source` | `"ariadne"` |
 | `generatedAt` | ISO timestamp |
-| `repositoryId` | UUID repo |
+| `repositoryId` | UUID repo ancla (single-repo o primero del merge) |
+| `repositoryIds` | Todos los repos cuando `mergeMode=project_multi_root` |
+| `mergeMode` | `single_repo` \| `project_multi_root` |
+| `mddSources` | Origen por repo (`fromSnapshot`, `snapshotId`, `slug`) |
+| `mdd` | MDD JSON (`summary`, secciones 7§, opcional `multi_root`) |
 | `projectId` | Falkor project UUID |
-| `mdd` | MDD 7§ JSON (same as `generate_legacy_documentation`) |
 | `navigationMapHint` | Instruction to run `generate_navigation_map` |
 | `scaffoldPreview` | `{ fileCount, paths[] }` |
 | `modificationPlanSeed` | JSON string with `filesToModify` sample |
 
+## Project merge (multi-root)
+
+`POST /internal/projects/:projectId/brownfield-parity-pack` or MCP:
+
+```json
+{ "projectId": "<uuid-proyecto-ariadne>", "mergeProject": true }
+```
+
+Optional: `preferSnapshots: false` or `live: true` to rebuild MDD live per repo instead of using post-sync snapshots.
+
 ## The Forge import
 
-Map sections to greenfield deliverables: SPEC ← `mdd.summary`, API ← `mdd.api_contracts`, entities ← `mdd.entities`, tasks ← `modificationPlanSeed` + Forge LLM.
+Map sections to greenfield deliverables: SPEC ← `mdd.summary` + `mdd.multi_root`, API ← `mdd.api_contracts`, entities ← `mdd.entities`, tasks ← `modificationPlanSeed` + Forge LLM.
