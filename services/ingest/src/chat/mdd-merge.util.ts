@@ -52,7 +52,7 @@ function dedupeApiContracts(
   return out;
 }
 
-function dedupeBusinessLogic(
+export function dedupeBusinessLogic(
   rows: MddEvidenceDocument['business_logic'],
 ): MddEvidenceDocument['business_logic'] {
   const byService = new Map<string, Set<string>>();

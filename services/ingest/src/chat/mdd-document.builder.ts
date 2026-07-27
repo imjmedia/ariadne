@@ -5,12 +5,13 @@ import type { MddEvidenceDocument, MddMultiRootBlock } from './mdd-document.type
 import { mddSummaryScopeLabel } from './mdd-multi-root.util';
 import { getMddBuilderLimits } from './mdd-limits';
 import { wantsSchemaDatabaseQuestion } from './chat-schema-question.util';
-import { inferStrapiMddFromEvidencePaths, collectStrapiBusinessLogicFromEvidencePaths } from './mdd-strapi-path-fallback';
+import { inferStrapiMddFromEvidencePaths } from './mdd-strapi-path-fallback';
 import {
   inferFrontendMddFromEvidencePaths,
   isFrontendEvidencePath,
-  collectFrontendBusinessLogicFromEvidencePaths,
 } from './mdd-frontend-path-fallback';
+import { enrichBusinessLogicFromEvidencePaths } from './mdd-business-logic.util';
+import { dedupeBusinessLogic } from './mdd-merge.util';
 import { loadSupplementaryDocExcerpts } from './mdd-supplementary-docs.util.js';
 
 function uniq(paths: string[]): string[] {
@@ -604,21 +605,11 @@ export async function buildMddEvidenceDocument(params: {
   );
   const hasFrontendEvidencePaths = mergedEvidencePaths.some(isFrontendEvidencePath);
 
-  if (hasStrapiEvidencePaths && businessFinal.length === 0) {
-    const fromPaths = collectStrapiBusinessLogicFromEvidencePaths(
-      mergedEvidencePaths,
-      L.nestServices,
-    );
-    if (fromPaths.length > 0) businessFinal = fromPaths;
-  }
-
-  if (hasFrontendEvidencePaths && !hasStrapiEvidencePaths && businessFinal.length === 0) {
-    const fromPaths = collectFrontendBusinessLogicFromEvidencePaths(
-      mergedEvidencePaths,
-      L.nestServices,
-    );
-    if (fromPaths.length > 0) businessFinal = fromPaths;
-  }
+  businessFinal = enrichBusinessLogicFromEvidencePaths(businessFinal, mergedEvidencePaths, {
+    hasStrapiEvidencePaths,
+    hasFrontendEvidencePaths,
+    maxServices: L.nestServices,
+  });
 
   if (
     entitiesFromStrapiResolved.length === 0 &&
@@ -637,15 +628,17 @@ export async function buildMddEvidenceDocument(params: {
       if (apiFromStrapiFinal.length === 0 && fb.api_contracts.length > 0) {
         apiFromStrapiFinal = fb.api_contracts;
       }
-      if (businessFinal.length === 0 && fb.business_logic.length > 0) {
-        businessFinal = fb.business_logic;
+      if (fb.business_logic.length > 0) {
+        businessFinal = dedupeBusinessLogic([...businessFinal, ...fb.business_logic]).slice(
+          0,
+          L.nestServices,
+        );
       }
     }
   }
 
   if (
     hasFrontendEvidencePaths &&
-    !hasStrapiEvidencePaths &&
     (entitiesFinal.length === 0 ||
       (apiFromAst.length === 0 && apiFromClientRefs.length === 0) ||
       businessFinal.length === 0)
@@ -668,8 +661,11 @@ export async function buildMddEvidenceDocument(params: {
       if (apiFromClientRefs.length === 0 && fb.api_contracts.length > 0) {
         apiFromFrontendFinal = fb.api_contracts;
       }
-      if (businessFinal.length === 0 && fb.business_logic.length > 0) {
-        businessFinal = fb.business_logic;
+      if (fb.business_logic.length > 0) {
+        businessFinal = dedupeBusinessLogic([...businessFinal, ...fb.business_logic]).slice(
+          0,
+          L.nestServices,
+        );
       }
     }
   }
