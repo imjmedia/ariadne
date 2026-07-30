@@ -8,9 +8,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type { CredentialActor } from '../credentials/credential-actor';
 import { ChatConversationEntity } from './entities/chat-conversation.entity';
+import { ChatIntegrationBatchEntity } from './entities/chat-integration-batch.entity';
 import { ChatMessageEntity, type ChatMessageRole } from './entities/chat-message.entity';
 
 export interface ChatConversationDto {
@@ -19,6 +20,9 @@ export interface ChatConversationDto {
   createdAt: string;
   updatedAt: string;
   messageCount: number;
+  integrationBatchId?: string | null;
+  integrationBatchLabel?: string | null;
+  integrationHandoffId?: string | null;
 }
 
 export interface ChatMessageDto {
@@ -44,13 +48,20 @@ function titleFromMessage(message: string): string {
   return oneLine.length > 72 ? `${oneLine.slice(0, 69)}…` : oneLine;
 }
 
-function toConversationDto(row: ChatConversationEntity, messageCount: number): ChatConversationDto {
+function toConversationDto(
+  row: ChatConversationEntity,
+  messageCount: number,
+  batchLabel?: string | null,
+): ChatConversationDto {
   return {
     id: row.id,
     title: row.title,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     messageCount,
+    integrationBatchId: row.integrationBatchId,
+    integrationBatchLabel: batchLabel ?? null,
+    integrationHandoffId: row.integrationHandoffId,
   };
 }
 
@@ -61,6 +72,8 @@ export class ChatConversationService {
     private readonly conversations: Repository<ChatConversationEntity>,
     @InjectRepository(ChatMessageEntity)
     private readonly messages: Repository<ChatMessageEntity>,
+    @InjectRepository(ChatIntegrationBatchEntity)
+    private readonly integrationBatches: Repository<ChatIntegrationBatchEntity>,
   ) {}
 
   async listByRepository(actor: CredentialActor, repositoryId: string): Promise<ChatConversationDto[]> {
@@ -194,6 +207,14 @@ export class ChatConversationService {
   private async withMessageCounts(rows: ChatConversationEntity[]): Promise<ChatConversationDto[]> {
     if (rows.length === 0) return [];
     const ids = rows.map((r) => r.id);
+    const batchIds = [...new Set(rows.map((r) => r.integrationBatchId).filter(Boolean))] as string[];
+    const batchLabels = new Map<string, string>();
+    if (batchIds.length > 0) {
+      const batches = await this.integrationBatches.find({ where: { id: In(batchIds) } });
+      for (const batch of batches) {
+        batchLabels.set(batch.id, batch.label);
+      }
+    }
     const countsRaw = await this.messages
       .createQueryBuilder('m')
       .select('m.conversation_id', 'conversationId')
@@ -202,6 +223,12 @@ export class ChatConversationService {
       .groupBy('m.conversation_id')
       .getRawMany<{ conversationId: string; count: string }>();
     const countMap = new Map(countsRaw.map((c) => [c.conversationId, Number(c.count)]));
-    return rows.map((r) => toConversationDto(r, countMap.get(r.id) ?? 0));
+    return rows.map((r) =>
+      toConversationDto(
+        r,
+        countMap.get(r.id) ?? 0,
+        r.integrationBatchId ? batchLabels.get(r.integrationBatchId) ?? null : null,
+      ),
+    );
   }
 }

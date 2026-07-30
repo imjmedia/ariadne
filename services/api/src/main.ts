@@ -59,6 +59,7 @@ async function bootstrap() {
       pathname.startsWith('/api/domains') ||
       pathname.startsWith('/api/repositories') ||
       pathname.startsWith('/api/conversations') ||
+      pathname.startsWith('/api/integration-batches') ||
       pathname.startsWith('/api/credentials') ||
       pathname.startsWith('/api/providers') ||
       pathname.startsWith('/api/webhooks') ||

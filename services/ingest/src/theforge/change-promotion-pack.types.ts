@@ -111,6 +111,8 @@ export interface CreateStageFromPackInput {
   runLegacyStart?: boolean;
   /** Default true — Forge upserts project_ariadne_links. */
   wireAriadne?: boolean;
+  /** Proyecto NEW origen cuando el pack fusiona handoffs NEW-LEG. */
+  linkedNewProjectId?: string;
 }
 
 /** Pack shape expected by POST /theforge/create-stage-from-ariadne-change-pack */

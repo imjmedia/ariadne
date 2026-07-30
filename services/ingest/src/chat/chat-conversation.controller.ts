@@ -5,6 +5,7 @@ import { Body, Controller, Delete, Get, Headers, Param, Patch, Post } from '@nes
 import { actorFromHeaders } from '../credentials/credential-actor';
 import type { PromoteToTheForgeBody } from '../theforge/theforge-promotion.service';
 import { TheForgePromotionService } from '../theforge/theforge-promotion.service';
+import { ChatIntegrationHandoffService } from '../theforge/chat-integration-handoff.service';
 import { ChatConversationService } from './chat-conversation.service';
 
 @Controller('repositories/:repositoryId/conversations')
@@ -56,6 +57,7 @@ export class ChatConversationsController {
   constructor(
     private readonly service: ChatConversationService,
     private readonly forgePromotion: TheForgePromotionService,
+    private readonly integrationHandoffs: ChatIntegrationHandoffService,
   ) {}
 
   @Get(':conversationId/messages')
@@ -98,6 +100,17 @@ export class ChatConversationsController {
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
     return this.forgePromotion.getPromotionState(actorFromHeaders(headers), conversationId);
+  }
+
+  @Get(':conversationId/integration-batch')
+  getIntegrationBatch(
+    @Param('conversationId') conversationId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.integrationHandoffs.findBatchForConversation(
+      actorFromHeaders(headers),
+      conversationId,
+    );
   }
 
   @Post(':conversationId/preview-theforge-pack')

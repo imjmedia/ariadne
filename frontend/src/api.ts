@@ -375,6 +375,40 @@ export const api = {
       { method: 'POST', body: JSON.stringify(body) },
     ),
 
+  listIntegrationHandoffSources: (projectId: string) =>
+    request<import('./types').ForgeIntegrationHandoffSource[]>(
+      `/projects/${projectId}/integration-handoffs/sources`,
+    ),
+
+  importIntegrationHandoffs: (projectId: string, sourceForgeProjectId: string) =>
+    request<import('./types').ImportIntegrationHandoffsResponse>(
+      `/projects/${projectId}/integration-handoffs/import`,
+      { method: 'POST', body: JSON.stringify({ sourceForgeProjectId }) },
+    ),
+
+  getConversationIntegrationBatch: (conversationId: string) =>
+    request<import('./types').ChatIntegrationBatch | null>(
+      `/conversations/${conversationId}/integration-batch`,
+    ),
+
+  previewIntegrationBatchTheForgePack: (
+    batchId: string,
+    body: Partial<import('./types').PromoteToTheForgeRequest>,
+  ) =>
+    request<import('./types').PreviewIntegrationBatchTheForgeResponse>(
+      `/integration-batches/${batchId}/preview-theforge-pack`,
+      { method: 'POST', body: JSON.stringify(body ?? {}) },
+    ),
+
+  promoteIntegrationBatchToTheForge: (
+    batchId: string,
+    body: import('./types').PromoteToTheForgeRequest,
+  ) =>
+    request<import('./types').PromoteToTheForgeResponse>(
+      `/integration-batches/${batchId}/promote-to-theforge`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   getTheForgeIntegrationStatus: () =>
     request<import('./types').TheForgeIntegrationStatus>('/theforge-integration/status'),
 

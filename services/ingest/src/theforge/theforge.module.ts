@@ -4,6 +4,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChatConversationEntity } from '../chat/entities/chat-conversation.entity';
+import { ChatIntegrationBatchEntity } from '../chat/entities/chat-integration-batch.entity';
 import { ChatMessageEntity } from '../chat/entities/chat-message.entity';
 import { ChatModule } from '../chat/chat.module';
 import { MddPersistenceModule } from '../mdd-persistence/mdd-persistence.module';
@@ -12,8 +13,10 @@ import { RepositoryEntity } from '../repositories/entities/repository.entity';
 import { ProjectRepositoryEntity } from '../repositories/entities/project-repository.entity';
 import { ProjectEntity } from '../projects/entities/project.entity';
 import { ChangePromotionPackService } from './change-promotion-pack.service';
+import { ChatIntegrationHandoffService } from './chat-integration-handoff.service';
 import { CursorTasksDocumentService } from './cursor-tasks-document.service';
 import { TheForgeBrownfieldCatalogService } from './theforge-brownfield-catalog.service';
+import { TheForgeIntegrationHandoffCatalogService } from './theforge-integration-handoff-catalog.service';
 import { TheForgeIntegrationEntity } from './entities/theforge-integration.entity';
 import { TheForgeConvergeService } from './theforge-converge.service';
 import { TheForgeIntegrationController } from './theforge-integration.controller';
@@ -34,6 +37,7 @@ import {
       ProjectEntity,
       ProjectRepositoryEntity,
       ChatConversationEntity,
+      ChatIntegrationBatchEntity,
       ChatMessageEntity,
       TheForgeIntegrationEntity,
     ]),
@@ -46,6 +50,8 @@ import {
     TheForgeConvergeService,
     TheForgeIntegrationService,
     TheForgeBrownfieldCatalogService,
+    TheForgeIntegrationHandoffCatalogService,
+    ChatIntegrationHandoffService,
     TheForgeProjectLinkService,
     ChangePromotionPackService,
     CursorTasksDocumentService,
@@ -66,6 +72,8 @@ import {
     TheForgeConvergeService,
     TheForgeIntegrationService,
     TheForgeBrownfieldCatalogService,
+    TheForgeIntegrationHandoffCatalogService,
+    ChatIntegrationHandoffService,
     TheForgeProjectLinkService,
     ChangePromotionPackService,
     CursorTasksDocumentService,
