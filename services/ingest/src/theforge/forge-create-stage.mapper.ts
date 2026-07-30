@@ -148,9 +148,13 @@ export function toForgeChangePackV1(pack: ChangePromotionPackV1): ForgeChangePac
 
 export function toForgeCreateStageApiBody(input: CreateStageFromPackInput): ForgeCreateStageApiBody {
   const filesCount = input.pack.modificationPlan.filesToModify.length;
+  const forgePack = toForgeChangePackV1(input.pack);
+  if (input.linkedNewProjectId?.trim()) {
+    forgePack.linkedNewProjectId = input.linkedNewProjectId.trim();
+  }
   return {
     forgeProjectId: input.forgeProjectId,
-    pack: toForgeChangePackV1(input.pack),
+    pack: forgePack,
     stageName: input.stageName ?? input.pack.change.title,
     ...(input.stageId ? { stageId: input.stageId } : {}),
     activate: input.activate ?? false,

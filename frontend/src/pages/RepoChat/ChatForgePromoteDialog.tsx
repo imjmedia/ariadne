@@ -28,6 +28,7 @@ import {
   ForgePromoteProgressPanel,
   useForgePromoteProgress,
 } from './forgePromoteProgress';
+import { ChatIntegrationBatchForgeDialog } from './ChatIntegrationBatchForgeDialog';
 
 const DELIVERABLE_OPTIONS: { id: ForgeDeliverableKind; label: string }[] = [
   { id: 'change_spec', label: 'Especificación del cambio' },
@@ -369,8 +370,11 @@ export function ChatForgePromoteButton(props: {
   conversationId: string | null;
   disabled?: boolean;
   defaultStageName?: string;
+  integrationBatchId?: string | null;
+  integrationBatchLabel?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const batchMode = Boolean(props.integrationBatchId);
 
   return (
     <>
@@ -379,20 +383,30 @@ export function ChatForgePromoteButton(props: {
         variant="outline"
         size="sm"
         className={cn(chatNavBtnClass, 'gap-2')}
-        disabled={!props.conversationId || props.disabled}
+        disabled={(!props.conversationId && !batchMode) || props.disabled}
         onClick={() => setOpen(true)}
-        title="Promover conversación a The Forge"
+        title={batchMode ? 'Promover lote de integración a The Forge' : 'Promover conversación a The Forge'}
       >
         <Hammer className="size-4 shrink-0" aria-hidden />
-        <span className="hidden sm:inline">The Forge</span>
+        <span className="hidden sm:inline">{batchMode ? 'The Forge (lote)' : 'The Forge'}</span>
       </Button>
-      <ChatForgePromoteDialog
-        conversationId={props.conversationId}
-        open={open}
-        onOpenChange={setOpen}
-        disabled={props.disabled}
-        defaultStageName={props.defaultStageName}
-      />
+      {batchMode && props.integrationBatchId ? (
+        <ChatIntegrationBatchForgeDialog
+          batchId={props.integrationBatchId}
+          batchLabel={props.integrationBatchLabel}
+          open={open}
+          onOpenChange={setOpen}
+          disabled={props.disabled}
+        />
+      ) : (
+        <ChatForgePromoteDialog
+          conversationId={props.conversationId}
+          open={open}
+          onOpenChange={setOpen}
+          disabled={props.disabled}
+          defaultStageName={props.defaultStageName}
+        />
+      )}
     </>
   );
 }

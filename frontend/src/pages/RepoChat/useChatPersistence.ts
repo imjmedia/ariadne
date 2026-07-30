@@ -172,6 +172,22 @@ export function useChatPersistence(scope: ChatPersistenceScope | null) {
     })();
   }, [scope?.kind, scope?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- remount per scope
 
+  const reloadConversations = useCallback(async () => {
+    if (!scope) return [];
+    setConversationsLoading(true);
+    try {
+      const list = await listConversations();
+      setConversations(list);
+      setPersistenceError(null);
+      return list;
+    } catch (e) {
+      setPersistenceError(e instanceof Error ? e.message : String(e));
+      return [];
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, [scope, listConversations]);
+
   return {
     conversations,
     activeConversationId,
@@ -185,5 +201,6 @@ export function useChatPersistence(scope: ChatPersistenceScope | null) {
     startNewConversation,
     ensureActiveConversation,
     persistMessage,
+    reloadConversations,
   };
 }

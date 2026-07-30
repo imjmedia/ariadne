@@ -276,6 +276,38 @@ export interface ChatConversation {
   createdAt: string;
   updatedAt: string;
   messageCount: number;
+  integrationBatchId?: string | null;
+  integrationBatchLabel?: string | null;
+  integrationHandoffId?: string | null;
+}
+
+export interface ForgeIntegrationHandoffSource {
+  forgeProjectId: string;
+  forgeProjectName: string;
+  groupName?: string | null;
+  sentHandoffCount: number;
+  linkedLegacyProjectId?: string | null;
+}
+
+export interface ImportIntegrationHandoffsResponse {
+  batchId: string;
+  batchLabel: string;
+  sourceForgeProjectId: string;
+  sourceForgeProjectName: string;
+  created: Array<{ conversationId: string; handoffId: string; title: string }>;
+  skipped: Array<{ handoffId: string; title: string; reason: string }>;
+}
+
+export interface ChatIntegrationBatch {
+  id: string;
+  label: string;
+  sourceForgeProjectId: string;
+  sourceForgeProjectName: string | null;
+  conversationCount: number;
+  forgePromotionStatus: string | null;
+  forgeStageId: string | null;
+  forgeStageUrl: string | null;
+  createdAt: string;
 }
 
 /** Mensaje persistido en Postgres. */
@@ -324,6 +356,24 @@ export interface TheForgePackPreview {
 
 export interface PreviewTheForgePackResponse {
   preview: TheForgePackPreview;
+  linkedForgeProject?: {
+    forgeProjectId: string;
+    forgeProjectName: string;
+    linkKind: 'primary' | 'alias' | 'inferred';
+  } | null;
+  promoteEnabled: boolean;
+}
+
+export interface PreviewIntegrationBatchTheForgeResponse {
+  batch: ChatIntegrationBatch;
+  preview: {
+    stageName: string;
+    stageKeySuggested: string;
+    conversationCount: number;
+    modificationPlanFileCount: number;
+    modificationPlanSample: string[];
+    warnings: string[];
+  };
   linkedForgeProject?: {
     forgeProjectId: string;
     forgeProjectName: string;

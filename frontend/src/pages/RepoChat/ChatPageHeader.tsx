@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, BarChart3, MessageSquare, MessageSquarePlus, Settings2 } from 'lucide-react';
-import type { ChatPipelineMode } from '@/types';
+import type { ChatPipelineMode, ImportIntegrationHandoffsResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { chatNavBtnClass } from '../chat/chatShellClasses';
 import { ChatOptionsPopover } from './ChatOptionsPopover';
 import { ChatForgePromoteButton } from './ChatForgePromoteDialog';
+import { ChatIntegrationHandoffImportButton } from './ChatIntegrationHandoffImportDialog';
 
 const PIPELINE_BADGE: Record<ChatPipelineMode, string> = {
   default: 'Chat',
@@ -38,9 +39,13 @@ export function ChatPageHeader(props: {
   chatViewMode: 'chat' | 'analysis';
   analysisPending: boolean;
   activeConversationId?: string | null;
+  integrationBatchId?: string | null;
+  integrationBatchLabel?: string | null;
   forgePromoteDisabled?: boolean;
   forgeDefaultStageName?: string;
   forgePromotionAvailable?: boolean;
+  projectId?: string | null;
+  onHandoffsImported?: (result: ImportIntegrationHandoffsResponse) => void;
   headerLeadingExtra?: ReactNode;
   optionsExtra?: ReactNode;
   extraBadges?: ReactNode;
@@ -136,11 +141,21 @@ export function ChatPageHeader(props: {
           ) : null}
         </Button>
 
+        {props.forgePromotionAvailable && props.projectId ? (
+          <ChatIntegrationHandoffImportButton
+            projectId={props.projectId}
+            disabled={props.forgePromoteDisabled}
+            onImported={props.onHandoffsImported}
+          />
+        ) : null}
+
         {props.forgePromotionAvailable ? (
           <ChatForgePromoteButton
-            conversationId={props.activeConversationId ?? null}
+            conversationId={props.integrationBatchId ? null : (props.activeConversationId ?? null)}
             disabled={props.forgePromoteDisabled}
             defaultStageName={props.forgeDefaultStageName}
+            integrationBatchId={props.integrationBatchId}
+            integrationBatchLabel={props.integrationBatchLabel}
           />
         ) : null}
 

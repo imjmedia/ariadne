@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { api } from '../api';
-import type { AnalyzeCodeMode, AnalyzeReportMeta, ChatPipelineMode, ChatScope, Project } from '../types';
+import type { AnalyzeCodeMode, AnalyzeReportMeta, ChatPipelineMode, ChatScope, ImportIntegrationHandoffsResponse, Project } from '../types';
 import { scopeFromAnalyzeForm } from '../utils/analyze-scope-form';
 import { buildChatHistoryForRequest, compactChatMessagesInMemory, formatMemoryCompactionNote } from '../utils/chat-history-payload';
 import { ingestOptionsFromChatPipelineMode } from '../utils/chat-pipeline-mode';
@@ -70,6 +70,7 @@ export function ProjectChat() {
     startNewConversation,
     ensureActiveConversation,
     persistMessage,
+    reloadConversations,
   } = persistence;
 
   const { available: forgePromotionAvailable } = useTheForgeChatPromotion();
@@ -325,6 +326,23 @@ export function ProjectChat() {
   const codeAnalysisDisabled = repoCount === 0 || (repoCount > 1 && !selectedRepoId);
   const chatBusy = loading || messagesLoading || conversationsLoading;
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
+  const integrationBatchId = activeConversation?.integrationBatchId ?? null;
+  const integrationBatchLabel = activeConversation?.integrationBatchLabel ?? null;
+
+  const handleHandoffsImported = useCallback(
+    async (result: ImportIntegrationHandoffsResponse) => {
+      const list = await reloadConversations();
+      const firstCreated = result.created[0]?.conversationId;
+      const targetId =
+        (firstCreated && list.some((c) => c.id === firstCreated) ? firstCreated : null) ??
+        list.find((c) => c.integrationBatchId === result.batchId)?.id ??
+        null;
+      if (targetId) {
+        await selectConversation(targetId);
+      }
+    },
+    [reloadConversations, selectConversation],
+  );
 
   return (
     <div className={chatPageSplitClass}>
@@ -364,9 +382,18 @@ export function ProjectChat() {
         chatViewMode={viewMode}
         analysisPending={analysisPending}
         activeConversationId={activeConversationId}
-        forgePromoteDisabled={chatBusy || messages.length === 0}
-        forgeDefaultStageName={activeConversation?.title ?? undefined}
+        integrationBatchId={integrationBatchId}
+        integrationBatchLabel={integrationBatchLabel}
+        forgePromoteDisabled={
+          chatBusy ||
+          (integrationBatchId ? false : messages.length === 0)
+        }
+        forgeDefaultStageName={
+          integrationBatchLabel ?? activeConversation?.title ?? undefined
+        }
         forgePromotionAvailable={forgePromotionAvailable}
+        projectId={projectId ?? null}
+        onHandoffsImported={handleHandoffsImported}
         headerLeadingExtra={
           <ChatConversationsMobileToggle onOpen={() => setHistoryOpen(true)} />
         }

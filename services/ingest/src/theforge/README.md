@@ -66,6 +66,9 @@ La vinculación usa **MCP** (`…/mcp` + Secret MCP/JWT) o **REST** (`…/api` +
 - `DELETE /projects/:id/theforge-link` — Desvincula
 - `POST /projects/:id/theforge-stage/preview` — Vista previa: descripción del trabajo + `# Tasks` (YAML/checklist)
 - `POST /projects/:id/theforge-stage` — Crea etapa en Forge vinculado con handoff `change_work_description` + `cursor_tasks_markdown`
+- `GET /projects/:id/integration-handoffs/sources` — Proyectos NEW con handoffs (`integrationHandoff`)
+- `POST /projects/:id/integration-handoffs/import` — Importa handoffs `sent` → chats agrupados por lote
+- `POST /integration-batches/:id/promote-to-theforge` — Fusiona packs del lote → una etapa LEGACY
 - `GET /conversations/:id/forge-promotion`, preview, promote — solo si integración activa; usa `theforgeProjectId` vinculado antes de `resolve_forge_project_for_ariadne`
 
 **Contratos:** `docs/contracts/theforge-create-stage-from-pack-v1.md`, `docs/contracts/theforge-resolve-ariadne-link-v1.md`, `docs/contracts/change-promotion-pack-v1.md`.

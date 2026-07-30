@@ -21,6 +21,74 @@ function conversationLabel(c: ChatConversation): string {
   return c.title?.trim() || 'Nueva conversación';
 }
 
+function groupConversations(conversations: ChatConversation[]) {
+  const integration = new Map<string, { label: string; items: ChatConversation[] }>();
+  const general: ChatConversation[] = [];
+
+  for (const c of conversations) {
+    if (c.integrationBatchId) {
+      const label = c.integrationBatchLabel?.trim() || 'Integración';
+      const bucket = integration.get(c.integrationBatchId) ?? { label, items: [] };
+      bucket.items.push(c);
+      integration.set(c.integrationBatchId, bucket);
+    } else {
+      general.push(c);
+    }
+  }
+
+  return {
+    integrationGroups: [...integration.entries()].map(([batchId, group]) => ({
+      batchId,
+      label: group.label,
+      items: group.items,
+    })),
+    general,
+  };
+}
+
+function ConversationRow(props: {
+  conversation: ChatConversation;
+  active: boolean;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { conversation: c, active } = props;
+  return (
+    <li className="group relative">
+      <button
+        type="button"
+        onClick={() => props.onSelect(c.id)}
+        className={cn(
+          'w-full rounded-xl px-3 py-2.5 pr-9 text-left transition-colors',
+          active
+            ? 'bg-[var(--secondary)] text-[var(--foreground)]'
+            : 'text-[var(--foreground-muted)] hover:bg-[var(--secondary)]/60 hover:text-[var(--foreground)]',
+        )}
+      >
+        <span className="line-clamp-2 text-sm leading-snug">{conversationLabel(c)}</span>
+        <span className="mt-1 block text-[10px] opacity-70">
+          {formatConversationDate(c.updatedAt)}
+          {c.messageCount > 0 ? ` · ${c.messageCount} msg` : ''}
+        </span>
+      </button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="absolute right-1 top-1/2 size-7 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (window.confirm('¿Eliminar esta conversación?')) props.onDelete(c.id);
+        }}
+        title="Eliminar conversación"
+      >
+        <Trash2 className="size-3.5" aria-hidden />
+        <span className="sr-only">Eliminar conversación</span>
+      </Button>
+    </li>
+  );
+}
+
 export function ChatConversationsSidebar(props: {
   conversations: ChatConversation[];
   activeConversationId: string | null;
@@ -30,6 +98,8 @@ export function ChatConversationsSidebar(props: {
   onDelete: (id: string) => void;
   className?: string;
 }) {
+  const { integrationGroups, general } = groupConversations(props.conversations);
+
   return (
     <aside
       className={cn(
@@ -62,45 +132,46 @@ export function ChatConversationsSidebar(props: {
             Sin conversaciones. Pulsa Nuevo para empezar.
           </p>
         ) : (
-          <ul className="space-y-1">
-            {props.conversations.map((c) => {
-              const active = c.id === props.activeConversationId;
-              return (
-                <li key={c.id} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => props.onSelect(c.id)}
-                    className={cn(
-                      'w-full rounded-xl px-3 py-2.5 pr-9 text-left transition-colors',
-                      active
-                        ? 'bg-[var(--secondary)] text-[var(--foreground)]'
-                        : 'text-[var(--foreground-muted)] hover:bg-[var(--secondary)]/60 hover:text-[var(--foreground)]',
-                    )}
-                  >
-                    <span className="line-clamp-2 text-sm leading-snug">{conversationLabel(c)}</span>
-                    <span className="mt-1 block text-[10px] opacity-70">
-                      {formatConversationDate(c.updatedAt)}
-                      {c.messageCount > 0 ? ` · ${c.messageCount} msg` : ''}
-                    </span>
-                  </button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 size-7 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm('¿Eliminar esta conversación?')) props.onDelete(c.id);
-                    }}
-                    title="Eliminar conversación"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                    <span className="sr-only">Eliminar conversación</span>
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="space-y-4">
+            {integrationGroups.map((group) => (
+              <section key={group.batchId}>
+                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--primary)]">
+                  {group.label}
+                </p>
+                <ul className="space-y-1">
+                  {group.items.map((c) => (
+                    <ConversationRow
+                      key={c.id}
+                      conversation={c}
+                      active={c.id === props.activeConversationId}
+                      onSelect={props.onSelect}
+                      onDelete={props.onDelete}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))}
+            {general.length > 0 ? (
+              <section>
+                {integrationGroups.length > 0 ? (
+                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
+                    General
+                  </p>
+                ) : null}
+                <ul className="space-y-1">
+                  {general.map((c) => (
+                    <ConversationRow
+                      key={c.id}
+                      conversation={c}
+                      active={c.id === props.activeConversationId}
+                      onSelect={props.onSelect}
+                      onDelete={props.onDelete}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
         )}
       </div>
     </aside>

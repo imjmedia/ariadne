@@ -23,18 +23,23 @@ import { RepositoriesModule } from '../repositories/repositories.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { ChatConversationEntity } from './entities/chat-conversation.entity';
+import { ChatIntegrationBatchEntity } from './entities/chat-integration-batch.entity';
 import { ChatMessageEntity } from './entities/chat-message.entity';
 import {
   ChatConversationsController,
   ProjectChatConversationsController,
   RepositoryChatConversationsController,
 } from './chat-conversation.controller';
+import {
+  IntegrationBatchesController,
+  ProjectIntegrationHandoffsController,
+} from './chat-integration.controller';
 import { ChatConversationService } from './chat-conversation.service';
 import { TheForgeModule } from '../theforge/theforge.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([IndexedFile, ChatConversationEntity, ChatMessageEntity]),
+    TypeOrmModule.forFeature([IndexedFile, ChatConversationEntity, ChatIntegrationBatchEntity, ChatMessageEntity]),
     RepositoriesModule,
     EmbeddingModule,
     ProjectsModule,
@@ -47,6 +52,8 @@ import { TheForgeModule } from '../theforge/theforge.module';
     InternalProjectToolsController,
     RepositoryChatConversationsController,
     ProjectChatConversationsController,
+    ProjectIntegrationHandoffsController,
+    IntegrationBatchesController,
     ChatConversationsController,
   ],
   providers: [

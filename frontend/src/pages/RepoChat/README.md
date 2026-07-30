@@ -19,6 +19,13 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 - Dev: `THEFORGE_PROMOTE_MOCK=true` simula promoción E2E.
 - Durante **Enviar a The Forge**, barra de progreso con pasos estimados (pack → # Tasks → resolve → create stage).
 
+## Handoffs NEW-LEG (solo chat de proyecto)
+
+- Botón **Handoffs** en cabecera: lista proyectos **NEW** de The Forge con `integrationHandoff` y crea un chat por cada item `sent`.
+- Sidebar agrupa esos chats bajo **Integración — {proyecto NEW}**; el resto queda en **General**.
+- **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY vinculado al proyecto Ariadne (no promueve chat a chat).
+- Re-importar omite handoffs ya presentes en el lote.
+
 ## Persistencia (por usuario)
 
 - Tablas Postgres: `chat_conversations`, `chat_messages` (ingest).
@@ -38,6 +45,8 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **ChatPageHeader.tsx** | Cabecera compartida repo/proyecto (interruptor Chat/Análisis) |
 | **ChatRepoHeader.tsx** | Wrapper repo → ChatPageHeader |
 | **ChatForgePromoteDialog.tsx** | Modal promover conversación → etapa The Forge |
+| **ChatIntegrationHandoffImportDialog.tsx** | Importar handoffs NEW-LEG desde Forge |
+| **ChatIntegrationBatchForgeDialog.tsx** | Promover lote de integración → una etapa |
 | **forgePromoteProgress.tsx** | Barra de progreso estimada durante promote/create-stage |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
 | **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable, **Copiar Markdown** en respuestas |
