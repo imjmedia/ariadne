@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, BarChart3, MessageSquare, MessageSquarePlus, Settings2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, MessageSquare, MessageSquarePlus, Play, Settings2 } from 'lucide-react';
 import type { ChatPipelineMode, ImportIntegrationHandoffsResponse } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,11 @@ export function ChatPageHeader(props: {
   forgePromotionAvailable?: boolean;
   projectId?: string | null;
   onHandoffsImported?: (result: ImportIntegrationHandoffsResponse) => void;
+  handoffAnalysisPending?: boolean;
+  onRunHandoffAnalysis?: () => void;
+  batchHandoffPendingCount?: number;
+  onRunBatchHandoffAnalysis?: () => void;
+  handoffAnalysisRunning?: boolean;
   headerLeadingExtra?: ReactNode;
   optionsExtra?: ReactNode;
   extraBadges?: ReactNode;
@@ -144,9 +149,41 @@ export function ChatPageHeader(props: {
         {props.forgePromotionAvailable && props.projectId ? (
           <ChatIntegrationHandoffImportButton
             projectId={props.projectId}
-            disabled={props.forgePromoteDisabled}
+            disabled={props.forgePromoteDisabled || props.handoffAnalysisRunning}
             onImported={props.onHandoffsImported}
           />
+        ) : null}
+
+        {props.batchHandoffPendingCount != null && props.batchHandoffPendingCount > 0 && props.onRunBatchHandoffAnalysis ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(chatNavBtnClass, 'gap-2')}
+            disabled={props.handoffAnalysisRunning || props.forgePromoteDisabled}
+            onClick={props.onRunBatchHandoffAnalysis}
+            title="Ejecutar el pipeline de chat en todos los handoffs del lote sin respuesta"
+          >
+            <Play className="size-4 shrink-0" aria-hidden />
+            <span className="hidden sm:inline">
+              Análisis ({props.batchHandoffPendingCount})
+            </span>
+            <span className="sm:hidden">Análisis</span>
+          </Button>
+        ) : props.handoffAnalysisPending && props.onRunHandoffAnalysis ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(chatNavBtnClass, 'gap-2')}
+            disabled={props.handoffAnalysisRunning || props.forgePromoteDisabled}
+            onClick={props.onRunHandoffAnalysis}
+            title="Enviar el handoff al pipeline de chat de Ariadne"
+          >
+            <Play className="size-4 shrink-0" aria-hidden />
+            <span className="hidden sm:inline">Ejecutar análisis</span>
+            <span className="sm:hidden">Análisis</span>
+          </Button>
         ) : null}
 
         {props.forgePromotionAvailable ? (

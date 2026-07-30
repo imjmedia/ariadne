@@ -22,6 +22,8 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 ## Handoffs NEW-LEG (solo chat de proyecto)
 
 - Botón **Handoffs** en cabecera: lista proyectos **NEW** de The Forge con `integrationHandoff` y crea un chat por cada item `sent`.
+- Tras importar, se **ejecuta automáticamente** el pipeline de chat (mismo flujo que Enviar) en cada handoff nuevo.
+- Si un handoff quedó solo con el mensaje semilla (`1 msg`), usa **Análisis (N)** en lote o **Ejecutar análisis** en el chat activo.
 - Sidebar agrupa esos chats bajo **Integración — {proyecto NEW}**; el resto queda en **General**.
 - **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY vinculado al proyecto Ariadne (no promueve chat a chat).
 - Re-importar omite handoffs ya presentes en el lote.
@@ -46,6 +48,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **ChatRepoHeader.tsx** | Wrapper repo → ChatPageHeader |
 | **ChatForgePromoteDialog.tsx** | Modal promover conversación → etapa The Forge |
 | **ChatIntegrationHandoffImportDialog.tsx** | Importar handoffs NEW-LEG desde Forge |
+| **handoff-chat-analysis.util.ts** | Detectar handoffs pendientes de respuesta LLM |
 | **ChatIntegrationBatchForgeDialog.tsx** | Promover lote de integración → una etapa |
 | **forgePromoteProgress.tsx** | Barra de progreso estimada durante promote/create-stage |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
