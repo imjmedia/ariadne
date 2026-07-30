@@ -68,7 +68,8 @@ La vinculación usa **MCP** (`…/mcp` + Secret MCP/JWT) o **REST** (`…/api` +
 - `POST /projects/:id/theforge-stage` — Crea etapa en Forge vinculado con handoff `change_work_description` + `cursor_tasks_markdown`
 - `GET /projects/:id/integration-handoffs/sources` — Proyectos NEW con handoffs (`integrationHandoff`)
 - `POST /projects/:id/integration-handoffs/import` — Importa handoffs `sent` → chats agrupados por lote
-- `POST /integration-batches/:id/promote-to-theforge` — Fusiona packs del lote → una etapa LEGACY
+- `POST /integration-batches/:id/preview-theforge-pack` — Fusiona chats del lote + genera pack enriquecido (se cachea en DB)
+- `POST /integration-batches/:id/promote-to-theforge` — Reutiliza pack cacheado si la vista previa coincide; crea etapa LEGACY
 - `DELETE /integration-batches/:id` — Elimina el lote y todas sus conversaciones (permite re-importar handoffs)
 - `GET /conversations/:id/forge-promotion`, preview, promote — solo si integración activa; usa `theforgeProjectId` vinculado antes de `resolve_forge_project_for_ariadne`
 
@@ -84,4 +85,23 @@ Mapper: `forge-create-stage.mapper.ts` (pack interno v1.1 → Forge `pack.versio
 El pack incluye `graphEvidenceBundle` + `changePlanSeed`. Handoff a Forge: `modification_plan_enriched`, `change_plan_seed`, **`change_work_description`** (markdown), **`cursor_tasks_markdown`** (`# Tasks` con secciones Backend/Frontend/Infra/Testing/Deploy), y si hay `migration_tasks` → `post_deliverable_gate` (Forge debe validar con Ariadne `POST /projects/:id/validate-tasks-json` tras `legacy_generate_deliverables`).
 
 Generación de tareas: `cursor-tasks-document.service.ts` (LLM con prompt estricto + fallback determinista desde `changePlanSeed`). Validación estructural en `cursor-tasks-document.util.ts`.
+
+**Promoción de lote (batch) — timeouts y caché**
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `THEFORGE_CREATE_STAGE_TIMEOUT_MS` | 600000 (10 min) | `create_stage_from_ariadne_change_pack` (HTTP o MCP) |
+| `THEFORGE_REQUEST_TIMEOUT_MS` | 120000 | resolve / llamadas ligeras |
+| `FORGE_PROMOTION_PENDING_TTL_MS` | 900000 (15 min) | Permite reintentar si quedó `pending` tras timeout |
+| `INGEST_PROXY_TIMEOUT_MS` (API) | 600000 | Proxy `/api/integration-batches/*` → ingest |
+
+Flujo recomendado: **Aplicar cambios** (preview) → **Enviar lote**. El preview guarda `forge_preview_pack` en Postgres; promote no reconstruye el pack si nombre/entregables/chats no cambiaron.
+
+| Síntoma | Causa habitual |
+|---------|----------------|
+| Barra ~92% mucho rato | Normal: la barra es estimada; la llamada real es `createStageFromChangePack` (puede tardar minutos) |
+| `500` / `502` / `504` tras espera | Timeout Traefik/nginx/API antes de ingest; sube `INGEST_PROXY_TIMEOUT_MS` y timeout del reverse proxy externo |
+| `503 FORGE_CREATE_STAGE_TIMEOUT` | Forge no respondió en 10 min |
+| `409` promoción en curso | Lote en `forgePromotionStatus=pending`; espera 15 min o redeploy con TTL |
+| Preview OK, promote lento | Versión antigua reconstruía pack dos veces; actualiza ingest con caché de preview |
 

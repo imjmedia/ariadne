@@ -53,6 +53,7 @@ async function bootstrap() {
 
   // Proxy /api/projects, /api/repositories, /api/credentials, /api/webhooks al ingest (quita /api al reenviar)
   const ingestUrl = process.env.INGEST_URL ?? 'http://localhost:3002';
+  const ingestProxyTimeoutMs = parseInt(process.env.INGEST_PROXY_TIMEOUT_MS ?? '600000', 10);
   const ingestProxy = createProxyMiddleware({
     pathFilter: (pathname) =>
       pathname.startsWith('/api/projects') ||
@@ -70,6 +71,8 @@ async function bootstrap() {
       pathname.startsWith('/api/internal'),
     target: ingestUrl,
     changeOrigin: true,
+    proxyTimeout: ingestProxyTimeoutMs,
+    timeout: ingestProxyTimeoutMs,
     pathRewrite: { '^/api': '' },
     on: {
       proxyReq: (proxyReq, req, res) => {

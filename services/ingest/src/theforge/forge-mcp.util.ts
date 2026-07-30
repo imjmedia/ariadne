@@ -85,6 +85,7 @@ export async function forgeMcpCallTool(
   cfg: TheForgeIntegrationEffective,
   toolName: string,
   args: Record<string, unknown>,
+  options?: { timeoutMs?: number },
 ): Promise<unknown> {
   if (cfg.transport !== 'mcp' || !cfg.mcpUrl) {
     throw new ServiceUnavailableException({
@@ -101,8 +102,10 @@ export async function forgeMcpCallTool(
     });
   }
 
+  const timeoutMs = options?.timeoutMs;
   const res = await fetch(cfg.mcpUrl, {
     method: 'POST',
+    signal: timeoutMs != null && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined,
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json, text/event-stream',
@@ -156,7 +159,8 @@ export async function forgeMcpCallToolJson<T = unknown>(
   cfg: TheForgeIntegrationEffective,
   toolName: string,
   args: Record<string, unknown>,
+  options?: { timeoutMs?: number },
 ): Promise<T> {
-  const data = await forgeMcpCallTool(cfg, toolName, args);
+  const data = await forgeMcpCallTool(cfg, toolName, args, options);
   return data as T;
 }

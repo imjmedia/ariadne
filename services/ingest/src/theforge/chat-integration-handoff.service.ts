@@ -6,6 +6,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -25,6 +26,11 @@ import type {
   ImportIntegrationHandoffsResult,
 } from './integration-handoff.types';
 import { mergeChangePromotionPacks } from './integration-pack-merge.util';
+import {
+  buildBatchContentFingerprint,
+  buildIntegrationPreviewParamsHash,
+} from './integration-preview-cache.util';
+import { FORGE_PROMOTION_PENDING_TTL_MS } from './forge-timeout.constants';
 import { TheForgeClient } from './theforge-client.service';
 import { TheForgeIntegrationHandoffCatalogService } from './theforge-integration-handoff-catalog.service';
 import { TheForgeIntegrationService } from './theforge-integration.service';
@@ -38,6 +44,8 @@ export interface PromoteIntegrationBatchBody {
 
 @Injectable()
 export class ChatIntegrationHandoffService {
+  private readonly logger = new Logger(ChatIntegrationHandoffService.name);
+
   constructor(
     @InjectRepository(ChatIntegrationBatchEntity)
     private readonly batches: Repository<ChatIntegrationBatchEntity>,
@@ -199,6 +207,7 @@ export class ChatIntegrationHandoffService {
     const stageName = body.stageName?.trim() || batch.label;
     const merged = await this.buildMergedPack(batch, stageName, body.stageKey, deliverables);
     const enriched = await this.cursorTasks.enrichPack(merged);
+    await this.savePreviewPackCache(batch, stageName, body.stageKey, deliverables, enriched.pack);
 
     const warnings: string[] = [];
     if (!enriched.pack.ariadne.indexFresh) {
@@ -241,9 +250,7 @@ export class ChatIntegrationHandoffService {
     }
 
     const batch = await this.getOwnedBatch(actor, batchId);
-    if (batch.forgePromotionStatus === 'pending') {
-      throw new ConflictException('Ya hay una promoción en curso para este lote');
-    }
+    await this.clearStalePendingPromotion(batch);
 
     const project = await this.assertProjectLinked(batch.projectId);
     const forgeProjectId = project.theforgeProjectId?.trim();
@@ -258,8 +265,15 @@ export class ChatIntegrationHandoffService {
     if (!stageName) throw new BadRequestException('Indica un nombre para la etapa');
 
     const deliverables = this.normalizeDeliverables(body.deliverables);
-    const merged = await this.buildMergedPack(batch, stageName, body.stageKey, deliverables);
-    const { pack } = await this.cursorTasks.enrichPack(merged);
+    const { pack, fromPreviewCache } = await this.resolveEnrichedPackForPromotion(
+      batch,
+      stageName,
+      body.stageKey,
+      deliverables,
+    );
+    this.logger.log(
+      `promoteBatch ${batchId}: pack ${fromPreviewCache ? 'from preview cache' : 'rebuilt'} (${pack.modificationPlan.filesToModify.length} files)`,
+    );
 
     if (
       batch.forgePromotionStatus === 'success' &&
@@ -281,6 +295,7 @@ export class ChatIntegrationHandoffService {
     });
 
     try {
+      this.logger.log(`promoteBatch ${batchId}: creating Forge stage…`);
       const created = await this.forgeClient.createStageFromChangePack({
         forgeProjectId,
         pack,
@@ -319,12 +334,104 @@ export class ChatIntegrationHandoffService {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`promoteBatch ${batchId} failed: ${message}`);
       await this.batches.update(batch.id, {
         forgePromotionStatus: 'failed',
         forgePromotionLastError: message,
       });
       throw err;
     }
+  }
+
+  private async clearStalePendingPromotion(batch: ChatIntegrationBatchEntity): Promise<void> {
+    if (batch.forgePromotionStatus !== 'pending') return;
+    const ageMs = Date.now() - batch.updatedAt.getTime();
+    if (ageMs < FORGE_PROMOTION_PENDING_TTL_MS) {
+      throw new ConflictException(
+        'Ya hay una promoción en curso para este lote. Espera unos minutos o vuelve a intentar cuando expire.',
+      );
+    }
+    this.logger.warn(
+      `Batch ${batch.id} promotion pending for ${Math.round(ageMs / 1000)}s — allowing retry`,
+    );
+    await this.batches.update(batch.id, {
+      forgePromotionStatus: 'failed',
+      forgePromotionLastError:
+        'La promoción anterior no terminó (timeout o error de red). Se permite reintentar.',
+    });
+    batch.forgePromotionStatus = 'failed';
+  }
+
+  private async batchContentFingerprint(batchId: string): Promise<string> {
+    const rows = await this.conversations
+      .createQueryBuilder('c')
+      .leftJoin('chat_messages', 'm', 'm.conversation_id = c.id')
+      .select('c.id', 'conversationId')
+      .addSelect('COUNT(m.id)', 'messageCount')
+      .addSelect('MAX(m.created_at)', 'lastMessageAt')
+      .where('c.integration_batch_id = :batchId', { batchId })
+      .groupBy('c.id')
+      .getRawMany<{ conversationId: string; messageCount: string; lastMessageAt: string | null }>();
+
+    return buildBatchContentFingerprint(
+      rows.map((row) => ({
+        conversationId: row.conversationId,
+        messageCount: parseInt(row.messageCount, 10) || 0,
+        lastMessageAt: row.lastMessageAt,
+      })),
+    );
+  }
+
+  private async previewParamsHash(
+    batch: ChatIntegrationBatchEntity,
+    stageName: string,
+    stageKey: string | undefined,
+    deliverables: ForgeDeliverableKind[],
+  ): Promise<string> {
+    const contentFingerprint = await this.batchContentFingerprint(batch.id);
+    return buildIntegrationPreviewParamsHash({
+      batchId: batch.id,
+      stageName,
+      stageKey,
+      deliverables,
+      contentFingerprint,
+    });
+  }
+
+  private async savePreviewPackCache(
+    batch: ChatIntegrationBatchEntity,
+    stageName: string,
+    stageKey: string | undefined,
+    deliverables: ForgeDeliverableKind[],
+    pack: ChangePromotionPackV1,
+  ): Promise<void> {
+    const hash = await this.previewParamsHash(batch, stageName, stageKey, deliverables);
+    const serialized = JSON.parse(JSON.stringify(pack)) as Record<string, unknown>;
+    batch.forgePreviewParamsHash = hash;
+    batch.forgePreviewPack = serialized;
+    await this.batches.save(batch);
+  }
+
+  private async resolveEnrichedPackForPromotion(
+    batch: ChatIntegrationBatchEntity,
+    stageName: string,
+    stageKey: string | undefined,
+    deliverables: ForgeDeliverableKind[],
+  ): Promise<{ pack: ChangePromotionPackV1; fromPreviewCache: boolean }> {
+    const hash = await this.previewParamsHash(batch, stageName, stageKey, deliverables);
+    if (
+      batch.forgePreviewParamsHash === hash &&
+      batch.forgePreviewPack &&
+      typeof batch.forgePreviewPack === 'object'
+    ) {
+      return { pack: batch.forgePreviewPack as unknown as ChangePromotionPackV1, fromPreviewCache: true };
+    }
+
+    this.logger.log(`promoteBatch ${batch.id}: rebuilding merged pack (preview cache miss)`);
+    const merged = await this.buildMergedPack(batch, stageName, stageKey, deliverables);
+    const { pack } = await this.cursorTasks.enrichPack(merged);
+    await this.savePreviewPackCache(batch, stageName, stageKey, deliverables, pack);
+    return { pack, fromPreviewCache: false };
   }
 
   private async buildMergedPack(
