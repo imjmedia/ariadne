@@ -4,6 +4,7 @@
  */
 
 import { HttpException, Injectable, Logger } from '@nestjs/common';
+import { LlmContextLengthError } from 'ariadne-common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { IndexedFile } from '../repositories/entities/indexed-file.entity';
@@ -3710,26 +3711,76 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
   private throwOrchestratorFailure(res: Response, bodyText: string): never {
     const status = res.status;
     const msg = bodyText?.trim() || res.statusText || 'upstream error';
+    let parsed: Record<string, unknown> | null = null;
+    try {
+      parsed = JSON.parse(msg) as Record<string, unknown>;
+    } catch {
+      parsed = null;
+    }
+    const parsedMessage =
+      typeof parsed?.message === 'string'
+        ? parsed.message
+        : typeof parsed?.message === 'object' && parsed?.message != null
+          ? JSON.stringify(parsed.message)
+          : msg;
+    const parsedCode = typeof parsed?.code === 'string' ? parsed.code : undefined;
+    const parsedError = typeof parsed?.error === 'string' ? parsed.error : undefined;
+
     if (status === 429) {
       throw new HttpException(
-        { code: 'ORCHESTRATOR_RATE_LIMIT', message: msg, upstream: 'orchestrator' },
+        { code: 'ORCHESTRATOR_RATE_LIMIT', message: parsedMessage, upstream: 'orchestrator' },
         429,
       );
     }
     if (status === 401 || status === 403) {
       throw new HttpException(
-        { code: 'ORCHESTRATOR_LLM_AUTH', message: msg, upstream: 'orchestrator' },
+        { code: 'ORCHESTRATOR_LLM_AUTH', message: parsedMessage, upstream: 'orchestrator' },
         status,
+      );
+    }
+    if (
+      status === 413 ||
+      parsedCode === 'LLM_CONTEXT_LENGTH_EXCEEDED' ||
+      parsedError === 'LlmContextLengthError'
+    ) {
+      throw new HttpException(
+        {
+          code: 'ORCHESTRATOR_LLM_CONTEXT_LENGTH',
+          message: parsedMessage,
+          upstream: 'orchestrator',
+          model: parsed?.model,
+          maxContextTokens: parsed?.maxContextTokens,
+          requestedTokens: parsed?.requestedTokens,
+        },
+        413,
       );
     }
     if (status === 503) {
       throw new HttpException(
-        { code: 'ORCHESTRATOR_UPSTREAM_UNAVAILABLE', message: msg, upstream: 'orchestrator' },
+        { code: 'ORCHESTRATOR_UPSTREAM_UNAVAILABLE', message: parsedMessage, upstream: 'orchestrator' },
         503,
       );
     }
     const mapped = status >= 400 && status < 600 ? status : 502;
-    throw new HttpException({ code: 'ORCHESTRATOR_ERROR', message: msg, upstream: 'orchestrator' }, mapped);
+    throw new HttpException(
+      { code: 'ORCHESTRATOR_ERROR', message: parsedMessage, upstream: 'orchestrator' },
+      mapped,
+    );
+  }
+
+  private throwIfLlmContextLength(err: unknown): void {
+    if (!(err instanceof LlmContextLengthError)) return;
+    throw new HttpException(
+      {
+        code: 'LLM_CONTEXT_LENGTH_EXCEEDED',
+        error: 'LlmContextLengthError',
+        message: err.message,
+        model: err.model,
+        maxContextTokens: err.maxContextTokens,
+        requestedTokens: err.requestedTokens,
+      },
+      413,
+    );
   }
 
   /**
@@ -3757,6 +3808,7 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       } catch (err) {
         recordChatPipelineError();
         if (err instanceof HttpException) throw err;
+        this.throwIfLlmContextLength(err);
         const msg = err instanceof Error ? err.message : String(err);
         return { answer: `Error: ${msg}` };
       }
@@ -3809,6 +3861,8 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       return result;
     } catch (err) {
       recordChatPipelineError();
+      if (err instanceof HttpException) throw err;
+      this.throwIfLlmContextLength(err);
       const msg = err instanceof Error ? err.message : String(err);
       return { answer: `Error: ${msg}` };
     }
@@ -3839,6 +3893,7 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
       } catch (err) {
         recordChatPipelineError();
         if (err instanceof HttpException) throw err;
+        this.throwIfLlmContextLength(err);
         const msg = err instanceof Error ? err.message : String(err);
         return { answer: `Error: ${msg}` };
       }

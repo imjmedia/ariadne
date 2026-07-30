@@ -9,6 +9,7 @@ import type { ChatScope } from './chat-scope.util';
 import { IngestChatClient } from './ingest-chat.client';
 import { OrchestratorLlmService } from './orchestrator-llm.service';
 import type { LlmMessage } from '../llm/orchestrator-llm.facade';
+import { LlmContextLengthError } from 'ariadne-common';
 import { isMoonshotRateLimitError } from '../llm/moonshot-rate-limit.error';
 import { isLlmAuthError } from '../llm/llm-auth.error';
 import { RedisStateService } from '../redis-state/redis-state.service';
@@ -235,6 +236,22 @@ export class CodebaseChatService {
             message: err.message,
           },
           HttpStatus.UNAUTHORIZED,
+        );
+      }
+      const contextLengthErr =
+        err instanceof LlmContextLengthError ? err : null;
+      if (contextLengthErr) {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+            error: 'LlmContextLengthError',
+            code: 'LLM_CONTEXT_LENGTH_EXCEEDED',
+            message: contextLengthErr.message,
+            model: contextLengthErr.model,
+            maxContextTokens: contextLengthErr.maxContextTokens,
+            requestedTokens: contextLengthErr.requestedTokens,
+          },
+          HttpStatus.PAYLOAD_TOO_LARGE,
         );
       }
       throw err;

@@ -47,6 +47,7 @@ export function ChatPageHeader(props: {
   projectId?: string | null;
   onHandoffsImported?: (result: ImportIntegrationHandoffsResponse) => void;
   handoffAnalysisPending?: boolean;
+  handoffAnalysisRetry?: boolean;
   onRunHandoffAnalysis?: () => void;
   batchHandoffPendingCount?: number;
   onRunBatchHandoffAnalysis?: () => void;
@@ -181,8 +182,10 @@ export function ChatPageHeader(props: {
             title="Enviar el handoff al pipeline de chat de Ariadne"
           >
             <Play className="size-4 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">Ejecutar análisis</span>
-            <span className="sm:hidden">Análisis</span>
+            <span className="hidden sm:inline">
+              {props.handoffAnalysisRetry ? 'Reintentar análisis' : 'Ejecutar análisis'}
+            </span>
+            <span className="sm:hidden">{props.handoffAnalysisRetry ? 'Reintentar' : 'Análisis'}</span>
           </Button>
         ) : null}
 

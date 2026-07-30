@@ -86,3 +86,12 @@ export {
   wantsReengineeringQuestion,
   wantsSchemaDatabaseQuestion,
 } from './chat-schema-question.util.js';
+export {
+  LlmContextLengthError,
+  buildLlmContextLengthMessage,
+  extractOpenRouterProviderMessage,
+  isContextLengthProviderMessage,
+  isLlmContextLengthError,
+  mapOpenRouterHttpError,
+  parseContextLengthFromMessage,
+} from './llm-openrouter-error.util.js';

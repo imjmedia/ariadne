@@ -24,7 +24,9 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 - Botón **Handoffs** en cabecera: lista proyectos **NEW** de The Forge con `integrationHandoff` y crea un chat por cada item `sent`.
 - Tras importar, se **ejecuta automáticamente** el pipeline de chat (mismo flujo que Enviar) en cada handoff nuevo.
 - Si un handoff quedó solo con el mensaje semilla (`1 msg`), usa **Análisis (N)** en lote o **Ejecutar análisis** en el chat activo.
+- Tras un fallo (`Error: …` en la burbuja), el botón pasa a **Reintentar análisis** (los errores de handoff no cuentan como respuesta válida).
 - Sidebar agrupa esos chats bajo **Integración — {proyecto NEW}**; el resto queda en **General**.
+- **Papelera** en cada chat (siempre visible al seleccionarlo) y en el encabezado del grupo para borrar el lote completo (`DELETE /integration-batches/:id`).
 - **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY vinculado al proyecto Ariadne (no promueve chat a chat).
 - Re-importar omite handoffs ya presentes en el lote.
 
@@ -33,7 +35,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 - Tablas Postgres: `chat_conversations`, `chat_messages` (ingest).
 - API: `GET/POST /repositories/:id/conversations`, `GET/POST /projects/:id/conversations`, `GET/POST/DELETE /conversations/:id/...`.
 - Cada hilo es independiente: cambiar de chat no mezcla memoria LLM (`history[]` se reconstruye solo desde ese hilo).
-- Título auto desde el primer mensaje del usuario; eliminar con icono papelera (confirmación).
+- Título auto desde el primer mensaje del usuario; eliminar con icono papelera (confirmación). En grupos de integración, papelera en el encabezado del grupo elimina todos los chats del lote.
 
 ## Componentes
 

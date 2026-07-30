@@ -159,6 +159,17 @@ export class ChatIntegrationHandoffService {
     return this.toBatchDto(batch, conversationCount);
   }
 
+  async deleteBatch(actor: CredentialActor, batchId: string): Promise<void> {
+    const batch = await this.getOwnedBatch(actor, batchId);
+    const conversationRows = await this.conversations.find({
+      where: { integrationBatchId: batch.id },
+    });
+    if (conversationRows.length > 0) {
+      await this.conversations.remove(conversationRows);
+    }
+    await this.batches.remove(batch);
+  }
+
   async findBatchForConversation(
     actor: CredentialActor,
     conversationId: string,

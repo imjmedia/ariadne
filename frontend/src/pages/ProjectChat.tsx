@@ -22,10 +22,14 @@ import { ChatMessageThread } from './RepoChat/ChatMessageThread';
 import { ChatPageHeader } from './RepoChat/ChatPageHeader';
 import { ChatProjectScopeOptions } from './RepoChat/ChatProjectScopeOptions';
 import {
-  conversationAwaitingHandoffAnalysis,
-  countBatchPendingHandoffAnalysis,
+  conversationNeedsHandoffAnalysis,
+  countBatchNeedingHandoffAnalysis,
   extractLastUserPrompt,
+  handoffAnalysisNeedsRetry,
+  hasSuccessfulHandoffAssistant,
   mapConversationMessages,
+  normalizeHandoffThreadMessages,
+  stripHandoffFailureAssistants,
 } from './RepoChat/handoff-chat-analysis.util';
 import { useChatPersistence } from './RepoChat/useChatPersistence';
 import { useTheForgeChatPromotion } from './RepoChat/useTheForgeChatPromotion';
@@ -74,6 +78,7 @@ export function ProjectChat() {
     persistenceError,
     selectConversation,
     deleteConversation,
+    deleteIntegrationBatch,
     startNewConversation,
     ensureActiveConversation,
     persistMessage,
@@ -248,13 +253,16 @@ export function ProjectChat() {
       }
 
       const rows = await api.getConversationMessages(conversationId);
-      const threadMessages = mapConversationMessages(rows);
-      const prompt = extractLastUserPrompt(threadMessages);
-      if (!prompt || threadMessages.some((m) => m.role === 'assistant')) return;
+      const threadMessages = normalizeHandoffThreadMessages(mapConversationMessages(rows));
+      if (hasSuccessfulHandoffAssistant(threadMessages)) return;
+
+      const analysisThread = stripHandoffFailureAssistants(threadMessages);
+      const prompt = extractLastUserPrompt(analysisThread);
+      if (!prompt) return;
 
       setError(null);
       if (conversationId === activeConversationId || opts?.selectFirst) {
-        setMessages(threadMessages);
+        setMessages(analysisThread);
       }
 
       try {
@@ -265,7 +273,7 @@ export function ProjectChat() {
           persistUserMessage: false,
           syncUiMessages:
             conversationId === activeConversationId || opts?.selectFirst
-              ? threadMessages
+              ? analysisThread
               : undefined,
         });
       } catch (e) {
@@ -273,14 +281,6 @@ export function ProjectChat() {
         setError(message);
         if (conversationId === activeConversationId || opts?.selectFirst) {
           setMessages((m) => [...m, { role: 'assistant', content: `Error: ${message}` }]);
-        }
-        try {
-          await persistMessage(conversationId, {
-            role: 'assistant',
-            content: `Error: ${message}`,
-          });
-        } catch {
-          /* ignore */
         }
       }
     },
@@ -290,7 +290,6 @@ export function ProjectChat() {
       activeConversationId,
       selectConversation,
       executeChatTurn,
-      persistMessage,
       setMessages,
     ],
   );
@@ -418,7 +417,7 @@ export function ProjectChat() {
         (c) =>
           c.integrationBatchId === integrationBatchId &&
           c.integrationHandoffId &&
-          c.messageCount === 1,
+          (c.messageCount === 1 || c.messageCount === 2),
       )
       .map((c) => c.id);
     void runHandoffAnalysisBatch(pending, { initialSelectId: activeConversationId });
@@ -494,9 +493,15 @@ export function ProjectChat() {
   const analysisPending = Boolean(analysisResult || loadingAnalysis || analysisError);
   const codeAnalysisDisabled = repoCount === 0 || (repoCount > 1 && !selectedRepoId);
   const chatBusy = loading || messagesLoading || conversationsLoading || handoffAnalysisRunning;
-  const handoffAnalysisPending = conversationAwaitingHandoffAnalysis(activeConversation, messages);
+  const handoffAnalysisPending = conversationNeedsHandoffAnalysis(activeConversation, messages);
+  const handoffAnalysisRetry = handoffAnalysisPending && handoffAnalysisNeedsRetry(messages);
   const batchHandoffPendingCount = integrationBatchId
-    ? countBatchPendingHandoffAnalysis(conversations, integrationBatchId)
+    ? countBatchNeedingHandoffAnalysis(
+        conversations,
+        integrationBatchId,
+        activeConversationId,
+        messages,
+      )
     : 0;
 
   return (
@@ -508,6 +513,7 @@ export function ProjectChat() {
         onSelect={(conversationId) => void selectConversation(conversationId)}
         onCreate={() => void handleNewConversation()}
         onDelete={(conversationId) => void deleteConversation(conversationId)}
+        onDeleteBatch={(batchId) => void deleteIntegrationBatch(batchId)}
         mobileOpen={historyOpen}
         onMobileOpenChange={setHistoryOpen}
       />
@@ -550,6 +556,7 @@ export function ProjectChat() {
         projectId={projectId ?? null}
         onHandoffsImported={handleHandoffsImported}
         handoffAnalysisPending={handoffAnalysisPending}
+        handoffAnalysisRetry={handoffAnalysisRetry}
         onRunHandoffAnalysis={runActiveHandoffAnalysis}
         batchHandoffPendingCount={batchHandoffPendingCount}
         onRunBatchHandoffAnalysis={runBatchHandoffAnalysis}

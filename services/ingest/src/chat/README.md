@@ -42,6 +42,8 @@ Si **`ORCHESTRATOR_URL`** está definido (p. ej. `http://orchestrator:3001` en D
 
 Si el orchestrator responde **HTTP 429** (cuota Moonshot/Kimi TPM tras reintentos), el proxy **repropaga 429** con body JSON (`code: ORCHESTRATOR_RATE_LIMIT`) en lugar de devolver **200** con `answer: "Error: orchestrator …"`.
 
+Si el orchestrator responde **HTTP 413** (contexto LLM excedido), el proxy **repropaga 413** con `code: ORCHESTRATOR_LLM_CONTEXT_LENGTH` y mensaje en español (modelo inadecuado / reducir alcance).
+
 Sin `ORCHESTRATOR_URL`, el pipeline unificado legacy sigue en este servicio (`runUnifiedPipeline` + `ChatRetrieverToolsService`).
 
 ## API

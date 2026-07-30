@@ -27,3 +27,5 @@ START → route_intent (modelo router en Ajustes)
 Variables: `INGEST_URL`, y **`LLM_*`** (u opciones legacy) — preguntas de modification-plan y síntesis de analyze/chat. **`CHAT_TOOL_CALL_MAX_TOKENS`** (default 8192): `max_tokens` en la fase retrieve con tools (misma semántica que en ingest). Ver [../llm/README.md](../llm/README.md).
 
 **429 Moonshot/Kimi:** si el proveedor LLM agota reintentos por TPM, este módulo responde **`HttpException` 429** en `POST /codebase/chat/*` (no 500). El ingest debe reenviar ese status a MCP/The Forge para no confundirlo con timeout.
+
+**413 contexto LLM:** si OpenRouter rechaza la petición por ventana de contexto (`maximum context length`), responde **`HttpException` 413** con `code: LLM_CONTEXT_LENGTH_EXCEEDED` y mensaje accionable (cambiar modelo o reducir alcance).

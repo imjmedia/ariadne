@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/api';
 import type { ChatConversation } from '@/types';
 import type { ChatMessage } from './ChatMessageThread';
+import { normalizeHandoffThreadMessages } from './handoff-chat-analysis.util';
 
 export type ChatPersistenceScope =
   | { kind: 'repository'; id: string }
@@ -16,12 +17,15 @@ function activeStorageKey(scope: ChatPersistenceScope): string {
 
 function toUiMessages(
   rows: Awaited<ReturnType<typeof api.getConversationMessages>>,
+  integrationHandoffId?: string | null,
 ): ChatMessage[] {
-  return rows.map((m) => ({
+  const mapped = rows.map((m) => ({
     role: m.role,
     content: m.content,
     ...(m.cypher ? { cypher: m.cypher } : {}),
   }));
+  if (!integrationHandoffId) return mapped;
+  return normalizeHandoffThreadMessages(mapped);
 }
 
 export function useChatPersistence(scope: ChatPersistenceScope | null) {
@@ -53,11 +57,15 @@ export function useChatPersistence(scope: ChatPersistenceScope | null) {
     return created;
   }, [scope]);
 
-  const loadMessages = useCallback(async (conversationId: string) => {
+  const loadMessages = useCallback(async (conversationId: string, integrationHandoffId?: string | null) => {
     setMessagesLoading(true);
     try {
       const rows = await api.getConversationMessages(conversationId);
-      setMessages(toUiMessages(rows));
+      const handoffId =
+        integrationHandoffId ??
+        conversations.find((c) => c.id === conversationId)?.integrationHandoffId ??
+        null;
+      setMessages(toUiMessages(rows, handoffId));
       setPersistenceError(null);
     } catch (e) {
       setPersistenceError(e instanceof Error ? e.message : String(e));
@@ -65,16 +73,17 @@ export function useChatPersistence(scope: ChatPersistenceScope | null) {
     } finally {
       setMessagesLoading(false);
     }
-  }, []);
+  }, [conversations]);
 
   const selectConversation = useCallback(
     async (conversationId: string) => {
       if (!scope || conversationId === activeConversationId) return;
+      const handoffId = conversations.find((c) => c.id === conversationId)?.integrationHandoffId ?? null;
       setActiveConversationId(conversationId);
       sessionStorage.setItem(activeStorageKey(scope), conversationId);
-      await loadMessages(conversationId);
+      await loadMessages(conversationId, handoffId);
     },
-    [scope, activeConversationId, loadMessages],
+    [scope, activeConversationId, conversations, loadMessages],
   );
 
   const deleteConversation = useCallback(
@@ -84,6 +93,41 @@ export function useChatPersistence(scope: ChatPersistenceScope | null) {
       setConversations(remaining);
 
       if (activeConversationId !== conversationId) return;
+
+      if (remaining.length > 0) {
+        const next = remaining[0];
+        setActiveConversationId(next.id);
+        if (scope) sessionStorage.setItem(activeStorageKey(scope), next.id);
+        await loadMessages(next.id);
+      } else {
+        setActiveConversationId(null);
+        if (scope) sessionStorage.removeItem(activeStorageKey(scope));
+        setMessages([]);
+        const created = await createConversation();
+        setActiveConversationId(created.id);
+      }
+    },
+    [conversations, activeConversationId, scope, loadMessages, createConversation],
+  );
+
+  const deleteIntegrationBatch = useCallback(
+    async (batchId: string) => {
+      const inBatch = conversations.filter((c) => c.integrationBatchId === batchId);
+      if (inBatch.length === 0) return;
+
+      const label = inBatch[0]?.integrationBatchLabel?.trim() || 'Integración';
+      const confirmed = window.confirm(
+        `¿Eliminar el grupo «${label}» y sus ${inBatch.length} chat${inBatch.length === 1 ? '' : 's'}? Podrás volver a importar los handoffs desde The Forge.`,
+      );
+      if (!confirmed) return;
+
+      await api.deleteIntegrationBatch(batchId);
+      const deletingActive = inBatch.some((c) => c.id === activeConversationId);
+      const remaining = conversations.filter((c) => c.integrationBatchId !== batchId);
+      setConversations(remaining);
+      setPersistenceError(null);
+
+      if (!deletingActive) return;
 
       if (remaining.length > 0) {
         const next = remaining[0];
@@ -156,9 +200,10 @@ export function useChatPersistence(scope: ChatPersistenceScope | null) {
           (list[0]?.id ?? null);
 
         if (initialId) {
+          const initial = list.find((c) => c.id === initialId);
           setActiveConversationId(initialId);
           sessionStorage.setItem(activeStorageKey(scope), initialId);
-          await loadMessages(initialId);
+          await loadMessages(initialId, initial?.integrationHandoffId ?? null);
         } else {
           const created = await createConversation();
           setActiveConversationId(created.id);
@@ -198,6 +243,7 @@ export function useChatPersistence(scope: ChatPersistenceScope | null) {
     persistenceError,
     selectConversation,
     deleteConversation,
+    deleteIntegrationBatch,
     startNewConversation,
     ensureActiveConversation,
     persistMessage,
