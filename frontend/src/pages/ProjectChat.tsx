@@ -262,6 +262,25 @@ export function ProjectChat() {
     activeConversationId,
   ]);
 
+  const activeConversation = conversations.find((c) => c.id === activeConversationId);
+  const integrationBatchId = activeConversation?.integrationBatchId ?? null;
+  const integrationBatchLabel = activeConversation?.integrationBatchLabel ?? null;
+
+  const handleHandoffsImported = useCallback(
+    async (result: ImportIntegrationHandoffsResponse) => {
+      const list = await reloadConversations();
+      const firstCreated = result.created[0]?.conversationId;
+      const targetId =
+        (firstCreated && list.some((c) => c.id === firstCreated) ? firstCreated : null) ??
+        list.find((c) => c.integrationBatchId === result.batchId)?.id ??
+        null;
+      if (targetId) {
+        await selectConversation(targetId);
+      }
+    },
+    [reloadConversations, selectConversation],
+  );
+
   function handleChatKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -325,24 +344,6 @@ export function ProjectChat() {
   const analysisPending = Boolean(analysisResult || loadingAnalysis || analysisError);
   const codeAnalysisDisabled = repoCount === 0 || (repoCount > 1 && !selectedRepoId);
   const chatBusy = loading || messagesLoading || conversationsLoading;
-  const activeConversation = conversations.find((c) => c.id === activeConversationId);
-  const integrationBatchId = activeConversation?.integrationBatchId ?? null;
-  const integrationBatchLabel = activeConversation?.integrationBatchLabel ?? null;
-
-  const handleHandoffsImported = useCallback(
-    async (result: ImportIntegrationHandoffsResponse) => {
-      const list = await reloadConversations();
-      const firstCreated = result.created[0]?.conversationId;
-      const targetId =
-        (firstCreated && list.some((c) => c.id === firstCreated) ? firstCreated : null) ??
-        list.find((c) => c.integrationBatchId === result.batchId)?.id ??
-        null;
-      if (targetId) {
-        await selectConversation(targetId);
-      }
-    },
-    [reloadConversations, selectConversation],
-  );
 
   return (
     <div className={chatPageSplitClass}>
