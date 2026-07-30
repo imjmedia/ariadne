@@ -16,6 +16,7 @@ export function ChatConversationsPanel(props: {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onDeleteBatch?: (batchId: string) => void;
   mobileOpen: boolean;
   onMobileOpenChange: (open: boolean) => void;
 }) {
@@ -31,6 +32,7 @@ export function ChatConversationsPanel(props: {
     onSelect: handleSelect,
     onCreate: props.onCreate,
     onDelete: props.onDelete,
+    onDeleteBatch: props.onDeleteBatch,
   };
 
   return (

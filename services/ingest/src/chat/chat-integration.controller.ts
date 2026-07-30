@@ -1,7 +1,7 @@
 /**
  * @fileoverview Importación de handoffs NEW-LEG y promoción batch a The Forge.
  */
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Post } from '@nestjs/common';
 import { actorFromHeaders } from '../credentials/credential-actor';
 import {
   ChatIntegrationHandoffService,
@@ -44,6 +44,14 @@ export class IntegrationBatchesController {
     @Headers() headers: Record<string, string | string[] | undefined>,
   ) {
     return this.service.getBatch(actorFromHeaders(headers), batchId);
+  }
+
+  @Delete(':batchId')
+  deleteBatch(
+    @Param('batchId') batchId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.service.deleteBatch(actorFromHeaders(headers), batchId);
   }
 
   @Post(':batchId/preview-theforge-pack')

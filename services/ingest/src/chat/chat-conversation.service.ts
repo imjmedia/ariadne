@@ -188,7 +188,14 @@ export class ChatConversationService {
 
   async remove(actor: CredentialActor, conversationId: string): Promise<void> {
     const conversation = await this.getOwnedConversation(actor, conversationId);
+    const batchId = conversation.integrationBatchId;
     await this.conversations.remove(conversation);
+    if (batchId) {
+      const remaining = await this.conversations.count({ where: { integrationBatchId: batchId } });
+      if (remaining === 0) {
+        await this.integrationBatches.delete({ id: batchId });
+      }
+    }
   }
 
   private async getOwnedConversation(

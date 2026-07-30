@@ -391,6 +391,9 @@ export const api = {
       `/conversations/${conversationId}/integration-batch`,
     ),
 
+  deleteIntegrationBatch: (batchId: string) =>
+    request<void>(`/integration-batches/${batchId}`, { method: 'DELETE' }),
+
   previewIntegrationBatchTheForgePack: (
     batchId: string,
     body: Partial<import('./types').PromoteToTheForgeRequest>,

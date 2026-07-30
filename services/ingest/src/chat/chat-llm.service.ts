@@ -3,6 +3,7 @@
  */
 import { Injectable } from '@nestjs/common';
 import { ingestChatLlmModel } from './chat-llm-config';
+import { mapOpenRouterHttpError } from 'ariadne-common';
 import {
   llmDefaultHeaders,
   resolveLlmApiKey,
@@ -54,6 +55,8 @@ export class ChatLlmService {
 
     if (!res.ok) {
       const err = await res.text();
+      const mapped = mapOpenRouterHttpError(res.status, err, ingestChatLlmModel());
+      if (mapped) throw mapped;
       throw new Error(`OpenRouter API ${res.status}: ${err}`);
     }
 
@@ -91,7 +94,12 @@ export class ChatLlmService {
       }),
     });
 
-    if (!res.ok) throw new Error(`OpenRouter API ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      const err = await res.text();
+      const mapped = mapOpenRouterHttpError(res.status, err, ingestChatLlmModel());
+      if (mapped) throw mapped;
+      throw new Error(`OpenRouter API ${res.status}: ${err}`);
+    }
 
     const data = (await res.json()) as {
       choices?: Array<{

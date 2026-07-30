@@ -75,7 +75,12 @@ function ConversationRow(props: {
         type="button"
         variant="ghost"
         size="icon"
-        className="absolute right-1 top-1/2 size-7 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        className={cn(
+          'absolute right-1 top-1/2 size-7 -translate-y-1/2 text-[var(--foreground-muted)] hover:text-[var(--destructive)]',
+          active
+            ? 'opacity-80 hover:opacity-100'
+            : 'opacity-50 group-hover:opacity-100 group-focus-within:opacity-100',
+        )}
         onClick={(e) => {
           e.stopPropagation();
           if (window.confirm('¿Eliminar esta conversación?')) props.onDelete(c.id);
@@ -89,6 +94,33 @@ function ConversationRow(props: {
   );
 }
 
+function IntegrationGroupHeader(props: {
+  label: string;
+  chatCount: number;
+  onDeleteBatch?: () => void;
+}) {
+  return (
+    <div className="mb-1.5 flex items-start gap-1 px-1">
+      <p className="min-w-0 flex-1 px-1 text-[10px] font-semibold uppercase leading-snug tracking-wide text-[var(--primary)]">
+        {props.label}
+      </p>
+      {props.onDeleteBatch ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-6 shrink-0 text-[var(--foreground-muted)] hover:text-[var(--destructive)]"
+          onClick={props.onDeleteBatch}
+          title={`Eliminar grupo (${props.chatCount} chat${props.chatCount === 1 ? '' : 's'})`}
+        >
+          <Trash2 className="size-3" aria-hidden />
+          <span className="sr-only">Eliminar grupo de integración</span>
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 export function ChatConversationsSidebar(props: {
   conversations: ChatConversation[];
   activeConversationId: string | null;
@@ -96,6 +128,7 @@ export function ChatConversationsSidebar(props: {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onDeleteBatch?: (batchId: string) => void;
   className?: string;
 }) {
   const { integrationGroups, general } = groupConversations(props.conversations);
@@ -135,9 +168,15 @@ export function ChatConversationsSidebar(props: {
           <div className="space-y-4">
             {integrationGroups.map((group) => (
               <section key={group.batchId}>
-                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--primary)]">
-                  {group.label}
-                </p>
+                <IntegrationGroupHeader
+                  label={group.label}
+                  chatCount={group.items.length}
+                  onDeleteBatch={
+                    props.onDeleteBatch
+                      ? () => props.onDeleteBatch?.(group.batchId)
+                      : undefined
+                  }
+                />
                 <ul className="space-y-1">
                   {group.items.map((c) => (
                     <ConversationRow

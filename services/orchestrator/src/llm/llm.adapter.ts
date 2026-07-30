@@ -1,3 +1,4 @@
+import { extractOpenRouterProviderMessage, mapOpenRouterHttpError } from 'ariadne-common';
 import { orchestratorLlmModel, orchestratorLlmRouterModel, orchestratorLlmWorkerModel } from './orchestrator-llm-config';
 import {
   llmDefaultHeaders,
@@ -7,6 +8,19 @@ import {
 } from './llm-config';
 import { ensureOrchestratorLlmRuntime } from './llm-settings.client';
 import { LlmAuthError } from './llm-auth.error';
+import { MoonshotRateLimitError } from './moonshot-rate-limit.error';
+
+function throwMappedOpenRouterError(status: number, bodyText: string, model: string): never {
+  const mapped = mapOpenRouterHttpError(status, bodyText, model);
+  if (mapped) throw mapped;
+  if (status === 429) {
+    const msg = extractOpenRouterProviderMessage(bodyText);
+    throw new MoonshotRateLimitError(
+      `Límite de tasa del proveedor LLM (429) en modelo «${model}». ${msg.slice(0, 400)}`,
+    );
+  }
+  throw new Error(`OpenRouter API ${status}: ${bodyText}`);
+}
 
 export type LlmMessage =
   | { role: 'user' | 'assistant' | 'system'; content: string }
@@ -76,7 +90,13 @@ export async function callLlm(
         `LLM auth failed (${res.status}) en modelo \`${model}\`: revisa API key (Ajustes → Proveedores IA) y que el orchestrator lea ingest (INGEST_URL). ${err.slice(0, 280)}`,
       );
     }
-    throw new Error(`OpenRouter API ${res.status}: ${err}`);
+    if (res.status === 429) {
+      const msg = extractOpenRouterProviderMessage(err);
+      throw new MoonshotRateLimitError(
+        `Límite de tasa del proveedor LLM (429) en modelo «${model}». ${msg.slice(0, 400)}`,
+      );
+    }
+    throwMappedOpenRouterError(res.status, err, model);
   }
 
   const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
@@ -117,7 +137,13 @@ export async function callLlmWithTools(
         `LLM auth failed (${res.status}) en modelo \`${model}\`: revisa API key (Ajustes → Proveedores IA) y que el orchestrator lea ingest (INGEST_URL). ${errText.slice(0, 280)}`,
       );
     }
-    throw new Error(`OpenRouter API ${res.status}: ${errText}`);
+    if (res.status === 429) {
+      const msg = extractOpenRouterProviderMessage(errText);
+      throw new MoonshotRateLimitError(
+        `Límite de tasa del proveedor LLM (429) en modelo «${model}». ${msg.slice(0, 400)}`,
+      );
+    }
+    throwMappedOpenRouterError(res.status, errText, model);
   }
 
   const data = (await res.json()) as {
