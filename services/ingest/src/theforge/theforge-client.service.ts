@@ -16,6 +16,10 @@ import {
 import { toForgeCreateStageApiBody } from './forge-create-stage.mapper';
 import { forgeErrorMessage, forgeIntegrationFetch, readForgeJsonBody } from './forge-http.util';
 import { forgeMcpCallToolJson } from './forge-mcp.util';
+import {
+  FORGE_CREATE_STAGE_TIMEOUT_MS,
+  FORGE_REQUEST_TIMEOUT_MS,
+} from './forge-timeout.constants';
 import { TheForgeIntegrationService } from './theforge-integration.service';
 import type { TheForgeIntegrationEffective } from './theforge-integration.types';
 
@@ -89,7 +93,7 @@ export class TheForgeClientHttp extends TheForgeClient {
     const res = await forgeIntegrationFetch(cfg, '/theforge/resolve-forge-project-for-ariadne', {
       method: 'POST',
       body: JSON.stringify(input),
-    });
+    }, { timeoutMs: FORGE_REQUEST_TIMEOUT_MS });
     const body = await readForgeJsonBody(res);
 
     if (res.status === 404) {
@@ -121,27 +125,38 @@ export class TheForgeClientHttp extends TheForgeClient {
   async createStageFromChangePack(
     input: CreateStageFromPackInput,
   ): Promise<CreateStageFromPackResult> {
-    const cfg = await this.integration.getEffective();
-    if (cfg.transport === 'mcp' && cfg.mcpUrl) {
-      return this.createStageViaMcp(cfg, input);
-    }
-    const payload = toForgeCreateStageApiBody(input);
-    const res = await forgeIntegrationFetch(cfg, '/theforge/create-stage-from-ariadne-change-pack', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    const body = await readForgeJsonBody(res);
+    try {
+      const cfg = await this.integration.getEffective();
+      if (cfg.transport === 'mcp' && cfg.mcpUrl) {
+        return this.createStageViaMcp(cfg, input);
+      }
+      const payload = toForgeCreateStageApiBody(input);
+      const res = await forgeIntegrationFetch(cfg, '/theforge/create-stage-from-ariadne-change-pack', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }, { timeoutMs: FORGE_CREATE_STAGE_TIMEOUT_MS });
+      const body = await readForgeJsonBody(res);
 
-    if (!res.ok) {
-      this.logger.warn(`create-stage-from-ariadne-change-pack → HTTP ${res.status}`);
-      throw new ServiceUnavailableException({
-        code: 'FORGE_CREATE_STAGE_FAILED',
-        message: forgeErrorMessage(body, `Forge create stage failed (${res.status})`),
-        status: res.status,
-      });
-    }
+      if (!res.ok) {
+        this.logger.warn(`create-stage-from-ariadne-change-pack → HTTP ${res.status}`);
+        throw new ServiceUnavailableException({
+          code: 'FORGE_CREATE_STAGE_FAILED',
+          message: forgeErrorMessage(body, `Forge create stage failed (${res.status})`),
+          status: res.status,
+        });
+      }
 
-    return this.parseCreateStageResponse(body, input, cfg.apiUrl ?? cfg.mcpUrl ?? '');
+      return this.parseCreateStageResponse(body, input, cfg.apiUrl ?? cfg.mcpUrl ?? '');
+    } catch (err) {
+      if (err instanceof Error && err.name === 'TimeoutError') {
+        throw new ServiceUnavailableException({
+          code: 'FORGE_CREATE_STAGE_TIMEOUT',
+          message:
+            'The Forge tardó demasiado en crear la etapa (timeout). Revisa logs de Forge o reintenta en unos minutos.',
+        });
+      }
+      throw err;
+    }
   }
 
   private async resolveProjectViaMcp(
@@ -184,6 +199,7 @@ export class TheForgeClientHttp extends TheForgeClient {
       cfg,
       'create_stage_from_ariadne_change_pack',
       payload as unknown as Record<string, unknown>,
+      { timeoutMs: FORGE_CREATE_STAGE_TIMEOUT_MS },
     );
     return this.parseCreateStageResponse(body, input, cfg.mcpUrl ?? '');
   }

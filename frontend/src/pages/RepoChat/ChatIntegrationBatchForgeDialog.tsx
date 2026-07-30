@@ -148,7 +148,9 @@ export function ChatIntegrationBatchForgeDialog(props: {
   };
 
   const busy = previewLoading || promoteLoading;
-  const canPromote = Boolean(props.batchId) && !props.disabled && !busy && !successResult;
+  const previewReady = Boolean(preview) && !previewStale;
+  const canPromote =
+    Boolean(props.batchId) && !props.disabled && !busy && !successResult && previewReady;
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -255,7 +257,11 @@ export function ChatIntegrationBatchForgeDialog(props: {
               <ForgePromoteProgressPanel
                 progress={forgeProgress.progress}
                 stepLabel={forgeProgress.stepLabel}
-                hint="Fusionando packs y creando la etapa en The Forge…"
+                hint={
+                  forgeProgress.progress >= 92
+                    ? 'Creando la etapa en The Forge… puede tardar varios minutos con lotes grandes. No cierres esta ventana.'
+                    : 'Enviando el pack fusionado a The Forge…'
+                }
               />
             ) : null}
             {error ? (
@@ -278,7 +284,11 @@ export function ChatIntegrationBatchForgeDialog(props: {
                 Cancelar
               </Button>
               <Button type="button" disabled={!canPromote} onClick={() => void runPromote()}>
-                {promoteLoading ? 'Enviando…' : 'Enviar lote a The Forge'}
+                {promoteLoading
+                  ? 'Enviando…'
+                  : !previewReady
+                    ? 'Aplicar cambios primero'
+                    : 'Enviar lote a The Forge'}
               </Button>
             </>
           )}

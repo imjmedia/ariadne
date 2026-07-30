@@ -120,7 +120,8 @@ export function mergeChangePromotionPacks(input: {
     generatedAt: new Date().toISOString(),
     ariadne: {
       ...base.ariadne,
-      conversationId: `batch:${batchId}`,
+      /** Forge contract expects a UUID; batch.id is the stable id for merged lotes. */
+      conversationId: batchId,
       conversationTitle: stageName,
     },
     change: {

@@ -52,6 +52,14 @@ export class ChatIntegrationBatchEntity {
   @Column({ name: 'forge_promotion_last_error', type: 'text', nullable: true })
   forgePromotionLastError!: string | null;
 
+  /** SHA-256 (32 hex) of stage/deliverables + batch message fingerprint — matches forge_preview_pack. */
+  @Column({ name: 'forge_preview_params_hash', type: 'varchar', length: 64, nullable: true })
+  forgePreviewParamsHash!: string | null;
+
+  /** Enriched ChangePromotionPack from last preview-theforge-pack (reused on promote when hash matches). */
+  @Column({ name: 'forge_preview_pack', type: 'jsonb', nullable: true })
+  forgePreviewPack!: Record<string, unknown> | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

@@ -53,7 +53,7 @@ export async function forgeIntegrationFetch(
   cfg: TheForgeIntegrationEffective,
   path: string,
   init: RequestInit,
-  options?: { apiBase?: string },
+  options?: { apiBase?: string; timeoutMs?: number },
 ): Promise<Response> {
   if (!cfg.enabled || !cfg.apiUrl) {
     throw new ServiceUnavailableException({
@@ -71,8 +71,14 @@ export async function forgeIntegrationFetch(
 
   const base = normalizeForgeApiBase(options?.apiBase ?? cfg.apiUrl ?? '');
   const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  const timeoutMs = options?.timeoutMs;
+  const signal =
+    timeoutMs != null && timeoutMs > 0
+      ? AbortSignal.timeout(timeoutMs)
+      : init.signal;
   return fetch(url, {
     ...init,
+    signal,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
