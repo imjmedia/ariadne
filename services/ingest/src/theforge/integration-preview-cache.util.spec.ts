@@ -1,3 +1,5 @@
+import { describe, it, expect } from 'vitest';
+import type { ForgeDeliverableKind } from './change-promotion-pack.types';
 import {
   buildBatchContentFingerprint,
   buildIntegrationPreviewParamsHash,
@@ -9,7 +11,7 @@ describe('integration-preview-cache.util', () => {
       batchId: 'batch-1',
       stageName: 'Integración',
       stageKey: 'integracion',
-      deliverables: ['change_spec', 'mdd'] as const,
+      deliverables: ['change_spec', 'mdd'] as ForgeDeliverableKind[],
       contentFingerprint: 'abc123',
     };
     expect(buildIntegrationPreviewParamsHash(params)).toBe(
