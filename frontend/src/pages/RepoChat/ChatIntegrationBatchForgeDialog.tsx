@@ -24,25 +24,19 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { chatNavBtnClass } from '../chat/chatShellClasses';
 import {
+  ALL_FORGE_DELIVERABLES,
+  FORGE_DELIVERABLE_OPTIONS,
+  forgeDeliverablesEqual,
+} from './forge-deliverables.constants';
+import {
   ForgePromoteProgressPanel,
   useForgePromoteProgress,
 } from './forgePromoteProgress';
 
-const DELIVERABLE_OPTIONS: { id: ForgeDeliverableKind; label: string }[] = [
-  { id: 'change_spec', label: 'Especificación del cambio' },
-  { id: 'data_model', label: 'Modelo de datos (ERD)' },
-  { id: 'modification_plan', label: 'Plan de modificación' },
-  { id: 'migration_tasks', label: 'Tareas de migración' },
-  { id: 'api_contracts', label: 'Contratos API' },
-  { id: 'mdd_full', label: 'MDD completo' },
-];
-
-const DEFAULT_DELIVERABLES: ForgeDeliverableKind[] = [
-  'change_spec',
-  'data_model',
-  'modification_plan',
-  'migration_tasks',
-];
+type PreviewParams = {
+  stageName: string;
+  deliverables: ForgeDeliverableKind[];
+};
 
 export function ChatIntegrationBatchForgeDialog(props: {
   batchId: string | null;
@@ -53,16 +47,23 @@ export function ChatIntegrationBatchForgeDialog(props: {
   onSuccess?: (result: PromoteToTheForgeResponse) => void;
 }) {
   const [stageName, setStageName] = useState('');
-  const [deliverables, setDeliverables] = useState<ForgeDeliverableKind[]>(DEFAULT_DELIVERABLES);
+  const [deliverables, setDeliverables] = useState<ForgeDeliverableKind[]>(ALL_FORGE_DELIVERABLES);
   const [preview, setPreview] = useState<PreviewIntegrationBatchTheForgeResponse | null>(null);
+  const [previewParams, setPreviewParams] = useState<PreviewParams | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [promoteLoading, setPromoteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<PromoteToTheForgeResponse | null>(null);
   const forgeProgress = useForgePromoteProgress(promoteLoading);
 
+  const previewStale =
+    previewParams == null ||
+    previewParams.stageName !== stageName.trim() ||
+    !forgeDeliverablesEqual(previewParams.deliverables, deliverables);
+
   const resetState = useCallback(() => {
     setPreview(null);
+    setPreviewParams(null);
     setError(null);
     setSuccessResult(null);
     setPreviewLoading(false);
@@ -75,35 +76,39 @@ export function ChatIntegrationBatchForgeDialog(props: {
       return;
     }
     setStageName(props.batchLabel?.trim() || '');
-    setDeliverables(DEFAULT_DELIVERABLES);
+    setDeliverables(ALL_FORGE_DELIVERABLES);
+    setPreview(null);
+    setPreviewParams(null);
   }, [props.open, props.batchLabel, resetState]);
 
   const runPreview = useCallback(async () => {
     if (!props.batchId) return;
+    if (deliverables.length === 0) {
+      setError('Selecciona al menos un entregable.');
+      return;
+    }
+    const trimmedStage = stageName.trim();
     setPreviewLoading(true);
     setError(null);
     try {
       const res = await api.previewIntegrationBatchTheForgePack(props.batchId, {
-        stageName: stageName.trim() || undefined,
+        stageName: trimmedStage || undefined,
         deliverables,
       });
       setPreview(res);
-      if (!stageName.trim() && res.preview.stageName) {
+      setPreviewParams({ stageName: trimmedStage, deliverables: [...deliverables] });
+      if (!trimmedStage && res.preview.stageName) {
         setStageName(res.preview.stageName);
+        setPreviewParams({ stageName: res.preview.stageName.trim(), deliverables: [...deliverables] });
       }
     } catch (e) {
       setPreview(null);
+      setPreviewParams(null);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setPreviewLoading(false);
     }
   }, [props.batchId, stageName, deliverables]);
-
-  useEffect(() => {
-    if (!props.open || !props.batchId) return;
-    const timer = window.setTimeout(() => void runPreview(), 400);
-    return () => window.clearTimeout(timer);
-  }, [props.open, props.batchId, stageName, deliverables, runPreview]);
 
   const toggleDeliverable = (id: ForgeDeliverableKind) => {
     setDeliverables((prev) =>
@@ -116,6 +121,10 @@ export function ChatIntegrationBatchForgeDialog(props: {
     const name = stageName.trim();
     if (!name) {
       setError('Indica un nombre para la etapa.');
+      return;
+    }
+    if (deliverables.length === 0) {
+      setError('Selecciona al menos un entregable.');
       return;
     }
     setPromoteLoading(true);
@@ -187,7 +196,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">Entregables</legend>
               <div className="grid gap-2 sm:grid-cols-2">
-                {DELIVERABLE_OPTIONS.map((opt) => (
+                {FORGE_DELIVERABLE_OPTIONS.map((opt) => (
                   <label
                     key={opt.id}
                     className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
@@ -204,22 +213,44 @@ export function ChatIntegrationBatchForgeDialog(props: {
                 ))}
               </div>
             </fieldset>
-            {previewLoading ? (
-              <p className="text-xs text-[var(--foreground-muted)]">Generando vista previa…</p>
-            ) : preview ? (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--background-muted)]/40 p-3 text-xs">
-                <p>
-                  <span className="font-medium">Chats en lote:</span> {preview.preview.conversationCount}{' '}
-                  · <span className="font-medium">Archivos fusionados:</span>{' '}
-                  {preview.preview.modificationPlanFileCount}
-                </p>
-                {preview.linkedForgeProject ? (
-                  <p className="mt-2 text-[var(--foreground-muted)]">
-                    Destino: {preview.linkedForgeProject.forgeProjectName}
+
+            <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--background-muted)]/30 p-3">
+              {previewStale && !previewLoading ? (
+                <>
+                  <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">
+                    Pulsa <strong className="font-medium text-[var(--foreground)]">Aplicar cambios</strong>{' '}
+                    para generar la vista previa. Puede tardar varios segundos: fusiona todos los chats del
+                    lote y prepara el pack para The Forge.
                   </p>
-                ) : null}
-              </div>
-            ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={chatNavBtnClass}
+                    disabled={busy || deliverables.length === 0}
+                    onClick={() => void runPreview()}
+                  >
+                    Aplicar cambios
+                  </Button>
+                </>
+              ) : previewLoading ? (
+                <p className="text-xs text-[var(--foreground-muted)]">Generando vista previa…</p>
+              ) : preview ? (
+                <div className="text-xs">
+                  <p>
+                    <span className="font-medium">Chats en lote:</span> {preview.preview.conversationCount}{' '}
+                    · <span className="font-medium">Archivos fusionados:</span>{' '}
+                    {preview.preview.modificationPlanFileCount}
+                  </p>
+                  {preview.linkedForgeProject ? (
+                    <p className="mt-2 text-[var(--foreground-muted)]">
+                      Destino: {preview.linkedForgeProject.forgeProjectName}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
             {promoteLoading ? (
               <ForgePromoteProgressPanel
                 progress={forgeProgress.progress}
