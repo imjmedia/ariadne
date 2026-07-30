@@ -21,6 +21,12 @@ import { ChatConversationsPanel } from './RepoChat/ChatConversationsPanel';
 import { ChatMessageThread } from './RepoChat/ChatMessageThread';
 import { ChatPageHeader } from './RepoChat/ChatPageHeader';
 import { ChatProjectScopeOptions } from './RepoChat/ChatProjectScopeOptions';
+import {
+  conversationAwaitingHandoffAnalysis,
+  countBatchPendingHandoffAnalysis,
+  extractLastUserPrompt,
+  mapConversationMessages,
+} from './RepoChat/handoff-chat-analysis.util';
 import { useChatPersistence } from './RepoChat/useChatPersistence';
 import { useTheForgeChatPromotion } from './RepoChat/useTheForgeChatPromotion';
 import {
@@ -54,6 +60,7 @@ export function ProjectChat() {
   const [chatPipelineMode, setChatPipelineMode] = useState<ChatPipelineMode>('default');
   const [viewMode, setViewMode] = useState<'chat' | 'analysis'>('chat');
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [handoffAnalysisRunning, setHandoffAnalysisRunning] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const persistence = useChatPersistence(projectId ? { kind: 'project', id: projectId } : null);
@@ -143,14 +150,174 @@ export function ProjectChat() {
   );
 
   const handleNewConversation = useCallback(() => {
-    if (loading) return;
+    if (loading || handoffAnalysisRunning) return;
     setError(null);
     setMemoryCompactionNote(null);
     void startNewConversation();
-  }, [loading, startNewConversation]);
+  }, [loading, handoffAnalysisRunning, startNewConversation]);
+
+  const buildProjectChatBody = useCallback(
+    (userMessage: string, priorMessages: typeof messages) => {
+      const history = buildChatHistoryForRequest(priorMessages);
+      const fromForm = scopeFromAnalyzeForm(includePrefixesText, excludeGlobsText);
+      let scope: ChatScope | undefined = fromForm;
+      if (project && project.repositories.length > 1 && !allowBroadProjectChat && selectedRepoId) {
+        scope = { ...(fromForm ?? {}), repoIds: [selectedRepoId] };
+      }
+      const hasScope =
+        scope &&
+        ((scope.repoIds?.length ?? 0) > 0 ||
+          (scope.includePathPrefixes?.length ?? 0) > 0 ||
+          (scope.excludePathGlobs?.length ?? 0) > 0);
+      const modeOpts = ingestOptionsFromChatPipelineMode(chatPipelineMode);
+      const chatBody: Parameters<typeof api.chatProject>[1] = {
+        message: userMessage,
+        history,
+        ...modeOpts,
+        ...(hasScope ? { scope } : {}),
+      };
+      if (project && project.repositories.length > 1 && allowBroadProjectChat) {
+        chatBody.strictChatScope = false;
+      }
+      return chatBody;
+    },
+    [
+      project,
+      allowBroadProjectChat,
+      selectedRepoId,
+      includePrefixesText,
+      excludeGlobsText,
+      chatPipelineMode,
+    ],
+  );
+
+  const executeChatTurn = useCallback(
+    async (opts: {
+      conversationId: string;
+      userMessage: string;
+      priorMessages: typeof messages;
+      persistUserMessage: boolean;
+      syncUiMessages?: typeof messages;
+    }) => {
+      if (!projectId || !project) throw new Error('Proyecto no disponible');
+
+      const uiBase = opts.syncUiMessages ?? opts.priorMessages;
+      if (opts.persistUserMessage) {
+        setMessages([...uiBase, { role: 'user', content: opts.userMessage }]);
+        await persistMessage(opts.conversationId, { role: 'user', content: opts.userMessage });
+      } else if (opts.syncUiMessages) {
+        setMessages(opts.syncUiMessages);
+      }
+
+      const res = await api.chatProject(
+        projectId,
+        buildProjectChatBody(opts.userMessage, opts.priorMessages),
+      );
+
+      setMessages((current) => {
+        const base =
+          opts.syncUiMessages ??
+          (opts.persistUserMessage
+            ? [...opts.priorMessages, { role: 'user' as const, content: opts.userMessage }]
+            : current);
+        const withNew = [
+          ...base,
+          { role: 'assistant' as const, content: res.answer, cypher: res.cypher },
+        ];
+        const compacted = compactChatMessagesInMemory(withNew);
+        const note = formatMemoryCompactionNote(compacted);
+        if (note) setMemoryCompactionNote(note);
+        return compacted.messages;
+      });
+
+      await persistMessage(opts.conversationId, {
+        role: 'assistant',
+        content: res.answer,
+        cypher: res.cypher,
+      });
+    },
+    [projectId, project, buildProjectChatBody, persistMessage, setMessages],
+  );
+
+  const runHandoffAnalysisForConversation = useCallback(
+    async (conversationId: string, opts?: { selectFirst?: boolean }) => {
+      if (!projectId || !project) return;
+
+      if (opts?.selectFirst && conversationId !== activeConversationId) {
+        await selectConversation(conversationId);
+      }
+
+      const rows = await api.getConversationMessages(conversationId);
+      const threadMessages = mapConversationMessages(rows);
+      const prompt = extractLastUserPrompt(threadMessages);
+      if (!prompt || threadMessages.some((m) => m.role === 'assistant')) return;
+
+      setError(null);
+      if (conversationId === activeConversationId || opts?.selectFirst) {
+        setMessages(threadMessages);
+      }
+
+      try {
+        await executeChatTurn({
+          conversationId,
+          userMessage: prompt.userMessage,
+          priorMessages: prompt.prior,
+          persistUserMessage: false,
+          syncUiMessages:
+            conversationId === activeConversationId || opts?.selectFirst
+              ? threadMessages
+              : undefined,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setError(message);
+        if (conversationId === activeConversationId || opts?.selectFirst) {
+          setMessages((m) => [...m, { role: 'assistant', content: `Error: ${message}` }]);
+        }
+        try {
+          await persistMessage(conversationId, {
+            role: 'assistant',
+            content: `Error: ${message}`,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [
+      projectId,
+      project,
+      activeConversationId,
+      selectConversation,
+      executeChatTurn,
+      persistMessage,
+      setMessages,
+    ],
+  );
+
+  const runHandoffAnalysisBatch = useCallback(
+    async (conversationIds: string[], opts?: { initialSelectId?: string | null }) => {
+      if (!projectId || !project || handoffAnalysisRunning || loading) return;
+      const selectId = opts?.initialSelectId ?? conversationIds[0] ?? null;
+      setHandoffAnalysisRunning(true);
+      setError(null);
+      try {
+        for (const conversationId of conversationIds) {
+          await runHandoffAnalysisForConversation(conversationId, {
+            selectFirst: conversationId === selectId,
+          });
+        }
+      } finally {
+        setHandoffAnalysisRunning(false);
+      }
+    },
+    [projectId, project, handoffAnalysisRunning, loading, runHandoffAnalysisForConversation],
+  );
 
   const send = useCallback(() => {
-    if (!projectId || !project || !input.trim() || loading || messagesLoading) return;
+    if (!projectId || !project || !input.trim() || loading || messagesLoading || handoffAnalysisRunning) {
+      return;
+    }
     const msg = input.trim();
     setInput('');
     setLoading(true);
@@ -168,77 +335,34 @@ export function ProjectChat() {
     });
     if (prevNote) setMemoryCompactionNote(prevNote);
 
-    setMessages(() => [...prevForHistory, { role: 'user', content: msg }]);
-
-    const history = buildChatHistoryForRequest(prevForHistory);
-    const fromForm = scopeFromAnalyzeForm(includePrefixesText, excludeGlobsText);
-    let scope: ChatScope | undefined = fromForm;
-    if (project.repositories.length > 1 && !allowBroadProjectChat && selectedRepoId) {
-      scope = { ...(fromForm ?? {}), repoIds: [selectedRepoId] };
-    }
-    const hasScope =
-      scope &&
-      ((scope.repoIds?.length ?? 0) > 0 ||
-        (scope.includePathPrefixes?.length ?? 0) > 0 ||
-        (scope.excludePathGlobs?.length ?? 0) > 0);
-
-    const modeOpts = ingestOptionsFromChatPipelineMode(chatPipelineMode);
-    const chatBody: Parameters<typeof api.chatProject>[1] = {
-      message: msg,
-      history,
-      ...modeOpts,
-      ...(hasScope ? { scope } : {}),
-    };
-    if (project.repositories.length > 1 && allowBroadProjectChat) {
-      chatBody.strictChatScope = false;
-    }
-
     void (async () => {
       let conversationId: string;
       try {
         conversationId = await ensureActiveConversation();
-        await persistMessage(conversationId, { role: 'user', content: msg });
       } catch (e) {
-        conversationId = activeConversationId ?? '';
-        if (!conversationId) {
-          setError(e instanceof Error ? e.message : String(e));
-          setLoading(false);
-          return;
-        }
+        setError(e instanceof Error ? e.message : String(e));
+        setLoading(false);
+        return;
       }
 
       try {
-        const res = await api.chatProject(projectId, chatBody);
-        setMessages((m) => {
-          const withNew = [
-            ...m,
-            { role: 'assistant' as const, content: res.answer, cypher: res.cypher },
-          ];
-          const compacted = compactChatMessagesInMemory(withNew);
-          const note = formatMemoryCompactionNote(compacted);
-          if (note) setMemoryCompactionNote(note);
-          return compacted.messages;
+        await executeChatTurn({
+          conversationId,
+          userMessage: msg,
+          priorMessages: prevForHistory,
+          persistUserMessage: true,
         });
-        if (conversationId) {
-          await persistMessage(conversationId, {
-            role: 'assistant',
-            content: res.answer,
-            cypher: res.cypher,
-          });
-        }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         setError(message);
         setMessages((m) => [...m, { role: 'assistant', content: `Error: ${message}` }]);
-        if (conversationId) {
-          try {
-            await persistMessage(conversationId, {
-              role: 'assistant',
-              content: `Error: ${message}`,
-            });
-          } catch {
-            /* ignore */
-          }
+        try {
+          await persistMessage(conversationId, {
+            role: 'assistant',
+            content: `Error: ${message}`,
+          });
+        } catch {
+          /* ignore */
         }
       } finally {
         setLoading(false);
@@ -250,16 +374,12 @@ export function ProjectChat() {
     input,
     loading,
     messagesLoading,
+    handoffAnalysisRunning,
     messages,
-    setMessages,
-    allowBroadProjectChat,
-    selectedRepoId,
-    includePrefixesText,
-    excludeGlobsText,
-    chatPipelineMode,
     ensureActiveConversation,
+    executeChatTurn,
     persistMessage,
-    activeConversationId,
+    setMessages,
   ]);
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
@@ -277,9 +397,39 @@ export function ProjectChat() {
       if (targetId) {
         await selectConversation(targetId);
       }
+
+      await runHandoffAnalysisBatch(
+        result.created.map((item) => item.conversationId),
+        { initialSelectId: targetId },
+      );
     },
-    [reloadConversations, selectConversation],
+    [reloadConversations, selectConversation, runHandoffAnalysisBatch],
   );
+
+  const runActiveHandoffAnalysis = useCallback(() => {
+    if (!activeConversationId || handoffAnalysisRunning || loading) return;
+    void runHandoffAnalysisBatch([activeConversationId], { initialSelectId: activeConversationId });
+  }, [activeConversationId, handoffAnalysisRunning, loading, runHandoffAnalysisBatch]);
+
+  const runBatchHandoffAnalysis = useCallback(() => {
+    if (!integrationBatchId || handoffAnalysisRunning || loading) return;
+    const pending = conversations
+      .filter(
+        (c) =>
+          c.integrationBatchId === integrationBatchId &&
+          c.integrationHandoffId &&
+          c.messageCount === 1,
+      )
+      .map((c) => c.id);
+    void runHandoffAnalysisBatch(pending, { initialSelectId: activeConversationId });
+  }, [
+    integrationBatchId,
+    conversations,
+    activeConversationId,
+    handoffAnalysisRunning,
+    loading,
+    runHandoffAnalysisBatch,
+  ]);
 
   function handleChatKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -343,7 +493,11 @@ export function ProjectChat() {
   const repoCount = project.repositories.length;
   const analysisPending = Boolean(analysisResult || loadingAnalysis || analysisError);
   const codeAnalysisDisabled = repoCount === 0 || (repoCount > 1 && !selectedRepoId);
-  const chatBusy = loading || messagesLoading || conversationsLoading;
+  const chatBusy = loading || messagesLoading || conversationsLoading || handoffAnalysisRunning;
+  const handoffAnalysisPending = conversationAwaitingHandoffAnalysis(activeConversation, messages);
+  const batchHandoffPendingCount = integrationBatchId
+    ? countBatchPendingHandoffAnalysis(conversations, integrationBatchId)
+    : 0;
 
   return (
     <div className={chatPageSplitClass}>
@@ -395,6 +549,11 @@ export function ProjectChat() {
         forgePromotionAvailable={forgePromotionAvailable}
         projectId={projectId ?? null}
         onHandoffsImported={handleHandoffsImported}
+        handoffAnalysisPending={handoffAnalysisPending}
+        onRunHandoffAnalysis={runActiveHandoffAnalysis}
+        batchHandoffPendingCount={batchHandoffPendingCount}
+        onRunBatchHandoffAnalysis={runBatchHandoffAnalysis}
+        handoffAnalysisRunning={handoffAnalysisRunning}
         headerLeadingExtra={
           <ChatConversationsMobileToggle onOpen={() => setHistoryOpen(true)} />
         }
@@ -439,7 +598,7 @@ export function ProjectChat() {
           ) : (
             <ChatMessageThread
               messages={messages}
-              loading={loading}
+              loading={loading || handoffAnalysisRunning}
               chatPipelineMode={chatPipelineMode}
               onPromptSelect={(t) => setInput(t.message)}
               scrollRef={scrollRef}
