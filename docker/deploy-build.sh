@@ -1,5 +1,6 @@
 #!/bin/sh
-# Build optimizado para Dokploy/VPS — sin registry externo.
+# Build optimizado — solo uso manual (SSH en el VPS). NO usar en Dokploy Command
+# (Dokploy antepone "docker" y falla con scripts shell).
 # Compila ariadne-common y mcp-export una sola vez; el resto de servicios reutiliza esas capas.
 set -e
 

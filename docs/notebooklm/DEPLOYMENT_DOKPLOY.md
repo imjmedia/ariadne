@@ -176,16 +176,13 @@ Sin registry externo: el VPS compila, pero **una sola vez** `ariadne-common` y e
 
 ### Comando en Dokploy (Compose → Advanced → Command)
 
-```bash
-COMPOSE_PROJECT_NAME=apps-grupowib-relic-wbaqzm sh docker/deploy-build.sh
+Dokploy ejecuta `docker` + tu comando. Usa **solo** el subcomando `compose` (sin `sh` ni script):
+
+```text
+compose -p apps-grupowib-relic-wbaqzm -f docker-compose.yml up -d --build --remove-orphans
 ```
 
-### Variables adicionales (Environment)
-
-```env
-COMPOSE_PARALLEL_LIMIT=3
-COMPOSE_PROJECT_NAME=apps-grupowib-relic-wbaqzm
-```
+Build optimizado por SSH (opcional): `sh docker/deploy-build.sh` — **no** pegarlo en Dokploy.
 
 ### Servidor Dokploy
 
