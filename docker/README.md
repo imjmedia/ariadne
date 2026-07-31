@@ -37,6 +37,17 @@ Ajustes en el servidor Dokploy (Settings → Server):
 - **Isolated deployment:** activado (no reinicia FalkorDB/Postgres/Redis)
 - **watchPaths:** paths del repo que disparan redeploy
 
+### Orden de arranque (Compose)
+
+El `frontend` nginx hace proxy de `/api/` a `api:3000`. Para evitar 502 al desplegar:
+
+- `ingest` → healthcheck (Dockerfile) antes de `api`
+- `api` → healthcheck `GET /api/health` antes de `frontend`
+- `frontend.depends_on.api`: `condition: service_healthy`
+- `restart: unless-stopped` en `frontend`, `api` e `ingest`
+
+`compose up` espera readiness; no hay reintento automático de nginx si el API cae después — solo orden correcto al levantar el stack.
+
 ## Tiempos esperados
 
 | Escenario | Tiempo aprox. |

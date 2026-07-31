@@ -557,6 +557,7 @@ export function ProjectChat() {
           chatBusy ||
           (integrationBatchId ? false : messages.length === 0)
         }
+        handoffImportDisabled={handoffAnalysisRunning}
         forgeDefaultStageName={
           integrationBatchLabel ?? activeConversation?.title ?? undefined
         }

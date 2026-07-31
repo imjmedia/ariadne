@@ -42,6 +42,7 @@ export function ChatPageHeader(props: {
   integrationBatchId?: string | null;
   integrationBatchLabel?: string | null;
   forgePromoteDisabled?: boolean;
+  handoffImportDisabled?: boolean;
   forgeDefaultStageName?: string;
   forgePromotionAvailable?: boolean;
   projectId?: string | null;
@@ -150,7 +151,7 @@ export function ChatPageHeader(props: {
         {props.forgePromotionAvailable && props.projectId ? (
           <ChatIntegrationHandoffImportButton
             projectId={props.projectId}
-            disabled={props.forgePromoteDisabled || props.handoffAnalysisRunning}
+            disabled={props.handoffImportDisabled ?? props.handoffAnalysisRunning}
             onImported={props.onHandoffsImported}
           />
         ) : null}
