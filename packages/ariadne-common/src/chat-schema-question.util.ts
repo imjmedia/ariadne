@@ -3,6 +3,8 @@
  * Prefer orchestrator `ChatIntentRouterAgent` when Ajustes tienen `chatIntentRouterEnabled`.
  */
 
+import { wantsIntegrationHandoffQuestion } from './integration-handoff-message.util.js';
+
 export const SCHEMA_MODEL_SOURCES = ['prisma', 'typeorm'] as const;
 
 function normalizeMessage(message: string): string {
@@ -88,5 +90,6 @@ export function wantsSchemaDatabaseQuestion(message: string): boolean {
 
 /** Keyword fallback for reengineering / architecture proposals. */
 export function wantsReengineeringQuestion(message: string): boolean {
+  if (wantsIntegrationHandoffQuestion(message)) return false;
   return wantsArchitectureDomainQuestion(message);
 }

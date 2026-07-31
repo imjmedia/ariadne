@@ -162,7 +162,7 @@ export function ProjectChat() {
   }, [loading, handoffAnalysisRunning, startNewConversation]);
 
   const buildProjectChatBody = useCallback(
-    (userMessage: string, priorMessages: typeof messages) => {
+    (userMessage: string, priorMessages: typeof messages, conversationId?: string | null) => {
       const history = buildChatHistoryForRequest(priorMessages);
       const fromForm = scopeFromAnalyzeForm(includePrefixesText, excludeGlobsText);
       let scope: ChatScope | undefined = fromForm;
@@ -175,11 +175,17 @@ export function ProjectChat() {
           (scope.includePathPrefixes?.length ?? 0) > 0 ||
           (scope.excludePathGlobs?.length ?? 0) > 0);
       const modeOpts = ingestOptionsFromChatPipelineMode(chatPipelineMode);
+      const convId = conversationId ?? activeConversationId;
+      const handoffId =
+        conversations.find((c) => c.id === convId)?.integrationHandoffId ?? null;
       const chatBody: Parameters<typeof api.chatProject>[1] = {
         message: userMessage,
         history,
         ...modeOpts,
         ...(hasScope ? { scope } : {}),
+        ...(handoffId
+          ? { integrationHandoffId: handoffId, chatMode: 'integration_handoff' as const }
+          : {}),
       };
       if (project && project.repositories.length > 1 && allowBroadProjectChat) {
         chatBody.strictChatScope = false;
@@ -193,6 +199,8 @@ export function ProjectChat() {
       includePrefixesText,
       excludeGlobsText,
       chatPipelineMode,
+      activeConversationId,
+      conversations,
     ],
   );
 
@@ -216,7 +224,7 @@ export function ProjectChat() {
 
       const res = await api.chatProject(
         projectId,
-        buildProjectChatBody(opts.userMessage, opts.priorMessages),
+        buildProjectChatBody(opts.userMessage, opts.priorMessages, opts.conversationId),
       );
 
       setMessages((current) => {

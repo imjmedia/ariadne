@@ -23,6 +23,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 
 - Botón **Handoffs** en cabecera: lista proyectos **NEW** de The Forge con `integrationHandoff` y crea un chat por cada item `sent`.
 - Tras importar, se **ejecuta automáticamente** el pipeline de chat (mismo flujo que Enviar) en cada handoff nuevo.
+- El análisis usa el agente **`integración handoff`** (no reingeniería genérica): plan multi-query (`POST …/integration-handoff-plan`), búsqueda semántica por journey UX/AC, checklist de criterios de aceptación. El frontend envía `integrationHandoffId` + `chatMode: integration_handoff`.
 - Si un handoff quedó solo con el mensaje semilla (`1 msg`), usa **Análisis (N)** en lote o **Ejecutar análisis** en el chat activo.
 - Tras un fallo (`Error: …` en la burbuja), el botón pasa a **Reintentar análisis** (los errores de handoff no cuentan como respuesta válida).
 - Sidebar agrupa esos chats bajo **Integración — {proyecto NEW}**; el resto queda en **General**.

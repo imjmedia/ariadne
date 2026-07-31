@@ -5,6 +5,7 @@ export const CHAT_INTENTS = [
   'codebase_qa',
   'schema_database',
   'reengineering',
+  'integration_handoff',
   'unused_api_endpoints',
 ] as const;
 

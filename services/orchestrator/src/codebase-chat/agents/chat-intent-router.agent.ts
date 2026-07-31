@@ -6,6 +6,7 @@ import type { ChatIntent, ChatIntentRouteResult } from 'ariadne-common';
 import {
   wantsReengineeringQuestion,
   wantsSchemaDatabaseQuestion,
+  wantsIntegrationHandoffQuestion,
 } from 'ariadne-common';
 import { wantsUnusedBackendApiEndpointsAnalysis } from '../chat-unused-api-endpoints.util';
 import { OrchestratorLlmService } from '../orchestrator-llm.service';
@@ -17,12 +18,13 @@ const ROUTER_SYSTEM = `<rol>Clasificador de intención para chat sobre código i
 <intents>
 - codebase_qa — Pregunta general: flujos, componentes, impacto, cómo está implementado X.
 - schema_database — Volcado o diagrama del esquema de persistencia (ERD, content-types Strapi, tablas Prisma/TypeORM). NO usar si piden arquitectura, desacoplar dominio o propuesta de reingeniería aunque mencionen "entidad" o "bd".
-- reengineering — Propuesta de arquitectura, desacoplar, nuevo tipo de negocio/medio, refactor brownfield, plan de cambio con reglas de negocio.
+- integration_handoff — Handoff NEW-LEG de The Forge: mensaje con "## Handoff de integración", id NEW-LEG, criterios de aceptación; mapear cambios LEG vs microservicio NEW. NO confundir con reingeniería genérica.
+- reengineering — Propuesta de arquitectura, desacoplar, refactor brownfield, plan de cambio con reglas de negocio (sin handoff estructurado).
 - unused_api_endpoints — Endpoints del backend (Strapi/Nest) sin uso en el frontend.
 </intents>
 
 <salida>JSON único sin markdown:
-{"intent":"codebase_qa|schema_database|reengineering|unused_api_endpoints","confidence":0.0-1.0,"reasoning":"una frase","focusTerms":["término1"]}
+{"intent":"codebase_qa|schema_database|integration_handoff|reengineering|unused_api_endpoints","confidence":0.0-1.0,"reasoning":"una frase","focusTerms":["término1"]}
 </salida>`;
 
 function intentRouterEnabled(): boolean {
@@ -41,6 +43,7 @@ function parseRouterJson(raw: string): ChatIntentRouteResult | null {
       'codebase_qa',
       'schema_database',
       'reengineering',
+      'integration_handoff',
       'unused_api_endpoints',
     ];
     if (!valid.includes(intent)) return null;
@@ -56,6 +59,14 @@ function parseRouterJson(raw: string): ChatIntentRouteResult | null {
 }
 
 function keywordFallback(message: string): ChatIntentRouteResult {
+  if (wantsIntegrationHandoffQuestion(message)) {
+    return {
+      intent: 'integration_handoff',
+      confidence: 0.9,
+      reasoning: 'Handoff NEW-LEG estructurado',
+      source: 'keyword_fallback',
+    };
+  }
   if (wantsUnusedBackendApiEndpointsAnalysis(message)) {
     return {
       intent: 'unused_api_endpoints',

@@ -260,6 +260,8 @@ export interface IngestChatRequestBody {
   responseMode?: 'default' | 'evidence_first' | 'raw_evidence';
   deterministicRetriever?: boolean;
   strictChatScope?: boolean;
+  integrationHandoffId?: string | null;
+  chatMode?: 'integration_handoff' | string | null;
 }
 
 export interface IngestChatResponse {

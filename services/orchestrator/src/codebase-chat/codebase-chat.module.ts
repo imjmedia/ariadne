@@ -9,6 +9,7 @@ import { CodebaseModificationPlanService } from './codebase-modification-plan.se
 import { IngestChatClient } from './ingest-chat.client';
 import { ChatIntentRouterAgent } from './agents/chat-intent-router.agent';
 import { ChatReengineeringAgent } from './agents/chat-reengineering.agent';
+import { ChatIntegrationHandoffAgent } from './agents/chat-integration-handoff.agent';
 import { OrchestratorLlmService } from './orchestrator-llm.service';
 
 @Module({
@@ -23,6 +24,7 @@ import { OrchestratorLlmService } from './orchestrator-llm.service';
     OrchestratorLlmService,
     ChatIntentRouterAgent,
     ChatReengineeringAgent,
+    ChatIntegrationHandoffAgent,
     CodebaseChatService,
     CodebaseAnalyzeService,
     CodebaseModificationPlanService,
