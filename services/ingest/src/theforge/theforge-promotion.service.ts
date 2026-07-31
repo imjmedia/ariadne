@@ -10,7 +10,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryDeepPartialEntity, Repository } from 'typeorm';
 import type { CredentialActor } from '../credentials/credential-actor';
 import { ChatConversationEntity } from '../chat/entities/chat-conversation.entity';
 import { ChatMessageEntity } from '../chat/entities/chat-message.entity';
@@ -333,7 +333,7 @@ export class TheForgePromotionService {
 
   private async updateConversation(
     conversationId: string,
-    patch: Partial<ChatConversationEntity>,
+    patch: QueryDeepPartialEntity<ChatConversationEntity>,
   ): Promise<void> {
     await this.conversations.update(conversationId, patch);
   }

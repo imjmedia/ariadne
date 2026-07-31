@@ -12,18 +12,23 @@ Los `Dockerfile` usan **BuildKit** (`# syntax=docker/dockerfile:1.4`) con:
 
 Requisito en el servidor: `DOCKER_BUILDKIT=1` (default en Docker 23+).
 
-## Dokploy — comando recomendado
+## Dokploy — comando (Advanced → Command)
 
-```bash
-COMPOSE_PROJECT_NAME=apps-grupowib-relic-wbaqzm sh docker/deploy-build.sh
+Dokploy **antepone** `docker` al comando. Debe empezar por subcomando `compose`, **no** por `sh` ni variables de entorno sueltas.
+
+```text
+compose -p apps-grupowib-relic-wbaqzm -f docker-compose.yml up -d --build --remove-orphans
 ```
 
-Variable en Environment:
+Eso ejecuta en el servidor: `docker compose -p ... up -d --build --remove-orphans`.
 
-```env
-COMPOSE_PARALLEL_LIMIT=3
-COMPOSE_PROJECT_NAME=apps-grupowib-relic-wbaqzm
+**Incorrecto** (falla con `unknown command: docker COMPOSE_PROJECT_NAME=...`):
+
+```text
+COMPOSE_PROJECT_NAME=... sh docker/deploy-build.sh
 ```
+
+El script `docker/deploy-build.sh` es solo para **build manual por SSH**, no para el campo Command de Dokploy.
 
 Ajustes en el servidor Dokploy (Settings → Server):
 
