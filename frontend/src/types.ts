@@ -379,6 +379,12 @@ export interface PreviewIntegrationBatchTheForgeResponse {
     forgeProjectName: string;
     linkKind: 'primary' | 'alias' | 'inferred';
   } | null;
+  /** Proyecto LEGACY que se usará al promover (explícito o vinculado por defecto). */
+  targetForgeProject?: {
+    forgeProjectId: string;
+    forgeProjectName: string;
+    linkKind: 'primary' | 'explicit';
+  } | null;
   promoteEnabled: boolean;
 }
 
