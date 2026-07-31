@@ -78,6 +78,10 @@ services:
       - dokploy-network
     expose:
       - "80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
   # API REST — proxy a ingest, /graph, /openapi, /health
   # Dokploy Domains UI: ariadne.kreoint.mx path /api → 3000
@@ -103,12 +107,25 @@ services:
       redis:
         condition: service_healthy
       ingest:
-        condition: service_started
+        condition: service_healthy
     networks:
       - falkor-net
       - dokploy-network
     expose:
       - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
 
   # Microservicio de Ingesta (repos + full sync + webhook Bitbucket)
   # Sin puerto expuesto: el frontend usa la API (proxy) como puerta de entrada
@@ -142,6 +159,7 @@ services:
         condition: service_healthy
     networks:
       - falkor-net
+    restart: unless-stopped
 
   # Orquestador NestJS + LangGraph (constitution §2.C)
   # Sin puerto expuesto: proxy enruta por orchestrator:3001

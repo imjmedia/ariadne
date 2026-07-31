@@ -21,7 +21,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 
 ## Handoffs NEW-LEG (solo chat de proyecto)
 
-- Botón **Handoffs** en cabecera: lista proyectos **NEW** de The Forge con `integrationHandoff` y crea un chat por cada item `sent`.
+- Botón **Handoffs** en cabecera (solo chat de proyecto): lista proyectos **NEW** de The Forge con `integrationHandoff` y crea un chat por cada item `sent`. **No requiere** mensajes en el chat activo (solo The Forge habilitado en Ajustes y proyecto vinculado a LEGACY).
 - Tras importar, se **ejecuta automáticamente** el pipeline de chat (mismo flujo que Enviar) en cada handoff nuevo.
 - El análisis usa el agente **`integración handoff`** (no reingeniería genérica): plan multi-query (`POST …/integration-handoff-plan`), búsqueda semántica por journey UX/AC, checklist de criterios de aceptación. El frontend envía `integrationHandoffId` + `chatMode: integration_handoff`.
 - Si un handoff quedó solo con el mensaje semilla (`1 msg`), usa **Análisis (N)** en lote o **Ejecutar análisis** en el chat activo.
