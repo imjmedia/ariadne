@@ -1,13 +1,17 @@
 # syntax=docker/dockerfile:1.4
 # AriadneSpecs MCP Server — Streamable HTTP para producción (Dokploy)
 # Build desde la raíz del repo: docker build -f services/mcp-ariadne/Dockerfile .
+# Export tarball (frontend dist/mcp): --target mcp-export
 
-FROM node:20-alpine AS ariadne-common
+FROM node:20-alpine AS ariadne-common-local
 WORKDIR /packages/ariadne-common
 COPY packages/ariadne-common/package.json packages/ariadne-common/tsconfig.json ./
 COPY packages/ariadne-common/src ./src
 RUN --mount=type=cache,target=/root/.npm \
     npm install && npm run build
+
+ARG ARIADNE_COMMON_IMAGE
+FROM ${ARIADNE_COMMON_IMAGE:-ariadne-common-local} AS ariadne-common
 
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -16,6 +20,10 @@ COPY services/mcp-ariadne/package.json services/mcp-ariadne/tsconfig.json ./
 COPY services/mcp-ariadne/src ./src
 RUN --mount=type=cache,target=/root/.npm \
     npm install --ignore-scripts && npm run build
+
+# Tarball estático para frontend (dist/mcp/) — evita recompilar MCP en frontend/Dockerfile
+FROM builder AS mcp-export
+RUN npm pack && mkdir -p /export && mv ariadne-mcp-*.tgz /export/ariadne-mcp.tgz
 
 FROM node:20-alpine AS runtime
 WORKDIR /app

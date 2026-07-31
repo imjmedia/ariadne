@@ -28,3 +28,10 @@ frontend/e2e
 
 # Servicios no incluidos en docker-compose producción
 services/cartographer
+
+# Artefactos locales / CI (no van a imágenes)
+.parity-pack-*.json
+.github
+
+# Capturas README (pesadas; no usadas en build frontend)
+docs/readme/screenshot-*.png

@@ -1,21 +1,20 @@
 # syntax=docker/dockerfile:1.4
 # Build — contexto: repo root (solo paths copiados abajo; no COPY . .)
-FROM node:20-alpine AS ariadne-common
-WORKDIR /packages/ariadne-common
-COPY packages/ariadne-common/package.json packages/ariadne-common/tsconfig.json ./
-COPY packages/ariadne-common/src ./src
-RUN --mount=type=cache,target=/root/.npm \
-    npm install && npm run build
-
-# Tarball MCP estático (dist/mcp/) — capa aparte del bundle Vite
-FROM node:20-alpine AS mcp-tarball
+# CI: --build-arg MCP_EXPORT_IMAGE=ariadne-mcp-export:local (ver docker/deploy-build.sh)
+FROM node:20-alpine AS mcp-tarball-local
 WORKDIR /app
-COPY --from=ariadne-common /packages/ariadne-common /packages/ariadne-common
+COPY packages/ariadne-common/package.json packages/ariadne-common/tsconfig.json /packages/ariadne-common/
+COPY packages/ariadne-common/src /packages/ariadne-common/src
+RUN --mount=type=cache,target=/root/.npm \
+    cd /packages/ariadne-common && npm install && npm run build
 COPY services/mcp-ariadne/package.json services/mcp-ariadne/tsconfig.json ./
 COPY services/mcp-ariadne/src ./src
 RUN --mount=type=cache,target=/root/.npm \
     npm install --ignore-scripts && npm run build && \
-    npm pack && mkdir -p /out && mv ariadne-mcp-*.tgz /out/ariadne-mcp.tgz
+    npm pack && mkdir -p /export && mv ariadne-mcp-*.tgz /export/ariadne-mcp.tgz
+
+ARG MCP_EXPORT_IMAGE
+FROM ${MCP_EXPORT_IMAGE:-mcp-tarball-local} AS mcp-tarball
 
 FROM node:20-alpine AS frontend-build
 WORKDIR /app
@@ -38,7 +37,7 @@ ENV VITE_API_URL=$VITE_API_URL
 
 RUN pnpm run build
 
-COPY --from=mcp-tarball /out/ariadne-mcp.tgz /tmp/ariadne-mcp.tgz
+COPY --from=mcp-tarball /export/ariadne-mcp.tgz /tmp/ariadne-mcp.tgz
 RUN mkdir -p dist/mcp && cp /tmp/ariadne-mcp.tgz dist/mcp/ariadne-mcp.tgz
 
 FROM nginx:alpine

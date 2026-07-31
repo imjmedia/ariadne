@@ -169,3 +169,31 @@ Tras redeploy, ambos deben pasar a **healthy**; si no, **Settings → Reload Tra
 - [ ] API accesible en ariadne.kreoint.mx/api/repositories, /api/graph/*, etc.
 - [ ] Certificado SSL en ariadne.kreoint.mx
 - [ ] Cursor con `headers.Authorization` (Secret MCP `ari_…` o JWT vigente); sin `ARIADNE_API_*` en Dokploy para eso
+
+## 11. Deploy optimizado (build en VPS)
+
+Sin registry externo: el VPS compila, pero **una sola vez** `ariadne-common` y el tarball MCP antes del `compose build` paralelo.
+
+### Comando en Dokploy (Compose → Advanced → Command)
+
+```bash
+COMPOSE_PROJECT_NAME=apps-grupowib-relic-wbaqzm sh docker/deploy-build.sh
+```
+
+### Variables adicionales (Environment)
+
+```env
+COMPOSE_PARALLEL_LIMIT=3
+COMPOSE_PROJECT_NAME=apps-grupowib-relic-wbaqzm
+```
+
+### Servidor Dokploy
+
+- **buildsConcurrency:** 2–3 (Settings → Server).
+- **Docker cleanup:** activado periódicamente.
+- **Isolated deployment:** recomendado (no reinicia FalkorDB/Postgres/Redis en cada deploy de app).
+- **watchPaths:** paths del repo para evitar redeploys innecesarios (ver `docker/README.md`).
+
+### mcp-docs (opcional)
+
+El servicio `mcp-docs` usa perfil Compose `docs` y no arranca en producción por defecto. Para levantarlo: `docker compose --profile docs up -d mcp-docs`.

@@ -26,4 +26,6 @@ Los servicios usan `"ariadne-common": "file:../../packages/ariadne-common"`. Tra
 
 ## Deployment (Docker)
 
-Los Dockerfiles de ingest, cartographer y mcp-ariadne **deben construirse con contexto en la raíz del repo** (no solo la carpeta del servicio), para poder copiar y compilar `packages/ariadne-common` dentro de la imagen. Ver [docs/ariadne-common.md](../../docs/ariadne-common.md).
+Los Dockerfiles de ingest, cartographer y mcp-ariadne **deben construirse con contexto en la raíz del repo** (no solo la carpeta del servicio), para poder copiar y compilar `packages/ariadne-common` dentro de la imagen.
+
+**CI / prod:** `docker/Dockerfile.ariadne-common` se construye una vez por deploy (`docker/deploy-build.sh`); los servicios reciben `ARIADNE_COMMON_IMAGE=ariadne-common:local`. Ver `docker/README.md`.

@@ -1,5 +1,16 @@
 # syntax=docker/dockerfile:1.4
 # Build desde la raíz del repo: docker build -f services/ingest/Dockerfile .
+# CI: --build-arg ARIADNE_COMMON_IMAGE=ariadne-common:local (ver docker/deploy-build.sh)
+FROM node:20-alpine AS ariadne-common-local
+WORKDIR /packages/ariadne-common
+COPY packages/ariadne-common/package.json packages/ariadne-common/tsconfig.json ./
+COPY packages/ariadne-common/src ./src
+RUN --mount=type=cache,target=/root/.npm \
+    npm install && npm run build
+
+ARG ARIADNE_COMMON_IMAGE
+FROM ${ARIADNE_COMMON_IMAGE:-ariadne-common-local} AS ariadne-common
+
 FROM node:20-alpine
 
 WORKDIR /app
@@ -7,10 +18,7 @@ WORKDIR /app
 # tree-sitter y tree-sitter-* requieren compilación nativa; git para shallow clone (sync)
 RUN apk add --no-cache python3 make g++ git
 
-COPY packages/ariadne-common/package.json packages/ariadne-common/tsconfig.json /packages/ariadne-common/
-COPY packages/ariadne-common/src /packages/ariadne-common/src
-RUN --mount=type=cache,target=/root/.npm \
-    cd /packages/ariadne-common && npm install && npm run build
+COPY --from=ariadne-common /packages/ariadne-common /packages/ariadne-common
 
 COPY services/ingest/package.json ./
 RUN --mount=type=cache,target=/root/.npm \
