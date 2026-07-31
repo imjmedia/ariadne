@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # Imagen base compartida: ariadne-common compilado (ingest, api, orchestrator, MCP, frontend).
-# CI: ghcr.io/kreodevs/ariadne-common:<sha>
+# Base compartida — una compilación por deploy (ver docker/deploy-build.sh).
 # Local: docker build -f docker/Dockerfile.ariadne-common -t ariadne-common:local .
 FROM node:20-alpine
 WORKDIR /packages/ariadne-common

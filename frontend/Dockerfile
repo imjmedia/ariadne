@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # Build — contexto: repo root (solo paths copiados abajo; no COPY . .)
-# CI: --build-arg MCP_EXPORT_IMAGE=ghcr.io/kreodevs/ariadne-mcp-export:<sha>
+# CI: --build-arg MCP_EXPORT_IMAGE=ariadne-mcp-export:local (ver docker/deploy-build.sh)
 FROM node:20-alpine AS mcp-tarball-local
 WORKDIR /app
 COPY packages/ariadne-common/package.json packages/ariadne-common/tsconfig.json /packages/ariadne-common/

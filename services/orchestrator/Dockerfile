@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-# CI: --build-arg ARIADNE_COMMON_IMAGE=ghcr.io/kreodevs/ariadne-common:<sha>
+# CI: --build-arg ARIADNE_COMMON_IMAGE=ariadne-common:local (ver docker/deploy-build.sh)
 FROM node:20-alpine AS ariadne-common-local
 WORKDIR /packages/ariadne-common
 COPY packages/ariadne-common/package.json packages/ariadne-common/tsconfig.json ./
