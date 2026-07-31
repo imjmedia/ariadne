@@ -49,6 +49,45 @@ function chatCompletionsUrl(): string {
   return `${resolveLlmBaseUrl().replace(/\/$/, '')}/chat/completions`;
 }
 
+function getErrorCause(err: unknown): unknown {
+  if (err instanceof Error && 'cause' in err) {
+    return (err as Error & { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
+function formatLlmFetchError(err: unknown, url: string, model: string): Error {
+  const cause = getErrorCause(err);
+  const causeMsg =
+    cause instanceof Error ? cause.message : cause != null ? String(cause) : '';
+  const base = err instanceof Error ? err.message : String(err);
+  if (err instanceof Error && err.name === 'TimeoutError') {
+    return new Error(
+      `Proveedor LLM no respondió a tiempo (modelo \`${model}\`). Revisa conectividad HTTPS desde orchestrator hacia ${url}.`,
+    );
+  }
+  const detail = causeMsg && causeMsg !== base ? `${base} (${causeMsg})` : base;
+  if (/fetch failed|econnrefused|enotfound|socket hang up|network/i.test(detail)) {
+    return new Error(
+      `No se pudo conectar al proveedor LLM (\`${model}\` en ${url}): ${detail}. ` +
+        'Revisa Ajustes → Proveedores IA (base URL + API key) y salida HTTPS del contenedor orchestrator.',
+    );
+  }
+  return new Error(`LLM request failed (\`${model}\`): ${detail}`);
+}
+
+async function fetchChatCompletions(
+  url: string,
+  init: RequestInit,
+  model: string,
+): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    throw formatLlmFetchError(err, url, model);
+  }
+}
+
 function buildAuthHeaders(): Record<string, string> {
   const key = resolveLlmApiKey();
   if (!key) {
@@ -71,16 +110,21 @@ export async function callLlm(
 ): Promise<string> {
   await ensureOrchestratorLlmRuntime();
   const model = modelOverride?.trim() || orchestratorLlmModel();
-  const res = await fetch(chatCompletionsUrl(), {
-    method: 'POST',
-    headers: buildAuthHeaders(),
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: resolveLlmTemperature(),
-      max_tokens: maxTokens,
-    }),
-  });
+  const url = chatCompletionsUrl();
+  const res = await fetchChatCompletions(
+    url,
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: resolveLlmTemperature(),
+        max_tokens: maxTokens,
+      }),
+    },
+    model,
+  );
 
   if (!res.ok) {
     const err = await res.text();
@@ -116,18 +160,23 @@ export async function callLlmWithTools(
 }> {
   await ensureOrchestratorLlmRuntime();
   const model = modelOverride?.trim() || orchestratorLlmModel();
-  const res = await fetch(chatCompletionsUrl(), {
-    method: 'POST',
-    headers: buildAuthHeaders(),
-    body: JSON.stringify({
-      model,
-      messages: stripReasoningFromMessages(messages),
-      tools,
-      tool_choice: 'auto',
-      temperature: resolveLlmTemperature(),
-      max_tokens: maxTokens,
-    }),
-  });
+  const url = chatCompletionsUrl();
+  const res = await fetchChatCompletions(
+    url,
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({
+        model,
+        messages: stripReasoningFromMessages(messages),
+        tools,
+        tool_choice: 'auto',
+        temperature: resolveLlmTemperature(),
+        max_tokens: maxTokens,
+      }),
+    },
+    model,
+  );
 
   if (!res.ok) {
     const errText = await res.text();
@@ -183,18 +232,24 @@ export async function chatSimple(
   await ensureOrchestratorLlmRuntime();
   const key = resolveLlmApiKey();
   if (!key) return '';
-  const res = await fetch(chatCompletionsUrl(), {
-    method: 'POST',
-    headers: buildAuthHeaders(),
-    body: JSON.stringify({
-      model: modelOverride?.trim() || orchestratorLlmModel(),
-      temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.2') || 0.2,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-    }),
-  });
+  const model = modelOverride?.trim() || orchestratorLlmModel();
+  const url = chatCompletionsUrl();
+  const res = await fetchChatCompletions(
+    url,
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({
+        model,
+        temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.2') || 0.2,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+    },
+    model,
+  );
   const data = (await res.json().catch(() => ({}))) as {
     choices?: Array<{ message?: { content?: string } }>;
     error?: { message?: string };
