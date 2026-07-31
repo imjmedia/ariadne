@@ -169,3 +169,49 @@ Tras redeploy, ambos deben pasar a **healthy**; si no, **Settings → Reload Tra
 - [ ] API accesible en ariadne.kreoint.mx/api/repositories, /api/graph/*, etc.
 - [ ] Certificado SSL en ariadne.kreoint.mx
 - [ ] Cursor con `headers.Authorization` (Secret MCP `ari_…` o JWT vigente); sin `ARIADNE_API_*` en Dokploy para eso
+
+## 11. Deploy rápido (GHCR + pull)
+
+Desde la optimización de deploy, las imágenes se construyen en **GitHub Actions** y Dokploy solo hace **pull** (sin `--build` en el VPS).
+
+### Flujo
+
+1. Push a `master` → workflow `.github/workflows/build-images.yml` publica en `ghcr.io/kreodevs/ariadne-*`.
+2. Dokploy ejecuta `docker-compose.yml` + `docker-compose.prod.yml` con `--no-build`.
+
+### Comando en Dokploy (Compose → Advanced → Command)
+
+```bash
+export COMPOSE_PARALLEL_LIMIT=${COMPOSE_PARALLEL_LIMIT:-3}
+docker compose -p apps-grupowib-relic-wbaqzm -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -p apps-grupowib-relic-wbaqzm -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans --no-build
+```
+
+### Variables adicionales (Environment)
+
+```env
+COMPOSE_PARALLEL_LIMIT=3
+IMAGE_TAG=latest
+```
+
+Opcional: `IMAGE_TAG=<sha-corto>` para fijar una versión concreta del workflow.
+
+### GHCR
+
+- Paquetes en `ghcr.io/kreodevs/ariadne-*` deben ser legibles desde el servidor (públicos o login con PAT `read:packages`).
+- Variable de repositorio GitHub `VITE_API_URL` para el build del frontend en CI (p. ej. `https://relicai.obp.mx`).
+
+### Servidor Dokploy
+
+- **buildsConcurrency:** 2–3 (Settings → Server).
+- **Docker cleanup:** activado periódicamente.
+- **Isolated deployment:** recomendado (no reinicia FalkorDB/Postgres/Redis en cada deploy de app).
+- **watchPaths:** paths por servicio para evitar redeploys innecesarios (ver `docker/README.md`).
+
+### Primer deploy tras activar GHCR
+
+Esperar a que el workflow *Build & push images* termine en verde antes del redeploy. Si falla el pull, usar fallback local documentado en `docker/README.md`.
+
+### mcp-docs (opcional)
+
+El servicio `mcp-docs` usa perfil Compose `docs` y no arranca en producción por defecto. Para levantarlo: `docker compose --profile docs up -d mcp-docs`.

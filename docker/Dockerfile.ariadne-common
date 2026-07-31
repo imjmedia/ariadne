@@ -1,0 +1,10 @@
+# syntax=docker/dockerfile:1.4
+# Imagen base compartida: ariadne-common compilado (ingest, api, orchestrator, MCP, frontend).
+# CI: ghcr.io/kreodevs/ariadne-common:<sha>
+# Local: docker build -f docker/Dockerfile.ariadne-common -t ariadne-common:local .
+FROM node:20-alpine
+WORKDIR /packages/ariadne-common
+COPY packages/ariadne-common/package.json packages/ariadne-common/tsconfig.json ./
+COPY packages/ariadne-common/src ./src
+RUN --mount=type=cache,target=/root/.npm \
+    npm install && npm run build
