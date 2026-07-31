@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ExternalLink, Hammer } from 'lucide-react';
 import { api } from '@/api';
 import type {
+  ForgeBrownfieldProjectOption,
   ForgeDeliverableKind,
   PreviewIntegrationBatchTheForgeResponse,
   PromoteToTheForgeResponse,
@@ -20,6 +21,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { chatNavBtnClass } from '../chat/chatShellClasses';
@@ -32,6 +40,11 @@ import {
   ForgePromoteProgressPanel,
   useForgePromoteProgress,
 } from './forgePromoteProgress';
+
+const forgeSelectTriggerClass = cn(
+  'h-11 w-full justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 shadow-none',
+  'text-left text-sm font-normal text-[var(--foreground)]',
+);
 
 type PreviewParams = {
   stageName: string;
@@ -48,6 +61,10 @@ export function ChatIntegrationBatchForgeDialog(props: {
 }) {
   const [stageName, setStageName] = useState('');
   const [deliverables, setDeliverables] = useState<ForgeDeliverableKind[]>(ALL_FORGE_DELIVERABLES);
+  const [forgeOptions, setForgeOptions] = useState<ForgeBrownfieldProjectOption[]>([]);
+  const [loadingForgeOptions, setLoadingForgeOptions] = useState(false);
+  const [forgeOptionsHint, setForgeOptionsHint] = useState<string | null>(null);
+  const [selectedForgeProjectId, setSelectedForgeProjectId] = useState('');
   const [preview, setPreview] = useState<PreviewIntegrationBatchTheForgeResponse | null>(null);
   const [previewParams, setPreviewParams] = useState<PreviewParams | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -61,6 +78,9 @@ export function ChatIntegrationBatchForgeDialog(props: {
     previewParams.stageName !== stageName.trim() ||
     !forgeDeliverablesEqual(previewParams.deliverables, deliverables);
 
+  const selectedForgeOption = forgeOptions.find((opt) => opt.id === selectedForgeProjectId);
+  const linkedForgeProjectId = preview?.linkedForgeProject?.forgeProjectId ?? null;
+
   const resetState = useCallback(() => {
     setPreview(null);
     setPreviewParams(null);
@@ -68,6 +88,27 @@ export function ChatIntegrationBatchForgeDialog(props: {
     setSuccessResult(null);
     setPreviewLoading(false);
     setPromoteLoading(false);
+    setSelectedForgeProjectId('');
+    setForgeOptions([]);
+    setForgeOptionsHint(null);
+  }, []);
+
+  const loadForgeOptions = useCallback(async () => {
+    setLoadingForgeOptions(true);
+    setForgeOptionsHint(null);
+    try {
+      const res = await api.listTheForgeBrownfieldProjects();
+      setForgeOptions(res.projects);
+      setForgeOptionsHint(res.hint ?? null);
+      return res.projects;
+    } catch (e) {
+      setForgeOptions([]);
+      setForgeOptionsHint(null);
+      setError(e instanceof Error ? e.message : String(e));
+      return [];
+    } finally {
+      setLoadingForgeOptions(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -79,10 +120,27 @@ export function ChatIntegrationBatchForgeDialog(props: {
     setDeliverables(ALL_FORGE_DELIVERABLES);
     setPreview(null);
     setPreviewParams(null);
-  }, [props.open, props.batchLabel, resetState]);
+    setError(null);
+    void loadForgeOptions().then((projects) => {
+      if (projects.length === 1) {
+        setSelectedForgeProjectId(projects[0].id);
+      }
+    });
+  }, [props.open, props.batchLabel, resetState, loadForgeOptions]);
+
+  useEffect(() => {
+    if (!props.open || selectedForgeProjectId || !linkedForgeProjectId) return;
+    if (forgeOptions.some((opt) => opt.id === linkedForgeProjectId)) {
+      setSelectedForgeProjectId(linkedForgeProjectId);
+    }
+  }, [props.open, linkedForgeProjectId, forgeOptions, selectedForgeProjectId]);
 
   const runPreview = useCallback(async () => {
     if (!props.batchId) return;
+    if (!selectedForgeProjectId) {
+      setError('Selecciona el proyecto LEGACY destino en The Forge.');
+      return;
+    }
     if (deliverables.length === 0) {
       setError('Selecciona al menos un entregable.');
       return;
@@ -94,12 +152,16 @@ export function ChatIntegrationBatchForgeDialog(props: {
       const res = await api.previewIntegrationBatchTheForgePack(props.batchId, {
         stageName: trimmedStage || undefined,
         deliverables,
+        forgeProjectId: selectedForgeProjectId,
       });
       setPreview(res);
       setPreviewParams({ stageName: trimmedStage, deliverables: [...deliverables] });
       if (!trimmedStage && res.preview.stageName) {
         setStageName(res.preview.stageName);
         setPreviewParams({ stageName: res.preview.stageName.trim(), deliverables: [...deliverables] });
+      }
+      if (res.targetForgeProject?.forgeProjectId) {
+        setSelectedForgeProjectId(res.targetForgeProject.forgeProjectId);
       }
     } catch (e) {
       setPreview(null);
@@ -108,7 +170,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
     } finally {
       setPreviewLoading(false);
     }
-  }, [props.batchId, stageName, deliverables]);
+  }, [props.batchId, stageName, deliverables, selectedForgeProjectId]);
 
   const toggleDeliverable = (id: ForgeDeliverableKind) => {
     setDeliverables((prev) =>
@@ -123,6 +185,10 @@ export function ChatIntegrationBatchForgeDialog(props: {
       setError('Indica un nombre para la etapa.');
       return;
     }
+    if (!selectedForgeProjectId) {
+      setError('Selecciona el proyecto LEGACY destino en The Forge.');
+      return;
+    }
     if (deliverables.length === 0) {
       setError('Selecciona al menos un entregable.');
       return;
@@ -135,6 +201,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
         stageKey: preview?.preview.stageKeySuggested,
         deliverables,
         activate: false,
+        forgeProjectId: selectedForgeProjectId,
       });
       forgeProgress.finish();
       await new Promise((r) => window.setTimeout(r, 350));
@@ -147,10 +214,15 @@ export function ChatIntegrationBatchForgeDialog(props: {
     }
   };
 
-  const busy = previewLoading || promoteLoading;
+  const busy = previewLoading || promoteLoading || loadingForgeOptions;
   const previewReady = Boolean(preview) && !previewStale;
   const canPromote =
-    Boolean(props.batchId) && !props.disabled && !busy && !successResult && previewReady;
+    Boolean(props.batchId) &&
+    !props.disabled &&
+    !busy &&
+    !successResult &&
+    previewReady &&
+    Boolean(selectedForgeProjectId);
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -163,7 +235,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
           <DialogDescription>
             Fusiona los {preview?.preview.conversationCount ?? '…'} chats del lote{' '}
             <strong>{props.batchLabel ?? 'de integración'}</strong> en una sola etapa del proyecto
-            LEGACY vinculado.
+            LEGACY que elijas.
           </DialogDescription>
         </DialogHeader>
 
@@ -186,6 +258,47 @@ export function ChatIntegrationBatchForgeDialog(props: {
           </div>
         ) : (
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="batch-forge-legacy-project">Proyecto LEGACY destino</Label>
+              {loadingForgeOptions ? (
+                <p className="text-xs text-[var(--foreground-muted)]">Cargando proyectos brownfield…</p>
+              ) : forgeOptions.length === 0 ? (
+                <div className="space-y-1 text-xs text-[var(--foreground-muted)]">
+                  <p>No se encontraron proyectos LEGACY en The Forge.</p>
+                  {forgeOptionsHint ? <p>{forgeOptionsHint}</p> : null}
+                </div>
+              ) : (
+                <>
+                  <Select
+                    value={selectedForgeProjectId || undefined}
+                    onValueChange={setSelectedForgeProjectId}
+                    disabled={busy}
+                  >
+                    <SelectTrigger id="batch-forge-legacy-project" className={forgeSelectTriggerClass}>
+                      <SelectValue placeholder="Selecciona un proyecto LEGACY" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {forgeOptions.map((opt) => (
+                        <SelectItem key={opt.id} value={opt.id}>
+                          {opt.name}
+                          {opt.groupName ? ` · ${opt.groupName}` : ''}
+                          {linkedForgeProjectId === opt.id ? ' (vinculado)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {linkedForgeProjectId &&
+                  selectedForgeProjectId &&
+                  selectedForgeProjectId !== linkedForgeProjectId ? (
+                    <p className="text-[10px] leading-snug text-amber-700 dark:text-amber-400">
+                      Destino distinto al vinculado en el detalle del proyecto Ariadne (
+                      {preview?.linkedForgeProject?.forgeProjectName ?? linkedForgeProjectId}).
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="batch-forge-stage-name">Nombre de la etapa</Label>
               <Input
@@ -229,7 +342,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
                     variant="outline"
                     size="sm"
                     className={chatNavBtnClass}
-                    disabled={busy || deliverables.length === 0}
+                    disabled={busy || deliverables.length === 0 || !selectedForgeProjectId}
                     onClick={() => void runPreview()}
                   >
                     Aplicar cambios
@@ -238,16 +351,25 @@ export function ChatIntegrationBatchForgeDialog(props: {
               ) : previewLoading ? (
                 <p className="text-xs text-[var(--foreground-muted)]">Generando vista previa…</p>
               ) : preview ? (
-                <div className="text-xs">
+                <div className="space-y-2 text-xs">
                   <p>
                     <span className="font-medium">Chats en lote:</span> {preview.preview.conversationCount}{' '}
                     · <span className="font-medium">Archivos fusionados:</span>{' '}
                     {preview.preview.modificationPlanFileCount}
                   </p>
-                  {preview.linkedForgeProject ? (
-                    <p className="mt-2 text-[var(--foreground-muted)]">
-                      Destino: {preview.linkedForgeProject.forgeProjectName}
+                  {preview.targetForgeProject ? (
+                    <p className="text-[var(--foreground-muted)]">
+                      Destino: {preview.targetForgeProject.forgeProjectName}
                     </p>
+                  ) : selectedForgeOption ? (
+                    <p className="text-[var(--foreground-muted)]">Destino: {selectedForgeOption.name}</p>
+                  ) : null}
+                  {preview.preview.warnings.length > 0 ? (
+                    <ul className="list-disc space-y-1 pl-4 text-amber-700 dark:text-amber-400">
+                      {preview.preview.warnings.map((w) => (
+                        <li key={w}>{w}</li>
+                      ))}
+                    </ul>
                   ) : null}
                 </div>
               ) : null}
@@ -286,9 +408,11 @@ export function ChatIntegrationBatchForgeDialog(props: {
               <Button type="button" disabled={!canPromote} onClick={() => void runPromote()}>
                 {promoteLoading
                   ? 'Enviando…'
-                  : !previewReady
-                    ? 'Aplicar cambios primero'
-                    : 'Enviar lote a The Forge'}
+                  : !selectedForgeProjectId
+                    ? 'Elige proyecto LEGACY'
+                    : !previewReady
+                      ? 'Aplicar cambios primero'
+                      : 'Enviar lote a The Forge'}
               </Button>
             </>
           )}

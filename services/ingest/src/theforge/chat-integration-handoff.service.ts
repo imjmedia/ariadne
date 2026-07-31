@@ -11,12 +11,14 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type { CredentialActor } from '../credentials/credential-actor';
 import { ChatConversationEntity } from '../chat/entities/chat-conversation.entity';
 import { ChatIntegrationBatchEntity } from '../chat/entities/chat-integration-batch.entity';
 import { ChatMessageEntity } from '../chat/entities/chat-message.entity';
 import { ProjectEntity } from '../projects/entities/project.entity';
+import { ProjectRepositoryEntity } from '../repositories/entities/project-repository.entity';
+import { RepositoryEntity } from '../repositories/entities/repository.entity';
 import { ChangePromotionPackService } from './change-promotion-pack.service';
 import type { ChangePromotionPackV1, ForgeDeliverableKind } from './change-promotion-pack.types';
 import { CursorTasksDocumentService } from './cursor-tasks-document.service';
@@ -40,6 +42,8 @@ export interface PromoteIntegrationBatchBody {
   stageKey?: string;
   deliverables: ForgeDeliverableKind[];
   activate?: boolean;
+  /** LEGACY destino; si no se envía, usa el vinculado al proyecto Ariadne. */
+  forgeProjectId?: string;
 }
 
 @Injectable()
@@ -55,6 +59,10 @@ export class ChatIntegrationHandoffService {
     private readonly messages: Repository<ChatMessageEntity>,
     @InjectRepository(ProjectEntity)
     private readonly projects: Repository<ProjectEntity>,
+    @InjectRepository(ProjectRepositoryEntity)
+    private readonly projectRepos: Repository<ProjectRepositoryEntity>,
+    @InjectRepository(RepositoryEntity)
+    private readonly repositories: Repository<RepositoryEntity>,
     private readonly catalog: TheForgeIntegrationHandoffCatalogService,
     private readonly packService: ChangePromotionPackService,
     private readonly cursorTasks: CursorTasksDocumentService,
@@ -202,7 +210,8 @@ export class ChatIntegrationHandoffService {
   ) {
     await this.integration.isChatPromotionAvailable();
     const batch = await this.getOwnedBatch(actor, batchId);
-    const project = await this.assertProjectLinked(batch.projectId);
+    const project = await this.getProjectOrThrow(batch.projectId);
+    const targetForge = this.resolveBatchForgeProject(project, body.forgeProjectId);
     const deliverables = this.normalizeDeliverables(body.deliverables);
     const stageName = body.stageName?.trim() || batch.label;
     const merged = await this.buildMergedPack(batch, stageName, body.stageKey, deliverables);
@@ -216,6 +225,7 @@ export class ChatIntegrationHandoffService {
     if (enriched.pack.modificationPlan.filesToModify.length === 0) {
       warnings.push('Plan de modificación vacío tras fusionar los chats del lote.');
     }
+    warnings.push(...(await this.repoForgeMismatchWarnings(batch.projectId, targetForge.forgeProjectId)));
 
     return {
       batch: this.toBatchDto(
@@ -237,6 +247,11 @@ export class ChatIntegrationHandoffService {
             linkKind: 'primary' as const,
           }
         : null,
+      targetForgeProject: {
+        forgeProjectId: targetForge.forgeProjectId,
+        forgeProjectName: targetForge.forgeProjectName,
+        linkKind: targetForge.linkKind,
+      },
       promoteEnabled: await this.integration.isChatPromotionAvailable(),
     };
   }
@@ -252,14 +267,9 @@ export class ChatIntegrationHandoffService {
     const batch = await this.getOwnedBatch(actor, batchId);
     await this.clearStalePendingPromotion(batch);
 
-    const project = await this.assertProjectLinked(batch.projectId);
-    const forgeProjectId = project.theforgeProjectId?.trim();
-    if (!forgeProjectId) {
-      throw new BadRequestException({
-        code: 'FORGE_NOT_LINKED',
-        message: 'Este proyecto Ariadne no está vinculado a The Forge.',
-      });
-    }
+    const project = await this.getProjectOrThrow(batch.projectId);
+    const targetForge = this.resolveBatchForgeProject(project, body.forgeProjectId);
+    const forgeProjectId = targetForge.forgeProjectId;
 
     const stageName = body.stageName?.trim();
     if (!stageName) throw new BadRequestException('Indica un nombre para la etapa');
@@ -320,7 +330,7 @@ export class ChatIntegrationHandoffService {
         status: 'success' as const,
         alreadyPromoted: false,
         forgeProjectId: created.forgeProjectId,
-        forgeProjectName: project.theforgeProjectName ?? forgeProjectId,
+        forgeProjectName: targetForge.forgeProjectName,
         forgeStageId: created.forgeStageId,
         stageKey: created.stageKey,
         stageName: created.stageName,
@@ -474,9 +484,14 @@ export class ChatIntegrationHandoffService {
     });
   }
 
-  private async assertProjectLinked(projectId: string): Promise<ProjectEntity> {
+  private async getProjectOrThrow(projectId: string): Promise<ProjectEntity> {
     const project = await this.projects.findOne({ where: { id: projectId } });
     if (!project) throw new NotFoundException('Proyecto no encontrado');
+    return project;
+  }
+
+  private async assertProjectLinked(projectId: string): Promise<ProjectEntity> {
+    const project = await this.getProjectOrThrow(projectId);
     if (!project.theforgeProjectId?.trim()) {
       throw new BadRequestException({
         code: 'FORGE_NOT_LINKED',
@@ -484,6 +499,72 @@ export class ChatIntegrationHandoffService {
       });
     }
     return project;
+  }
+
+  private resolveBatchForgeProject(
+    project: ProjectEntity,
+    explicitForgeProjectId?: string,
+  ): {
+    forgeProjectId: string;
+    forgeProjectName: string;
+    linkKind: 'primary' | 'explicit';
+  } {
+    const explicit = explicitForgeProjectId?.trim();
+    if (explicit) {
+      const linked = project.theforgeProjectId?.trim();
+      return {
+        forgeProjectId: explicit,
+        forgeProjectName:
+          linked === explicit
+            ? project.theforgeProjectName?.trim() || explicit
+            : explicit,
+        linkKind: linked === explicit ? 'primary' : 'explicit',
+      };
+    }
+
+    const linked = project.theforgeProjectId?.trim();
+    if (!linked) {
+      throw new BadRequestException({
+        code: 'FORGE_DESTINATION_REQUIRED',
+        message:
+          'Selecciona un proyecto LEGACY de The Forge en el modal o vincula el proyecto Ariadne en su detalle.',
+      });
+    }
+
+    return {
+      forgeProjectId: linked,
+      forgeProjectName: project.theforgeProjectName?.trim() || linked,
+      linkKind: 'primary',
+    };
+  }
+
+  private async repoForgeMismatchWarnings(
+    projectId: string,
+    selectedForgeId: string,
+  ): Promise<string[]> {
+    const prs = await this.projectRepos.find({
+      where: { projectId },
+      select: ['repoId'],
+    });
+    if (prs.length === 0) return [];
+
+    const repos = await this.repositories.find({
+      where: { id: In(prs.map((pr) => pr.repoId)) },
+      select: ['id', 'repoSlug', 'theforgeProjectId'],
+    });
+    const mismatched = repos.filter((repo) => {
+      const repoForgeId = repo.theforgeProjectId?.trim();
+      return repoForgeId && repoForgeId !== selectedForgeId;
+    });
+    if (mismatched.length === 0) return [];
+
+    const labels = mismatched
+      .map((repo) => repo.repoSlug?.trim() || repo.id)
+      .slice(0, 4)
+      .join(', ');
+    return [
+      `${mismatched.length} repo(s) del proyecto Ariadne tienen otro theforgeProjectId (${labels}${mismatched.length > 4 ? '…' : ''}).`,
+    ];
   }
 
   private async getOwnedBatch(actor: CredentialActor, batchId: string): Promise<ChatIntegrationBatchEntity> {

@@ -68,8 +68,8 @@ La vinculación usa **MCP** (`…/mcp` + Secret MCP/JWT) o **REST** (`…/api` +
 - `POST /projects/:id/theforge-stage` — Crea etapa en Forge vinculado con handoff `change_work_description` + `cursor_tasks_markdown`
 - `GET /projects/:id/integration-handoffs/sources` — Proyectos NEW con handoffs (`integrationHandoff`)
 - `POST /projects/:id/integration-handoffs/import` — Importa handoffs `sent` → chats agrupados por lote
-- `POST /integration-batches/:id/preview-theforge-pack` — Fusiona chats del lote + genera pack enriquecido (se cachea en DB)
-- `POST /integration-batches/:id/promote-to-theforge` — Reutiliza pack cacheado si la vista previa coincide; crea etapa LEGACY
+- `POST /integration-batches/:id/preview-theforge-pack` — Fusiona chats del lote + genera pack enriquecido (se cachea en DB). Body opcional: `forgeProjectId` (LEGACY destino).
+- `POST /integration-batches/:id/promote-to-theforge` — Reutiliza pack cacheado si la vista previa coincide; crea etapa en el LEGACY indicado (`forgeProjectId` opcional; default = vinculado al proyecto Ariadne).
 - `DELETE /integration-batches/:id` — Elimina el lote y todas sus conversaciones (permite re-importar handoffs)
 - `GET /conversations/:id/forge-promotion`, preview, promote — solo si integración activa; usa `theforgeProjectId` vinculado antes de `resolve_forge_project_for_ariadne`
 

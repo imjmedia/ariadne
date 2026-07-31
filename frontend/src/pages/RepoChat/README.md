@@ -27,7 +27,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 - Tras un fallo (`Error: …` en la burbuja), el botón pasa a **Reintentar análisis** (los errores de handoff no cuentan como respuesta válida).
 - Sidebar agrupa esos chats bajo **Integración — {proyecto NEW}**; el resto queda en **General**.
 - **Papelera** en cada chat (siempre visible al seleccionarlo) y en el encabezado del grupo para borrar el lote completo (`DELETE /integration-batches/:id`).
-- **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY vinculado al proyecto Ariadne (no promueve chat a chat). Vista previa **manual** con **Aplicar cambios** (todos los entregables marcados por defecto).
+- **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY que elijas en el modal (lista brownfield de The Forge; preselecciona el vinculado al proyecto Ariadne). Vista previa **manual** con **Aplicar cambios** (todos los entregables marcados por defecto).
 - Re-importar omite handoffs ya presentes en el lote.
 
 ## Persistencia (por usuario)
@@ -52,7 +52,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **ChatIntegrationHandoffImportDialog.tsx** | Importar handoffs NEW-LEG desde Forge |
 | **handoff-chat-analysis.util.ts** | Detectar handoffs pendientes de respuesta LLM |
 | **forge-deliverables.constants.ts** | Opciones y defaults de entregables Forge |
-| **ChatIntegrationBatchForgeDialog.tsx** | Promover lote de integración → una etapa (vista previa manual) |
+| **ChatIntegrationBatchForgeDialog.tsx** | Promover lote → una etapa; selector de proyecto LEGACY brownfield |
 | **forgePromoteProgress.tsx** | Barra de progreso estimada durante promote/create-stage |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
 | **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable, **Copiar Markdown** en respuestas |
