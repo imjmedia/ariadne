@@ -87,6 +87,19 @@ export {
   wantsSchemaDatabaseQuestion,
 } from './chat-schema-question.util.js';
 export {
+  parseIntegrationHandoffMessage,
+  wantsIntegrationHandoffQuestion,
+  type IntegrationHandoffDetectOptions,
+  type ParsedIntegrationHandoff,
+} from './integration-handoff-message.util.js';
+export {
+  buildIntegrationHandoffSearchQueries,
+  integrationHandoffComponentTerms,
+  integrationHandoffPathPatternTerms,
+  mergeIntegrationHandoffFileCandidates,
+  scoreIntegrationHandoffFile,
+} from './integration-handoff-plan.util.js';
+export {
   LlmContextLengthError,
   buildLlmContextLengthMessage,
   extractOpenRouterProviderMessage,

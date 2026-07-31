@@ -126,6 +126,18 @@ export class InternalChatToolsController {
     return { filesToModify: await this.chat.getModificationPlanFilesOnly(repoId, desc, body.scope) };
   }
 
+  /** Multi-query plan for NEW-LEG integration handoffs (orchestrator integration agent). */
+  @Post(':repoId/integration-handoff-plan')
+  async integrationHandoffPlan(
+    @Param('repoId') repoId: string,
+    @Body() body: { userDescription: string; scope?: ChatScope },
+  ): Promise<import('./chat.service').ModificationPlanResult> {
+    await this.repos.findOne(repoId);
+    const desc = body.userDescription?.trim() ?? '';
+    if (!desc) return { filesToModify: [], questionsToRefine: [] };
+    return this.chat.getIntegrationHandoffPlan(repoId, desc, body.scope);
+  }
+
   /** Resuelve projectId del repo y ejecuta cruce Strapi vs consumidores (multi-root). */
   @Post(':repoId/unused-api-endpoints')
   async unusedApiEndpoints(

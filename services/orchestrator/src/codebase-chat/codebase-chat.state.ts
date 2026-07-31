@@ -19,6 +19,9 @@ export interface ChatRequest {
   responseMode?: 'default' | 'evidence_first' | 'raw_evidence';
   deterministicRetriever?: boolean;
   threadId?: string;
+  /** NEW-LEG handoff id (The Forge import) — forces integration_handoff agent. */
+  integrationHandoffId?: string | null;
+  chatMode?: 'integration_handoff' | string | null;
 }
 
 export interface ChatResponse {
@@ -48,4 +51,6 @@ export interface CodebaseChatState {
   resultOut?: unknown[];
   chatIntent?: ChatIntent;
   intentRoute?: ChatIntentRouteResult;
+  integrationHandoffId?: string;
+  chatMode?: string;
 }

@@ -32,4 +32,29 @@ describe('ChatIntentRouterAgent keyword fallback', () => {
     expect(route.source).toBe('keyword_fallback');
     vi.restoreAllMocks();
   });
+
+  it('classifies NEW-LEG handoff seed as integration_handoff', async () => {
+    vi.spyOn(llmSettingsClient, 'getOrchestratorLlmRuntimeSync').mockReturnValue({
+      provider: 'openrouter',
+      apiKey: '',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      chatModel: 'test',
+      orchestratorChatModel: 'test',
+      orchestratorRouterModel: 'test',
+      orchestratorWorkerModel: 'test',
+      chatIntentRouterEnabled: false,
+      temperature: 0.1,
+      embeddingProvider: null,
+      embeddingModel: null,
+      embeddingDimension: 1536,
+      extras: {},
+      httpReferer: null,
+      appTitle: null,
+      source: 'db',
+    });
+    const msg = '## Handoff de integración `NEW-LEG-04`\n\n**Título:** Costos en catálogo\n\n### Descripción\n\nVer costos en previsualizador.';
+    const route = await agent.classify(msg);
+    expect(route.intent).toBe('integration_handoff');
+    vi.restoreAllMocks();
+  });
 });

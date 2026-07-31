@@ -4,7 +4,7 @@
  */
 
 import { HttpException, Injectable, Logger } from '@nestjs/common';
-import { LlmContextLengthError } from 'ariadne-common';
+import { LlmContextLengthError, parseIntegrationHandoffMessage } from 'ariadne-common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { IndexedFile } from '../repositories/entities/indexed-file.entity';
@@ -108,6 +108,12 @@ import {
   prioritizeModificationPlanFiles,
 } from './modification-plan-path-hints.util';
 import { ModificationPlanEvidenceService } from './modification-plan-evidence.service';
+import {
+  buildIntegrationHandoffSearchQueries,
+  integrationHandoffComponentTerms,
+  integrationHandoffPathPatternTerms,
+  mergeIntegrationHandoffFileCandidates,
+} from './integration-handoff-plan.util';
 import { observeChatPipelineComplete, recordChatPipelineError } from '../metrics/ingest-metrics';
 import {
   analyzeCacheDisabledFromEnv,
@@ -232,6 +238,10 @@ export interface ChatRequest {
    * `false` = chat amplio sobre todos los repos (riesgo de mezcla en el contexto).
    */
   strictChatScope?: boolean;
+  /** Conversación importada desde The Forge (NEW-LEG); activa pipeline de integración en orchestrator. */
+  integrationHandoffId?: string | null;
+  /** Modo explícito de chat (`integration_handoff` → agente dedicado). */
+  chatMode?: 'integration_handoff' | string | null;
 }
 
 /** Respuesta del chat con texto, opcional cypher ejecutado y resultados. */
@@ -1148,6 +1158,165 @@ Sé conciso en los párrafos pedagógicos. Usa bullet points y tablas. Incluye T
     }
 
     return filesToModify;
+  }
+
+  /** Path/component pattern hits for integration handoffs (catalog, preview, costos). */
+  private async collectIntegrationHandoffPatternFiles(
+    repositoryId: string,
+    scope?: ChatScope,
+  ): Promise<Array<{ path: string; repoId: string }>> {
+    const repo = await this.repos.findOne(repositoryId);
+    const projectId = await this.resolveProjectIdForRepo(repo.id);
+    const sc = modificationPlanScopeCypher(scope);
+    const scopeParams = sc.params;
+    const out = new Map<string, { path: string; repoId: string }>();
+
+    const add = (path: string, repoId: string) => {
+      if (!path || modificationPlanPathExcludedByDefaults(path)) return;
+      if (scope && !matchesChatScope(path, repoId, scope)) return;
+      out.set(`${path}\t${repoId}`, { path, repoId });
+    };
+
+    for (const term of integrationHandoffPathPatternTerms()) {
+      const rows = (await this.cypher.executeCypher(
+        projectId,
+        `MATCH (f:File) WHERE f.projectId = $projectId${sc.fileClause} AND f.path CONTAINS $term
+         RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId LIMIT 30`,
+        { ...scopeParams, term },
+      )) as Array<{ path: string; repoId: string }>;
+      rows.forEach((r) => add(r.path, r.repoId));
+    }
+
+    for (const term of integrationHandoffComponentTerms()) {
+      const rows = (await this.cypher.executeCypher(
+        projectId,
+        `MATCH (f:File)-[:CONTAINS]->(c:Component)
+         WHERE f.projectId = $projectId AND c.projectId = $projectId${sc.fileClause} AND c.name CONTAINS $term
+         RETURN DISTINCT f.path as path, coalesce(f.repoId, f.projectId) as repoId LIMIT 20`,
+        { ...scopeParams, term },
+      )) as Array<{ path: string; repoId: string }>;
+      rows.forEach((r) => add(r.path, r.repoId));
+    }
+
+    const restrictRepos = scope?.repoIds?.length ? new Set(scope.repoIds) : new Set([repositoryId]);
+    return [...out.values()].filter((f) => restrictRepos.has(f.repoId));
+  }
+
+  /**
+   * Multi-query modification plan for NEW-LEG handoffs: UX journey, AC, path patterns; merges and ranks.
+   */
+  async getIntegrationHandoffPlanFilesOnly(
+    repositoryId: string,
+    userDescription: string,
+    scope?: ChatScope,
+  ): Promise<Array<{ path: string; repoId: string }>> {
+    const parsed = parseIntegrationHandoffMessage(userDescription);
+    if (!parsed) {
+      return this.collectModificationPlanFiles(repositoryId, userDescription, scope);
+    }
+
+    const queries = buildIntegrationHandoffSearchQueries(parsed, userDescription);
+    const batches: Array<Array<{ path: string; repoId: string }>> = [];
+    for (const q of queries) {
+      batches.push(await this.collectModificationPlanFiles(repositoryId, q, scope));
+    }
+    batches.push(await this.collectIntegrationHandoffPatternFiles(repositoryId, scope));
+
+    const maxFiles = (() => {
+      const cfgMax = getActiveSystemConfig().chat.modificationPlanMaxFiles;
+      const raw = process.env.INTEGRATION_HANDOFF_PLAN_MAX_FILES?.trim();
+      const n = raw ? parseInt(raw, 10) : Math.min(cfgMax, 40);
+      if (!Number.isFinite(n) || n < 1) return Math.min(cfgMax, 40);
+      return Math.min(n, 80);
+    })();
+
+    let files = mergeIntegrationHandoffFileCandidates(batches, parsed, maxFiles);
+    const pathHints = extractLikelyRepoRelativePaths(userDescription);
+    files = prioritizeModificationPlanFiles(files, pathHints);
+    return files;
+  }
+
+  async getIntegrationHandoffPlanFilesOnlyByProject(
+    projectIdOrRepoId: string,
+    userDescription: string,
+    scope?: ChatScope,
+    currentFilePath?: string | null,
+  ): Promise<Array<{ path: string; repoId: string }>> {
+    const resolved = await this.resolveModificationPlanRepositoryId(
+      projectIdOrRepoId,
+      scope,
+      currentFilePath,
+    );
+    if (!resolved.ok) return [];
+    return this.getIntegrationHandoffPlanFilesOnly(resolved.repositoryId, userDescription, scope);
+  }
+
+  /** Plan completo para handoff NEW-LEG con evidencia de grafo y ChangePlan seed. */
+  async getIntegrationHandoffPlan(
+    repositoryId: string,
+    userDescription: string,
+    scope?: ChatScope,
+  ): Promise<ModificationPlanResult> {
+    if (!userDescription.trim()) {
+      return { filesToModify: [], questionsToRefine: [] };
+    }
+    const filesToModify = await this.getIntegrationHandoffPlanFilesOnly(
+      repositoryId,
+      userDescription,
+      scope,
+    );
+    const warnings: string[] = [];
+    const parsed = parseIntegrationHandoffMessage(userDescription);
+    if (parsed && filesToModify.length > 0) {
+      const folders = new Set(
+        filesToModify
+          .map((f) => {
+            const m = f.path.match(/(?:^|\/)pages\/([^/]+)/i);
+            return m?.[1]?.toLowerCase() ?? '';
+          })
+          .filter(Boolean),
+      );
+      if (folders.size === 1 && parsed.description.toLowerCase().includes('catálogo')) {
+        warnings.push(
+          'Todos los archivos candidatos pertenecen a un solo módulo pages/*; revisa si el handoff aplica a más tipos de medio o entry points del catálogo.',
+        );
+      }
+    }
+    let diagnostic: ModificationPlanDiagnostic | undefined;
+    if (filesToModify.length === 0) {
+      diagnostic = {
+        code: 'NO_MATCHING_FILES',
+        message:
+          'Ningún archivo indexado coincide con el handoff y el alcance. Revisa sync, scope.repoIds o términos del handoff.',
+      };
+    }
+    return this.attachModificationPlanEvidence(repositoryId, userDescription, {
+      filesToModify,
+      questionsToRefine: [],
+      ...(warnings.length > 0 ? { warnings } : {}),
+      ...(diagnostic ? { diagnostic } : {}),
+    });
+  }
+
+  async getIntegrationHandoffPlanByProject(
+    projectIdOrRepoId: string,
+    userDescription: string,
+    scope?: ChatScope,
+    currentFilePath?: string | null,
+  ): Promise<ModificationPlanResult> {
+    const resolved = await this.resolveModificationPlanRepositoryId(
+      projectIdOrRepoId,
+      scope,
+      currentFilePath,
+    );
+    if (!resolved.ok) {
+      return {
+        filesToModify: [],
+        questionsToRefine: [],
+        diagnostic: resolved.diagnostic,
+      };
+    }
+    return this.getIntegrationHandoffPlan(resolved.repositoryId, userDescription, scope);
   }
 
   private async buildModificationPlanQuestionsToRefine(

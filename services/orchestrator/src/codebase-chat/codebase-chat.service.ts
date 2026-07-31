@@ -16,6 +16,8 @@ import { RedisStateService } from '../redis-state/redis-state.service';
 import type { RetrieverToolName } from './ingest-types';
 import { ChatIntentRouterAgent } from './agents/chat-intent-router.agent';
 import { ChatReengineeringAgent } from './agents/chat-reengineering.agent';
+import { ChatIntegrationHandoffAgent } from './agents/chat-integration-handoff.agent';
+import { wantsIntegrationHandoffQuestion } from 'ariadne-common';
 import type {
   ChatMessage,
   ChatRequest,
@@ -81,6 +83,8 @@ const CodebaseChatStateAnnotation = Annotation.Root({
   answer: Annotation<string | undefined>({ value: lastValue, default: () => undefined }),
   resultOut: Annotation<unknown[] | undefined>({ value: lastValue, default: () => undefined }),
   skipIntentRouter: Annotation<boolean>({ value: lastValue, default: () => false }),
+  integrationHandoffId: Annotation<string | undefined>({ value: lastValue, default: () => undefined }),
+  chatMode: Annotation<string | undefined>({ value: lastValue, default: () => undefined }),
   chatIntent: Annotation<ChatIntent | undefined>({ value: lastValue, default: () => undefined }),
   intentRoute: Annotation<import('ariadne-common').ChatIntentRouteResult | undefined>({
     value: lastValue,
@@ -150,6 +154,8 @@ function initialStateFromRequest(
     answer: undefined,
     resultOut: undefined,
     skipIntentRouter: rawEvidence || evidenceFirst,
+    integrationHandoffId: req.integrationHandoffId?.trim() || undefined,
+    chatMode: req.chatMode?.trim() || undefined,
     chatIntent: undefined,
     intentRoute: undefined,
   };
@@ -166,6 +172,7 @@ export class CodebaseChatService {
     private readonly redis: RedisStateService,
     private readonly intentRouter: ChatIntentRouterAgent,
     private readonly reengineeringAgent: ChatReengineeringAgent,
+    private readonly integrationHandoffAgent: ChatIntegrationHandoffAgent,
   ) {}
 
   async chatRepository(repositoryId: string, req: ChatRequest): Promise<ChatResponse> {
@@ -271,15 +278,18 @@ export class CodebaseChatService {
       .addNode('handle_unused_api', (s) => svc.nodeHandleUnusedApi(s))
       .addNode('retrieve', (s) => svc.nodeRetrieve(s))
       .addNode('reengineering_audit', (s) => svc.nodeReengineeringAudit(s))
+      .addNode('integration_handoff_audit', (s) => svc.nodeIntegrationHandoffAudit(s))
       .addNode('synthesize', (s) => svc.nodeSynthesize(s))
       .addEdge(START, 'route_intent')
       .addConditionalEdges('route_intent', (s) => svc.routeAfterIntent(s), {
         handle_schema: 'handle_schema',
         handle_unused_api: 'handle_unused_api',
+        integration_handoff: 'integration_handoff_audit',
         retrieve: 'retrieve',
       })
       .addEdge('handle_schema', END)
       .addEdge('handle_unused_api', END)
+      .addEdge('integration_handoff_audit', END)
       .addConditionalEdges('retrieve', (s) =>
         s.chatIntent === 'reengineering' ? 'reengineering_audit' : 'synthesize',
       )
@@ -288,12 +298,16 @@ export class CodebaseChatService {
     return workflow.compile();
   }
 
-  private routeAfterIntent(state: CodebaseChatState): 'handle_schema' | 'handle_unused_api' | 'retrieve' {
+  private routeAfterIntent(
+    state: CodebaseChatState,
+  ): 'handle_schema' | 'handle_unused_api' | 'integration_handoff' | 'retrieve' {
     switch (state.chatIntent) {
       case 'schema_database':
         return 'handle_schema';
       case 'unused_api_endpoints':
         return 'handle_unused_api';
+      case 'integration_handoff':
+        return 'integration_handoff';
       default:
         return 'retrieve';
     }
@@ -302,6 +316,22 @@ export class CodebaseChatService {
   private async nodeRouteIntent(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {
     if (state.skipIntentRouter || state.rawEvidence || state.evidenceFirst) {
       return { chatIntent: 'codebase_qa' };
+    }
+    if (
+      wantsIntegrationHandoffQuestion(state.message, {
+        integrationHandoffId: state.integrationHandoffId,
+        chatMode: state.chatMode,
+      })
+    ) {
+      return {
+        chatIntent: 'integration_handoff',
+        intentRoute: {
+          intent: 'integration_handoff',
+          confidence: 0.95,
+          reasoning: 'Handoff NEW-LEG / integración The Forge',
+          source: 'keyword_fallback',
+        },
+      };
     }
     const route = await this.intentRouter.classify(state.message, state.historyContent);
     return { chatIntent: route.intent, intentRoute: route };
@@ -340,6 +370,20 @@ export class CodebaseChatService {
       const detail = err instanceof Error ? err.message : String(err);
       return {
         answer: `No pude completar el análisis de reingeniería: ${detail}. Revisa que el servicio ingest esté disponible y vuelve a intentar con un alcance más acotado (prefijo de carpeta).`,
+      };
+    }
+  }
+
+  private async nodeIntegrationHandoffAudit(
+    state: CodebaseChatState,
+  ): Promise<Partial<CodebaseChatState>> {
+    try {
+      const { answer } = await this.integrationHandoffAgent.runAudit(state);
+      return { answer };
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      return {
+        answer: `No pude completar el análisis del handoff: ${detail}. Revisa sync del índice y vuelve a intentar.`,
       };
     }
   }

@@ -178,6 +178,32 @@ export class IngestChatClient {
     return { filesToModify, questionsToRefine: [] };
   }
 
+  async fetchIntegrationHandoffPlanRepository(
+    repositoryId: string,
+    userDescription: string,
+    scope?: ChatScope,
+  ): Promise<ModificationPlanResult> {
+    const url = `${this.ingestBase()}/internal/repositories/${encodeURIComponent(repositoryId)}/integration-handoff-plan`;
+    return fetchIngestJson<ModificationPlanResult>(url, {
+      body: { userDescription, scope },
+      timeoutMs: 180_000,
+      label: 'integration-handoff-plan',
+    });
+  }
+
+  async fetchIntegrationHandoffPlanProject(
+    projectId: string,
+    userDescription: string,
+    scope?: ChatScope,
+  ): Promise<ModificationPlanResult> {
+    const url = `${this.ingestBase()}/internal/projects/${encodeURIComponent(projectId)}/integration-handoff-plan`;
+    return fetchIngestJson<ModificationPlanResult>(url, {
+      body: { userDescription, scope },
+      timeoutMs: 180_000,
+      label: 'integration-handoff-plan-project',
+    });
+  }
+
   async fetchUnusedApiEndpointsProject(
     projectId: string,
     scope?: ChatScope,

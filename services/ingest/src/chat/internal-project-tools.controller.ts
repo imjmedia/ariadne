@@ -37,6 +37,21 @@ export class InternalProjectToolsController {
     };
   }
 
+  @Post(':projectId/integration-handoff-plan')
+  async integrationHandoffPlan(
+    @Param('projectId') projectId: string,
+    @Body() body: { userDescription: string; scope?: ChatScope; currentFilePath?: string },
+  ): Promise<import('./chat.service').ModificationPlanResult> {
+    const desc = body.userDescription?.trim() ?? '';
+    if (!desc) return { filesToModify: [], questionsToRefine: [] };
+    return this.chat.getIntegrationHandoffPlanByProject(
+      projectId,
+      desc,
+      body.scope,
+      body.currentFilePath?.trim() || null,
+    );
+  }
+
   /** Cruce endpoints Strapi vs consumidores (evita LangGraph cuando orchestrator delega aquí). */
   @Post(':projectId/unused-api-endpoints')
   async unusedApiEndpoints(
