@@ -25,7 +25,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 - Tras importar, se **ejecuta automáticamente** el pipeline de chat (mismo flujo que Enviar) en cada handoff nuevo.
 - El análisis usa el agente **`integración handoff`** (no reingeniería genérica): plan multi-query (`POST …/integration-handoff-plan`), búsqueda semántica por journey UX/AC, checklist de criterios de aceptación. El frontend envía `integrationHandoffId` + `chatMode: integration_handoff`.
 - Si un handoff quedó solo con el mensaje semilla (`1 msg`), usa **Análisis (N)** en lote o **Ejecutar análisis** en el chat activo.
-- Tras un fallo (`Error: …` en la burbuja), el botón pasa a **Reintentar análisis** (los errores de handoff no cuentan como respuesta válida).
+- Tras un fallo (`Error: …` o `No pude completar el análisis del handoff: …` en la burbuja), el botón pasa a **Reintentar análisis** (esos mensajes no cuentan como respuesta válida; se eliminan al reintentar).
 - Sidebar agrupa esos chats bajo **Integración — {proyecto NEW}**; el resto queda en **General**.
 - **Papelera** en cada chat (siempre visible al seleccionarlo) y en el encabezado del grupo para borrar el lote completo (`DELETE /integration-batches/:id`).
 - **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY que elijas en el modal (lista brownfield de The Forge; preselecciona el vinculado al proyecto Ariadne). Vista previa **manual** con **Aplicar cambios** (todos los entregables marcados por defecto).

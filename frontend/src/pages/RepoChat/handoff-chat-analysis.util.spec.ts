@@ -10,6 +10,14 @@ import {
 describe('handoff-chat-analysis.util', () => {
   it('detects persisted pipeline errors', () => {
     expect(isHandoffAnalysisFailureMessage('Error: 500: Internal server error')).toBe(true);
+    expect(
+      isHandoffAnalysisFailureMessage(
+        'No pude completar el análisis del handoff: fetch failed. Fallo de red…',
+      ),
+    ).toBe(true);
+    expect(isHandoffAnalysisFailureMessage('> **Agente:** integración handoff · 4 archivos')).toBe(
+      false,
+    );
     expect(isHandoffAnalysisFailureMessage('Análisis completado')).toBe(false);
   });
 
@@ -25,6 +33,18 @@ describe('handoff-chat-analysis.util', () => {
     expect(stripHandoffFailureAssistants(messages)).toEqual([
       { role: 'user', content: 'Handoff seed' },
     ]);
+  });
+
+  it('treats orchestrator handoff failure as retryable', () => {
+    const messages = [
+      { role: 'user' as const, content: 'Handoff seed' },
+      {
+        role: 'assistant' as const,
+        content: 'No pude completar el análisis del handoff: fetch failed. Fallo de red…',
+      },
+    ];
+    expect(hasSuccessfulHandoffAssistant(messages)).toBe(false);
+    expect(stripHandoffFailureAssistants(messages)).toEqual([{ role: 'user', content: 'Handoff seed' }]);
   });
 
   it('counts batch chats with seed or failed error', () => {

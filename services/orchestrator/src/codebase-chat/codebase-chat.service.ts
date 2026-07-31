@@ -18,6 +18,7 @@ import { ChatIntentRouterAgent } from './agents/chat-intent-router.agent';
 import { ChatReengineeringAgent } from './agents/chat-reengineering.agent';
 import { ChatIntegrationHandoffAgent } from './agents/chat-integration-handoff.agent';
 import { wantsIntegrationHandoffQuestion } from 'ariadne-common';
+import { formatHandoffAuditFailureAnswer } from './handoff-audit-error.util';
 import type {
   ChatMessage,
   ChatRequest,
@@ -382,9 +383,7 @@ export class CodebaseChatService {
       return { answer };
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      return {
-        answer: `No pude completar el análisis del handoff: ${detail}. Revisa sync del índice y vuelve a intentar.`,
-      };
+      return { answer: formatHandoffAuditFailureAnswer(detail) };
     }
   }
 

@@ -4,8 +4,14 @@
 import type { ChatConversation } from '@/types';
 import type { ChatMessage } from './ChatMessageThread';
 
+const HANDOFF_FAILURE_PATTERNS = [
+  /^Error:\s/i,
+  /^No pude completar el análisis del handoff:/i,
+] as const;
+
 export function isHandoffAnalysisFailureMessage(content: string): boolean {
-  return /^Error:\s/i.test(content.trim());
+  const trimmed = content.trim();
+  return HANDOFF_FAILURE_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
 export function hasSuccessfulHandoffAssistant(messages: ChatMessage[]): boolean {

@@ -9,6 +9,7 @@ START → route_intent (modelo router en Ajustes)
   → schema_database     → handle_schema (determinista ingest)
   → unused_api_endpoints → handle_unused_api (determinista ingest)
   → reengineering       → retrieve (WORKER) → reengineering_audit (ROUTER)
+  → integration_handoff → integration_handoff_audit (ROUTER; plan multi-query en ingest)
   → codebase_qa         → retrieve (WORKER) → synthesize (WORKER)
 ```
 
@@ -29,3 +30,5 @@ Variables: `INGEST_URL`, y **`LLM_*`** (u opciones legacy) — preguntas de modi
 **429 Moonshot/Kimi:** si el proveedor LLM agota reintentos por TPM, este módulo responde **`HttpException` 429** en `POST /codebase/chat/*` (no 500). El ingest debe reenviar ese status a MCP/The Forge para no confundirlo con timeout.
 
 **413 contexto LLM:** si OpenRouter rechaza la petición por ventana de contexto (`maximum context length`), responde **`HttpException` 413** con `code: LLM_CONTEXT_LENGTH_EXCEEDED` y mensaje accionable (cambiar modelo o reducir alcance).
+
+**Errores en handoff NEW-LEG:** el nodo `integration_handoff_audit` devuelve mensajes accionables vía `handoff-audit-error.util.ts` (LLM/red vs ingest vs índice). Fallos de red al proveedor LLM se envuelven en `llm.adapter.ts` (`formatLlmFetchError`).

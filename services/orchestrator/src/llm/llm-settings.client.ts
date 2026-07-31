@@ -70,7 +70,16 @@ export async function fetchOrchestratorLlmRuntime(): Promise<OrchestratorLlmRunt
   }
 
   const url = `${ingestBase()}/internal/llm-runtime`;
-  const res = await fetch(url, { method: 'GET' });
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'GET' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `No se pudo cargar LLM desde ingest (${url}): ${msg}. ` +
+        'Verifica INGEST_URL en orchestrator y que el servicio ingest esté healthy.',
+    );
+  }
   if (!res.ok) {
     throw new Error(
       `No se pudo cargar LLM desde ingest (${url}): HTTP ${res.status}. ` +
