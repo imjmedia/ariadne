@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils';
 import { chatNavBtnClass } from '../chat/chatShellClasses';
 import {
   ALL_FORGE_DELIVERABLES,
+  INTEGRATION_BATCH_FORGE_DELIVERABLES,
   FORGE_DELIVERABLE_OPTIONS,
   forgeDeliverablesEqual,
 } from './forge-deliverables.constants';
@@ -67,7 +68,9 @@ export function ChatIntegrationBatchForgeDialog(props: {
   onSuccess?: (result: PromoteToTheForgeResponse) => void;
 }) {
   const [stageName, setStageName] = useState('');
-  const [deliverables, setDeliverables] = useState<ForgeDeliverableKind[]>(ALL_FORGE_DELIVERABLES);
+  const [deliverables, setDeliverables] = useState<ForgeDeliverableKind[]>(
+    INTEGRATION_BATCH_FORGE_DELIVERABLES,
+  );
   const [forgeOptions, setForgeOptions] = useState<ForgeBrownfieldProjectOption[]>([]);
   const [loadingForgeOptions, setLoadingForgeOptions] = useState(false);
   const [forgeOptionsHint, setForgeOptionsHint] = useState<string | null>(null);
@@ -209,7 +212,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
       return;
     }
     setStageName(props.batchLabel?.trim() || '');
-    setDeliverables(ALL_FORGE_DELIVERABLES);
+    setDeliverables(INTEGRATION_BATCH_FORGE_DELIVERABLES);
     setPreview(null);
     setPreviewParams(null);
     setError(null);

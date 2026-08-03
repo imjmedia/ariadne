@@ -28,7 +28,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 - Tras un fallo (`Error: …` o `No pude completar el análisis del handoff: …` en la burbuja), el botón pasa a **Reintentar análisis** (esos mensajes no cuentan como respuesta válida; se eliminan al reintentar).
 - Sidebar agrupa esos chats bajo **Integración — {proyecto NEW}**; el resto queda en **General**.
 - **Papelera** en cada chat (siempre visible al seleccionarlo) y en el encabezado del grupo para borrar el lote completo (`DELETE /integration-batches/:id`).
-- **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY que elijas en el modal (lista brownfield de The Forge; preselecciona el vinculado al proyecto Ariadne). Vista previa **manual** con **Aplicar cambios** (todos los entregables marcados por defecto).
+- **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY que elijas en el modal (lista brownfield de The Forge; preselecciona el vinculado al proyecto Ariadne). Vista previa **manual** con **Aplicar cambios**. Entregables por defecto: `modification_plan` + opcional `api_contracts` — **no** `migration_tasks` (Forge regeneraría user stories baseline del LEGACY: login, campañas, infra). Las tareas van en `cursor_tasks_markdown` del pack Ariadne.
 - Re-importar omite handoffs ya presentes en el lote.
 
 ## Persistencia (por usuario)
