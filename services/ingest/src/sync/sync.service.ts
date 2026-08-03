@@ -48,6 +48,8 @@ import { loadRepoTsconfigPaths } from '../pipeline/tsconfig-resolve';
 import { buildProjectMergeCypher } from '../pipeline/project';
 import type { ParsedFile } from '../pipeline/parser';
 import { recordSyncJobFailed } from '../metrics/ingest-metrics';
+import { AsyncSemaphore } from '../pipeline/async-semaphore';
+import { syncParseConcurrencyFromEnv } from './sync-parse-concurrency.util';
 import {
   augmentClonePathsForIndexRules,
   filterPathsByRepoIndexRules,
@@ -487,53 +489,71 @@ export class SyncService {
       const withAst: Array<{ parsed: ParsedFile; root: import('tree-sitter').SyntaxNode; source: string }> = [];
       const skipped: { fetch: string[]; parse: string[] } = { fetch: [], parse: [] };
 
-      if (!skipGraphWrite) for (const relPath of paths) {
-        try {
-          const content = await getContent(relPath);
-          fetchedCount++;
-          if (fetchedCount % 10 === 0 || fetchedCount === paths.length) {
-            await this.updateJobProgress(job.id, {
-              phase: 'indexing',
-              current: fetchedCount,
-              total: paths.length,
-              lastFile: relPath,
-            });
-          }
-          if (!content) {
-            skipped.fetch.push(relPath);
-            continue;
-          }
-          if (relPath.toLowerCase().endsWith('.prisma')) {
-            prismaFiles.push({ path: relPath, content });
-            continue;
-          }
-          if (isOpenApiSpecSyncPath(relPath)) {
-            continue;
-          }
-          if (isFirstSync) {
-            const out = parseSource(relPath, content, { returnAst: true });
-            if (out && 'root' in out) {
-              withAst.push({ parsed: out.parsed, root: out.root, source: out.source });
-              parsedByPath.set(relPath, out.parsed);
-            } else if (out) {
-              parsedByPath.set(relPath, out);
-            } else if (!out) {
-              skipped.parse.push(relPath);
+      if (!skipGraphWrite) {
+        const parseConcurrency = syncParseConcurrencyFromEnv();
+        const parseSemaphore = new AsyncSemaphore(parseConcurrency);
+        if (parseConcurrency > 1) {
+          this.logger.log(
+            `Sync job ${job.id}: indexing ${paths.length} paths with SYNC_PARSE_CONCURRENCY=${parseConcurrency}`,
+          );
+        }
+
+        const indexOnePath = async (relPath: string): Promise<void> => {
+          try {
+            const content = await getContent(relPath);
+            fetchedCount++;
+            if (fetchedCount % 10 === 0 || fetchedCount === paths.length) {
+              await this.updateJobProgress(job.id, {
+                phase: 'indexing',
+                current: fetchedCount,
+                total: paths.length,
+                lastFile: relPath,
+              });
             }
-          } else {
-            const parsed = parseSource(relPath, content, {
-              domainConfig: repo.domainConfig,
-              extractDomainConcepts,
-            });
-            if (parsed && !('root' in parsed)) {
-              parsedByPath.set(relPath, parsed);
-            } else if (!parsed) {
-              skipped.parse.push(relPath);
+            if (!content) {
+              skipped.fetch.push(relPath);
+              return;
             }
+            if (relPath.toLowerCase().endsWith('.prisma')) {
+              prismaFiles.push({ path: relPath, content });
+              return;
+            }
+            if (isOpenApiSpecSyncPath(relPath)) {
+              return;
+            }
+            if (isFirstSync) {
+              const out = parseSource(relPath, content, { returnAst: true });
+              if (out && 'root' in out) {
+                withAst.push({ parsed: out.parsed, root: out.root, source: out.source });
+                parsedByPath.set(relPath, out.parsed);
+              } else if (out) {
+                parsedByPath.set(relPath, out);
+              } else if (!out) {
+                skipped.parse.push(relPath);
+              }
+            } else {
+              const parsed = parseSource(relPath, content, {
+                domainConfig: repo.domainConfig,
+                extractDomainConcepts,
+              });
+              if (parsed && !('root' in parsed)) {
+                parsedByPath.set(relPath, parsed);
+              } else if (!parsed) {
+                skipped.parse.push(relPath);
+              }
+            }
+          } catch (err) {
+            console.error(`Sync: error fetching/parsing ${relPath}:`, err);
+            skipped.parse.push(relPath);
           }
-        } catch (err) {
-          console.error(`Sync: error fetching/parsing ${relPath}:`, err);
-          skipped.parse.push(relPath);
+        };
+
+        if (parseConcurrency <= 1) {
+          for (const relPath of paths) {
+            await indexOnePath(relPath);
+          }
+        } else {
+          await Promise.all(paths.map((relPath) => parseSemaphore.run(() => indexOnePath(relPath))));
         }
       }
 

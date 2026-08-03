@@ -6,7 +6,7 @@ Microservicio NestJS que reemplaza la ingesta basada en directorio local (chokid
 
 1. **Fase Mapping:** Escaneo del repo (árbol, lenguajes); incluye `.prisma` cuando aplica. Opcional: **`index_include_rules`** en `repositories` acota paths tras el listado (`index-include-rules.ts`).
 2. **Fase Deps:** Lectura de `package.json` para `manifestDeps` en Project (JSON: **`depKeys`** + **`scripts`**; el formato antiguo solo-array sigue siendo aceptado en lectura).
-3. **Fase Chunking:** Parse Tree-sitter con metadata `line_range` y `commit_sha`; **Prisma** vía `@prisma/internals` (getDMMF) → nodos `:Model`, `:Enum`, relaciones `RELATES_TO` / `USES_ENUM`; **tsconfig** con TypeScript API (`extends` merge) para aliases en `IMPORTS`. Incluye **domain-extract** (DomainConcept).
+3. **Fase Chunking:** Parse Tree-sitter con metadata `line_range` y `commit_sha` (paralelo acotado vía `SYNC_PARSE_CONCURRENCY`, default 4); **Prisma** vía `@prisma/internals` (getDMMF) → nodos `:Model`, `:Enum`, relaciones `RELATES_TO` / `USES_ENUM`; **tsconfig** con TypeScript API (`extends` merge) para aliases en `IMPORTS`. Incluye **domain-extract** (DomainConcept).
 4. **Cola Redis/BullMQ:** Sync se encola; worker procesa en background.
 5. **Orphan cleanup:** Archivos borrados se eliminan del grafo.
 
@@ -76,6 +76,8 @@ Tras cada sync (normal o resync), se ejecuta automáticamente `embed-index` si h
 - `FALKOR_AUTO_DOMAIN_OVERFLOW` — Si está activo y el grafo monolítico supera `FALKOR_GRAPH_NODE_SOFT_LIMIT`, se actualiza `falkor_shard_mode` a `domain`; hace falta **resync** para repartir datos.
 - `FALKOR_GRAPH_NODE_SOFT_LIMIT` — Umbral de nodos (default 100000) para el disparador anterior.
 - `FALKORDB_BATCH_SIZE` — Tamaño de batch para Cypher (default 500)
+- `SYNC_PARSE_CONCURRENCY` — Descarga + parseo Tree-sitter en paralelo durante full sync (default **4**, máx. 32). Usar `1` para comportamiento secuencial legacy. Subir en VPS con CPU/RAM holgados (~8 en repos de ~1500 archivos).
+- `EMBED_INDEX_BATCH_SIZE` / `EMBED_INDEX_CONCURRENCY` — Rendimiento de la fase embeddings post-sync (ver `src/embedding/embed-index.service.ts`)
 - `DOMAIN_COMPONENT_PATTERNS`, `DOMAIN_CONST_NAMES` — Fallback global si el proyecto no tiene `domain_config` (por defecto se infiere en primera ingesta)
 - `REDIS_URL` — Redis para cola BullMQ (default `redis://localhost:6380`)
 - `CREDENTIALS_ENCRYPTION_KEY` — Clave para cifrar credenciales en BD (32 bytes base64). Requerida si se usan credenciales en BD.
