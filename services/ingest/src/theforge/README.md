@@ -84,7 +84,9 @@ La vinculación usa **MCP** (`…/mcp` + Secret MCP/JWT) o **REST** (`…/api` +
 
 Mapper: `forge-create-stage.mapper.ts` (pack interno v1.1 → Forge `pack.version: "1"`).
 
-El pack incluye `graphEvidenceBundle` + `changePlanSeed`. Handoff a Forge: `modification_plan_enriched`, `change_plan_seed`, **`change_work_description`** (markdown), **`cursor_tasks_markdown`** (`# Tasks` con secciones Backend/Frontend/Infra/Testing/Deploy), y si hay `migration_tasks` → `post_deliverable_gate` (Forge debe validar con Ariadne `POST /projects/:id/validate-tasks-json` tras `legacy_generate_deliverables`).
+El pack incluye `graphEvidenceBundle` + `changePlanSeed`. Handoff a Forge: `modification_plan_enriched`, `change_plan_seed`, **`tasks_json_seed`** (tasksJson v2 — SSOT para panel Tasks), **`change_work_description`** (markdown), **`cursor_tasks_markdown`** (`# Tasks` fallback humano/agente), y si hay `migration_tasks` → `post_deliverable_gate` (Forge debe validar con Ariadne `POST /projects/:id/validate-tasks-json` tras `legacy_generate_deliverables`).
+
+**Forge (pendiente):** hidratar `tasksJson` al importar pack — spec `docs/contracts/theforge-tasks-hydration-from-ariadne-v1.md`.
 
 Generación de tareas: `cursor-tasks-document.service.ts` (LLM con prompt estricto + fallback determinista desde `changePlanSeed`). Validación estructural en `cursor-tasks-document.util.ts`.
 

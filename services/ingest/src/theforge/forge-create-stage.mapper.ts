@@ -15,6 +15,7 @@ import {
   isIntegrationHandoffPack,
   mddEvidenceForForgePack,
 } from './integration-handoff-pack.util';
+import { buildForgeTasksJsonSeed } from './forge-tasks-json-seed.util';
 
 function forgeHandoffItem(
   id: string,
@@ -64,7 +65,8 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
         'Alcance integración NEW→LEG',
         JSON.stringify({
           mode: 'integration_handoff',
-          taskSource: 'cursor_tasks_markdown',
+          taskSource: 'tasks_json_seed',
+          taskSourceFallback: 'cursor_tasks_markdown',
           skipBaselineDeliverables: [
             'migration_tasks',
             'change_spec',
@@ -111,6 +113,19 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
         'change_plan_seed',
         'ChangePlan seed (tasks + symbols)',
         JSON.stringify(pack.changePlanSeed),
+        { mimeType: 'application/json' },
+      ),
+    );
+  }
+
+  const tasksJsonSeed = buildForgeTasksJsonSeed(pack);
+  if (tasksJsonSeed) {
+    items.push(
+      forgeHandoffItem(
+        nextId(),
+        'tasks_json_seed',
+        'Tasks JSON seed (Ariadne SSOT)',
+        JSON.stringify(tasksJsonSeed),
         { mimeType: 'application/json' },
       ),
     );
