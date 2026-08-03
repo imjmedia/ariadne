@@ -79,6 +79,10 @@ Ariadne envía por defecto: `wireAriadne: true`, `runLegacyStart: false` cuando 
 
 Cuando el pack pide `migration_tasks`, Ariadne añade `validate_change_plan_via_ariadne` y un handoff `post_deliverable_gate` apuntando a `POST /projects/:projectId/validate-tasks-json`.
 
+### Tasks hydration (integration NEW→LEG)
+
+Ariadne sends handoff `tasks_json_seed` (Forge tasksJson v2) + `cursor_tasks_markdown`. Forge **must** hydrate the native Tasks panel on import — see `docs/contracts/theforge-tasks-hydration-from-ariadne-v1.md`. Do **not** rely on `legacy_generate_deliverables` → `migration_tasks` for integration batches.
+
 ## Flujo recomendado (Ariadne → Forge)
 
 1. `POST /theforge/resolve-forge-project-for-ariadne`

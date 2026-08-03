@@ -146,7 +146,11 @@ describe('forge-create-stage.mapper', () => {
     pack.cursorTasksMarkdown = '# Tasks\n\n## Backend tasks\n### Fase 1\n---\nid: T-001\nsection: Backend\ntitle: x\nstatus: pending\nchange_type: modify\nparallel: true\ndepends_on: []\ncontext:\n  mdd_ref: x\n  story_ref: ""\n  why: x\nscope:\n  include:\n    - a.ts\n  exclude: []\nrequirements:\n  - x\nverification:\n  - run: echo ok\n    expect_exit: 0\ndone_when:\n  - ok\n---\n- [ ] T-001 — x';
     const forgePack = toForgeChangePackV1(pack);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'change_work_description')).toBe(true);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'tasks_json_seed')).toBe(true);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'cursor_tasks_markdown')).toBe(true);
+    const tasksSeed = forgePack.handoffItems?.find((h) => h.kind === 'tasks_json_seed');
+    expect(tasksSeed?.content).toContain('"schemaVersion":"2"');
+    expect(tasksSeed?.content).toContain('T-001');
   });
 
   it('sets runLegacyStart false when files present', () => {
@@ -172,6 +176,9 @@ describe('forge-create-stage.mapper', () => {
     pack.cursorTasksMarkdown = '# Tasks\n\n## Backend tasks\n';
     const forgePack = toForgeChangePackV1(pack);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'integration_scope')).toBe(true);
+    const scope = forgePack.handoffItems?.find((h) => h.kind === 'integration_scope');
+    expect(scope?.content).toContain('"taskSource":"tasks_json_seed"');
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'tasks_json_seed')).toBe(true);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'deliverable_request' && h.content === 'migration_tasks')).toBe(false);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'post_deliverable_gate')).toBe(false);
     const mdd = forgePack.handoffItems?.find((h) => h.kind === 'mdd_evidence');
