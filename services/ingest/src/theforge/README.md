@@ -97,7 +97,7 @@ Generación de tareas: `cursor-tasks-document.service.ts` (LLM con prompt estric
 | `FORGE_PROMOTION_PENDING_TTL_MS` | 900000 (15 min) | Permite reintentar si quedó `pending` tras timeout |
 | `INGEST_PROXY_TIMEOUT_MS` (API) | 600000 | Proxy `/api/integration-batches/*` → ingest |
 
-Flujo recomendado: **Aplicar cambios** (preview) → **Enviar lote**. El preview guarda `forge_preview_pack` en Postgres; promote no reconstruye el pack si nombre/entregables/chats no cambiaron.
+Flujo recomendado: **Aplicar cambios** (preview) → **Enviar lote**. El preview guarda `forge_preview_pack` en Postgres; promote reutiliza ese pack si nombre, entregables, `stageKey` del pack y chats no cambiaron (no vuelve a generar `# Tasks`).
 
 **Fases de preview** (`forge_preview_*` en batch y conversación):
 
@@ -128,5 +128,6 @@ El frontend hace polling cada ~1,5 s a `GET /integration-batches/:id` o `GET /co
 | `500` Zod `handoffItems[n].id` regex `invalid_string` | `id` con `_` o `:`; Forge exige kebab-case (`mdd-evidence`); actualiza ingest (`forgeHandoffItemId`) |
 | `503 FORGE_CREATE_STAGE_TIMEOUT` | Forge no respondió en 10 min |
 | `409` promoción en curso | Lote en `forgePromotionStatus=pending`; espera 15 min o redeploy con TTL |
-| Preview OK, promote lento | Versión antigua reconstruía pack dos veces; actualiza ingest con caché de preview |
+| Promote en 35% “Generando tareas Cursor” tras preview OK | Caché invalidada (chats/entregables distintos) o preview anterior al fix de `stageKey`; **Aplicar cambios** de nuevo y reenviar |
+| Preview OK, promote lento | Versión antigua reconstruía pack dos veces (hash `stageKey` vacío en preview); actualiza ingest y repite **Aplicar cambios** |
 

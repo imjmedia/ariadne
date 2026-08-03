@@ -39,3 +39,13 @@ export function buildBatchContentFingerprint(
     }));
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex').slice(0, 16);
 }
+
+/** Align preview vs promote cache keys when preview omits explicit stageKey. */
+export function resolveIntegrationPreviewStageKey(
+  explicitStageKey: string | undefined,
+  packStageKey: string,
+): string {
+  const explicit = explicitStageKey?.trim();
+  if (explicit) return explicit;
+  return packStageKey.trim();
+}
