@@ -6,6 +6,7 @@ import { ChatLlmService } from '../chat/chat-llm.service';
 import { hasIngestLlmConfigured } from '../chat/chat-llm-config';
 import type { ChangePromotionPackV1 } from './change-promotion-pack.types';
 import { buildChangeWorkDescription } from './change-work-description.util';
+import { CURSOR_TASKS_INTEGRATION_HANDOFF_SUPPLEMENT } from './cursor-tasks-integration-handoff.prompt';
 import { CURSOR_TASKS_SYSTEM_PROMPT } from './cursor-tasks-document.prompt';
 import {
   buildCursorTasksUserPrompt,
@@ -27,11 +28,16 @@ export class CursorTasksDocumentService {
   constructor(private readonly llm: ChatLlmService) {}
 
   async generate(pack: ChangePromotionPackV1): Promise<CursorTasksGenerationResult> {
+    const systemPrompt =
+      pack.promotionScope === 'integration_handoff'
+        ? `${CURSOR_TASKS_SYSTEM_PROMPT}\n\n${CURSOR_TASKS_INTEGRATION_HANDOFF_SUPPLEMENT}`
+        : CURSOR_TASKS_SYSTEM_PROMPT;
+
     if (hasIngestLlmConfigured()) {
       try {
         const raw = await this.llm.callLlm(
           [
-            { role: 'system', content: CURSOR_TASKS_SYSTEM_PROMPT },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: buildCursorTasksUserPrompt(pack) },
           ],
           12_000,
@@ -42,7 +48,7 @@ export class CursorTasksDocumentService {
           this.logger.warn(`Cursor tasks LLM output invalid (${validation.errors.join('; ')}); retrying once`);
           const retryRaw = await this.llm.callLlm(
             [
-              { role: 'system', content: CURSOR_TASKS_SYSTEM_PROMPT },
+              { role: 'system', content: systemPrompt },
               {
                 role: 'user',
                 content: `${buildCursorTasksUserPrompt(pack)}\n\nErrores previos a corregir:\n- ${validation.errors.join('\n- ')}`,

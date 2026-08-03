@@ -57,6 +57,17 @@ export interface ChangePromotionPackV1 {
   /** Documento # Tasks para Cursor Agent (YAML + checklist). */
   cursorTasksMarkdown?: string;
   deliverablesRequested: ForgeDeliverableKind[];
+  /**
+   * `integration_handoff` — wiring NEW capability into existing LEGACY only (Forge batch import).
+   * Default brownfield reengineering when omitted.
+   */
+  promotionScope?: 'integration_handoff' | 'brownfield_change';
+  integrationHandoff?: {
+    handoffId?: string | null;
+    title?: string | null;
+    sourceProject?: string | null;
+    acceptanceCriteria?: string[];
+  };
 }
 
 export interface ResolveForgeProjectInput {

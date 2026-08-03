@@ -88,6 +88,8 @@ El pack incluye `graphEvidenceBundle` + `changePlanSeed`. Handoff a Forge: `modi
 
 Generación de tareas: `cursor-tasks-document.service.ts` (LLM con prompt estricto + fallback determinista desde `changePlanSeed`). Validación estructural en `cursor-tasks-document.util.ts`.
 
+**Lotes de integración (NEW→LEG):** el pack lleva `promotionScope: integration_handoff`. El plan de archivos usa `getIntegrationHandoffPlanByProject` (no el plan genérico). El prompt de `# Tasks` prohíbe tareas greenfield (login, auth, pantallas base) y acota al wiring del handoff + `filesToModify` / `changePlanSeed`.
+
 **Promoción de lote (batch) — timeouts y caché**
 
 | Variable | Default | Uso |

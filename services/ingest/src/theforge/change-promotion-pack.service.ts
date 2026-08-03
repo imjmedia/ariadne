@@ -3,6 +3,7 @@
  */
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { parseIntegrationHandoffMessage } from 'ariadne-common';
 import { Repository } from 'typeorm';
 import { ChatConversationEntity } from '../chat/entities/chat-conversation.entity';
 import { ChatMessageEntity } from '../chat/entities/chat-message.entity';
@@ -149,16 +150,50 @@ export class ChangePromotionPackService {
       mdd = { summary: userDescription, evidence_paths: [] };
     }
 
-    const modFiles = await this.chat.getModificationPlanFilesOnlyByProject(
-      falkorProjectId,
-      userDescription.slice(0, 2000),
-      repository ? { repoIds: [repository.id] } : undefined,
+    const isIntegrationHandoff = Boolean(
+      conversation.integrationHandoffId?.trim() || conversation.integrationBatchId,
     );
+    const parsedHandoff = isIntegrationHandoff
+      ? parseIntegrationHandoffMessage(userDescription)
+      : null;
 
-    const filesToModify = modFiles.slice(0, 80).map((f) => ({
-      path: f.path,
-      ...(f.repoId ? { repoId: f.repoId } : {}),
-    }));
+    let filesToModify: Array<{ path: string; repoId?: string }>;
+    let graphEvidenceBundle: ChangePromotionPackV1['graphEvidenceBundle'];
+    let changePlanSeed: ChangePromotionPackV1['changePlanSeed'];
+    let questionsToRefine: string[] | undefined;
+
+    if (isIntegrationHandoff) {
+      const plan = await this.chat.getIntegrationHandoffPlanByProject(
+        falkorProjectId,
+        userDescription,
+        repository ? { repoIds: [repository.id] } : undefined,
+      );
+      filesToModify = plan.filesToModify.slice(0, 80).map((f) => ({
+        path: f.path,
+        ...(f.repoId ? { repoId: f.repoId } : {}),
+      }));
+      graphEvidenceBundle = plan.graphEvidenceBundle;
+      changePlanSeed = plan.changePlanTemplate;
+      questionsToRefine = plan.questionsToRefine?.length ? plan.questionsToRefine : undefined;
+    } else {
+      const modFiles = await this.chat.getModificationPlanFilesOnlyByProject(
+        falkorProjectId,
+        userDescription.slice(0, 2000),
+        repository ? { repoIds: [repository.id] } : undefined,
+      );
+      filesToModify = modFiles.slice(0, 80).map((f) => ({
+        path: f.path,
+        ...(f.repoId ? { repoId: f.repoId } : {}),
+      }));
+      const evidence = await this.buildEvidenceForFiles(
+        falkorProjectId,
+        repository,
+        filesToModify,
+        userDescription,
+      );
+      graphEvidenceBundle = evidence.graphEvidenceBundle;
+      changePlanSeed = evidence.changePlanSeed;
+    }
 
     const idempotencyKey = buildPromotionIdempotencyKey(
       conversation.id,
@@ -194,8 +229,21 @@ export class ChangePromotionPackService {
       mdd,
       modificationPlan: {
         filesToModify,
+        ...(questionsToRefine?.length ? { questionsToRefine } : {}),
       },
-      ...(await this.buildEvidenceForFiles(falkorProjectId, repository, filesToModify, userDescription)),
+      ...(graphEvidenceBundle ? { graphEvidenceBundle } : {}),
+      ...(changePlanSeed ? { changePlanSeed } : {}),
+      ...(isIntegrationHandoff
+        ? {
+            promotionScope: 'integration_handoff' as const,
+            integrationHandoff: {
+              handoffId: parsedHandoff?.handoffId ?? conversation.integrationHandoffId,
+              title: parsedHandoff?.title ?? conversation.title,
+              sourceProject: parsedHandoff?.sourceProject ?? null,
+              acceptanceCriteria: parsedHandoff?.acceptanceCriteria ?? [],
+            },
+          }
+        : {}),
       deliverablesRequested: options.deliverablesRequested,
     };
   }
