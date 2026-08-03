@@ -7,6 +7,8 @@ import { api } from '@/api';
 import type {
   ForgeBrownfieldProjectOption,
   ForgeDeliverableKind,
+  ForgePreviewStatus,
+  ForgePromotionStatus,
   PreviewIntegrationBatchTheForgeResponse,
   PromoteToTheForgeResponse,
 } from '@/types';
@@ -38,7 +40,11 @@ import {
 } from './forge-deliverables.constants';
 import {
   ForgePromoteProgressPanel,
-  useForgePromoteProgress,
+  forgePromotionSuccessFromBatch,
+  useForgePreviewProgressPoll,
+  useForgePromoteProgressPoll,
+  type ForgePreviewPollState,
+  type ForgePromotionPollState,
 } from './forgePromoteProgress';
 
 const forgeSelectTriggerClass = cn(
@@ -68,10 +74,93 @@ export function ChatIntegrationBatchForgeDialog(props: {
   const [preview, setPreview] = useState<PreviewIntegrationBatchTheForgeResponse | null>(null);
   const [previewParams, setPreviewParams] = useState<PreviewParams | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewPollActive, setPreviewPollActive] = useState(false);
   const [promoteLoading, setPromoteLoading] = useState(false);
+  const [promotePollActive, setPromotePollActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<PromoteToTheForgeResponse | null>(null);
-  const forgeProgress = useForgePromoteProgress(promoteLoading);
+
+  const pollBatchPreview = useCallback(async (): Promise<ForgePreviewPollState> => {
+    if (!props.batchId) throw new Error('batchId required');
+    const batch = await api.getIntegrationBatch(props.batchId);
+    return {
+      status: (batch.forgePreviewStatus ?? 'none') as ForgePreviewStatus,
+      phase: batch.forgePreviewPhase,
+      percent: batch.forgePreviewPercent,
+      lastError: batch.forgePreviewLastError,
+    };
+  }, [props.batchId]);
+
+  const handlePreviewPollSuccess = useCallback(async () => {
+    setPreviewPollActive(false);
+    setPreviewLoading(false);
+    if (!props.batchId) return;
+    const res = await api.getIntegrationBatchPreviewResult(props.batchId);
+    setPreview(res);
+    setPreviewParams({
+      stageName: res.preview.stageName.trim(),
+      deliverables: [...deliverables],
+    });
+    if (res.preview.stageName && !stageName.trim()) {
+      setStageName(res.preview.stageName);
+    }
+    if (res.targetForgeProject?.forgeProjectId) {
+      setSelectedForgeProjectId(res.targetForgeProject.forgeProjectId);
+    }
+  }, [props.batchId, deliverables, stageName]);
+
+  const handlePreviewPollFailed = useCallback((state: ForgePreviewPollState) => {
+    setPreviewPollActive(false);
+    setPreviewLoading(false);
+    setPreview(null);
+    setPreviewParams(null);
+    setError(state.lastError ?? 'Error al generar la vista previa.');
+  }, []);
+
+  const previewProgress = useForgePreviewProgressPoll({
+    active: previewPollActive,
+    poll: pollBatchPreview,
+    onSuccess: () => void handlePreviewPollSuccess(),
+    onFailed: handlePreviewPollFailed,
+    initialPhase: 'pack_merge',
+  });
+
+  const pollBatchPromotion = useCallback(async (): Promise<ForgePromotionPollState> => {
+    if (!props.batchId) throw new Error('batchId required');
+    const batch = await api.getIntegrationBatch(props.batchId);
+    return {
+      status: (batch.forgePromotionStatus ?? 'none') as ForgePromotionStatus,
+      phase: batch.forgePromotionPhase,
+      percent: batch.forgePromotionPercent,
+      lastError: batch.forgePromotionLastError,
+      forgeProjectId: batch.forgeProjectId,
+      forgeStageId: batch.forgeStageId,
+      stageUrl: batch.forgeStageUrl,
+    };
+  }, [props.batchId]);
+
+  const handlePollSuccess = useCallback(async () => {
+    setPromotePollActive(false);
+    setPromoteLoading(false);
+    if (!props.batchId) return;
+    const batch = await api.getIntegrationBatch(props.batchId);
+    const result = forgePromotionSuccessFromBatch(batch);
+    setSuccessResult(result);
+    props.onSuccess?.(result);
+  }, [props.batchId, props.onSuccess]);
+
+  const handlePollFailed = useCallback((state: ForgePromotionPollState) => {
+    setPromotePollActive(false);
+    setPromoteLoading(false);
+    setError(state.lastError ?? 'Error al promover el lote a The Forge.');
+  }, []);
+
+  const forgeProgress = useForgePromoteProgressPoll({
+    active: promotePollActive,
+    poll: pollBatchPromotion,
+    onSuccess: () => void handlePollSuccess(),
+    onFailed: handlePollFailed,
+  });
 
   const previewStale =
     previewParams == null ||
@@ -87,7 +176,9 @@ export function ChatIntegrationBatchForgeDialog(props: {
     setError(null);
     setSuccessResult(null);
     setPreviewLoading(false);
+    setPreviewPollActive(false);
     setPromoteLoading(false);
+    setPromotePollActive(false);
     setSelectedForgeProjectId('');
     setForgeOptions([]);
     setForgeOptionsHint(null);
@@ -147,28 +238,33 @@ export function ChatIntegrationBatchForgeDialog(props: {
     }
     const trimmedStage = stageName.trim();
     setPreviewLoading(true);
+    setPreviewPollActive(false);
     setError(null);
     try {
-      const res = await api.previewIntegrationBatchTheForgePack(props.batchId, {
+      const result = await api.previewIntegrationBatchTheForgePack(props.batchId, {
         stageName: trimmedStage || undefined,
         deliverables,
         forgeProjectId: selectedForgeProjectId,
       });
-      setPreview(res);
-      setPreviewParams({ stageName: trimmedStage, deliverables: [...deliverables] });
-      if (!trimmedStage && res.preview.stageName) {
-        setStageName(res.preview.stageName);
-        setPreviewParams({ stageName: res.preview.stageName.trim(), deliverables: [...deliverables] });
+      if (result.status === 'pending') {
+        setPreviewPollActive(true);
+        return;
       }
-      if (res.targetForgeProject?.forgeProjectId) {
-        setSelectedForgeProjectId(res.targetForgeProject.forgeProjectId);
+      setPreviewLoading(false);
+      setPreview(result);
+      setPreviewParams({ stageName: trimmedStage, deliverables: [...deliverables] });
+      if (!trimmedStage && result.preview.stageName) {
+        setStageName(result.preview.stageName);
+        setPreviewParams({ stageName: result.preview.stageName.trim(), deliverables: [...deliverables] });
+      }
+      if (result.targetForgeProject?.forgeProjectId) {
+        setSelectedForgeProjectId(result.targetForgeProject.forgeProjectId);
       }
     } catch (e) {
+      setPreviewLoading(false);
       setPreview(null);
       setPreviewParams(null);
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setPreviewLoading(false);
     }
   }, [props.batchId, stageName, deliverables, selectedForgeProjectId]);
 
@@ -194,6 +290,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
       return;
     }
     setPromoteLoading(true);
+    setPromotePollActive(false);
     setError(null);
     try {
       const result = await api.promoteIntegrationBatchToTheForge(props.batchId, {
@@ -203,18 +300,22 @@ export function ChatIntegrationBatchForgeDialog(props: {
         activate: false,
         forgeProjectId: selectedForgeProjectId,
       });
-      forgeProgress.finish();
-      await new Promise((r) => window.setTimeout(r, 350));
+      if (result.status === 'pending') {
+        setPromotePollActive(true);
+        return;
+      }
+      setPromoteLoading(false);
       setSuccessResult(result);
       props.onSuccess?.(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
       setPromoteLoading(false);
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const busy = previewLoading || promoteLoading || loadingForgeOptions;
+  const showPreviewProgress = previewLoading || previewPollActive;
+  const showPromoteProgress = promoteLoading || promotePollActive;
+  const busy = previewLoading || previewPollActive || showPromoteProgress || loadingForgeOptions;
   const previewReady = Boolean(preview) && !previewStale;
   const canPromote =
     Boolean(props.batchId) &&
@@ -330,7 +431,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
             </fieldset>
 
             <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--background-muted)]/30 p-3">
-              {previewStale && !previewLoading ? (
+              {previewStale && !showPreviewProgress ? (
                 <>
                   <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">
                     Pulsa <strong className="font-medium text-[var(--foreground)]">Aplicar cambios</strong>{' '}
@@ -348,8 +449,12 @@ export function ChatIntegrationBatchForgeDialog(props: {
                     Aplicar cambios
                   </Button>
                 </>
-              ) : previewLoading ? (
-                <p className="text-xs text-[var(--foreground-muted)]">Generando vista previa…</p>
+              ) : showPreviewProgress ? (
+                <ForgePromoteProgressPanel
+                  progress={previewProgress.progress}
+                  stepLabel={previewProgress.stepLabel}
+                  hint="Fusionando chats y generando el pack enriquecido. Puede tardar con lotes grandes."
+                />
               ) : preview ? (
                 <div className="space-y-2 text-xs">
                   <p>
@@ -375,14 +480,14 @@ export function ChatIntegrationBatchForgeDialog(props: {
               ) : null}
             </div>
 
-            {promoteLoading ? (
+            {showPromoteProgress ? (
               <ForgePromoteProgressPanel
                 progress={forgeProgress.progress}
                 stepLabel={forgeProgress.stepLabel}
                 hint={
-                  forgeProgress.progress >= 92
+                  forgeProgress.progress >= 90
                     ? 'Creando la etapa en The Forge… puede tardar varios minutos con lotes grandes. No cierres esta ventana.'
-                    : 'Enviando el pack fusionado a The Forge…'
+                    : 'Preparando y enviando el pack fusionado a The Forge…'
                 }
               />
             ) : null}

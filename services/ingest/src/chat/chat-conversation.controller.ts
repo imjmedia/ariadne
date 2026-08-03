@@ -122,6 +122,14 @@ export class ChatConversationsController {
     return this.forgePromotion.previewPack(actorFromHeaders(headers), conversationId, body ?? {});
   }
 
+  @Get(':conversationId/preview-theforge-pack/result')
+  getPreviewTheForgePackResult(
+    @Param('conversationId') conversationId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.forgePromotion.getPreviewResult(actorFromHeaders(headers), conversationId);
+  }
+
   @Post(':conversationId/promote-to-theforge')
   promoteToTheForge(
     @Param('conversationId') conversationId: string,

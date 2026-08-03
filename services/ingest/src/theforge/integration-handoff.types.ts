@@ -37,7 +37,15 @@ export interface ChatIntegrationBatchDto {
   sourceForgeProjectName: string | null;
   conversationCount: number;
   forgePromotionStatus: string | null;
+  forgePromotionPhase: string | null;
+  forgePromotionPercent: number | null;
+  forgePromotionLastError: string | null;
+  forgeProjectId: string | null;
   forgeStageId: string | null;
   forgeStageUrl: string | null;
+  forgePreviewStatus: string | null;
+  forgePreviewPhase: string | null;
+  forgePreviewPercent: number | null;
+  forgePreviewLastError: string | null;
   createdAt: string;
 }

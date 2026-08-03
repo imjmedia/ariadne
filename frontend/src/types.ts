@@ -307,8 +307,16 @@ export interface ChatIntegrationBatch {
   sourceForgeProjectName: string | null;
   conversationCount: number;
   forgePromotionStatus: string | null;
+  forgePromotionPhase: string | null;
+  forgePromotionPercent: number | null;
+  forgePromotionLastError: string | null;
+  forgeProjectId: string | null;
   forgeStageId: string | null;
   forgeStageUrl: string | null;
+  forgePreviewStatus: string | null;
+  forgePreviewPhase: string | null;
+  forgePreviewPercent: number | null;
+  forgePreviewLastError: string | null;
   createdAt: string;
 }
 
@@ -332,6 +340,8 @@ export type ForgeDeliverableKind =
 
 export type ForgePromotionStatus = 'none' | 'pending' | 'success' | 'failed';
 
+export type ForgePreviewStatus = 'none' | 'pending' | 'success' | 'failed';
+
 export interface ForgePromotionState {
   status: ForgePromotionStatus;
   forgeProjectId: string | null;
@@ -340,6 +350,12 @@ export interface ForgePromotionState {
   lastError: string | null;
   stageUrl: string | null;
   idempotencyKey: string | null;
+  phase: string | null;
+  percent: number | null;
+  previewStatus: ForgePreviewStatus;
+  previewPhase: string | null;
+  previewPercent: number | null;
+  previewLastError: string | null;
 }
 
 export interface TheForgePackPreview {
@@ -415,6 +431,26 @@ export interface PromoteToTheForgeResponse {
   warnings?: string[];
   linkKind?: string;
 }
+
+export interface PromoteToTheForgePendingResponse {
+  status: 'pending';
+}
+
+export type PromoteToTheForgeResult =
+  | PromoteToTheForgeResponse
+  | PromoteToTheForgePendingResponse;
+
+export interface PreviewToTheForgePendingResponse {
+  status: 'pending';
+}
+
+export type PreviewIntegrationBatchTheForgeResult =
+  | PreviewIntegrationBatchTheForgeResponse
+  | PreviewToTheForgePendingResponse;
+
+export type PreviewTheForgePackResult =
+  | PreviewTheForgePackResponse
+  | PreviewToTheForgePendingResponse;
 
 export interface ProjectTheForgeStageRequest {
   stageName: string;

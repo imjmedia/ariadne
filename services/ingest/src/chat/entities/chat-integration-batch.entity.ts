@@ -52,6 +52,12 @@ export class ChatIntegrationBatchEntity {
   @Column({ name: 'forge_promotion_last_error', type: 'text', nullable: true })
   forgePromotionLastError!: string | null;
 
+  @Column({ name: 'forge_promotion_phase', type: 'varchar', length: 32, nullable: true })
+  forgePromotionPhase!: string | null;
+
+  @Column({ name: 'forge_promotion_percent', type: 'smallint', nullable: true })
+  forgePromotionPercent!: number | null;
+
   /** SHA-256 (32 hex) of stage/deliverables + batch message fingerprint — matches forge_preview_pack. */
   @Column({ name: 'forge_preview_params_hash', type: 'varchar', length: 64, nullable: true })
   forgePreviewParamsHash!: string | null;
@@ -59,6 +65,22 @@ export class ChatIntegrationBatchEntity {
   /** Enriched ChangePromotionPack from last preview-theforge-pack (reused on promote when hash matches). */
   @Column({ name: 'forge_preview_pack', type: 'jsonb', nullable: true })
   forgePreviewPack!: Record<string, unknown> | null;
+
+  @Column({ name: 'forge_preview_status', type: 'varchar', length: 16, nullable: true })
+  forgePreviewStatus!: string | null;
+
+  @Column({ name: 'forge_preview_phase', type: 'varchar', length: 32, nullable: true })
+  forgePreviewPhase!: string | null;
+
+  @Column({ name: 'forge_preview_percent', type: 'smallint', nullable: true })
+  forgePreviewPercent!: number | null;
+
+  @Column({ name: 'forge_preview_last_error', type: 'text', nullable: true })
+  forgePreviewLastError!: string | null;
+
+  /** Last successful preview-theforge-pack response (summary for UI). */
+  @Column({ name: 'forge_preview_result', type: 'jsonb', nullable: true })
+  forgePreviewResult!: Record<string, unknown> | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

@@ -63,6 +63,14 @@ export class IntegrationBatchesController {
     return this.service.previewBatchPromotion(actorFromHeaders(headers), batchId, body ?? {});
   }
 
+  @Get(':batchId/preview-theforge-pack/result')
+  getPreviewResult(
+    @Param('batchId') batchId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.service.getBatchPreviewResult(actorFromHeaders(headers), batchId);
+  }
+
   @Post(':batchId/promote-to-theforge')
   promote(
     @Param('batchId') batchId: string,

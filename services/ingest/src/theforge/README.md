@@ -68,10 +68,12 @@ La vinculación usa **MCP** (`…/mcp` + Secret MCP/JWT) o **REST** (`…/api` +
 - `POST /projects/:id/theforge-stage` — Crea etapa en Forge vinculado con handoff `change_work_description` + `cursor_tasks_markdown`
 - `GET /projects/:id/integration-handoffs/sources` — Proyectos NEW con handoffs (`integrationHandoff`)
 - `POST /projects/:id/integration-handoffs/import` — Importa handoffs `sent` → chats agrupados por lote
-- `POST /integration-batches/:id/preview-theforge-pack` — Fusiona chats del lote + genera pack enriquecido (se cachea en DB). Body opcional: `forgeProjectId` (LEGACY destino).
-- `POST /integration-batches/:id/promote-to-theforge` — Reutiliza pack cacheado si la vista previa coincide; crea etapa en el LEGACY indicado (`forgeProjectId` opcional; default = vinculado al proyecto Ariadne).
+- `GET /integration-batches/:id` — Estado del lote (incl. `forgePromotionPhase` / `forgePromotionPercent` durante promote async)
+- `POST /integration-batches/:id/preview-theforge-pack` — Responde `{ status: 'pending' }`; fusiona chats + enriquece pack en background con fase/% en DB.
+- `GET /integration-batches/:id/preview-theforge-pack/result` — Resultado cuando `forgePreviewStatus=success`.
+- `POST /integration-batches/:id/promote-to-theforge` — Responde `{ status: 'pending' }` de inmediato; el trabajo continúa en background y actualiza fase/% en DB. Reutiliza pack cacheado si la vista previa coincide.
 - `DELETE /integration-batches/:id` — Elimina el lote y todas sus conversaciones (permite re-importar handoffs)
-- `GET /conversations/:id/forge-promotion`, preview, promote — solo si integración activa; usa `theforgeProjectId` vinculado antes de `resolve_forge_project_for_ariadne`
+- `GET /conversations/:id/forge-promotion`, preview, promote — solo si integración activa; **promote** responde `{ status: 'pending' }` y expone `phase`/`percent` en GET; usa `theforgeProjectId` vinculado antes de `resolve_forge_project_for_ariadne`
 
 **Contratos:** `docs/contracts/theforge-create-stage-from-pack-v1.md`, `docs/contracts/theforge-resolve-ariadne-link-v1.md`, `docs/contracts/change-promotion-pack-v1.md`.
 
@@ -97,9 +99,30 @@ Generación de tareas: `cursor-tasks-document.service.ts` (LLM con prompt estric
 
 Flujo recomendado: **Aplicar cambios** (preview) → **Enviar lote**. El preview guarda `forge_preview_pack` en Postgres; promote no reconstruye el pack si nombre/entregables/chats no cambiaron.
 
+**Fases de preview** (`forge_preview_*` en batch y conversación):
+
+| Fase | % (lote) | Significado |
+|------|----------|-------------|
+| `pack_merge` | 15→50 | Fusionando pack por chat (granular) |
+| `pack_enrich` | 55→90 | `# Tasks` / enriquecimiento LLM |
+| `pack_build` | 40 | Preview de chat individual (un solo pack) |
+| `done` | 100 | Vista previa lista (`GET …/preview-theforge-pack/result`) |
+
+**Fases de promote** (`forge_promotion_phase` / `forge_promotion_percent` en `chat_integration_batches` y `chat_conversations`):
+
+| Fase | % | Significado |
+|------|---|-------------|
+| `pack_resolve` | 15 | Resolviendo pack (caché preview o merge) |
+| `pack_enrich` | 35 | Generando `# Tasks` / enriquecimiento LLM |
+| `forge_create` | 95 | Llamada a Forge `create-stage-from-ariadne-change-pack` |
+| `done` | 100 | Etapa creada |
+| `failed` | 0 | Error persistido en `forge_promotion_last_error` |
+
+El frontend hace polling cada ~1,5 s a `GET /integration-batches/:id` o `GET /conversations/:id/forge-promotion`.
+
 | Síntoma | Causa habitual |
 |---------|----------------|
-| Barra ~92% mucho rato | Normal: la barra es estimada; la llamada real es `createStageFromChangePack` (puede tardar minutos) |
+| Barra en 95% mucho rato | Normal: fase `forge_create`; Forge puede tardar varios minutos |
 | `500` / `502` / `504` tras espera | Timeout Traefik/nginx/API antes de ingest; sube `INGEST_PROXY_TIMEOUT_MS` y timeout del reverse proxy externo |
 | `500` Zod `handoffItems[n].id/description Required` | Pack Ariadne antiguo sin `id`+`description` en cada handoff; actualiza ingest (mapper `forge-create-stage.mapper.ts`) |
 | `503 FORGE_CREATE_STAGE_TIMEOUT` | Forge no respondió en 10 min |
