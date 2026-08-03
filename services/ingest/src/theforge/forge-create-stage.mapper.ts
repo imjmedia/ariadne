@@ -4,6 +4,7 @@
  */
 import {
   forgeHandoffItemId,
+  FORGE_CHANGE_DESCRIPTION_MAX,
   type ChangePromotionPackV1,
   type CreateStageFromPackInput,
   type ForgeCreateStageApiBody,
@@ -43,7 +44,7 @@ export function buildForgeChangeDescription(pack: ChangePromotionPackV1): string
       '\n\n## ERD (Mermaid)\n```mermaid\n' + pack.change.erDiagramMermaid.trim() + '\n```',
     );
   }
-  return parts.join('').slice(0, 12_000);
+  return parts.join('').slice(0, FORGE_CHANGE_DESCRIPTION_MAX);
 }
 
 export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandoffItem[] {

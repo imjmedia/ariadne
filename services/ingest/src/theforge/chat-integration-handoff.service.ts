@@ -34,6 +34,7 @@ import {
   resolveIntegrationPreviewStageKey,
 } from './integration-preview-cache.util';
 import { FORGE_PROMOTION_PENDING_TTL_MS } from './forge-timeout.constants';
+import { formatForgePromotionError } from './forge-http.util';
 import { forgePromotionProgressPatch, type ForgePromotionPhase } from './forge-promotion-progress.util';
 import {
   forgePreviewMergePercent,
@@ -466,7 +467,7 @@ export class ChatIntegrationHandoffService {
         ...forgePromotionProgressPatch('done'),
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = formatForgePromotionError(err);
       this.logger.warn(`promoteBatch ${batchId} failed: ${message}`);
       await this.batches.update(batchId, {
         forgePromotionStatus: 'failed',

@@ -179,6 +179,9 @@ export interface CreateStageFromPackResult {
 /** Forge `integrationHandoffItemSchema` regex for `pack.handoffItems[].id`. */
 export const FORGE_HANDOFF_ITEM_ID_REGEX = /^NEW-LEG-\d{2,}$/;
 
+/** Forge `ariadneChangePackV1Schema.changeDescription` max length. */
+export const FORGE_CHANGE_DESCRIPTION_MAX = 8000;
+
 /** Sequential NEW-LEG id for Forge create-stage handoff items (1-based). */
 export function forgeHandoffItemId(sequence: number): string {
   const n = Number.isFinite(sequence) && sequence >= 1 ? Math.floor(sequence) : 1;

@@ -26,6 +26,7 @@ import {
 } from './change-promotion-pack.types';
 import { CursorTasksDocumentService } from './cursor-tasks-document.service';
 import { FORGE_PROMOTION_PENDING_TTL_MS } from './forge-timeout.constants';
+import { formatForgePromotionError } from './forge-http.util';
 import {
   forgePromotionProgressPatch,
   type ForgePromotionPhase,
@@ -332,7 +333,7 @@ export class TheForgePromotionService {
       return;
     }
 
-    const message = err instanceof Error ? err.message : String(err);
+    const message = formatForgePromotionError(err);
     this.logger.warn(`promote ${conversationId} failed: ${message}`);
     await this.updateConversation(conversationId, {
       forgePromotionStatus: 'failed',
