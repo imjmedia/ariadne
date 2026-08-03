@@ -307,8 +307,23 @@ export function cursorTasksFromChangePlanSeed(pack: ChangePromotionPackV1): stri
   return normalizeCursorTasksMarkdown(lines.join('\n'));
 }
 
+export function summarizeMddForIntegrationHandoff(pack: ChangePromotionPackV1): Record<string, unknown> {
+  const mdd = pack.mdd ?? {};
+  const paths = pack.modificationPlan.filesToModify.map((f) => f.path);
+  return {
+    note: 'MDD legacy existente — NO implica backlog greenfield; solo contexto de lo ya implementado',
+    summary: typeof mdd.summary === 'string' ? mdd.summary.slice(0, 2000) : undefined,
+    stack: mdd.stack ?? mdd.tech_stack,
+    pathsInHandoffScope: paths.slice(0, 40),
+    endpointCount: Array.isArray(mdd.endpoints) ? mdd.endpoints.length : undefined,
+  };
+}
+
 export function buildCursorTasksUserPrompt(pack: ChangePromotionPackV1): string {
+  const isHandoff = pack.promotionScope === 'integration_handoff';
   const payload = {
+    promotionScope: pack.promotionScope ?? 'brownfield_change',
+    integrationHandoff: pack.integrationHandoff,
     changeTitle: pack.change.title,
     changeDescription: pack.change.userDescription,
     stageKey: pack.change.stageKey,
@@ -316,9 +331,12 @@ export function buildCursorTasksUserPrompt(pack: ChangePromotionPackV1): string 
     migrationNotes: pack.change.migrationNotes,
     filesToModify: pack.modificationPlan.filesToModify,
     questionsToRefine: pack.modificationPlan.questionsToRefine,
-    mddSummary: pack.mdd,
+    mddSummary: isHandoff ? summarizeMddForIntegrationHandoff(pack) : pack.mdd,
     changePlanSeed: pack.changePlanSeed,
     graphEvidence: pack.graphEvidenceBundle,
   };
-  return `Genera el documento # Tasks completo para este cambio brownfield.\n\nContexto JSON:\n${JSON.stringify(payload, null, 2).slice(0, 90_000)}`;
+  const intro = isHandoff
+    ? 'Genera el documento # Tasks SOLO para integrar el handoff NEW→LEG en el brownfield existente (no greenfield).'
+    : 'Genera el documento # Tasks completo para este cambio brownfield.';
+  return `${intro}\n\nContexto JSON:\n${JSON.stringify(payload, null, 2).slice(0, 90_000)}`;
 }

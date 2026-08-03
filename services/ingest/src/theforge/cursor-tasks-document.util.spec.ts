@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { ChangePromotionPackV1 } from './change-promotion-pack.types';
 import {
+  buildCursorTasksUserPrompt,
   cursorTasksFromChangePlanSeed,
   normalizeCursorTasksMarkdown,
+  summarizeMddForIntegrationHandoff,
   validateCursorTasksMarkdown,
 } from './cursor-tasks-document.util';
 
@@ -74,5 +76,31 @@ describe('cursor-tasks-document.util', () => {
     expect(md).toContain('## Frontend tasks');
     expect(md).toContain('## Testing tasks');
     expect(md).toContain('T-001');
+  });
+
+  it('buildCursorTasksUserPrompt scopes integration handoff and trims MDD', () => {
+    const pack = {
+      ...samplePack(),
+      promotionScope: 'integration_handoff' as const,
+      integrationHandoff: {
+        handoffId: 'NEW-LEG-01',
+        sourceProject: 'Micro costos',
+        acceptanceCriteria: ['Mostrar costos en catálogo'],
+      },
+    };
+    const prompt = buildCursorTasksUserPrompt(pack);
+    expect(prompt).toContain('SOLO para integrar el handoff NEW→LEG');
+    expect(prompt).toContain('integration_handoff');
+    expect(prompt).toContain('pathsInHandoffScope');
+    expect(prompt).not.toContain('"endpoints"');
+  });
+
+  it('summarizeMddForIntegrationHandoff keeps scope paths only', () => {
+    const summary = summarizeMddForIntegrationHandoff(samplePack());
+    expect(summary.note).toMatch(/legacy existente/i);
+    expect(summary.pathsInHandoffScope).toEqual([
+      'services/ingest/src/auth/auth.service.ts',
+      'frontend/src/pages/Login.tsx',
+    ]);
   });
 });

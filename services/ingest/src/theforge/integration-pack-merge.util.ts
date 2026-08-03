@@ -114,6 +114,14 @@ export function mergeChangePromotionPacks(input: {
         }
       : undefined;
 
+  const isIntegrationHandoff = packs.some((p) => p.promotionScope === 'integration_handoff');
+  const handoffSources = packs
+    .map((p) => p.integrationHandoff)
+    .filter((h): h is NonNullable<typeof h> => Boolean(h));
+  const mergedAcceptanceCriteria = [
+    ...new Set(handoffSources.flatMap((h) => h.acceptanceCriteria ?? [])),
+  ];
+
   return {
     ...base,
     idempotencyKey,
@@ -142,5 +150,17 @@ export function mergeChangePromotionPacks(input: {
     graphEvidenceBundle,
     changePlanSeed,
     deliverablesRequested: base.deliverablesRequested,
+    ...(isIntegrationHandoff
+      ? {
+          promotionScope: 'integration_handoff' as const,
+          integrationHandoff: {
+            handoffId: handoffSources[0]?.handoffId ?? null,
+            title: stageName.trim(),
+            sourceProject:
+              handoffSources.find((h) => h.sourceProject?.trim())?.sourceProject ?? null,
+            acceptanceCriteria: mergedAcceptanceCriteria,
+          },
+        }
+      : {}),
   };
 }

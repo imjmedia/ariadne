@@ -7,6 +7,28 @@ export function buildChangeWorkDescription(pack: ChangePromotionPackV1): string 
   const lines: string[] = [];
   lines.push(`# ${pack.change.title}`);
   lines.push('');
+  if (pack.promotionScope === 'integration_handoff') {
+    lines.push(
+      '> **Alcance:** integración NEW→LEG — solo wiring en el brownfield existente; no reimplementar features ya presentes (login, auth, layout, etc.).',
+    );
+    lines.push('');
+    if (pack.integrationHandoff?.handoffId || pack.integrationHandoff?.sourceProject) {
+      lines.push('## Handoff');
+      if (pack.integrationHandoff.handoffId) {
+        lines.push(`- Id: \`${pack.integrationHandoff.handoffId}\``);
+      }
+      if (pack.integrationHandoff.sourceProject) {
+        lines.push(`- Proyecto NEW origen: ${pack.integrationHandoff.sourceProject}`);
+      }
+      if (pack.integrationHandoff.acceptanceCriteria?.length) {
+        lines.push('- Criterios de aceptación:');
+        for (const ac of pack.integrationHandoff.acceptanceCriteria) {
+          lines.push(`  - ${ac}`);
+        }
+      }
+      lines.push('');
+    }
+  }
   lines.push('## Descripción del cambio');
   lines.push(pack.change.userDescription.trim() || '_Sin descripción._');
   lines.push('');
