@@ -31,6 +31,7 @@ import { mergeChangePromotionPacks } from './integration-pack-merge.util';
 import {
   buildBatchContentFingerprint,
   buildIntegrationPreviewParamsHash,
+  resolveIntegrationPreviewStageKey,
 } from './integration-preview-cache.util';
 import { FORGE_PROMOTION_PENDING_TTL_MS } from './forge-timeout.constants';
 import { forgePromotionProgressPatch, type ForgePromotionPhase } from './forge-promotion-progress.util';
@@ -545,11 +546,19 @@ export class ChatIntegrationHandoffService {
     deliverables: ForgeDeliverableKind[],
     pack: ChangePromotionPackV1,
   ): Promise<void> {
-    const hash = await this.previewParamsHash(batch, stageName, stageKey, deliverables);
+    const resolvedStageKey = resolveIntegrationPreviewStageKey(stageKey, pack.change.stageKey);
+    const hash = await this.previewParamsHash(batch, stageName, resolvedStageKey, deliverables);
     const serialized = JSON.parse(JSON.stringify(pack)) as Record<string, unknown>;
     batch.forgePreviewParamsHash = hash;
     batch.forgePreviewPack = serialized;
     await this.batches.save(batch);
+  }
+
+  private cachedPreviewPackStageKey(batch: ChatIntegrationBatchEntity): string {
+    const cached = batch.forgePreviewPack;
+    if (!cached || typeof cached !== 'object') return '';
+    const change = (cached as { change?: { stageKey?: string } }).change;
+    return change?.stageKey?.trim() ?? '';
   }
 
   private async resolveEnrichedPackForPromotion(
@@ -558,7 +567,11 @@ export class ChatIntegrationHandoffService {
     stageKey: string | undefined,
     deliverables: ForgeDeliverableKind[],
   ): Promise<{ pack: ChangePromotionPackV1; fromPreviewCache: boolean }> {
-    const hash = await this.previewParamsHash(batch, stageName, stageKey, deliverables);
+    const resolvedStageKey = resolveIntegrationPreviewStageKey(
+      stageKey,
+      this.cachedPreviewPackStageKey(batch),
+    );
+    const hash = await this.previewParamsHash(batch, stageName, resolvedStageKey, deliverables);
     if (
       batch.forgePreviewParamsHash === hash &&
       batch.forgePreviewPack &&
