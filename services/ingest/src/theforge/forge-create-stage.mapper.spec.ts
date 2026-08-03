@@ -161,14 +161,21 @@ describe('forge-create-stage.mapper', () => {
     expect(body.stageName).toBe('Etapa 2');
   });
 
-  it('defaults runLegacyStart true without files', () => {
+  it('integration handoff pack skips migration_tasks deliverable and uses slim MDD', () => {
     const pack = samplePack();
-    pack.modificationPlan.filesToModify = [];
-    const body = toForgeCreateStageApiBody({
-      forgeProjectId: 'forge-1',
-      pack,
-      stageName: 'Etapa vacía',
-    });
-    expect(body.runLegacyStart).toBe(true);
+    pack.promotionScope = 'integration_handoff';
+    pack.integrationHandoff = {
+      handoffId: 'NEW-LEG-01',
+      acceptanceCriteria: ['Mostrar costos en cotizador'],
+    };
+    pack.deliverablesRequested = ['modification_plan', 'migration_tasks', 'change_spec'];
+    pack.cursorTasksMarkdown = '# Tasks\n\n## Backend tasks\n';
+    const forgePack = toForgeChangePackV1(pack);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'integration_scope')).toBe(true);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'deliverable_request' && h.content === 'migration_tasks')).toBe(false);
+    expect(forgePack.handoffItems?.some((h) => h.kind === 'post_deliverable_gate')).toBe(false);
+    const mdd = forgePack.handoffItems?.find((h) => h.kind === 'mdd_evidence');
+    expect(mdd?.content).toContain('pathsInHandoffScope');
+    expect(mdd?.content).not.toContain('userStories');
   });
 });

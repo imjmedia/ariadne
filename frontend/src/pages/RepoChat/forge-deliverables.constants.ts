@@ -13,6 +13,12 @@ export const ALL_FORGE_DELIVERABLES: ForgeDeliverableKind[] = FORGE_DELIVERABLE_
   (opt) => opt.id,
 );
 
+/** Lotes NEW→LEG: no pedir migration_tasks (Forge regenera US baseline); tareas en cursor_tasks_markdown. */
+export const INTEGRATION_BATCH_FORGE_DELIVERABLES: ForgeDeliverableKind[] = [
+  'modification_plan',
+  'api_contracts',
+];
+
 export function forgeDeliverablesEqual(
   a: ForgeDeliverableKind[],
   b: ForgeDeliverableKind[],

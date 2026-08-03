@@ -90,6 +90,8 @@ Generación de tareas: `cursor-tasks-document.service.ts` (LLM con prompt estric
 
 **Lotes de integración (NEW→LEG):** el pack lleva `promotionScope: integration_handoff`. El plan de archivos usa `getIntegrationHandoffPlanByProject` (no el plan genérico). El prompt de `# Tasks` prohíbe tareas greenfield (login, auth, pantallas base) y acota al wiring del handoff + `filesToModify` / `changePlanSeed`.
 
+**Deliverables en lotes:** por defecto solo `modification_plan` (+ opcional `api_contracts` en UI). **No** pedir `migration_tasks`, `change_spec`, `data_model` ni `mdd_full`: Forge regenera tareas desde el cascade baseline del LEGACY (US-001 login, campañas, infra). Las tareas ejecutables van en `cursor_tasks_markdown` (handoff item).
+
 **Promoción de lote (batch) — timeouts y caché**
 
 | Variable | Default | Uso |

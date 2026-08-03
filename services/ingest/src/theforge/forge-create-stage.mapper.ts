@@ -11,6 +11,10 @@ import {
   type ForgeChangePackV1,
   type ForgeHandoffItem,
 } from './change-promotion-pack.types';
+import {
+  isIntegrationHandoffPack,
+  mddEvidenceForForgePack,
+} from './integration-handoff-pack.util';
 
 function forgeHandoffItem(
   id: string,
@@ -52,11 +56,39 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   let legSequence = 0;
   const nextId = () => forgeHandoffItemId(++legSequence);
 
-  if (pack.mdd && Object.keys(pack.mdd).length > 0) {
+  if (isIntegrationHandoffPack(pack)) {
     items.push(
-      forgeHandoffItem(nextId(), 'mdd_evidence', 'MDD Ariadne (as-is)', JSON.stringify(pack.mdd), {
-        mimeType: 'application/json',
-      }),
+      forgeHandoffItem(
+        nextId(),
+        'integration_scope',
+        'Alcance integración NEW→LEG',
+        JSON.stringify({
+          mode: 'integration_handoff',
+          taskSource: 'cursor_tasks_markdown',
+          skipBaselineDeliverables: [
+            'migration_tasks',
+            'change_spec',
+            'data_model',
+            'mdd_full',
+          ],
+          linkedNewProjectId: pack.integrationHandoff?.sourceProject ?? undefined,
+          acceptanceCriteria: pack.integrationHandoff?.acceptanceCriteria ?? [],
+        }),
+        { mimeType: 'application/json' },
+      ),
+    );
+  }
+
+  const mddEvidence = mddEvidenceForForgePack(pack);
+  if (mddEvidence && Object.keys(mddEvidence).length > 0) {
+    items.push(
+      forgeHandoffItem(
+        nextId(),
+        'mdd_evidence',
+        isIntegrationHandoffPack(pack) ? 'MDD legacy (resumen alcance)' : 'MDD Ariadne (as-is)',
+        JSON.stringify(mddEvidence),
+        { mimeType: 'application/json' },
+      ),
     );
   }
 
@@ -121,11 +153,23 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   }
 
   for (const deliverable of pack.deliverablesRequested) {
+    if (
+      isIntegrationHandoffPack(pack) &&
+      (deliverable === 'migration_tasks' ||
+        deliverable === 'change_spec' ||
+        deliverable === 'data_model' ||
+        deliverable === 'mdd_full')
+    ) {
+      continue;
+    }
     items.push(forgeHandoffItem(nextId(), 'deliverable_request', deliverable, deliverable));
   }
 
   // P2: Forge must validate migration_tasks against Ariadne Gate 2 after generation.
-  if (pack.deliverablesRequested.includes('migration_tasks')) {
+  if (
+    pack.deliverablesRequested.includes('migration_tasks') &&
+    !isIntegrationHandoffPack(pack)
+  ) {
     items.push(
       forgeHandoffItem(
         nextId(),
@@ -153,6 +197,9 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
 
 /** Default tools after create-stage — includes Ariadne Gate 2 after deliverables. */
 export function defaultRecommendedNextTools(pack: ChangePromotionPackV1): string[] {
+  if (isIntegrationHandoffPack(pack)) {
+    return ['legacy_answer'];
+  }
   const tools = ['legacy_answer', 'legacy_generate_mdd', 'legacy_generate_deliverables'];
   if (pack.deliverablesRequested.includes('migration_tasks')) {
     tools.push('validate_change_plan_via_ariadne');
