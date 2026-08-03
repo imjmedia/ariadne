@@ -3,6 +3,12 @@
  */
 import type { ChangePlanTask } from '../plan-validation/change-plan-validation.types';
 import type { ChangePromotionPackV1 } from './change-promotion-pack.types';
+import {
+  isIntegrationHandoffPack,
+  summarizeMddForIntegrationHandoff,
+} from './integration-handoff-pack.util';
+
+export { summarizeMddForIntegrationHandoff } from './integration-handoff-pack.util';
 
 const REQUIRED_H2 = [
   '## Backend tasks',
@@ -307,20 +313,8 @@ export function cursorTasksFromChangePlanSeed(pack: ChangePromotionPackV1): stri
   return normalizeCursorTasksMarkdown(lines.join('\n'));
 }
 
-export function summarizeMddForIntegrationHandoff(pack: ChangePromotionPackV1): Record<string, unknown> {
-  const mdd = pack.mdd ?? {};
-  const paths = pack.modificationPlan.filesToModify.map((f) => f.path);
-  return {
-    note: 'MDD legacy existente — NO implica backlog greenfield; solo contexto de lo ya implementado',
-    summary: typeof mdd.summary === 'string' ? mdd.summary.slice(0, 2000) : undefined,
-    stack: mdd.stack ?? mdd.tech_stack,
-    pathsInHandoffScope: paths.slice(0, 40),
-    endpointCount: Array.isArray(mdd.endpoints) ? mdd.endpoints.length : undefined,
-  };
-}
-
 export function buildCursorTasksUserPrompt(pack: ChangePromotionPackV1): string {
-  const isHandoff = pack.promotionScope === 'integration_handoff';
+  const isHandoff = isIntegrationHandoffPack(pack);
   const payload = {
     promotionScope: pack.promotionScope ?? 'brownfield_change',
     integrationHandoff: pack.integrationHandoff,

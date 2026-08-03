@@ -21,6 +21,7 @@ import { ProjectRepositoryEntity } from '../repositories/entities/project-reposi
 import { RepositoryEntity } from '../repositories/entities/repository.entity';
 import { ChangePromotionPackService } from './change-promotion-pack.service';
 import type { ChangePromotionPackV1, ForgeDeliverableKind } from './change-promotion-pack.types';
+import { normalizeIntegrationHandoffDeliverables } from './integration-handoff-pack.util';
 import { CursorTasksDocumentService } from './cursor-tasks-document.service';
 import { buildHandoffSeedMessage } from './integration-handoff.util';
 import type {
@@ -758,14 +759,7 @@ export class ChatIntegrationHandoffService {
   }
 
   private normalizeDeliverables(input?: ForgeDeliverableKind[]): ForgeDeliverableKind[] {
-    const defaults: ForgeDeliverableKind[] = [
-      'change_spec',
-      'data_model',
-      'modification_plan',
-      'migration_tasks',
-    ];
-    if (!input?.length) return defaults;
-    return input;
+    return normalizeIntegrationHandoffDeliverables(input);
   }
 
   private requireUserId(actor: CredentialActor): string {

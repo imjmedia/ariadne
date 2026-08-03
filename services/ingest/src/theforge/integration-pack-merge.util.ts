@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import type { GraphEvidenceBundle } from '../chat/modification-plan-evidence.types';
 import type { ChangePromotionPackV1 } from './change-promotion-pack.types';
 import { slugifyStageKey } from './change-promotion-pack.types';
+import { normalizeIntegrationHandoffDeliverables } from './integration-handoff-pack.util';
 
 function dedupeFiles(files: ChangePromotionPackV1['modificationPlan']['filesToModify']) {
   const seen = new Set<string>();
@@ -149,7 +150,7 @@ export function mergeChangePromotionPacks(input: {
     },
     graphEvidenceBundle,
     changePlanSeed,
-    deliverablesRequested: base.deliverablesRequested,
+    deliverablesRequested: normalizeIntegrationHandoffDeliverables(base.deliverablesRequested),
     ...(isIntegrationHandoff
       ? {
           promotionScope: 'integration_handoff' as const,
