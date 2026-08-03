@@ -1,7 +1,7 @@
 /**
  * Shared HTTP helper for The Forge integration API (`/theforge/*`).
  */
-import { Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Logger, ServiceUnavailableException, HttpException } from '@nestjs/common';
 import type { TheForgeIntegrationEffective } from './theforge-integration.types';
 
 const logger = new Logger('TheForgeHttp');
@@ -119,6 +119,21 @@ export function forgeErrorMessage(body: unknown, fallback: string): string {
     if (Array.isArray(rec.message)) return rec.message.join('; ');
   }
   return fallback;
+}
+
+/** Prefer Nest HttpException payload over generic `err.message` for Forge promotion failures. */
+export function formatForgePromotionError(err: unknown): string {
+  if (err instanceof HttpException) {
+    const response = err.getResponse();
+    if (typeof response === 'string') return response;
+    if (response && typeof response === 'object') {
+      const rec = response as Record<string, unknown>;
+      if (typeof rec.message === 'string') return rec.message;
+      if (Array.isArray(rec.message)) return rec.message.join('; ');
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 export function forgeHtmlApiUrlError(configuredUrl: string): ServiceUnavailableException {

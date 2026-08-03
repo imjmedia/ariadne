@@ -131,6 +131,13 @@ describe('forge-create-stage.mapper', () => {
     expect(desc).toContain('Normalizar tablas');
     expect(desc).toContain('Prisma migrate');
     expect(desc).toContain('erDiagram');
+    expect(desc.length).toBeLessThanOrEqual(8000);
+  });
+
+  it('truncates changeDescription to Forge max 8000 chars', () => {
+    const pack = samplePack();
+    pack.change.userDescription = 'x'.repeat(9000);
+    expect(buildForgeChangeDescription(pack).length).toBe(8000);
   });
 
   it('includes cursor handoff items when present', () => {

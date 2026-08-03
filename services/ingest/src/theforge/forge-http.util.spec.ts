@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { ServiceUnavailableException } from '@nestjs/common';
 import {
   collectForgeApiBaseCandidates,
+  formatForgePromotionError,
   isLikelyHtmlBody,
   normalizeForgeApiBase,
   suggestForgeApiUrl,
@@ -32,5 +34,15 @@ describe('forge-http.util', () => {
 
   it('suggests /api base', () => {
     expect(suggestForgeApiUrl('https://maxprime.obp.mx/mcp')).toBe('https://maxprime.obp.mx/api');
+  });
+
+  it('formatForgePromotionError reads Nest HttpException payload', () => {
+    const err = new ServiceUnavailableException({
+      code: 'FORGE_CREATE_STAGE_FAILED',
+      message: 'changeDescription: String must contain at most 8000 character(s)',
+    });
+    expect(formatForgePromotionError(err)).toBe(
+      'changeDescription: String must contain at most 8000 character(s)',
+    );
   });
 });
