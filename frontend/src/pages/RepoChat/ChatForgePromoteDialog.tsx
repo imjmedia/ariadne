@@ -6,11 +6,11 @@ import { ExternalLink, Hammer } from 'lucide-react';
 import { api } from '@/api';
 import type {
   ForgeDeliverableKind,
-  ForgePreviewStatus,
   ForgeProjectCandidate,
   PreviewTheForgePackResponse,
   PromoteToTheForgeResponse,
 } from '@/types';
+import { isPreviewTheForgePackPending } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -220,7 +220,7 @@ export function ChatForgePromoteDialog(props: {
         stageName: trimmedStage || undefined,
         deliverables,
       });
-      if (result.status === 'pending') {
+      if (isPreviewTheForgePackPending(result)) {
         setPreviewPollActive(true);
         return;
       }

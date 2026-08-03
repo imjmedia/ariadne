@@ -444,13 +444,25 @@ export interface PreviewToTheForgePendingResponse {
   status: 'pending';
 }
 
+export type PreviewTheForgePackResult =
+  | PreviewTheForgePackResponse
+  | PreviewToTheForgePendingResponse;
+
 export type PreviewIntegrationBatchTheForgeResult =
   | PreviewIntegrationBatchTheForgeResponse
   | PreviewToTheForgePendingResponse;
 
-export type PreviewTheForgePackResult =
-  | PreviewTheForgePackResponse
-  | PreviewToTheForgePendingResponse;
+export function isPreviewTheForgePackPending(
+  result: PreviewTheForgePackResult,
+): result is PreviewToTheForgePendingResponse {
+  return 'status' in result && result.status === 'pending';
+}
+
+export function isPreviewIntegrationBatchPending(
+  result: PreviewIntegrationBatchTheForgeResult,
+): result is PreviewToTheForgePendingResponse {
+  return 'status' in result && result.status === 'pending';
+}
 
 export interface ProjectTheForgeStageRequest {
   stageName: string;

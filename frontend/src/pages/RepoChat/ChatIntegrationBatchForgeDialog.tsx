@@ -12,6 +12,7 @@ import type {
   PreviewIntegrationBatchTheForgeResponse,
   PromoteToTheForgeResponse,
 } from '@/types';
+import { isPreviewIntegrationBatchPending } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -246,7 +247,7 @@ export function ChatIntegrationBatchForgeDialog(props: {
         deliverables,
         forgeProjectId: selectedForgeProjectId,
       });
-      if (result.status === 'pending') {
+      if (isPreviewIntegrationBatchPending(result)) {
         setPreviewPollActive(true);
         return;
       }

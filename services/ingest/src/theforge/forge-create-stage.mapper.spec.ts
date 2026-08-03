@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ChangePromotionPackV1 } from './change-promotion-pack.types';
+import { FORGE_HANDOFF_ITEM_ID_REGEX } from './change-promotion-pack.types';
 import {
   buildForgeChangeDescription,
   toForgeChangePackV1,
@@ -50,7 +51,9 @@ describe('forge-create-stage.mapper', () => {
     expect(forgePack.filesToModify).toHaveLength(1);
     expect(forgePack.questionsToRefine).toEqual(['¿Soft delete en medios?']);
     expect(forgePack.handoffItems?.every((h) => h.id && h.description)).toBe(true);
+    expect(forgePack.handoffItems?.every((h) => FORGE_HANDOFF_ITEM_ID_REGEX.test(h.id))).toBe(true);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'mdd_evidence')).toBe(true);
+    expect(forgePack.handoffItems?.find((h) => h.kind === 'mdd_evidence')?.id).toBe('mdd-evidence');
   });
 
   it('assigns unique ids for deliverable_request handoffs', () => {
@@ -66,9 +69,13 @@ describe('forge-create-stage.mapper', () => {
     const items = toForgeChangePackV1(pack).handoffItems ?? [];
     const deliverables = items.filter((h) => h.kind === 'deliverable_request');
     expect(deliverables).toHaveLength(6);
-    expect(deliverables.every((h) => h.id.startsWith('deliverable_request:'))).toBe(true);
+    expect(deliverables.every((h) => h.id.startsWith('deliverable-request-'))).toBe(true);
+    expect(deliverables.every((h) => FORGE_HANDOFF_ITEM_ID_REGEX.test(h.id))).toBe(true);
     expect(deliverables.every((h) => h.description === h.title)).toBe(true);
     expect(new Set(deliverables.map((h) => h.id)).size).toBe(6);
+    expect(deliverables.find((h) => h.title === 'api_contracts')?.id).toBe(
+      'deliverable-request-api-contracts',
+    );
   });
 
   it('includes enriched evidence and post_deliverable_gate for migration_tasks', () => {

@@ -25,7 +25,7 @@ Auth: `Authorization: Bearer {service JWT}` (mismo patrón que converge).
     "questionsToRefine": ["…"],
     "handoffItems": [
       {
-        "id": "mdd_evidence",
+        "id": "mdd-evidence",
         "description": "MDD Ariadne",
         "kind": "mdd_evidence",
         "title": "MDD Ariadne",
