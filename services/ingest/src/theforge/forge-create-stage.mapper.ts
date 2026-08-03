@@ -12,17 +12,17 @@ import {
 } from './change-promotion-pack.types';
 
 function forgeHandoffItem(
+  id: string,
   kind: string,
   title: string,
   content: string,
-  options?: { mimeType?: string; idSuffix?: string },
+  options?: { mimeType?: string },
 ): ForgeHandoffItem {
-  const id = forgeHandoffItemId(kind, options?.idSuffix);
   return {
     id,
-    description: title,
+    description: title.slice(0, 4000),
     kind,
-    title,
+    title: title.slice(0, 200),
     content,
     ...(options?.mimeType ? { mimeType: options.mimeType } : {}),
   };
@@ -48,10 +48,12 @@ export function buildForgeChangeDescription(pack: ChangePromotionPackV1): string
 
 export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandoffItem[] {
   const items: ForgeHandoffItem[] = [];
+  let legSequence = 0;
+  const nextId = () => forgeHandoffItemId(++legSequence);
 
   if (pack.mdd && Object.keys(pack.mdd).length > 0) {
     items.push(
-      forgeHandoffItem('mdd_evidence', 'MDD Ariadne (as-is)', JSON.stringify(pack.mdd), {
+      forgeHandoffItem(nextId(), 'mdd_evidence', 'MDD Ariadne (as-is)', JSON.stringify(pack.mdd), {
         mimeType: 'application/json',
       }),
     );
@@ -60,6 +62,7 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   if (pack.graphEvidenceBundle) {
     items.push(
       forgeHandoffItem(
+        nextId(),
         'modification_plan_enriched',
         'Modification plan graph evidence',
         JSON.stringify(pack.graphEvidenceBundle),
@@ -71,6 +74,7 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   if (pack.changePlanSeed) {
     items.push(
       forgeHandoffItem(
+        nextId(),
         'change_plan_seed',
         'ChangePlan seed (tasks + symbols)',
         JSON.stringify(pack.changePlanSeed),
@@ -82,6 +86,7 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   if (pack.changeWorkDescription?.trim()) {
     items.push(
       forgeHandoffItem(
+        nextId(),
         'change_work_description',
         'Descripción del trabajo (Ariadne)',
         pack.changeWorkDescription.trim(),
@@ -93,6 +98,7 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   if (pack.cursorTasksMarkdown?.trim()) {
     items.push(
       forgeHandoffItem(
+        nextId(),
         'cursor_tasks_markdown',
         'Tareas Cursor (# Tasks)',
         pack.cursorTasksMarkdown.trim(),
@@ -104,6 +110,7 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   if (pack.change.erDiagramMermaid?.trim()) {
     items.push(
       forgeHandoffItem(
+        nextId(),
         'er_diagram',
         'Diagrama ER',
         pack.change.erDiagramMermaid.trim(),
@@ -113,17 +120,14 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   }
 
   for (const deliverable of pack.deliverablesRequested) {
-    items.push(
-      forgeHandoffItem('deliverable_request', deliverable, deliverable, {
-        idSuffix: deliverable,
-      }),
-    );
+    items.push(forgeHandoffItem(nextId(), 'deliverable_request', deliverable, deliverable));
   }
 
   // P2: Forge must validate migration_tasks against Ariadne Gate 2 after generation.
   if (pack.deliverablesRequested.includes('migration_tasks')) {
     items.push(
       forgeHandoffItem(
+        nextId(),
         'post_deliverable_gate',
         'Validate tasksJson via Ariadne Gate 2',
         JSON.stringify({
