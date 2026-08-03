@@ -10,6 +10,23 @@ import type {
   ForgeHandoffItem,
 } from './change-promotion-pack.types';
 
+function forgeHandoffItem(
+  kind: string,
+  title: string,
+  content: string,
+  options?: { mimeType?: string; idSuffix?: string },
+): ForgeHandoffItem {
+  const id = options?.idSuffix ? `${kind}:${options.idSuffix}` : kind;
+  return {
+    id,
+    description: title,
+    kind,
+    title,
+    content,
+    ...(options?.mimeType ? { mimeType: options.mimeType } : {}),
+  };
+}
+
 export function buildForgeChangeDescription(pack: ChangePromotionPackV1): string {
   const parts: string[] = [pack.change.userDescription.trim()];
   if (pack.change.decisions.length > 0) {
@@ -32,86 +49,97 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
   const items: ForgeHandoffItem[] = [];
 
   if (pack.mdd && Object.keys(pack.mdd).length > 0) {
-    items.push({
-      kind: 'mdd_evidence',
-      title: 'MDD Ariadne (as-is)',
-      content: JSON.stringify(pack.mdd),
-      mimeType: 'application/json',
-    });
+    items.push(
+      forgeHandoffItem('mdd_evidence', 'MDD Ariadne (as-is)', JSON.stringify(pack.mdd), {
+        mimeType: 'application/json',
+      }),
+    );
   }
 
   if (pack.graphEvidenceBundle) {
-    items.push({
-      kind: 'modification_plan_enriched',
-      title: 'Modification plan graph evidence',
-      content: JSON.stringify(pack.graphEvidenceBundle),
-      mimeType: 'application/json',
-    });
+    items.push(
+      forgeHandoffItem(
+        'modification_plan_enriched',
+        'Modification plan graph evidence',
+        JSON.stringify(pack.graphEvidenceBundle),
+        { mimeType: 'application/json' },
+      ),
+    );
   }
 
   if (pack.changePlanSeed) {
-    items.push({
-      kind: 'change_plan_seed',
-      title: 'ChangePlan seed (tasks + symbols)',
-      content: JSON.stringify(pack.changePlanSeed),
-      mimeType: 'application/json',
-    });
+    items.push(
+      forgeHandoffItem(
+        'change_plan_seed',
+        'ChangePlan seed (tasks + symbols)',
+        JSON.stringify(pack.changePlanSeed),
+        { mimeType: 'application/json' },
+      ),
+    );
   }
 
   if (pack.changeWorkDescription?.trim()) {
-    items.push({
-      kind: 'change_work_description',
-      title: 'Descripción del trabajo (Ariadne)',
-      content: pack.changeWorkDescription.trim(),
-      mimeType: 'text/markdown',
-    });
+    items.push(
+      forgeHandoffItem(
+        'change_work_description',
+        'Descripción del trabajo (Ariadne)',
+        pack.changeWorkDescription.trim(),
+        { mimeType: 'text/markdown' },
+      ),
+    );
   }
 
   if (pack.cursorTasksMarkdown?.trim()) {
-    items.push({
-      kind: 'cursor_tasks_markdown',
-      title: 'Tareas Cursor (# Tasks)',
-      content: pack.cursorTasksMarkdown.trim(),
-      mimeType: 'text/markdown',
-    });
+    items.push(
+      forgeHandoffItem(
+        'cursor_tasks_markdown',
+        'Tareas Cursor (# Tasks)',
+        pack.cursorTasksMarkdown.trim(),
+        { mimeType: 'text/markdown' },
+      ),
+    );
   }
 
   if (pack.change.erDiagramMermaid?.trim()) {
-    items.push({
-      kind: 'er_diagram',
-      title: 'Diagrama ER',
-      content: pack.change.erDiagramMermaid.trim(),
-      mimeType: 'text/vnd.mermaid',
-    });
+    items.push(
+      forgeHandoffItem(
+        'er_diagram',
+        'Diagrama ER',
+        pack.change.erDiagramMermaid.trim(),
+        { mimeType: 'text/vnd.mermaid' },
+      ),
+    );
   }
 
   for (const deliverable of pack.deliverablesRequested) {
-    items.push({
-      kind: 'deliverable_request',
-      title: deliverable,
-      content: deliverable,
-    });
+    items.push(
+      forgeHandoffItem('deliverable_request', deliverable, deliverable, {
+        idSuffix: deliverable,
+      }),
+    );
   }
 
   // P2: Forge must validate migration_tasks against Ariadne Gate 2 after generation.
   if (pack.deliverablesRequested.includes('migration_tasks')) {
-    items.push({
-      kind: 'post_deliverable_gate',
-      title: 'Validate tasksJson via Ariadne Gate 2',
-      content: JSON.stringify({
-        required: true,
-        blockOnVerdict: 'BLOCKED',
-        endpoint: `/projects/${pack.ariadne.projectId}/validate-tasks-json`,
-        method: 'POST',
-        bodyHint: {
-          tasksJson: '<Forge tasksJson v2 after legacy_generate_deliverables>',
-          changeDescription: pack.change.userDescription.slice(0, 500),
-        },
-        mcpTool: 'validate_change_plan',
-        note: 'After legacy_generate_deliverables, POST tasksJson to Ariadne. If verdict===BLOCKED, do not mark migration_tasks complete.',
-      }),
-      mimeType: 'application/json',
-    });
+    items.push(
+      forgeHandoffItem(
+        'post_deliverable_gate',
+        'Validate tasksJson via Ariadne Gate 2',
+        JSON.stringify({
+          required: true,
+          blockOnVerdict: 'BLOCKED',
+          endpoint: `/projects/${pack.ariadne.projectId}/validate-tasks-json`,
+          method: 'POST',
+          bodyHint: {
+            tasksJson: '<Forge tasksJson v2 after legacy_generate_deliverables>',
+            changeDescription: pack.change.userDescription.slice(0, 500),
+          },
+          mcpTool: 'validate_change_plan',
+          note: 'After legacy_generate_deliverables, POST tasksJson to Ariadne. If verdict===BLOCKED, do not mark migration_tasks complete.',
+        }),
+        { mimeType: 'application/json' },
+      ),
+    );
   }
 
   return items;

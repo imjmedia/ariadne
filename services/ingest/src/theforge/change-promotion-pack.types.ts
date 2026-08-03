@@ -117,6 +117,10 @@ export interface CreateStageFromPackInput {
 
 /** Pack shape expected by POST /theforge/create-stage-from-ariadne-change-pack */
 export interface ForgeHandoffItem {
+  /** Stable id for Forge Zod schema (required since integration handoffs batch). */
+  id: string;
+  /** Human summary for Forge UI / legacy handoff snapshot. */
+  description: string;
   kind: string;
   title: string;
   content: string;

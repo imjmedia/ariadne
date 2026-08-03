@@ -24,7 +24,14 @@ Auth: `Authorization: Bearer {service JWT}` (mismo patrón que converge).
     "filesToModify": [{ "path": "src/foo.ts", "repoId": "…" }],
     "questionsToRefine": ["…"],
     "handoffItems": [
-      { "kind": "mdd_evidence", "title": "MDD Ariadne", "content": "{…}", "mimeType": "application/json" }
+      {
+        "id": "mdd_evidence",
+        "description": "MDD Ariadne",
+        "kind": "mdd_evidence",
+        "title": "MDD Ariadne",
+        "content": "{…}",
+        "mimeType": "application/json"
+      }
     ],
     "linkedNewProjectId": "uuid-new"
   },
