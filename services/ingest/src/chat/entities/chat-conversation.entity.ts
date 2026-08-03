@@ -58,11 +58,32 @@ export class ChatConversationEntity {
   @Column({ name: 'forge_promotion_last_error', type: 'text', nullable: true })
   forgePromotionLastError!: string | null;
 
+  @Column({ name: 'forge_promotion_phase', type: 'varchar', length: 32, nullable: true })
+  forgePromotionPhase!: string | null;
+
+  @Column({ name: 'forge_promotion_percent', type: 'smallint', nullable: true })
+  forgePromotionPercent!: number | null;
+
   @Column({ name: 'integration_batch_id', type: 'uuid', nullable: true })
   integrationBatchId!: string | null;
 
   @Column({ name: 'integration_handoff_id', type: 'varchar', length: 32, nullable: true })
   integrationHandoffId!: string | null;
+
+  @Column({ name: 'forge_preview_status', type: 'varchar', length: 16, nullable: true })
+  forgePreviewStatus!: string | null;
+
+  @Column({ name: 'forge_preview_phase', type: 'varchar', length: 32, nullable: true })
+  forgePreviewPhase!: string | null;
+
+  @Column({ name: 'forge_preview_percent', type: 'smallint', nullable: true })
+  forgePreviewPercent!: number | null;
+
+  @Column({ name: 'forge_preview_last_error', type: 'text', nullable: true })
+  forgePreviewLastError!: string | null;
+
+  @Column({ name: 'forge_preview_result', type: 'jsonb', nullable: true })
+  forgePreviewResult!: Record<string, unknown> | null;
 
   @OneToMany(() => ChatMessageEntity, (m) => m.conversation)
   messages?: ChatMessageEntity[];

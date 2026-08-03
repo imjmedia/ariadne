@@ -6,6 +6,7 @@ import { ExternalLink, Hammer } from 'lucide-react';
 import { api } from '@/api';
 import type {
   ForgeDeliverableKind,
+  ForgePreviewStatus,
   ForgeProjectCandidate,
   PreviewTheForgePackResponse,
   PromoteToTheForgeResponse,
@@ -26,7 +27,11 @@ import { cn } from '@/lib/utils';
 import { chatNavBtnClass } from '../chat/chatShellClasses';
 import {
   ForgePromoteProgressPanel,
-  useForgePromoteProgress,
+  forgePromotionSuccessFromState,
+  useForgePreviewProgressPoll,
+  useForgePromoteProgressPoll,
+  type ForgePreviewPollState,
+  type ForgePromotionPollState,
 } from './forgePromoteProgress';
 import {
   ALL_FORGE_DELIVERABLES,
@@ -53,14 +58,120 @@ export function ChatForgePromoteDialog(props: {
   const [preview, setPreview] = useState<PreviewTheForgePackResponse | null>(null);
   const [previewParams, setPreviewParams] = useState<PreviewParams | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewPollActive, setPreviewPollActive] = useState(false);
   const [promoteLoading, setPromoteLoading] = useState(false);
+  const [promotePollActive, setPromotePollActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<ForgeProjectCandidate[] | null>(null);
   const [selectedForgeProjectId, setSelectedForgeProjectId] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<PromoteToTheForgeResponse | null>(null);
   const [linkedForgeProjectId, setLinkedForgeProjectId] = useState<string | null>(null);
   const [linkedForgeProjectName, setLinkedForgeProjectName] = useState<string | null>(null);
-  const forgeProgress = useForgePromoteProgress(promoteLoading);
+
+  const pollConversationPreview = useCallback(async (): Promise<ForgePreviewPollState> => {
+    if (!props.conversationId) throw new Error('conversationId required');
+    const state = await api.getConversationForgePromotion(props.conversationId);
+    return {
+      status: state.previewStatus,
+      phase: state.previewPhase,
+      percent: state.previewPercent,
+      lastError: state.previewLastError,
+    };
+  }, [props.conversationId]);
+
+  const handlePreviewPollSuccess = useCallback(async () => {
+    setPreviewPollActive(false);
+    setPreviewLoading(false);
+    if (!props.conversationId) return;
+    const res = await api.getConversationPreviewTheForgePackResult(props.conversationId);
+    setPreview(res);
+    const trimmedStage = stageName.trim();
+    setPreviewParams({ stageName: trimmedStage, deliverables: [...deliverables] });
+    if (res.linkedForgeProject?.forgeProjectId) {
+      setLinkedForgeProjectId(res.linkedForgeProject.forgeProjectId);
+      setLinkedForgeProjectName(res.linkedForgeProject.forgeProjectName ?? null);
+    } else {
+      setLinkedForgeProjectId(null);
+      setLinkedForgeProjectName(null);
+    }
+    const resolvedStage =
+      !trimmedStage && res.preview.changeTitle ? res.preview.changeTitle.trim() : trimmedStage;
+    if (!trimmedStage && res.preview.changeTitle) {
+      setStageName(res.preview.changeTitle);
+    }
+    setPreviewParams({ stageName: resolvedStage, deliverables: [...deliverables] });
+  }, [props.conversationId, stageName, deliverables]);
+
+  const handlePreviewPollFailed = useCallback((state: ForgePreviewPollState) => {
+    setPreviewPollActive(false);
+    setPreviewLoading(false);
+    setPreview(null);
+    setPreviewParams(null);
+    setError(state.lastError ?? 'Error al generar la vista previa.');
+  }, []);
+
+  const previewProgress = useForgePreviewProgressPoll({
+    active: previewPollActive,
+    poll: pollConversationPreview,
+    onSuccess: () => void handlePreviewPollSuccess(),
+    onFailed: handlePreviewPollFailed,
+    initialPhase: 'pack_build',
+  });
+
+  const pollConversationPromotion = useCallback(async (): Promise<ForgePromotionPollState> => {
+    if (!props.conversationId) throw new Error('conversationId required');
+    const state = await api.getConversationForgePromotion(props.conversationId);
+    return {
+      status: state.status,
+      phase: state.phase,
+      percent: state.percent,
+      lastError: state.lastError,
+      forgeProjectId: state.forgeProjectId,
+      forgeStageId: state.forgeStageId,
+      stageUrl: state.stageUrl,
+    };
+  }, [props.conversationId]);
+
+  const handlePollFailed = useCallback((state: ForgePromotionPollState) => {
+    setPromotePollActive(false);
+    setPromoteLoading(false);
+    const raw = state.lastError;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as {
+          code?: string;
+          candidates?: ForgeProjectCandidate[];
+          message?: string;
+        };
+        if (parsed.code === 'FORGE_RESOLVE_AMBIGUOUS' && parsed.candidates?.length) {
+          setCandidates(parsed.candidates);
+          setError(parsed.message ?? 'Varios proyectos Forge coinciden. Elige uno.');
+          return;
+        }
+      } catch {
+        /* plain text error */
+      }
+    }
+    setError(raw ?? 'Error al promover a The Forge.');
+  }, []);
+
+  const handlePollSuccess = useCallback(
+    (state: ForgePromotionPollState) => {
+      setPromotePollActive(false);
+      setPromoteLoading(false);
+      const result = forgePromotionSuccessFromState(state);
+      setSuccessResult(result);
+      props.onSuccess?.(result);
+    },
+    [props.onSuccess],
+  );
+
+  const forgeProgress = useForgePromoteProgressPoll({
+    active: promotePollActive,
+    poll: pollConversationPromotion,
+    onSuccess: handlePollSuccess,
+    onFailed: handlePollFailed,
+  });
 
   const previewStale =
     previewParams == null ||
@@ -77,7 +188,9 @@ export function ChatForgePromoteDialog(props: {
     setLinkedForgeProjectId(null);
     setLinkedForgeProjectName(null);
     setPreviewLoading(false);
+    setPreviewPollActive(false);
     setPromoteLoading(false);
+    setPromotePollActive(false);
   }, []);
 
   useEffect(() => {
@@ -99,33 +212,39 @@ export function ChatForgePromoteDialog(props: {
     }
     const trimmedStage = stageName.trim();
     setPreviewLoading(true);
+    setPreviewPollActive(false);
     setError(null);
     setCandidates(null);
     try {
-      const res = await api.previewTheForgePack(props.conversationId, {
+      const result = await api.previewTheForgePack(props.conversationId, {
         stageName: trimmedStage || undefined,
         deliverables,
       });
-      setPreview(res);
+      if (result.status === 'pending') {
+        setPreviewPollActive(true);
+        return;
+      }
+      setPreviewLoading(false);
+      setPreview(result);
       setPreviewParams({ stageName: trimmedStage, deliverables: [...deliverables] });
-      if (res.linkedForgeProject?.forgeProjectId) {
-        setLinkedForgeProjectId(res.linkedForgeProject.forgeProjectId);
-        setLinkedForgeProjectName(res.linkedForgeProject.forgeProjectName ?? null);
+      if (result.linkedForgeProject?.forgeProjectId) {
+        setLinkedForgeProjectId(result.linkedForgeProject.forgeProjectId);
+        setLinkedForgeProjectName(result.linkedForgeProject.forgeProjectName ?? null);
       } else {
         setLinkedForgeProjectId(null);
         setLinkedForgeProjectName(null);
       }
-      const resolvedStage = !trimmedStage && res.preview.changeTitle ? res.preview.changeTitle.trim() : trimmedStage;
-      if (!trimmedStage && res.preview.changeTitle) {
-        setStageName(res.preview.changeTitle);
+      const resolvedStage =
+        !trimmedStage && result.preview.changeTitle ? result.preview.changeTitle.trim() : trimmedStage;
+      if (!trimmedStage && result.preview.changeTitle) {
+        setStageName(result.preview.changeTitle);
       }
       setPreviewParams({ stageName: resolvedStage, deliverables: [...deliverables] });
     } catch (e) {
+      setPreviewLoading(false);
       setPreview(null);
       setPreviewParams(null);
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setPreviewLoading(false);
     }
   }, [props.conversationId, stageName, deliverables]);
 
@@ -148,6 +267,7 @@ export function ChatForgePromoteDialog(props: {
     }
 
     setPromoteLoading(true);
+    setPromotePollActive(false);
     setError(null);
     try {
       const result = await api.promoteConversationToTheForge(props.conversationId, {
@@ -161,11 +281,15 @@ export function ChatForgePromoteDialog(props: {
             ? { forgeProjectId: linkedForgeProjectId }
             : {}),
       });
-      forgeProgress.finish();
-      await new Promise((r) => window.setTimeout(r, 350));
+      if (result.status === 'pending') {
+        setPromotePollActive(true);
+        return;
+      }
+      setPromoteLoading(false);
       setSuccessResult(result);
       props.onSuccess?.(result);
     } catch (e) {
+      setPromoteLoading(false);
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes('FORGE_RESOLVE_AMBIGUOUS') || msg.includes('409')) {
         try {
@@ -185,12 +309,12 @@ export function ChatForgePromoteDialog(props: {
         }
       }
       setError(msg);
-    } finally {
-      setPromoteLoading(false);
     }
   };
 
-  const busy = previewLoading || promoteLoading;
+  const showPreviewProgress = previewLoading || previewPollActive;
+  const showPromoteProgress = promoteLoading || promotePollActive;
+  const busy = showPreviewProgress || showPromoteProgress;
   const canPromote = Boolean(props.conversationId) && !props.disabled && !busy && !successResult;
 
   return (
@@ -273,7 +397,7 @@ export function ChatForgePromoteDialog(props: {
             </fieldset>
 
             <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--background-muted)]/30 p-3">
-              {previewStale && !previewLoading ? (
+              {previewStale && !showPreviewProgress ? (
                 <>
                   <p className="text-xs leading-relaxed text-[var(--foreground-muted)]">
                     Pulsa <strong className="font-medium text-[var(--foreground)]">Aplicar cambios</strong>{' '}
@@ -291,8 +415,12 @@ export function ChatForgePromoteDialog(props: {
                     Aplicar cambios
                   </Button>
                 </>
-              ) : previewLoading ? (
-                <p className="text-xs text-[var(--foreground-muted)]">Generando vista previa…</p>
+              ) : showPreviewProgress ? (
+                <ForgePromoteProgressPanel
+                  progress={previewProgress.progress}
+                  stepLabel={previewProgress.stepLabel}
+                  hint="Analizando la conversación y preparando el plan de modificación."
+                />
               ) : preview ? (
                 <div className="space-y-2 text-xs">
                   <p>
@@ -342,7 +470,7 @@ export function ChatForgePromoteDialog(props: {
               </div>
             ) : null}
 
-            {promoteLoading ? (
+            {showPromoteProgress ? (
               <ForgePromoteProgressPanel
                 progress={forgeProgress.progress}
                 stepLabel={forgeProgress.stepLabel}

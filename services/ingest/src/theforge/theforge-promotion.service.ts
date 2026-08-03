@@ -6,6 +6,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -24,6 +25,16 @@ import {
   type ResolveForgeProjectResult,
 } from './change-promotion-pack.types';
 import { CursorTasksDocumentService } from './cursor-tasks-document.service';
+import { FORGE_PROMOTION_PENDING_TTL_MS } from './forge-timeout.constants';
+import {
+  forgePromotionProgressPatch,
+  type ForgePromotionPhase,
+} from './forge-promotion-progress.util';
+import {
+  forgePreviewProgressPatch,
+  type ForgePreviewPhase,
+  type ForgePreviewStatus,
+} from './forge-preview-progress.util';
 import { TheForgeClient } from './theforge-client.service';
 import { TheForgeIntegrationService } from './theforge-integration.service';
 
@@ -37,6 +48,12 @@ export interface ForgePromotionStateDto {
   lastError: string | null;
   stageUrl: string | null;
   idempotencyKey: string | null;
+  phase: string | null;
+  percent: number | null;
+  previewStatus: ForgePreviewStatus;
+  previewPhase: string | null;
+  previewPercent: number | null;
+  previewLastError: string | null;
 }
 
 export interface PromoteToTheForgeBody {
@@ -47,8 +64,14 @@ export interface PromoteToTheForgeBody {
   forgeProjectId?: string;
 }
 
+export type PromoteToTheForgeResult = { status: 'pending' };
+
+export type PreviewToTheForgeResult = { status: 'pending' };
+
 @Injectable()
 export class TheForgePromotionService {
+  private readonly logger = new Logger(TheForgePromotionService.name);
+
   constructor(
     @InjectRepository(ChatConversationEntity)
     private readonly conversations: Repository<ChatConversationEntity>,
@@ -83,81 +106,184 @@ export class TheForgePromotionService {
     return this.toStateDto(row);
   }
 
-  async previewPack(actor: CredentialActor, conversationId: string, body: Partial<PromoteToTheForgeBody>) {
-    await this.assertChatPromotionAvailable();
-    await this.getOwnedConversation(actor, conversationId);
-    const deliverables = this.normalizeDeliverables(body.deliverables);
-    const preview = await this.packService.buildPreview({
-      conversationId,
-      stageName: body.stageName,
-      stageKey: body.stageKey,
-      deliverablesRequested: deliverables,
-    });
-    const linkedForge = await this.findLinkedForgeProject(
-      preview.pack.ariadne.projectId,
-      preview.pack.ariadne.repositoryId,
-    );
-    return {
-      preview: {
-        changeTitle: preview.changeTitle,
-        stageKeySuggested: preview.stageKeySuggested,
-        userDescription: preview.userDescription,
-        hasMermaid: preview.hasMermaid,
-        erDiagramPreview: preview.erDiagramPreview,
-        modificationPlanFileCount: preview.modificationPlanFileCount,
-        modificationPlanSample: preview.modificationPlanSample,
-        indexFresh: preview.indexFresh,
-        indexStaleHours: preview.indexStaleHours,
-        warnings: preview.warnings,
-        messageCount: preview.messageCount,
-      },
-      linkedForgeProject: linkedForge,
-      promoteEnabled: await this.isPromoteEnabled(),
-    };
-  }
-
-  async promote(actor: CredentialActor, conversationId: string, body: PromoteToTheForgeBody) {
+  async previewPack(
+    actor: CredentialActor,
+    conversationId: string,
+    body: Partial<PromoteToTheForgeBody>,
+  ): Promise<PreviewToTheForgeResult> {
     await this.assertChatPromotionAvailable();
     const conversation = await this.getOwnedConversation(actor, conversationId);
-    if (conversation.forgePromotionStatus === 'pending') {
-      throw new ConflictException('Ya hay una promoción en curso para esta conversación');
+    await this.clearStalePendingPreview(conversation);
+    this.normalizeDeliverables(body.deliverables);
+
+    await this.updateConversation(conversationId, {
+      forgePreviewStatus: 'pending',
+      forgePreviewLastError: null,
+      forgePreviewResult: null,
+      ...forgePreviewProgressPatch('pack_build'),
+    });
+
+    void this.runPreviewConversationJob(conversationId, body).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`previewPack ${conversationId} background job crashed: ${message}`);
+    });
+
+    return { status: 'pending' };
+  }
+
+  async getPreviewResult(actor: CredentialActor, conversationId: string) {
+    const row = await this.getOwnedConversation(actor, conversationId);
+    if (row.forgePreviewStatus !== 'success' || !row.forgePreviewResult) {
+      throw new BadRequestException('No hay vista previa lista para esta conversación.');
     }
+    return row.forgePreviewResult;
+  }
+
+  private async runPreviewConversationJob(
+    conversationId: string,
+    body: Partial<PromoteToTheForgeBody>,
+  ): Promise<void> {
+    try {
+      await this.updateConversationPreviewPhase(conversationId, 'pack_build');
+
+      const deliverables = this.normalizeDeliverables(body.deliverables);
+      const preview = await this.packService.buildPreview({
+        conversationId,
+        stageName: body.stageName,
+        stageKey: body.stageKey,
+        deliverablesRequested: deliverables,
+      });
+      const linkedForge = await this.findLinkedForgeProject(
+        preview.pack.ariadne.projectId,
+        preview.pack.ariadne.repositoryId,
+      );
+
+      const result = {
+        preview: {
+          changeTitle: preview.changeTitle,
+          stageKeySuggested: preview.stageKeySuggested,
+          userDescription: preview.userDescription,
+          hasMermaid: preview.hasMermaid,
+          erDiagramPreview: preview.erDiagramPreview,
+          modificationPlanFileCount: preview.modificationPlanFileCount,
+          modificationPlanSample: preview.modificationPlanSample,
+          indexFresh: preview.indexFresh,
+          indexStaleHours: preview.indexStaleHours,
+          warnings: preview.warnings,
+          messageCount: preview.messageCount,
+        },
+        linkedForgeProject: linkedForge,
+        promoteEnabled: await this.isPromoteEnabled(),
+      };
+
+      await this.updateConversation(conversationId, {
+        forgePreviewStatus: 'success',
+        forgePreviewLastError: null,
+        ...forgePreviewProgressPatch('done'),
+      });
+      const fresh = await this.conversations.findOne({ where: { id: conversationId } });
+      if (fresh) {
+        fresh.forgePreviewResult = JSON.parse(JSON.stringify(result)) as Record<string, unknown>;
+        await this.conversations.save(fresh);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`previewPack ${conversationId} failed: ${message}`);
+      await this.updateConversation(conversationId, {
+        forgePreviewStatus: 'failed',
+        forgePreviewLastError: message,
+        forgePreviewResult: null,
+        ...forgePreviewProgressPatch('failed'),
+      });
+    }
+  }
+
+  private async clearStalePendingPreview(conversation: ChatConversationEntity): Promise<void> {
+    if (conversation.forgePreviewStatus !== 'pending') return;
+    const ageMs = Date.now() - conversation.updatedAt.getTime();
+    if (ageMs < FORGE_PROMOTION_PENDING_TTL_MS) {
+      throw new ConflictException('Ya hay una vista previa en curso para esta conversación');
+    }
+    this.logger.warn(
+      `Conversation ${conversation.id} preview pending for ${Math.round(ageMs / 1000)}s — allowing retry`,
+    );
+    await this.updateConversation(conversation.id, {
+      forgePreviewStatus: 'failed',
+      forgePreviewLastError:
+        'La vista previa anterior no terminó (timeout o error de red). Se permite reintentar.',
+      ...forgePreviewProgressPatch('failed'),
+    });
+    conversation.forgePreviewStatus = 'failed';
+  }
+
+  private async updateConversationPreviewPhase(
+    conversationId: string,
+    phase: ForgePreviewPhase,
+  ): Promise<void> {
+    await this.updateConversation(conversationId, forgePreviewProgressPatch(phase));
+  }
+
+  async promote(
+    actor: CredentialActor,
+    conversationId: string,
+    body: PromoteToTheForgeBody,
+  ): Promise<PromoteToTheForgeResult> {
+    await this.assertChatPromotionAvailable();
+    const conversation = await this.getOwnedConversation(actor, conversationId);
+    await this.clearStalePendingPromotion(conversation);
 
     const messageCount = await this.messages.count({ where: { conversationId } });
     if (messageCount === 0) {
       throw new BadRequestException('La conversación está vacía');
     }
 
-    const deliverables = this.normalizeDeliverables(body.deliverables);
-    const basePack = await this.packService.build({
-      conversationId,
-      stageName: body.stageName,
-      stageKey: body.stageKey,
-      deliverablesRequested: deliverables,
-    });
-    const { pack } = await this.cursorTasks.enrichPack(basePack);
-
-    if (
-      conversation.forgePromotionStatus === 'success' &&
-      conversation.forgePromotionIdempotencyKey === pack.idempotencyKey &&
-      conversation.forgeStageId
-    ) {
-      return {
-        status: 'success' as const,
-        alreadyPromoted: true,
-        forgeProjectId: conversation.forgeProjectId,
-        forgeStageId: conversation.forgeStageId,
-        stageUrl: conversation.forgeStageUrl,
-      };
-    }
+    this.normalizeDeliverables(body.deliverables);
 
     await this.updateConversation(conversationId, {
       forgePromotionStatus: 'pending',
       forgePromotionLastError: null,
+      ...forgePromotionProgressPatch('pack_resolve'),
     });
 
+    void this.runPromoteConversationJob(conversationId, body).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`promote ${conversationId} background job crashed: ${message}`);
+    });
+
+    return { status: 'pending' };
+  }
+
+  private async runPromoteConversationJob(
+    conversationId: string,
+    body: PromoteToTheForgeBody,
+  ): Promise<void> {
     try {
+      await this.updateConversationPhase(conversationId, 'pack_resolve');
+
+      const deliverables = this.normalizeDeliverables(body.deliverables);
+      const basePack = await this.packService.build({
+        conversationId,
+        stageName: body.stageName,
+        stageKey: body.stageKey,
+        deliverablesRequested: deliverables,
+      });
+
+      await this.updateConversationPhase(conversationId, 'pack_enrich');
+      const { pack } = await this.cursorTasks.enrichPack(basePack);
+
+      const fresh = await this.conversations.findOne({ where: { id: conversationId } });
+      if (
+        fresh?.forgePromotionStatus === 'success' &&
+        fresh.forgePromotionIdempotencyKey === pack.idempotencyKey &&
+        fresh.forgeStageId
+      ) {
+        await this.updateConversation(conversationId, forgePromotionProgressPatch('done'));
+        return;
+      }
+
       const resolved = await this.resolveForgeProjectForPromotion(pack, body.forgeProjectId);
+
+      await this.updateConversationPhase(conversationId, 'forge_create');
 
       const created = await this.forgeClient.createStageFromChangePack({
         forgeProjectId: resolved.forgeProjectId,
@@ -176,47 +302,68 @@ export class TheForgePromotionService {
         forgePromotionStatus: 'success',
         forgePromotionIdempotencyKey: pack.idempotencyKey,
         forgePromotionLastError: null,
+        ...forgePromotionProgressPatch('done'),
       });
-
-      return {
-        status: 'success' as const,
-        alreadyPromoted: false,
-        forgeProjectId: created.forgeProjectId,
-        forgeProjectName: resolved.forgeProjectName,
-        forgeStageId: created.forgeStageId,
-        stageKey: created.stageKey,
-        stageName: created.stageName,
-        stageUrl: created.stageUrl,
-        importMode: created.importMode,
-        legacyStart: created.legacyStart,
-        ariadneWire: created.ariadneWire,
-        recommendedNextTools: created.recommendedNextTools,
-        deliverablesCreated: created.deliverablesCreated,
-        warnings: resolved.warnings,
-        linkKind: resolved.linkKind,
-      };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      await this.handlePromoteJobFailure(conversationId, err);
+    }
+  }
+
+  private async handlePromoteJobFailure(conversationId: string, err: unknown): Promise<void> {
+    if (err instanceof ForgeResolveAmbiguousError) {
       await this.updateConversation(conversationId, {
         forgePromotionStatus: 'failed',
-        forgePromotionLastError: message,
-      });
-
-      if (err instanceof ForgeResolveAmbiguousError) {
-        throw new ConflictException({
+        forgePromotionLastError: JSON.stringify({
           code: 'FORGE_RESOLVE_AMBIGUOUS',
           message: err.message,
           candidates: err.candidates,
-        });
-      }
-      if (err instanceof ForgeResolveNotFoundError) {
-        throw new NotFoundException({
-          code: 'FORGE_RESOLVE_NOT_FOUND',
-          message: err.message,
-        });
-      }
-      throw err;
+        }),
+        ...forgePromotionProgressPatch('failed'),
+      });
+      return;
     }
+
+    if (err instanceof ForgeResolveNotFoundError) {
+      await this.updateConversation(conversationId, {
+        forgePromotionStatus: 'failed',
+        forgePromotionLastError: err.message,
+        ...forgePromotionProgressPatch('failed'),
+      });
+      return;
+    }
+
+    const message = err instanceof Error ? err.message : String(err);
+    this.logger.warn(`promote ${conversationId} failed: ${message}`);
+    await this.updateConversation(conversationId, {
+      forgePromotionStatus: 'failed',
+      forgePromotionLastError: message,
+      ...forgePromotionProgressPatch('failed'),
+    });
+  }
+
+  private async clearStalePendingPromotion(conversation: ChatConversationEntity): Promise<void> {
+    if (conversation.forgePromotionStatus !== 'pending') return;
+    const ageMs = Date.now() - conversation.updatedAt.getTime();
+    if (ageMs < FORGE_PROMOTION_PENDING_TTL_MS) {
+      throw new ConflictException('Ya hay una promoción en curso para esta conversación');
+    }
+    this.logger.warn(
+      `Conversation ${conversation.id} promotion pending for ${Math.round(ageMs / 1000)}s — allowing retry`,
+    );
+    await this.updateConversation(conversation.id, {
+      forgePromotionStatus: 'failed',
+      forgePromotionLastError:
+        'La promoción anterior no terminó (timeout o error de red). Se permite reintentar.',
+      ...forgePromotionProgressPatch('failed'),
+    });
+    conversation.forgePromotionStatus = 'failed';
+  }
+
+  private async updateConversationPhase(
+    conversationId: string,
+    phase: ForgePromotionPhase,
+  ): Promise<void> {
+    await this.updateConversation(conversationId, forgePromotionProgressPatch(phase));
   }
 
   private normalizeDeliverables(input?: ForgeDeliverableKind[]): ForgeDeliverableKind[] {
@@ -313,6 +460,12 @@ export class TheForgePromotionService {
       lastError: row.forgePromotionLastError,
       stageUrl: row.forgeStageUrl,
       idempotencyKey: row.forgePromotionIdempotencyKey,
+      phase: row.forgePromotionPhase,
+      percent: row.forgePromotionPercent,
+      previewStatus: (row.forgePreviewStatus ?? 'none') as ForgePreviewStatus,
+      previewPhase: row.forgePreviewPhase,
+      previewPercent: row.forgePreviewPercent,
+      previewLastError: row.forgePreviewLastError,
     };
   }
 

@@ -54,7 +54,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **handoff-chat-analysis.util.ts** | Detectar handoffs pendientes de respuesta LLM |
 | **forge-deliverables.constants.ts** | Opciones y defaults de entregables Forge |
 | **ChatIntegrationBatchForgeDialog.tsx** | Promover lote → una etapa; selector de proyecto LEGACY brownfield |
-| **forgePromoteProgress.tsx** | Barra de progreso estimada durante promote/create-stage |
+| **forgePromoteProgress.tsx** | Progreso real (polling) en preview y promote chat/lote; simulado solo en create-stage de proyecto |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |
 | **ChatMessageThread.tsx** | Burbujas, empty state con chips, Cypher colapsable, **Copiar Markdown** en respuestas |
 | **ChatCopyMarkdownButton.tsx** | Copia la respuesta cruda (GFM + fences `mermaid`/`cypher`) al portapapeles |

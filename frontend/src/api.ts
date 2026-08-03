@@ -361,16 +361,21 @@ export const api = {
     conversationId: string,
     body: Partial<import('./types').PromoteToTheForgeRequest>,
   ) =>
-    request<import('./types').PreviewTheForgePackResponse>(
+    request<import('./types').PreviewTheForgePackResult>(
       `/conversations/${conversationId}/preview-theforge-pack`,
       { method: 'POST', body: JSON.stringify(body ?? {}) },
+    ),
+
+  getConversationPreviewTheForgePackResult: (conversationId: string) =>
+    request<import('./types').PreviewTheForgePackResponse>(
+      `/conversations/${conversationId}/preview-theforge-pack/result`,
     ),
 
   promoteConversationToTheForge: (
     conversationId: string,
     body: import('./types').PromoteToTheForgeRequest,
   ) =>
-    request<import('./types').PromoteToTheForgeResponse>(
+    request<import('./types').PromoteToTheForgeResult>(
       `/conversations/${conversationId}/promote-to-theforge`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
@@ -391,6 +396,9 @@ export const api = {
       `/conversations/${conversationId}/integration-batch`,
     ),
 
+  getIntegrationBatch: (batchId: string) =>
+    request<import('./types').ChatIntegrationBatch>(`/integration-batches/${batchId}`),
+
   deleteIntegrationBatch: (batchId: string) =>
     request<void>(`/integration-batches/${batchId}`, { method: 'DELETE' }),
 
@@ -398,16 +406,21 @@ export const api = {
     batchId: string,
     body: Partial<import('./types').PromoteToTheForgeRequest>,
   ) =>
-    request<import('./types').PreviewIntegrationBatchTheForgeResponse>(
+    request<import('./types').PreviewIntegrationBatchTheForgeResult>(
       `/integration-batches/${batchId}/preview-theforge-pack`,
       { method: 'POST', body: JSON.stringify(body ?? {}) },
+    ),
+
+  getIntegrationBatchPreviewResult: (batchId: string) =>
+    request<import('./types').PreviewIntegrationBatchTheForgeResponse>(
+      `/integration-batches/${batchId}/preview-theforge-pack/result`,
     ),
 
   promoteIntegrationBatchToTheForge: (
     batchId: string,
     body: import('./types').PromoteToTheForgeRequest,
   ) =>
-    request<import('./types').PromoteToTheForgeResponse>(
+    request<import('./types').PromoteToTheForgeResult>(
       `/integration-batches/${batchId}/promote-to-theforge`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
