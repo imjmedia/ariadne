@@ -176,6 +176,25 @@ export interface CreateStageFromPackResult {
   deliverablesCreated?: string[];
 }
 
+/** Forge Zod regex for `pack.handoffItems[].id` (lowercase kebab-case). */
+export const FORGE_HANDOFF_ITEM_ID_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Stable handoff id accepted by Forge create-stage Zod schema. */
+export function forgeHandoffItemId(kind: string, idSuffix?: string): string {
+  const raw = idSuffix?.trim() ? `${kind}-${idSuffix.trim()}` : kind.trim();
+  const slug = raw
+    .toLowerCase()
+    .replace(/[_:/\s]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 128);
+  if (slug && FORGE_HANDOFF_ITEM_ID_REGEX.test(slug)) {
+    return slug;
+  }
+  return 'handoff-item';
+}
+
 export function slugifyStageKey(title: string): string {
   const base = title
     .normalize('NFD')

@@ -2,12 +2,13 @@
  * Maps internal ChangePromotionPack v1.1 → The Forge API create-stage body.
  * @see docs/contracts/theforge-create-stage-from-pack-v1.md
  */
-import type {
-  ChangePromotionPackV1,
-  CreateStageFromPackInput,
-  ForgeCreateStageApiBody,
-  ForgeChangePackV1,
-  ForgeHandoffItem,
+import {
+  forgeHandoffItemId,
+  type ChangePromotionPackV1,
+  type CreateStageFromPackInput,
+  type ForgeCreateStageApiBody,
+  type ForgeChangePackV1,
+  type ForgeHandoffItem,
 } from './change-promotion-pack.types';
 
 function forgeHandoffItem(
@@ -16,7 +17,7 @@ function forgeHandoffItem(
   content: string,
   options?: { mimeType?: string; idSuffix?: string },
 ): ForgeHandoffItem {
-  const id = options?.idSuffix ? `${kind}:${options.idSuffix}` : kind;
+  const id = forgeHandoffItemId(kind, options?.idSuffix);
   return {
     id,
     description: title,
