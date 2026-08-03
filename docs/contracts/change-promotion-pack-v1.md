@@ -69,6 +69,6 @@ El mapper `forge-create-stage.mapper.ts` transforma este JSON interno al `pack.v
 | `deliverable_request` | Cada deliverable pedido |
 | `er_diagram` | Mermaid si existe |
 
-Cada `handoffItem` incluye **`id`** (slug kebab-case estable, p. ej. `mdd-evidence`, `deliverable-request-api-contracts`) y **`description`** (título legible) — requeridos por el schema Zod de Forge además de `kind`, `title`, `content`. El campo `kind` conserva el identificador interno con guiones bajos.
+Cada `handoffItem` incluye **`id`** (`NEW-LEG-01`, `NEW-LEG-02`, … — regex Forge `^NEW-LEG-\d{2,}$`), **`title`** y **`description`** (1–4000 chars). Los campos `kind`, `content` y `mimeType` son metadatos Ariadne en el mapper; Forge valida con `integrationHandoffItemSchema` y persiste título/descripción en el snapshot.
 
 Tras `legacy_generate_deliverables`, Forge debe llamar `POST /projects/:id/validate-tasks-json` y **bloquear** si `verdict === BLOCKED`.

@@ -53,10 +53,10 @@ describe('forge-create-stage.mapper', () => {
     expect(forgePack.handoffItems?.every((h) => h.id && h.description)).toBe(true);
     expect(forgePack.handoffItems?.every((h) => FORGE_HANDOFF_ITEM_ID_REGEX.test(h.id))).toBe(true);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'mdd_evidence')).toBe(true);
-    expect(forgePack.handoffItems?.find((h) => h.kind === 'mdd_evidence')?.id).toBe('mdd-evidence');
+    expect(forgePack.handoffItems?.find((h) => h.kind === 'mdd_evidence')?.id).toBe('NEW-LEG-01');
   });
 
-  it('assigns unique ids for deliverable_request handoffs', () => {
+  it('assigns sequential NEW-LEG ids for deliverable_request handoffs', () => {
     const pack = samplePack();
     pack.deliverablesRequested = [
       'change_spec',
@@ -69,13 +69,21 @@ describe('forge-create-stage.mapper', () => {
     const items = toForgeChangePackV1(pack).handoffItems ?? [];
     const deliverables = items.filter((h) => h.kind === 'deliverable_request');
     expect(deliverables).toHaveLength(6);
-    expect(deliverables.every((h) => h.id.startsWith('deliverable-request-'))).toBe(true);
     expect(deliverables.every((h) => FORGE_HANDOFF_ITEM_ID_REGEX.test(h.id))).toBe(true);
     expect(deliverables.every((h) => h.description === h.title)).toBe(true);
     expect(new Set(deliverables.map((h) => h.id)).size).toBe(6);
-    expect(deliverables.find((h) => h.title === 'api_contracts')?.id).toBe(
-      'deliverable-request-api-contracts',
-    );
+    const allIds = items.map((h) => h.id);
+    expect(allIds).toEqual([
+      'NEW-LEG-01',
+      'NEW-LEG-02',
+      'NEW-LEG-03',
+      'NEW-LEG-04',
+      'NEW-LEG-05',
+      'NEW-LEG-06',
+      'NEW-LEG-07',
+      'NEW-LEG-08',
+      'NEW-LEG-09',
+    ]);
   });
 
   it('includes enriched evidence and post_deliverable_gate for migration_tasks', () => {

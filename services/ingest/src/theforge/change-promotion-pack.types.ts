@@ -117,7 +117,7 @@ export interface CreateStageFromPackInput {
 
 /** Pack shape expected by POST /theforge/create-stage-from-ariadne-change-pack */
 export interface ForgeHandoffItem {
-  /** Stable id for Forge Zod schema (required since integration handoffs batch). */
+  /** Forge integrationHandoffItemSchema id (`NEW-LEG-01`, …). */
   id: string;
   /** Human summary for Forge UI / legacy handoff snapshot. */
   description: string;
@@ -176,23 +176,13 @@ export interface CreateStageFromPackResult {
   deliverablesCreated?: string[];
 }
 
-/** Forge Zod regex for `pack.handoffItems[].id` (lowercase kebab-case). */
-export const FORGE_HANDOFF_ITEM_ID_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Forge `integrationHandoffItemSchema` regex for `pack.handoffItems[].id`. */
+export const FORGE_HANDOFF_ITEM_ID_REGEX = /^NEW-LEG-\d{2,}$/;
 
-/** Stable handoff id accepted by Forge create-stage Zod schema. */
-export function forgeHandoffItemId(kind: string, idSuffix?: string): string {
-  const raw = idSuffix?.trim() ? `${kind}-${idSuffix.trim()}` : kind.trim();
-  const slug = raw
-    .toLowerCase()
-    .replace(/[_:/\s]+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 128);
-  if (slug && FORGE_HANDOFF_ITEM_ID_REGEX.test(slug)) {
-    return slug;
-  }
-  return 'handoff-item';
+/** Sequential NEW-LEG id for Forge create-stage handoff items (1-based). */
+export function forgeHandoffItemId(sequence: number): string {
+  const n = Number.isFinite(sequence) && sequence >= 1 ? Math.floor(sequence) : 1;
+  return `NEW-LEG-${String(n).padStart(2, '0')}`;
 }
 
 export function slugifyStageKey(title: string): string {
