@@ -101,6 +101,7 @@ Flujo recomendado: **Aplicar cambios** (preview) → **Enviar lote**. El preview
 |---------|----------------|
 | Barra ~92% mucho rato | Normal: la barra es estimada; la llamada real es `createStageFromChangePack` (puede tardar minutos) |
 | `500` / `502` / `504` tras espera | Timeout Traefik/nginx/API antes de ingest; sube `INGEST_PROXY_TIMEOUT_MS` y timeout del reverse proxy externo |
+| `500` Zod `handoffItems[n].id/description Required` | Pack Ariadne antiguo sin `id`+`description` en cada handoff; actualiza ingest (mapper `forge-create-stage.mapper.ts`) |
 | `503 FORGE_CREATE_STAGE_TIMEOUT` | Forge no respondió en 10 min |
 | `409` promoción en curso | Lote en `forgePromotionStatus=pending`; espera 15 min o redeploy con TTL |
 | Preview OK, promote lento | Versión antigua reconstruía pack dos veces; actualiza ingest con caché de preview |

@@ -49,7 +49,26 @@ describe('forge-create-stage.mapper', () => {
     expect(forgePack.ariadneRepositoryId).toBe('repo-1');
     expect(forgePack.filesToModify).toHaveLength(1);
     expect(forgePack.questionsToRefine).toEqual(['¿Soft delete en medios?']);
+    expect(forgePack.handoffItems?.every((h) => h.id && h.description)).toBe(true);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'mdd_evidence')).toBe(true);
+  });
+
+  it('assigns unique ids for deliverable_request handoffs', () => {
+    const pack = samplePack();
+    pack.deliverablesRequested = [
+      'change_spec',
+      'data_model',
+      'api_contracts',
+      'modification_plan',
+      'migration_tasks',
+      'mdd_full',
+    ];
+    const items = toForgeChangePackV1(pack).handoffItems ?? [];
+    const deliverables = items.filter((h) => h.kind === 'deliverable_request');
+    expect(deliverables).toHaveLength(6);
+    expect(deliverables.every((h) => h.id.startsWith('deliverable_request:'))).toBe(true);
+    expect(deliverables.every((h) => h.description === h.title)).toBe(true);
+    expect(new Set(deliverables.map((h) => h.id)).size).toBe(6);
   });
 
   it('includes enriched evidence and post_deliverable_gate for migration_tasks', () => {
