@@ -140,6 +140,16 @@ describe('forge-create-stage.mapper', () => {
     expect(buildForgeChangeDescription(pack).length).toBe(8000);
   });
 
+  it('puts document body in handoff description (Forge SSOT)', () => {
+    const pack = samplePack();
+    pack.changeWorkDescription = '# Trabajo\n\nDetalle largo';
+    const item = toForgeChangePackV1(pack).handoffItems?.find(
+      (h) => h.kind === 'change_work_description',
+    );
+    expect(item?.description).toContain('# Trabajo');
+    expect(item?.description).not.toBe(item?.title);
+  });
+
   it('includes cursor handoff items when present', () => {
     const pack = samplePack();
     pack.changeWorkDescription = '# Trabajo\n\nDetalle';

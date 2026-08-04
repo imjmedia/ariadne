@@ -24,12 +24,23 @@ function forgeHandoffItem(
   content: string,
   options?: { mimeType?: string },
 ): ForgeHandoffItem {
+  const body = content.trim();
+  const isJson = body.startsWith('{') || body.startsWith('[');
+  let payload: unknown | undefined;
+  if (isJson) {
+    try {
+      payload = JSON.parse(body) as unknown;
+    } catch {
+      payload = undefined;
+    }
+  }
   return {
     id,
-    description: title.slice(0, 4000),
+    description: body.slice(0, 200_000),
     kind,
     title: title.slice(0, 200),
-    content,
+    content: body,
+    ...(payload !== undefined ? { payload } : {}),
     ...(options?.mimeType ? { mimeType: options.mimeType } : {}),
   };
 }
@@ -65,6 +76,7 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
         'Alcance integración NEW→LEG',
         JSON.stringify({
           mode: 'integration_handoff',
+          stageOrigin: 'ariadne_integration_handoff',
           taskSource: 'tasks_json_seed',
           taskSourceFallback: 'cursor_tasks_markdown',
           skipBaselineDeliverables: [
