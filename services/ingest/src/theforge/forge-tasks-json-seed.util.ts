@@ -5,6 +5,7 @@
 import type { ChangePlanTask } from '../plan-validation/change-plan-validation.types';
 import type { ChangePromotionPackV1 } from './change-promotion-pack.types';
 import { isIntegrationHandoffPack } from './integration-handoff-pack.util';
+import { parseCursorTasksMarkdownToSeed } from './parse-cursor-tasks-markdown.util';
 
 export const FORGE_TASKS_JSON_SCHEMA_VERSION = '2' as const;
 
@@ -19,7 +20,9 @@ export interface ForgeTasksJsonSeedTask {
   evidence?: Array<{ kind: string; ref: string }>;
   dependsOn?: string[];
   status?: 'pending' | 'in_progress' | 'done';
-  source?: 'ariadne_change_plan_seed' | 'ariadne_modification_plan';
+  source?: 'ariadne_change_plan_seed' | 'ariadne_modification_plan' | 'ariadne_cursor_tasks_markdown';
+  /** Business handoff ref (e.g. NEW-LEG-01) when derived from cursor markdown. */
+  storyRef?: string;
 }
 
 export interface ForgeTasksJsonSeedV2 {
@@ -73,11 +76,55 @@ export function shouldIncludeForgeTasksJsonSeed(pack: ChangePromotionPackV1): bo
   return false;
 }
 
+function enrichTasksWithGraphEvidence(
+  tasks: ForgeTasksJsonSeedTask[],
+  seedTasks: ChangePlanTask[],
+): ForgeTasksJsonSeedTask[] {
+  if (!seedTasks.length) return tasks;
+  const byFile = new Map<string, ChangePlanTask>();
+  for (const t of seedTasks) {
+    for (const f of t.files) {
+      byFile.set(f.replace(/\\/g, '/'), t);
+    }
+  }
+  return tasks.map((task) => {
+    const graph = task.files.map((f) => byFile.get(f)).find(Boolean);
+    if (!graph) return task;
+    return {
+      ...task,
+      ...(graph.symbols?.length && !task.symbols?.length ? { symbols: graph.symbols } : {}),
+      ...(graph.evidence?.length && !task.evidence?.length
+        ? { evidence: graph.evidence.map((e) => ({ kind: e.kind, ref: e.ref })) }
+        : {}),
+      ...(graph.criterion && !task.criterion ? { criterion: graph.criterion } : {}),
+    };
+  });
+}
+
 /** Build Forge tasksJson v2 seed; null when no tasks/files can be derived. */
 export function buildForgeTasksJsonSeed(
   pack: ChangePromotionPackV1,
 ): ForgeTasksJsonSeedV2 | null {
   if (!shouldIncludeForgeTasksJsonSeed(pack)) return null;
+
+  const meta = {
+    projectId: pack.ariadne.projectId,
+    changeDescription: pack.change.userDescription.trim(),
+    ariadneChangeId: pack.change.stageKey,
+    promotionScope: pack.promotionScope,
+  };
+
+  const cursorMd = pack.cursorTasksMarkdown?.trim();
+  if (cursorMd) {
+    const parsed = parseCursorTasksMarkdownToSeed(cursorMd, meta);
+    if (parsed.ok) {
+      const seedTasks = pack.changePlanSeed?.tasks ?? [];
+      return {
+        ...parsed.seed,
+        tasks: enrichTasksWithGraphEvidence(parsed.seed.tasks, seedTasks),
+      };
+    }
+  }
 
   const seedTasks = pack.changePlanSeed?.tasks ?? [];
   const mapped =

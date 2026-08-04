@@ -12,17 +12,18 @@
 
 | Priority | Source | `handoffItems[].kind` | Format |
 |----------|--------|----------------------|--------|
-| 1 | Structured seed | `tasks_json_seed` | JSON — Forge tasksJson v2 (see below) |
-| 2 | Human/agent doc | `cursor_tasks_markdown` | Markdown `# Tasks` (YAML blocks + checklists) |
-| 3 | Gate 2 only | `change_plan_seed` | Ariadne ChangePlan v1.0 (not Forge tasksJson) |
+| 1 | Human/agent doc | `cursor_tasks_markdown` | Markdown `# Tasks` (YAML blocks + checklists) |
+| 2 | Structured seed | `tasks_json_seed` | JSON — Forge tasksJson v2 (derived from markdown in Ariadne) |
+| 3 | Graph evidence | `change_plan_seed` | Ariadne ChangePlan v1.0 (enrichment / blast radius) |
 
 **Integration scope metadata** (`handoffItems` kind `integration_scope`, JSON):
 
 ```json
 {
   "mode": "integration_handoff",
-  "taskSource": "tasks_json_seed",
-  "taskSourceFallback": "cursor_tasks_markdown",
+  "taskSource": "cursor_tasks_markdown",
+  "taskSourceFallback": "tasks_json_seed",
+  "taskSourceGraph": "change_plan_seed",
   "skipBaselineDeliverables": [
     "migration_tasks",
     "change_spec",
@@ -192,14 +193,14 @@ Reference format: Ariadne `cursor-tasks-document.util.ts` (`buildTaskBlock`).
 
 | ID | kind | Title |
 |----|------|-------|
-| NEW-LEG-01 | `integration_scope` | Alcance integración NEW→LEG |
-| NEW-LEG-02 | `mdd_evidence` | MDD legacy (resumen alcance) |
-| NEW-LEG-03 | `modification_plan_enriched` | Modification plan graph evidence |
-| NEW-LEG-04 | `change_plan_seed` | ChangePlan seed (tasks + symbols) |
-| NEW-LEG-05 | **`tasks_json_seed`** | **Tasks JSON seed (Ariadne SSOT)** |
-| NEW-LEG-06 | `change_work_description` | Descripción del trabajo (Ariadne) |
-| NEW-LEG-07 | `cursor_tasks_markdown` | Tareas Cursor (# Tasks) |
-| NEW-LEG-08 | `deliverable_request` | modification_plan |
-| NEW-LEG-09 | `deliverable_request` | api_contracts |
+| ARIADNE-ART-01 | `integration_scope` | Alcance integración NEW→LEG |
+| ARIADNE-ART-02 | `mdd_evidence` | MDD legacy (resumen alcance) |
+| ARIADNE-ART-03 | `modification_plan_enriched` | Modification plan graph evidence |
+| ARIADNE-ART-04 | `change_plan_seed` | ChangePlan seed (tasks + symbols) |
+| ARIADNE-ART-05 | **`tasks_json_seed`** | **Tasks JSON seed (derivado del markdown)** |
+| ARIADNE-ART-06 | `change_work_description` | Descripción del trabajo (Ariadne) |
+| ARIADNE-ART-07 | **`cursor_tasks_markdown`** | **Tareas Cursor (# Tasks) — SSOT ejecutable** |
+| ARIADNE-ART-08 | `deliverable_request` | modification_plan |
+| ARIADNE-ART-09 | `deliverable_request` | api_contracts |
 
-*(Ordinal IDs shift if optional items like `er_diagram` are present.)*
+*(Business traces from project NEW remain `NEW-LEG-NN`; pack artifacts use `ARIADNE-ART-NN`.)*
