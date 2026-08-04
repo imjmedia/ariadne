@@ -131,7 +131,7 @@ El frontend hace polling cada ~1,5 s a `GET /integration-batches/:id` o `GET /co
 | Barra en 95% mucho rato | Normal: fase `forge_create`; Forge puede tardar varios minutos |
 | `500` / `502` / `504` tras espera | Timeout Traefik/nginx/API antes de ingest; sube `INGEST_PROXY_TIMEOUT_MS` y timeout del reverse proxy externo |
 | `500` Zod `handoffItems[n].id/description Required` | Pack Ariadne antiguo sin `id`+`description` en cada handoff; actualiza ingest (mapper `forge-create-stage.mapper.ts`) |
-| `500` Zod `handoffItems[n].id` regex `invalid_string` | `id` debe ser `NEW-LEG-01`, `NEW-LEG-02`, … (`^NEW-LEG-\d{2,}$` en Forge); actualiza ingest (`forgeHandoffItemId`) y **Aplicar cambios** de nuevo |
+| `500` Zod `handoffItems[n].id` regex `invalid_string` | `id` debe ser `ARIADNE-ART-01` (artefactos pack) o `NEW-LEG-01` (requisitos); actualiza ingest y **Aplicar cambios** de nuevo |
 | `500` Zod `changeDescription` too_big | Ariadne truncaba a 12k; Forge max **8000** (`FORGE_CHANGE_DESCRIPTION_MAX`); redeploy ingest + **Aplicar cambios** |
 | `503 FORGE_CREATE_STAGE_TIMEOUT` | Forge no respondió en 10 min |
 | `409` promoción en curso | Lote en `forgePromotionStatus=pending`; espera 15 min o redeploy con TTL |

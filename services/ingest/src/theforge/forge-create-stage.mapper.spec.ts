@@ -53,7 +53,7 @@ describe('forge-create-stage.mapper', () => {
     expect(forgePack.handoffItems?.every((h) => h.id && h.description)).toBe(true);
     expect(forgePack.handoffItems?.every((h) => FORGE_HANDOFF_ITEM_ID_REGEX.test(h.id))).toBe(true);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'mdd_evidence')).toBe(true);
-    expect(forgePack.handoffItems?.find((h) => h.kind === 'mdd_evidence')?.id).toBe('NEW-LEG-01');
+    expect(forgePack.handoffItems?.find((h) => h.kind === 'mdd_evidence')?.id).toBe('ARIADNE-ART-01');
   });
 
   it('assigns sequential NEW-LEG ids for deliverable_request handoffs', () => {
@@ -74,15 +74,15 @@ describe('forge-create-stage.mapper', () => {
     expect(new Set(deliverables.map((h) => h.id)).size).toBe(6);
     const allIds = items.map((h) => h.id);
     expect(allIds).toEqual([
-      'NEW-LEG-01',
-      'NEW-LEG-02',
-      'NEW-LEG-03',
-      'NEW-LEG-04',
-      'NEW-LEG-05',
-      'NEW-LEG-06',
-      'NEW-LEG-07',
-      'NEW-LEG-08',
-      'NEW-LEG-09',
+      'ARIADNE-ART-01',
+      'ARIADNE-ART-02',
+      'ARIADNE-ART-03',
+      'ARIADNE-ART-04',
+      'ARIADNE-ART-05',
+      'ARIADNE-ART-06',
+      'ARIADNE-ART-07',
+      'ARIADNE-ART-08',
+      'ARIADNE-ART-09',
     ]);
   });
 
@@ -187,7 +187,7 @@ describe('forge-create-stage.mapper', () => {
     const forgePack = toForgeChangePackV1(pack);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'integration_scope')).toBe(true);
     const scope = forgePack.handoffItems?.find((h) => h.kind === 'integration_scope');
-    expect(scope?.content).toContain('"taskSource":"tasks_json_seed"');
+    expect(scope?.content).toContain('"taskSource":"cursor_tasks_markdown"');
     expect(forgePack.handoffItems?.some((h) => h.kind === 'tasks_json_seed')).toBe(true);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'deliverable_request' && h.content === 'migration_tasks')).toBe(false);
     expect(forgePack.handoffItems?.some((h) => h.kind === 'post_deliverable_gate')).toBe(false);

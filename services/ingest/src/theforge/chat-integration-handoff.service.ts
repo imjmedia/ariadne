@@ -451,7 +451,7 @@ export class ChatIntegrationHandoffService {
         forgeProjectId,
         pack,
         stageName,
-        activate: body.activate ?? false,
+        activate: body.activate ?? true,
         runLegacyStart: pack.modificationPlan.filesToModify.length === 0 ? undefined : false,
         wireAriadne: true,
         linkedNewProjectId: batch.sourceForgeProjectId,

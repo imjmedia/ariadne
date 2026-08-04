@@ -77,8 +77,9 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
         JSON.stringify({
           mode: 'integration_handoff',
           stageOrigin: 'ariadne_integration_handoff',
-          taskSource: 'tasks_json_seed',
-          taskSourceFallback: 'cursor_tasks_markdown',
+          taskSource: 'cursor_tasks_markdown',
+          taskSourceFallback: 'tasks_json_seed',
+          taskSourceGraph: 'change_plan_seed',
           skipBaselineDeliverables: [
             'migration_tasks',
             'change_spec',
@@ -225,7 +226,7 @@ export function buildForgeHandoffItems(pack: ChangePromotionPackV1): ForgeHandof
 /** Default tools after create-stage — includes Ariadne Gate 2 after deliverables. */
 export function defaultRecommendedNextTools(pack: ChangePromotionPackV1): string[] {
   if (isIntegrationHandoffPack(pack)) {
-    return ['legacy_answer'];
+    return ['get_tasks_json', 'get_next_implementation_task', 'legacy_answer'];
   }
   const tools = ['legacy_answer', 'legacy_generate_mdd', 'legacy_generate_deliverables'];
   if (pack.deliverablesRequested.includes('migration_tasks')) {

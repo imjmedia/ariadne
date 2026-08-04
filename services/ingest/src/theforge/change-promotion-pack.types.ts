@@ -128,7 +128,7 @@ export interface CreateStageFromPackInput {
 
 /** Pack shape expected by POST /theforge/create-stage-from-ariadne-change-pack */
 export interface ForgeHandoffItem {
-  /** Forge integrationHandoffItemSchema id (`NEW-LEG-01`, …). */
+  /** Forge handoff item id (`ARIADNE-ART-01` for pack artifacts; `NEW-LEG-NN` for business requirements). */
   id: string;
   /** Document body (Forge `description` / `payload`). */
   description: string;
@@ -189,16 +189,19 @@ export interface CreateStageFromPackResult {
   deliverablesCreated?: string[];
 }
 
-/** Forge `integrationHandoffItemSchema` regex for `pack.handoffItems[].id`. */
-export const FORGE_HANDOFF_ITEM_ID_REGEX = /^NEW-LEG-\d{2,}$/;
+/** Forge handoff item id for Ariadne pack artifacts (not business NEW→LEG traces). */
+export const FORGE_HANDOFF_ITEM_ID_REGEX = /^ARIADNE-ART-\d{2,}$/;
+
+/** Business integration trace ids (project NEW handoff). */
+export const FORGE_NEW_LEG_ITEM_ID_REGEX = /^NEW-LEG-\d{2,}$/;
 
 /** Forge `ariadneChangePackV1Schema.changeDescription` max length. */
 export const FORGE_CHANGE_DESCRIPTION_MAX = 8000;
 
-/** Sequential NEW-LEG id for Forge create-stage handoff items (1-based). */
+/** Sequential Ariadne artifact id for pack handoff items (1-based). */
 export function forgeHandoffItemId(sequence: number): string {
   const n = Number.isFinite(sequence) && sequence >= 1 ? Math.floor(sequence) : 1;
-  return `NEW-LEG-${String(n).padStart(2, '0')}`;
+  return `ARIADNE-ART-${String(n).padStart(2, '0')}`;
 }
 
 export function slugifyStageKey(title: string): string {
