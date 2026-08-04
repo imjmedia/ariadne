@@ -28,7 +28,7 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 - Tras un fallo (`Error: …` o `No pude completar el análisis del handoff: …` en la burbuja), el botón pasa a **Reintentar análisis** (esos mensajes no cuentan como respuesta válida; se eliminan al reintentar).
 - Sidebar agrupa esos chats bajo **Integración — {proyecto NEW}**; el resto queda en **General**.
 - **Papelera** en cada chat (siempre visible al seleccionarlo) y en el encabezado del grupo para borrar el lote completo (`DELETE /integration-batches/:id`).
-- **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY que elijas en el modal (lista brownfield de The Forge; preselecciona el vinculado al proyecto Ariadne). Vista previa **manual** con **Aplicar cambios**. Entregables por defecto: `modification_plan` + opcional `api_contracts` — **no** `migration_tasks` (Forge regeneraría user stories baseline del LEGACY: login, campañas, infra). Las tareas van en handoffs `tasks_json_seed` (JSON) + `cursor_tasks_markdown` (markdown); Forge debe hidratar el panel Tasks al importar (`docs/contracts/theforge-tasks-hydration-from-ariadne-v1.md`).
+- **The Forge (lote)** fusiona todos los chats del grupo en **una etapa** del LEGACY que elijas. El modal lista los **documentos Ariadne** incluidos en el pack (tasks JSON, # Tasks, ChangePlan, evidencia del grafo, etc.) y solo entregables Forge **opcionales** (`modification_plan`, `api_contracts`). **No** marques `migration_tasks` / `mdd_full` — Forge regeneraría baseline greenfield. En The Forge: panel Integración → ver/descargar documentos + generar **Gobernanza IA** desde esos artefactos.
 - Re-importar omite handoffs ya presentes en el lote.
 
 ## Persistencia (por usuario)
@@ -52,7 +52,8 @@ Página de chat con el repositorio: preguntas en lenguaje natural → Cypher →
 | **ChatForgePromoteDialog.tsx** | Modal promover conversación → etapa The Forge |
 | **ChatIntegrationHandoffImportDialog.tsx** | Importar handoffs NEW-LEG desde Forge |
 | **handoff-chat-analysis.util.ts** | Detectar handoffs pendientes de respuesta LLM |
-| **forge-deliverables.constants.ts** | Opciones y defaults de entregables Forge |
+| **forge-deliverables.constants.ts** | Entregables Forge (chat brownfield individual) |
+| **forge-ariadne-artifacts.constants.ts** | Documentos Ariadne en pack + entregables opcionales (lote NEW→LEG) |
 | **ChatIntegrationBatchForgeDialog.tsx** | Promover lote → una etapa; selector de proyecto LEGACY brownfield |
 | **forgePromoteProgress.tsx** | Progreso real (polling) en preview y promote chat/lote; simulado solo en create-stage de proyecto |
 | **ChatProjectScopeOptions.tsx** | Multi-repo: foco + chat amplio (solo proyecto) |

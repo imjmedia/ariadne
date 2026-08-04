@@ -130,11 +130,13 @@ export interface CreateStageFromPackInput {
 export interface ForgeHandoffItem {
   /** Forge integrationHandoffItemSchema id (`NEW-LEG-01`, …). */
   id: string;
-  /** Human summary for Forge UI / legacy handoff snapshot. */
+  /** Document body (Forge `description` / `payload`). */
   description: string;
   kind: string;
   title: string;
+  /** Legacy alias enviado por Ariadne; Forge normaliza a description/payload. */
   content: string;
+  payload?: unknown;
   mimeType?: string;
 }
 

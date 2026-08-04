@@ -13,17 +13,9 @@ export const ALL_FORGE_DELIVERABLES: ForgeDeliverableKind[] = FORGE_DELIVERABLE_
   (opt) => opt.id,
 );
 
-/** Lotes NEW→LEG: no pedir migration_tasks (Forge regenera US baseline); tareas en cursor_tasks_markdown. */
-export const INTEGRATION_BATCH_FORGE_DELIVERABLES: ForgeDeliverableKind[] = [
-  'modification_plan',
-  'api_contracts',
-];
-
-export function forgeDeliverablesEqual(
-  a: ForgeDeliverableKind[],
-  b: ForgeDeliverableKind[],
-): boolean {
-  if (a.length !== b.length) return false;
-  const setB = new Set(b);
-  return a.every((id) => setB.has(id));
-}
+/** Lotes NEW→LEG: re-export desde forge-ariadne-artifacts.constants.ts */
+export {
+  INTEGRATION_BATCH_FORGE_DELIVERABLES,
+  INTEGRATION_BATCH_FORGE_OPTIONAL_DELIVERABLES,
+  forgeDeliverablesEqual,
+} from './forge-ariadne-artifacts.constants';

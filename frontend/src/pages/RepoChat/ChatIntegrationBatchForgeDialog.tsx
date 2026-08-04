@@ -36,9 +36,10 @@ import { cn } from '@/lib/utils';
 import { chatNavBtnClass } from '../chat/chatShellClasses';
 import {
   INTEGRATION_BATCH_FORGE_DELIVERABLES,
-  FORGE_DELIVERABLE_OPTIONS,
+  INTEGRATION_BATCH_FORGE_OPTIONAL_DELIVERABLES,
+  ARIADNE_FORGE_ARTIFACT_LABELS,
   forgeDeliverablesEqual,
-} from './forge-deliverables.constants';
+} from './forge-ariadne-artifacts.constants';
 import {
   ForgePromoteProgressPanel,
   forgePromotionSuccessFromBatch,
@@ -413,9 +414,29 @@ export function ChatIntegrationBatchForgeDialog(props: {
               />
             </div>
             <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Entregables</legend>
+              <legend className="text-sm font-medium">Documentos Ariadne (incluidos en el pack)</legend>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {ARIADNE_FORGE_ARTIFACT_LABELS.map((art) => (
+                  <li
+                    key={art.id}
+                    className="rounded-lg border border-[var(--border)] bg-[color-mix(in_oklch,var(--success)_6%,var(--card))] px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium">{art.label}</span>
+                    {art.hint ? (
+                      <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">{art.hint}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-[var(--foreground-muted)]">
+                The Forge mostrará estos documentos en Integración (ver / descargar) y la gobernanza IA los
+                consumirá. No uses entregables legacy que regeneren login, US baseline ni MDD completo.
+              </p>
+            </fieldset>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Entregables Forge opcionales</legend>
               <div className="grid gap-2 sm:grid-cols-2">
-                {FORGE_DELIVERABLE_OPTIONS.map((opt) => (
+                {INTEGRATION_BATCH_FORGE_OPTIONAL_DELIVERABLES.map((opt) => (
                   <label
                     key={opt.id}
                     className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
