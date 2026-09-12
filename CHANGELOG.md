@@ -11,6 +11,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 - **Compliance Archify:** aviso en `NOTICE`, pin `ARCHIFY_VERSION` en imagen ingest, script `scripts/verify-archify-third-party.mjs` + job CI.
 - **fix(ingest):** Docker Archify v2.9+ — normalizar subcarpeta `archify/` a `/opt/archify` e instalar deps npm.
 - **fix(c4):** UI muestra `archifyError` detallado (CLI / validate / deliver) al fallar HTML Archify.
+- **fix(c4):** mapper Archify v2.9 — `pos`/`size` en componentes; sin `layout` ni `quality_profile` en meta.
 
 ## [1.4.0] — 2026-07-18
 

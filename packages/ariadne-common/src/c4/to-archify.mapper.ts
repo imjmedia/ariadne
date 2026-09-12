@@ -9,38 +9,57 @@ export type ArchifyComponentType =
   | 'messagebus'
   | 'external';
 
+/** IR Archify v2.9+ (architecture.schema.json) — pos/size, sin layout ni quality_profile en meta. */
 export interface ArchifyArchitectureIr {
   schema_version: 1;
   diagram_type: 'architecture';
   meta: {
     title: string;
-    quality_profile: 'showcase' | 'standard';
     subtitle?: string;
-  };
-  layout: {
-    mode: 'grid';
-    cols: number;
-    gapX: number;
-    gapY: number;
-    cellW: number;
-    cellH: number;
+    output?: string;
+    animation?: 'trace' | 'none';
+    viewBox?: [number, number];
   };
   components: Array<{
     id: string;
     type: ArchifyComponentType;
     label: string;
     sublabel?: string;
-    row?: number;
-    col?: number;
+    tag?: string;
+    pos: [number, number];
+    size?: [number, number];
   }>;
-  connections: Array<{
-    id: string;
+  boundaries?: Array<{
+    kind: 'region' | 'security-group';
+    label: string;
+    wraps: string[];
+    pad?: number;
+  }>;
+  connections?: Array<{
     from: string;
     to: string;
     label?: string;
-    variant?: 'default' | 'emphasis' | 'dashed';
+    variant?: 'default' | 'emphasis' | 'security' | 'dashed';
+    fromSide?: 'left' | 'right' | 'top' | 'bottom';
+    toSide?: 'left' | 'right' | 'top' | 'bottom';
   }>;
   cards?: Array<{ dot: string; title: string; items: string[] }>;
+}
+
+const CELL_W = 130;
+const CELL_H = 60;
+const GAP_X = 80;
+const GAP_Y = 100;
+const MARGIN_X = 40;
+const MARGIN_Y = 80;
+
+function gridPosition(index: number, cols: number): { pos: [number, number]; size: [number, number] } {
+  const row = Math.floor(index / cols);
+  const col = index % cols;
+  return {
+    pos: [MARGIN_X + col * (CELL_W + GAP_X), MARGIN_Y + row * (CELL_H + GAP_Y)],
+    size: [CELL_W, CELL_H],
+  };
 }
 
 function archifyTypeForElement(el: C4Element, level: C4Model['level']): ArchifyComponentType {
@@ -90,7 +109,7 @@ function diagramRelationships(model: C4Model): C4Relationship[] {
 }
 
 /**
- * Mapea C4Model (container) → JSON IR Archify architecture con layout grid.
+ * Mapea C4Model → JSON IR Archify architecture (pos/size grid, schema v2.9).
  */
 export function c4ModelToArchifyArchitecture(
   model: C4Model,
@@ -103,20 +122,22 @@ export function c4ModelToArchifyArchitecture(
   });
   const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(nodes.length + 1))));
 
-  const components = nodes.map((el, index) => ({
-    id: el.id,
-    type: archifyTypeForElement(el, model.level),
-    label: el.name,
-    sublabel:
-      model.level === 'context'
-        ? el.description?.slice(0, 64) ?? el.technology?.slice(0, 64)
-        : el.technology?.slice(0, 64),
-    row: Math.floor(index / cols),
-    col: index % cols,
-  }));
+  const components = nodes.map((el, index) => {
+    const { pos, size } = gridPosition(index, cols);
+    return {
+      id: el.id,
+      type: archifyTypeForElement(el, model.level),
+      label: el.name,
+      sublabel:
+        model.level === 'context'
+          ? el.description?.slice(0, 64) ?? el.technology?.slice(0, 64)
+          : el.technology?.slice(0, 64),
+      pos,
+      size,
+    };
+  });
 
   const connections = diagramRelationships(model).map((rel) => ({
-    id: rel.id,
     from: rel.from,
     to: rel.to,
     label: rel.protocol ?? rel.label,
@@ -154,6 +175,10 @@ export function c4ModelToArchifyArchitecture(
     });
   }
 
+  const rows = Math.ceil(nodes.length / cols);
+  const viewBoxW = Math.max(820, MARGIN_X * 2 + cols * CELL_W + (cols - 1) * GAP_X);
+  const viewBoxH = Math.max(480, MARGIN_Y * 2 + rows * CELL_H + (rows - 1) * GAP_Y + 120);
+
   const defaultTitle =
     model.level === 'context'
       ? `C4 Context — ${model.systemName ?? model.projectId}`
@@ -176,16 +201,8 @@ export function c4ModelToArchifyArchitecture(
     diagram_type: 'architecture',
     meta: {
       title: title ?? defaultTitle,
-      quality_profile: 'showcase',
       subtitle,
-    },
-    layout: {
-      mode: 'grid',
-      cols,
-      gapX: 48,
-      gapY: 56,
-      cellW: 150,
-      cellH: 72,
+      viewBox: [viewBoxW, viewBoxH],
     },
     components,
     connections,

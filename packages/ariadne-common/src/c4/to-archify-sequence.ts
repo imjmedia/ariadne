@@ -20,23 +20,25 @@ export interface ApiFlowSpec {
   evidence: C4Evidence[];
 }
 
+/** IR Archify v2.9+ (sequence.schema.json). */
 export interface ArchifySequenceIr {
   schema_version: 1;
   diagram_type: 'sequence';
   meta: {
     title: string;
-    quality_profile: 'showcase' | 'standard';
     subtitle?: string;
+    output?: string;
+    animation?: 'trace' | 'none';
     viewBox?: [number, number];
   };
   participants: Array<{ id: string; type: string; label: string; sublabel?: string }>;
   messages: Array<{
-    id: string;
     from: string;
     to: string;
     y: number;
     label: string;
-    variant?: string;
+    variant?: 'default' | 'emphasis' | 'security' | 'dashed' | 'return';
+    note?: string;
   }>;
   cards?: Array<{ dot: string; title: string; items: string[] }>;
 }
@@ -48,7 +50,6 @@ export function apiFlowToArchifySequence(spec: ApiFlowSpec): ArchifySequenceIr {
   const yStart = 180;
   const yStep = 48;
   const messages = spec.steps.map((step, index) => ({
-    id: step.id,
     from: step.from,
     to: step.to,
     y: yStart + index * yStep,
@@ -79,7 +80,6 @@ export function apiFlowToArchifySequence(spec: ApiFlowSpec): ArchifySequenceIr {
     diagram_type: 'sequence',
     meta: {
       title: spec.title,
-      quality_profile: 'showcase',
       subtitle: 'Flujo API inferido desde Falkor (Route / REFERENCES_API / Nest)',
       viewBox: [820, Math.max(520, yStart + spec.steps.length * yStep + 80)],
     },

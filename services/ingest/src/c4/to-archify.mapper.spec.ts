@@ -29,7 +29,7 @@ describe('c4ModelToArchifyArchitecture', () => {
     );
     const ir = c4ModelToArchifyArchitecture(model);
     expect(ir.diagram_type).toBe('architecture');
-    expect(ir.layout.mode).toBe('grid');
+    expect(ir.components[0]?.pos).toBeDefined();
     expect(ir.components.length).toBe(2);
     expect(ir.components.find((c) => c.id.includes('api'))?.type).toBe('backend');
     expect(ir.components.find((c) => c.label === 'postgres')?.type).toBe('database');
