@@ -19,6 +19,7 @@ import { FileContentService } from '../repositories/file-content.service';
 import { JobAnalysisService } from '../repositories/job-analysis.service';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { DomainsService } from '../domains/domains.service';
+import { DomainDependencyInferenceService } from '../domains/domain-dependency-inference.service';
 import { SyncStatusService } from './sync-status.service';
 import { actorFromHeaders } from '../credentials/credential-actor';
 import { TheForgeProjectLinkService } from '../theforge/theforge-project-link.service';
@@ -34,6 +35,7 @@ export class ProjectsController {
     private readonly jobAnalysis: JobAnalysisService,
     private readonly reposService: RepositoriesService,
     private readonly domains: DomainsService,
+    private readonly domainDependencyInference: DomainDependencyInferenceService,
     private readonly syncStatus: SyncStatusService,
     private readonly forgeLink: TheForgeProjectLinkService,
     private readonly forgeStage: TheForgeProjectStageService,
@@ -57,6 +59,12 @@ export class ProjectsController {
     body: { dependsOnDomainId: string; connectionType?: string; description?: string | null },
   ) {
     return this.domains.addProjectDependency(id, body);
+  }
+
+  /** Infiere whitelist desde package.json, workspaces y compose; solo añade si hay match en catálogo. */
+  @Post(':id/domain-dependencies/infer')
+  inferDomainDependencies(@Param('id') id: string) {
+    return this.domainDependencyInference.inferAndApply(id);
   }
 
   @Delete(':id/domain-dependencies/:depId')

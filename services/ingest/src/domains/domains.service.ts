@@ -226,6 +226,15 @@ export class DomainsService {
     await this.domainVisRepo.delete(edgeId);
   }
 
+  async getProjectDomainContext(projectId: string): Promise<{ domainId: string | null }> {
+    const project = await this.projectRepo.findOne({
+      where: { id: projectId },
+      select: ['id', 'domainId'],
+    });
+    if (!project) throw new NotFoundException(`Project ${projectId} not found`);
+    return { domainId: project.domainId ?? null };
+  }
+
   async listProjectDependencies(projectId: string): Promise<ProjectDomainDependencyDto[]> {
     await this.ensureProject(projectId);
     const rows = await this.depRepo.find({

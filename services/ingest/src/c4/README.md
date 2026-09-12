@@ -37,7 +37,7 @@ Pipeline: dominios / docker-compose / Falkor → `C4Model` → Archify HTML.
 - `POST /projects/:id/c4/sequence/generate` — flujo Route → API → backend (Falkor)
 - `GET /projects/:id/c4/sequence/html` — HTML Archify sequence
 
-Antes de invocar Archify CLI, `C4ArchifyRenderer` pasa el IR por `sanitizeArchifySequenceIr` / `sanitizeArchifyArchitectureIr` (`ariadne-common`) para eliminar campos legacy (`meta.quality_profile`, `messages[].id`, `layout`, etc.) compatibles con Archify v2.9.
+Antes de invocar Archify CLI, `C4ArchifyRenderer` pasa el IR por `sanitizeArchifySequenceIr` / `sanitizeArchifyArchitectureIr` (`ariadne-common`) para eliminar campos legacy (`meta.quality_profile`, `messages[].id`, `layout`, etc.) compatibles con Archify v2.9, ajustar labels `org/repo` + ancho de componente (architecture showcase), y convertir mensajes `from===to` de secuencia en `note` (mínimo 60px entre columnas Archify).
 
 ## Export / chat / parity
 

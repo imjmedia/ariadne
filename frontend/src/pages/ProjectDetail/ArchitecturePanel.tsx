@@ -1,7 +1,7 @@
 /**
  * @fileoverview Pestaña Arquitectura: dominio del proyecto y whitelist de dominios.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/api';
 import type { Domain, Project, ProjectDomainDependency } from '@/types';
@@ -46,6 +46,9 @@ export function ArchitecturePanel({
   const [connType, setConnType] = useState('REST');
   const [depDesc, setDepDesc] = useState('');
   const [adding, setAdding] = useState(false);
+  const [inferring, setInferring] = useState(false);
+  const [inferMsg, setInferMsg] = useState<string | null>(null);
+  const autoInferDone = useRef(false);
   const [archTab, setArchTab] = useState<'domains' | 'c4'>('domains');
   const [c4Level, setC4Level] = useState<'context' | 'container' | 'component'>('context');
   const [drillContainerKey, setDrillContainerKey] = useState<string | undefined>();
@@ -108,6 +111,36 @@ export function ArchitecturePanel({
       setError(e instanceof Error ? e.message : String(e));
     }
   };
+
+  const runInfer = useCallback(
+    async (silent = false) => {
+      setInferring(true);
+      if (!silent) setInferMsg(null);
+      try {
+        const res = await api.inferProjectDomainDependencies(projectId);
+        if (res.added.length > 0) {
+          setInferMsg(
+            `Se añadieron ${res.added.length} dependencia(s) desde package.json, workspaces y compose.`,
+          );
+          load();
+          onProjectUpdated();
+        } else if (!silent) {
+          setInferMsg('No se encontraron dependencias nuevas que coincidan con el catálogo de dominios.');
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setInferring(false);
+      }
+    },
+    [load, onProjectUpdated, projectId],
+  );
+
+  useEffect(() => {
+    if (autoInferDone.current || deps.length > 0 || domains.length === 0 || archTab !== 'domains') return;
+    autoInferDone.current = true;
+    void runInfer(true);
+  }, [archTab, deps.length, domains.length, runInfer]);
 
   const depChoices = domains.filter((d) => d.id !== project.domainId);
 
@@ -277,10 +310,23 @@ export function ArchitecturePanel({
           <CardTitle className="text-base">Dependencias entre dominios (whitelist)</CardTitle>
           <CardDescription>
             Define qué otros dominios puede consumir este proyecto (REST, gRPC, eventos…). Amplía la búsqueda en
-            grafos Falkor de proyectos en esos dominios.
+            grafos Falkor de proyectos en esos dominios. Puedes inferir desde el índice (package.json, workspaces,
+            docker-compose).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={inferring || domains.length === 0}
+              onClick={() => void runInfer(false)}
+            >
+              {inferring ? 'Inferiendo…' : 'Inferir desde índice'}
+            </Button>
+            {inferMsg ? <p className="text-xs text-muted-foreground">{inferMsg}</p> : null}
+          </div>
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1 min-w-[200px]">
               <Label>Dominio destino</Label>

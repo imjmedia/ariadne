@@ -319,6 +319,18 @@ export const api = {
       `/projects/${encodeURIComponent(projectId)}/domain-dependencies/${encodeURIComponent(depId)}`,
       { method: 'DELETE' },
     ),
+  inferProjectDomainDependencies: (projectId: string) =>
+    request<{
+      added: import('./types').ProjectDomainDependency[];
+      inferred: Array<{
+        dependsOnDomainId: string;
+        dependsOnDomainName: string;
+        connectionType: string;
+        description: string;
+      }>;
+    }>(`/projects/${encodeURIComponent(projectId)}/domain-dependencies/infer`, {
+      method: 'POST',
+    }),
 
   getRepositories: (projectId?: string) =>
     request<import('./types').Repository[]>(

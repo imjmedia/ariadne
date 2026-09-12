@@ -40,12 +40,11 @@ export class C4SequenceExtractor {
 
     const title = `API flow — ${route}`;
     const steps = [
-      { id: 'open', from: 'user', to: 'web', label: 'navega', variant: 'default' as const },
       {
-        id: 'route',
-        from: 'web',
+        id: 'open',
+        from: 'user',
         to: 'web',
-        label: `render ${screen}`,
+        label: `navega → render ${screen}`,
         variant: 'default' as const,
       },
       {
