@@ -82,7 +82,9 @@ export function apiFlowToArchifySequence(spec: ApiFlowSpec): ArchifySequenceIr {
     diagram_type: 'sequence',
     meta: {
       title: spec.title,
-      subtitle: 'Flujo API inferido desde Falkor (Route / REFERENCES_API / Nest)',
+      subtitle: spec.routePath
+        ? `${spec.routePath} · ${spec.participants.find((p) => p.id === 'web')?.label ?? 'Web'} → ${spec.participants.find((p) => p.id === 'api')?.label ?? 'API'}`
+        : 'Flujo API inferido desde Falkor (Route / REFERENCES_API / Nest)',
       viewBox: [820, Math.max(520, yStart + spec.steps.length * yStep + 80)],
     },
     participants: spec.participants.map((p) => ({

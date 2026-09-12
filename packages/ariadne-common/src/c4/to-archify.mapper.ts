@@ -111,16 +111,59 @@ function diagramRelationships(model: C4Model): C4Relationship[] {
 /** En nivel componente, RENDERS/IMPORTS/CALLS no llevan label (Archify showcase en grafos densos). */
 const IMPLICIT_COMPONENT_PROTOCOLS = new Set(['RENDERS', 'IMPORTS', 'CALLS']);
 
+const ARCHIFY_WIRE_PROTOCOL =
+  /^(REST|HTTP|HTTPS|GRPC|SOAP|MQTT|AMQP|SQL|TCP|UDP|GRAPHQL|WEBSOCKET|WEBHOOK)$/i;
+
+function isArchifyWireProtocol(value: string | undefined): boolean {
+  return Boolean(value?.trim() && ARCHIFY_WIRE_PROTOCOL.test(value.trim()));
+}
+
+function isRedundantContextEdgeDescription(
+  description: string,
+  protocol: string | undefined,
+  targetName: string | undefined,
+): boolean {
+  const desc = description.trim().toLowerCase();
+  const proto = protocol?.trim().toLowerCase();
+  const target = targetName?.trim().toLowerCase();
+  if (!desc || /^visibilidad de dominio$/i.test(description)) return true;
+  if (proto && desc === proto) return true;
+  if (!target) return false;
+  return target === desc || target.includes(desc) || desc.includes(target);
+}
+
 function archifyConnectionFromRelationship(
   rel: C4Relationship,
   level: C4Model['level'],
+  elementNameById?: ReadonlyMap<string, string>,
 ): NonNullable<ArchifyArchitectureIr['connections']>[number] {
-  const protocol = rel.protocol?.toUpperCase();
-  if (level === 'component' && protocol && IMPLICIT_COMPONENT_PROTOCOLS.has(protocol)) {
+  const protocol = rel.protocol?.trim();
+  const protocolUpper = protocol?.toUpperCase();
+
+  if (level === 'component' && protocolUpper && IMPLICIT_COMPONENT_PROTOCOLS.has(protocolUpper)) {
     return { from: rel.from, to: rel.to, variant: 'dashed' };
   }
+
+  if (level === 'context') {
+    const wireLabel = isArchifyWireProtocol(protocol) ? protocol : undefined;
+    const description = rel.label?.trim();
+    const targetName = elementNameById?.get(rel.to);
+    const contextLabel =
+      wireLabel ??
+      (description &&
+      !isRedundantContextEdgeDescription(description, protocol, targetName)
+        ? description.slice(0, 48)
+        : undefined);
+    return {
+      from: rel.from,
+      to: rel.to,
+      ...(contextLabel ? { label: contextLabel } : {}),
+      variant: wireLabel ? ('emphasis' as const) : ('default' as const),
+    };
+  }
+
   const label =
-    level === 'component' && protocol === 'ROUTE_TO_COMPONENT'
+    level === 'component' && protocolUpper === 'ROUTE_TO_COMPONENT'
       ? rel.label
       : rel.protocol ?? rel.label;
   return {
@@ -171,8 +214,9 @@ export function c4ModelToArchifyArchitecture(
     };
   });
 
+  const elementNameById = new Map(diagramElements(model).map((el) => [el.id, el.name] as const));
   const connections = diagramRelationships(model).map((rel) =>
-    archifyConnectionFromRelationship(rel, model.level),
+    archifyConnectionFromRelationship(rel, model.level, elementNameById),
   );
 
   const dbCount = components.filter((c) => c.type === 'database').length;

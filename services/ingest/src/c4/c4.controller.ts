@@ -96,6 +96,11 @@ export class C4Controller {
     return { levels: results };
   }
 
+  @Get('sequence/routes')
+  async listSequenceRoutes(@Param('projectId') projectId: string) {
+    return this.c4.listSequenceRoutes(projectId);
+  }
+
   @Post('sequence/generate')
   async generateSequence(
     @Param('projectId') projectId: string,

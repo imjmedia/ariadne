@@ -163,3 +163,8 @@ export {
   sanitizeArchifyArchitectureIr,
   sanitizeArchifySequenceIr,
 } from './c4/archify-ir-sanitize.js';
+export {
+  formatHttpCallLabel,
+  inferMonorepoSegmentLabel,
+} from './c4/api-flow-labels.util.js';
+export type { C4SequenceRouteOption } from './c4/c4-sequence.types.js';

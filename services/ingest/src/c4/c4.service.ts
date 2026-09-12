@@ -160,6 +160,12 @@ export class C4Service {
     };
   }
 
+  async listSequenceRoutes(projectId: string) {
+    await this.projects.findOne(projectId);
+    const routes = await this.sequenceExtractor.listRoutes(projectId);
+    return { routes };
+  }
+
   async generateSequence(
     projectId: string,
     routePath?: string,
@@ -170,12 +176,17 @@ export class C4Service {
     archifyError: string | null;
     archifyBin: string | null;
     durationMs: number;
+    routePath: string;
+    title: string;
+    synthetic: boolean;
   }> {
     const t0 = Date.now();
     await this.projects.findOne(projectId);
-    const { archifyIr } = await this.sequenceExtractor.buildRepresentativeFlow(projectId, routePath);
+    const { archifyIr, spec, routePath: resolvedRoute } =
+      await this.sequenceExtractor.buildRepresentativeFlow(projectId, routePath);
     const render = await this.archify.renderSequence(projectId, archifyIr);
     const durationMs = Date.now() - t0;
+    const synthetic = spec.evidence.some((e) => e.reason?.includes('sintético'));
     return {
       archifyIr,
       htmlReady: render.validated,
@@ -183,6 +194,9 @@ export class C4Service {
       archifyError: render.validated ? null : render.stderr ?? null,
       archifyBin: render.archifyBin,
       durationMs,
+      routePath: resolvedRoute,
+      title: spec.title,
+      synthetic,
     };
   }
 

@@ -205,12 +205,26 @@ export const api = {
       `/projects/${projectId}/c4/snapshots?${level ? `level=${encodeURIComponent(level)}&` : ''}limit=${limit}`,
     ),
 
+  listC4SequenceRoutes: (projectId: string) =>
+    request<{
+      routes: Array<{
+        routePath: string;
+        screenName: string | null;
+        apiSummary: string | null;
+        isPublicEntry: boolean;
+        hasApiLink: boolean;
+      }>;
+    }>(`/projects/${projectId}/c4/sequence/routes`),
+
   generateC4Sequence: (projectId: string, routePath?: string) =>
     request<{
       htmlReady: boolean;
       durationMs: number;
       archifyError: string | null;
       archifyBin: string | null;
+      routePath: string;
+      title: string;
+      synthetic: boolean;
     }>(
       `/projects/${projectId}/c4/sequence/generate`,
       {

@@ -79,6 +79,25 @@ describe('c4ModelToArchifyArchitecture', () => {
     expect(ir.connections?.[0]?.variant).toBe('dashed');
   });
 
+  it('no usa connectionType custom (eventos) como label en context', () => {
+    const model = domainContextSpecToC4Model({
+      projectId: 'p1',
+      projectName: 'Memoria',
+      repos: [{ id: 'repo-11111111-aaaa-bbbb-cccc-dddddddddddd', label: 'memoria-generacional' }],
+      dependencies: [
+        {
+          dependencyId: 'dep-1',
+          domainId: 'dom-ev',
+          domainName: 'Eventos y memorias',
+          connectionType: 'eventos',
+        },
+      ],
+      visibilityEdges: [],
+    });
+    const ir = c4ModelToArchifyArchitecture(model);
+    expect(ir.connections?.every((c) => c.label?.toLowerCase() !== 'eventos')).toBe(true);
+  });
+
   it('mapea context sin layout legacy', () => {
     const model = domainContextSpecToC4Model({
       projectId: 'p1',
