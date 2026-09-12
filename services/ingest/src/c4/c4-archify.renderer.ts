@@ -1,5 +1,5 @@
 /**
- * @fileoverview Invoca Archify CLI (validate + deliver) para HTML showcase.
+ * @fileoverview Invoca Archify CLI (validate + deliver/render) para HTML showcase.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -14,6 +14,7 @@ import {
   type ArchifySequenceIr,
 } from 'ariadne-common';
 import { getC4Settings } from './c4-settings.util';
+import { runArchifyRender, runArchifyValidate } from './archify-cli.util';
 import { fixArchifyArchitectureIr, fixArchifySequenceIr } from './c4-archify-ir-fix';
 
 export interface ArchifyRenderResult {
@@ -94,11 +95,7 @@ export class C4ArchifyRenderer {
       return { htmlPath, validated: false, archifyBin: null, stderr: ARCHIFY_BIN_MISSING };
     }
 
-    const validate = spawnSync(
-      process.execPath,
-      [bin, 'validate', 'architecture', jsonPath, '--quality', 'showcase', '--json'],
-      { encoding: 'utf8', timeout: 120_000 },
-    );
+    const validate = runArchifyValidate(bin, 'architecture', jsonPath);
     if (validate.status !== 0) {
       const err = extractArchifyCliError(
         validate.stdout ?? '',
@@ -110,18 +107,14 @@ export class C4ArchifyRenderer {
     }
 
     await mkdir(dirname(htmlPath), { recursive: true });
-    const deliver = spawnSync(
-      process.execPath,
-      [bin, 'deliver', 'architecture', jsonPath, htmlPath, '--quality', 'showcase', '--json'],
-      { encoding: 'utf8', timeout: 120_000 },
-    );
-    if (deliver.status !== 0) {
+    const rendered = runArchifyRender(bin, 'architecture', jsonPath, htmlPath);
+    if (rendered.status !== 0) {
       const err = extractArchifyCliError(
-        deliver.stdout ?? '',
-        deliver.stderr ?? '',
-        'Archify deliver (architecture) falló',
+        rendered.stdout ?? '',
+        rendered.stderr ?? '',
+        'Archify render (architecture) falló',
       );
-      this.logger.warn(`Archify deliver failed: ${err.slice(0, 500)}`);
+      this.logger.warn(`Archify render failed: ${err.slice(0, 500)}`);
       return { htmlPath, validated: false, archifyBin: bin, stderr: err };
     }
 
@@ -195,11 +188,7 @@ export class C4ArchifyRenderer {
       return { htmlPath, validated: false, archifyBin: null, stderr: ARCHIFY_BIN_MISSING };
     }
 
-    const validate = spawnSync(
-      process.execPath,
-      [bin, 'validate', 'sequence', jsonPath, '--quality', 'showcase', '--json'],
-      { encoding: 'utf8', timeout: 120_000 },
-    );
+    const validate = runArchifyValidate(bin, 'sequence', jsonPath);
     if (validate.status !== 0) {
       const err = extractArchifyCliError(
         validate.stdout ?? '',
@@ -210,18 +199,14 @@ export class C4ArchifyRenderer {
       return { htmlPath, validated: false, archifyBin: bin, stderr: err };
     }
 
-    const deliver = spawnSync(
-      process.execPath,
-      [bin, 'deliver', 'sequence', jsonPath, htmlPath, '--quality', 'showcase', '--json'],
-      { encoding: 'utf8', timeout: 120_000 },
-    );
-    if (deliver.status !== 0) {
+    const rendered = runArchifyRender(bin, 'sequence', jsonPath, htmlPath);
+    if (rendered.status !== 0) {
       const err = extractArchifyCliError(
-        deliver.stdout ?? '',
-        deliver.stderr ?? '',
-        'Archify deliver (sequence) falló',
+        rendered.stdout ?? '',
+        rendered.stderr ?? '',
+        'Archify render (sequence) falló',
       );
-      this.logger.warn(`Archify sequence deliver failed: ${err.slice(0, 500)}`);
+      this.logger.warn(`Archify sequence render failed: ${err.slice(0, 500)}`);
       return { htmlPath, validated: false, archifyBin: bin, stderr: err };
     }
 

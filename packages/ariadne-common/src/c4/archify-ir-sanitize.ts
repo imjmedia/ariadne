@@ -8,6 +8,9 @@ const GAP_X = 80;
 const GAP_Y = 100;
 const MARGIN_X = 40;
 const MARGIN_Y = 80;
+const MIN_VIEWBOX_W = 820;
+const MIN_VIEWBOX_H = 480;
+const VIEWBOX_BOTTOM_PAD = 120;
 
 /** Misma heurística que Archify `render-architecture.mjs` (label showcase). */
 const ARCHIFY_LABEL_WIDTH_FACTOR = 6.6;
@@ -117,13 +120,77 @@ type LegacyArchitectureIr = Omit<ArchifyArchitectureIr, 'components' | 'meta' | 
   connections?: Array<ArchifyConnection & { id?: string }>;
 };
 
+type ArchifyComponent = ArchifyArchitectureIr['components'][number];
+
+/** Recoloca el grid usando el ancho/alto real de cada celda (evita solapes tras ensanchar labels). */
+function reflowArchifyArchitectureLayout(
+  components: ArchifyComponent[],
+  cols: number,
+): ArchifyComponent[] {
+  if (components.length === 0) return components;
+
+  const rows = Math.ceil(components.length / cols);
+  const colWidths = Array.from({ length: cols }, () => CELL_W);
+  const rowHeights = Array.from({ length: rows }, () => CELL_H);
+
+  for (let index = 0; index < components.length; index += 1) {
+    const component = components[index]!;
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    const width = component.size?.[0] ?? CELL_W;
+    const height = component.size?.[1] ?? CELL_H;
+    colWidths[col] = Math.max(colWidths[col], width);
+    rowHeights[row] = Math.max(rowHeights[row], height);
+  }
+
+  const colX: number[] = [];
+  let x = MARGIN_X;
+  for (let col = 0; col < cols; col += 1) {
+    colX[col] = x;
+    x += colWidths[col] + GAP_X;
+  }
+
+  const rowY: number[] = [];
+  let y = MARGIN_Y;
+  for (let row = 0; row < rows; row += 1) {
+    rowY[row] = y;
+    y += rowHeights[row] + GAP_Y;
+  }
+
+  return components.map((component, index) => ({
+    ...component,
+    pos: [colX[index % cols], rowY[Math.floor(index / cols)]] as [number, number],
+  }));
+}
+
+function computeArchitectureViewBox(components: ArchifyComponent[]): [number, number] {
+  if (components.length === 0) {
+    return [MIN_VIEWBOX_W, MIN_VIEWBOX_H];
+  }
+
+  let maxRight = MARGIN_X;
+  let maxBottom = MARGIN_Y;
+  for (const component of components) {
+    const [posX, posY] = component.pos;
+    const width = component.size?.[0] ?? CELL_W;
+    const height = component.size?.[1] ?? CELL_H;
+    maxRight = Math.max(maxRight, posX + width);
+    maxBottom = Math.max(maxBottom, posY + height);
+  }
+
+  return [
+    Math.max(MIN_VIEWBOX_W, maxRight + MARGIN_X),
+    Math.max(MIN_VIEWBOX_H, maxBottom + MARGIN_Y + VIEWBOX_BOTTOM_PAD),
+  ];
+}
+
 /** Elimina campos legacy (pre v2.9) y normaliza al schema Archify actual. */
 export function sanitizeArchifyArchitectureIr(ir: LegacyArchitectureIr): ArchifyArchitectureIr {
   const cols =
     ir.layout?.cols ??
     Math.min(4, Math.max(2, Math.ceil(Math.sqrt((ir.components?.length ?? 1) + 1))));
 
-  const components = (ir.components ?? []).map((c, index) => {
+  const sizedComponents = (ir.components ?? []).map((c, index) => {
     const row = c.row ?? Math.floor(index / cols);
     const col = c.col ?? index % cols;
     const pos: [number, number] =
@@ -144,6 +211,8 @@ export function sanitizeArchifyArchitectureIr(ir: LegacyArchitectureIr): Archify
       size,
     };
   });
+  const components = reflowArchifyArchitectureLayout(sizedComponents, cols);
+  const viewBox = computeArchitectureViewBox(components);
 
   const connections: ArchifyConnection[] = (ir.connections ?? []).map((conn) => {
     const { id: _id, ...rest } = conn;
@@ -160,7 +229,7 @@ export function sanitizeArchifyArchitectureIr(ir: LegacyArchitectureIr): Archify
       subtitle: meta.subtitle,
       output: meta.output,
       animation: meta.animation,
-      viewBox: meta.viewBox,
+      viewBox,
     },
     components,
     ...(ir.boundaries?.length ? { boundaries: ir.boundaries } : {}),

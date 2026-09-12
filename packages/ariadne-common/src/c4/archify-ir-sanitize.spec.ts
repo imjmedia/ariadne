@@ -25,6 +25,51 @@ describe('sanitizeArchifyArchitectureIr', () => {
     expect(component.size?.[0]).toBeLessThanOrEqual(280);
   });
 
+  it('reflow mantiene separación mínima tras ensanchar varios componentes en fila', () => {
+    const ids = [
+      'sys_cc2826e9509a4253',
+      'ext_4ee71653bd084aad',
+      'ext_d7803bcc833f4d46',
+      'ext_76ee3705cdaa44e6',
+    ];
+    const out = sanitizeArchifyArchitectureIr({
+      schema_version: 1,
+      diagram_type: 'architecture',
+      meta: { title: 'C4 Context' },
+      components: ids.map((id, index) => ({
+        id,
+        type: id.startsWith('sys') ? 'backend' : 'external',
+        label: id.startsWith('sys') ? 'kreodevs/memoria-generacional' : `external-${index}`,
+        pos: [40 + index * 210, 80] as [number, number],
+        size: [130, 60] as [number, number],
+      })),
+      connections: [
+        { from: ids[0], to: ids[1], label: 'REST' },
+        { from: ids[1], to: ids[2], label: 'eventos' },
+      ],
+    });
+
+    const minGap = (
+      a: { pos: [number, number]; size?: [number, number] },
+      b: { pos: [number, number]; size?: [number, number] },
+    ) => {
+      const [ax, ay] = a.pos;
+      const [aw, ah] = a.size ?? [130, 60];
+      const [bx, by] = b.pos;
+      const [bw, bh] = b.size ?? [130, 60];
+      const dx = Math.max(0, Math.max(ax - (bx + bw), bx - (ax + aw)));
+      const dy = Math.max(0, Math.max(ay - (by + bh), by - (ay + ah)));
+      return Math.max(dx, dy);
+    };
+
+    for (let i = 0; i < out.components.length; i += 1) {
+      for (let j = i + 1; j < out.components.length; j += 1) {
+        expect(minGap(out.components[i]!, out.components[j]!)).toBeGreaterThanOrEqual(8);
+      }
+    }
+    expect(out.meta.viewBox?.[0]).toBeGreaterThanOrEqual(820);
+  });
+
   it('ensancha el componente cuando el label no cabe ni tras acortar', () => {
     const out = sanitizeArchifyArchitectureIr({
       schema_version: 1,

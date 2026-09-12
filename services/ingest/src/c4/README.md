@@ -37,7 +37,7 @@ Pipeline: dominios / docker-compose / Falkor → `C4Model` → Archify HTML.
 - `POST /projects/:id/c4/sequence/generate` — flujo Route → API → backend (Falkor)
 - `GET /projects/:id/c4/sequence/html` — HTML Archify sequence
 
-Antes de invocar Archify CLI, `C4ArchifyRenderer` aplica `c4-archify-ir-fix.ts` (ingest: labels `org/repo`, sin self-loops) y luego `sanitizeArchifySequenceIr` / `sanitizeArchifyArchitectureIr` (`ariadne-common`). `npm run build` en ingest ejecuta `prebuild` de `ariadne-common`.
+Antes de invocar Archify CLI, `C4ArchifyRenderer` aplica `c4-archify-ir-fix.ts` (ingest: labels `org/repo`, sin self-loops) y luego `sanitizeArchifySequenceIr` / `sanitizeArchifyArchitectureIr` (`ariadne-common`, incluye reflow del grid tras ensanchar componentes). Tras `validate`, usa `deliver` si el CLI lo soporta; si no, cae a `render` (Archify v2.9 en Docker). `npm run build` en ingest ejecuta `prebuild` de `ariadne-common`.
 
 ## Export / chat / parity
 
