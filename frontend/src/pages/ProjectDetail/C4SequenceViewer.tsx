@@ -3,6 +3,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/api';
+import { formatC4ArchifyFailure } from '@/utils/c4-archify-error';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
@@ -31,7 +32,16 @@ export function C4SequenceViewer({ projectId }: { projectId: string }) {
     try {
       const res = await api.generateC4Sequence(projectId);
       if (res.htmlReady) await load();
-      else setError('Secuencia generada pero sin HTML Archify.');
+      else {
+        setError(
+          formatC4ArchifyFailure({
+            htmlReady: false,
+            archifyError: res.archifyError,
+            archifyBin: res.archifyBin,
+            fallback: 'Secuencia generada pero sin HTML Archify.',
+          }),
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -57,7 +67,7 @@ export function C4SequenceViewer({ projectId }: { projectId: string }) {
       <Button type="button" size="sm" disabled={generating} onClick={() => void generate()}>
         {generating ? <Loader2 className="size-4 animate-spin" /> : 'Generar secuencia API'}
       </Button>
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-destructive whitespace-pre-wrap">{error}</p> : null}
       {html ? (
         <iframe
           title="C4 Sequence"

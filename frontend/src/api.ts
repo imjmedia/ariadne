@@ -159,8 +159,20 @@ export const api = {
           snapshotId: string;
           htmlReady: boolean;
           archifyHtmlPath: string | null;
+          archifyError: string | null;
+          archifyBin: string | null;
         }
-      | { levels: Record<string, { model: Record<string, unknown>; htmlReady: boolean }> }
+      | {
+          levels: Record<
+            string,
+            {
+              model: Record<string, unknown>;
+              htmlReady: boolean;
+              archifyError: string | null;
+              archifyBin: string | null;
+            }
+          >;
+        }
     >(`/projects/${projectId}/c4/generate`, {
       method: 'POST',
       body: JSON.stringify(
@@ -194,7 +206,12 @@ export const api = {
     ),
 
   generateC4Sequence: (projectId: string, routePath?: string) =>
-    request<{ htmlReady: boolean; durationMs: number }>(
+    request<{
+      htmlReady: boolean;
+      durationMs: number;
+      archifyError: string | null;
+      archifyBin: string | null;
+    }>(
       `/projects/${projectId}/c4/sequence/generate`,
       {
         method: 'POST',
@@ -224,6 +241,8 @@ export const api = {
       diff: Record<string, unknown>;
       archifyCompareHtml: string | null;
       archifyComparePath: string | null;
+      archifyCompareError: string | null;
+      archifyBin: string | null;
     }>(
       `/projects/${projectId}/c4/diff?from=${encodeURIComponent(fromId)}&to=${encodeURIComponent(toId)}`,
     ),

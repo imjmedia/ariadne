@@ -36,6 +36,9 @@ export type C4GenerateLevelResult = {
   snapshotId: string;
   htmlReady: boolean;
   archifyHtmlPath: string | null;
+  /** Detalle de Archify cuando htmlReady=false (CLI ausente, validate o deliver). */
+  archifyError: string | null;
+  archifyBin: string | null;
   durationMs?: number;
   showcaseValidated?: boolean;
 };
@@ -150,6 +153,8 @@ export class C4Service {
       snapshotId: snapshot.id,
       htmlReady: render.validated,
       archifyHtmlPath: render.validated ? render.htmlPath : null,
+      archifyError: render.validated ? null : render.stderr ?? null,
+      archifyBin: render.archifyBin,
       durationMs,
       showcaseValidated: render.validated,
     };
@@ -162,6 +167,8 @@ export class C4Service {
     archifyIr: unknown;
     htmlReady: boolean;
     archifyHtmlPath: string | null;
+    archifyError: string | null;
+    archifyBin: string | null;
     durationMs: number;
   }> {
     const t0 = Date.now();
@@ -173,6 +180,8 @@ export class C4Service {
       archifyIr,
       htmlReady: render.validated,
       archifyHtmlPath: render.validated ? render.htmlPath : null,
+      archifyError: render.validated ? null : render.stderr ?? null,
+      archifyBin: render.archifyBin,
       durationMs,
     };
   }

@@ -17,6 +17,32 @@ export interface ArchifyRenderResult {
   stderr?: string;
 }
 
+const ARCHIFY_BIN_MISSING =
+  'Archify CLI no encontrado. Rebuild del contenedor ingest (imagen con /opt/archify) o configura la ruta en Ajustes → Sistema → C4.';
+
+function extractArchifyCliError(stdout: string, stderr: string, fallback: string): string {
+  const raw = (stderr || stdout || '').trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as {
+      message?: string;
+      error?: string;
+      errors?: Array<{ message?: string; path?: string }>;
+    };
+    if (typeof parsed.message === 'string' && parsed.message.trim()) return parsed.message.trim();
+    if (typeof parsed.error === 'string' && parsed.error.trim()) return parsed.error.trim();
+    if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+      return parsed.errors
+        .slice(0, 5)
+        .map((e) => [e.path, e.message].filter(Boolean).join(': '))
+        .join(' · ');
+    }
+  } catch {
+    /* salida no JSON */
+  }
+  return raw.slice(0, 2000);
+}
+
 @Injectable()
 export class C4ArchifyRenderer {
   private readonly logger = new Logger(C4ArchifyRenderer.name);
@@ -58,7 +84,7 @@ export class C4ArchifyRenderer {
       this.logger.warn(
         'Archify bin not found; configura ruta en Ajustes → Sistema o instala en /opt/archify.',
       );
-      return { htmlPath, validated: false, archifyBin: null };
+      return { htmlPath, validated: false, archifyBin: null, stderr: ARCHIFY_BIN_MISSING };
     }
 
     const validate = spawnSync(
@@ -67,7 +93,11 @@ export class C4ArchifyRenderer {
       { encoding: 'utf8', timeout: 120_000 },
     );
     if (validate.status !== 0) {
-      const err = validate.stderr || validate.stdout || 'validate failed';
+      const err = extractArchifyCliError(
+        validate.stdout ?? '',
+        validate.stderr ?? '',
+        'Archify validate (architecture) falló',
+      );
       this.logger.warn(`Archify validate failed: ${err.slice(0, 500)}`);
       return { htmlPath, validated: false, archifyBin: bin, stderr: err };
     }
@@ -79,7 +109,11 @@ export class C4ArchifyRenderer {
       { encoding: 'utf8', timeout: 120_000 },
     );
     if (deliver.status !== 0) {
-      const err = deliver.stderr || deliver.stdout || 'deliver failed';
+      const err = extractArchifyCliError(
+        deliver.stdout ?? '',
+        deliver.stderr ?? '',
+        'Archify deliver (architecture) falló',
+      );
       this.logger.warn(`Archify deliver failed: ${err.slice(0, 500)}`);
       return { htmlPath, validated: false, archifyBin: bin, stderr: err };
     }
@@ -94,7 +128,7 @@ export class C4ArchifyRenderer {
     headIr: ArchifyArchitectureIr,
     fromSnapshotId: string,
     toSnapshotId: string,
-  ): Promise<{ htmlPath: string; validated: boolean; archifyBin: string | null }> {
+  ): Promise<ArchifyRenderResult> {
     const root = this.storageRoot();
     const base = join(root, projectId);
     await mkdir(base, { recursive: true });
@@ -107,7 +141,7 @@ export class C4ArchifyRenderer {
 
     const bin = this.resolveArchifyBin();
     if (!bin) {
-      return { htmlPath, validated: false, archifyBin: null };
+      return { htmlPath, validated: false, archifyBin: null, stderr: ARCHIFY_BIN_MISSING };
     }
 
     const cmp = spawnSync(
@@ -116,9 +150,13 @@ export class C4ArchifyRenderer {
       { encoding: 'utf8', timeout: 120_000 },
     );
     if (cmp.status !== 0) {
-      const err = cmp.stderr || cmp.stdout || 'compare failed';
+      const err = extractArchifyCliError(
+        cmp.stdout ?? '',
+        cmp.stderr ?? '',
+        'Archify compare (architecture) falló',
+      );
       this.logger.warn(`Archify compare failed: ${err.slice(0, 500)}`);
-      return { htmlPath, validated: false, archifyBin: bin };
+      return { htmlPath, validated: false, archifyBin: bin, stderr: err };
     }
 
     return { htmlPath, validated: true, archifyBin: bin };
@@ -138,7 +176,7 @@ export class C4ArchifyRenderer {
 
     const bin = this.resolveArchifyBin();
     if (!bin) {
-      return { htmlPath, validated: false, archifyBin: null };
+      return { htmlPath, validated: false, archifyBin: null, stderr: ARCHIFY_BIN_MISSING };
     }
 
     const validate = spawnSync(
@@ -147,7 +185,11 @@ export class C4ArchifyRenderer {
       { encoding: 'utf8', timeout: 120_000 },
     );
     if (validate.status !== 0) {
-      const err = validate.stderr || validate.stdout || 'validate failed';
+      const err = extractArchifyCliError(
+        validate.stdout ?? '',
+        validate.stderr ?? '',
+        'Archify validate (sequence) falló',
+      );
       this.logger.warn(`Archify sequence validate failed: ${err.slice(0, 500)}`);
       return { htmlPath, validated: false, archifyBin: bin, stderr: err };
     }
@@ -158,7 +200,11 @@ export class C4ArchifyRenderer {
       { encoding: 'utf8', timeout: 120_000 },
     );
     if (deliver.status !== 0) {
-      const err = deliver.stderr || deliver.stdout || 'deliver failed';
+      const err = extractArchifyCliError(
+        deliver.stdout ?? '',
+        deliver.stderr ?? '',
+        'Archify deliver (sequence) falló',
+      );
       this.logger.warn(`Archify sequence deliver failed: ${err.slice(0, 500)}`);
       return { htmlPath, validated: false, archifyBin: bin, stderr: err };
     }

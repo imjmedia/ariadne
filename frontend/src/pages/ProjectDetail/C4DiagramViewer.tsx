@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatC4ArchifyFailure } from '@/utils/c4-archify-error';
 import { C4EvidencePanel } from './C4EvidencePanel';
 import { C4SnapshotCompare } from './C4SnapshotCompare';
 
@@ -97,6 +98,8 @@ export function C4DiagramViewer({
       });
       const single = res as {
         htmlReady?: boolean;
+        archifyError?: string | null;
+        archifyBin?: string | null;
         model?: { elements?: C4Element[]; generator?: string };
       };
       setMeta({ htmlReady: single.htmlReady });
@@ -106,7 +109,13 @@ export function C4DiagramViewer({
         await loadHtml();
       } else {
         setError(
-          'Modelo C4 guardado pero HTML no generado. Revisa Archify en Ajustes → Sistema y vuelve a generar.',
+          formatC4ArchifyFailure({
+            htmlReady: false,
+            archifyError: single.archifyError,
+            archifyBin: single.archifyBin,
+            fallback:
+              'Modelo C4 guardado pero HTML no generado. Revisa Archify en Ajustes → Sistema y vuelve a generar.',
+          }),
         );
       }
     } catch (e) {
@@ -213,7 +222,7 @@ export function C4DiagramViewer({
         <Alert variant="destructive">
           <AlertTitle>Diagrama C4 {levelLabel}</AlertTitle>
           <AlertDescription className="space-y-2">
-            <p>{error}</p>
+            <p className="whitespace-pre-wrap text-sm">{error}</p>
             <Button type="button" variant="outline" size="sm" onClick={() => void regenerate()}>
               Generar ahora
             </Button>

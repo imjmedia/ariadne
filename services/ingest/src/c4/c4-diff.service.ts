@@ -23,6 +23,8 @@ export class C4DiffService {
     diff: C4ModelDiff;
     archifyCompareHtml: string | null;
     archifyComparePath: string | null;
+    archifyCompareError: string | null;
+    archifyBin: string | null;
   }> {
     const fromSnap = await this.snapshots.getById(fromId);
     const toSnap = await this.snapshots.getById(toId);
@@ -42,6 +44,8 @@ export class C4DiffService {
     const headIr = toSnap.archifyJson as ArchifyArchitectureIr | null;
     let archifyCompareHtml: string | null = null;
     let archifyComparePath: string | null = null;
+    let archifyCompareError: string | null = null;
+    let archifyBin: string | null = null;
 
     if (baseIr && headIr) {
       const cmp = await this.archify.compareArchitecture(
@@ -53,12 +57,17 @@ export class C4DiffService {
         toId,
       );
       archifyComparePath = cmp.htmlPath;
+      archifyBin = cmp.archifyBin;
       if (cmp.validated && existsSync(cmp.htmlPath)) {
         archifyCompareHtml = await readFile(cmp.htmlPath, 'utf8');
+      } else if (!cmp.validated) {
+        archifyCompareError = cmp.stderr ?? null;
       }
+    } else {
+      archifyCompareError = 'Snapshots sin IR Archify guardado; regenera ambos diagramas.';
     }
 
-    return { diff, archifyCompareHtml, archifyComparePath };
+    return { diff, archifyCompareHtml, archifyComparePath, archifyCompareError, archifyBin };
   }
 
   /** True si los dos últimos snapshots de un nivel difieren en contentHash. */

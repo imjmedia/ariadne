@@ -3,6 +3,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/api';
+import { formatC4ArchifyFailure } from '@/utils/c4-archify-error';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import type { C4DiagramLevel } from './C4DiagramViewer';
@@ -53,7 +54,14 @@ export function C4SnapshotCompare({
       const res = await api.diffC4Snapshots(projectId, fromId, toId);
       setDiffHtml(res.archifyCompareHtml);
       if (!res.archifyCompareHtml) {
-        setError('Diff JSON disponible pero sin HTML Archify compare.');
+        setError(
+          formatC4ArchifyFailure({
+            htmlReady: false,
+            archifyError: res.archifyCompareError,
+            archifyBin: res.archifyBin,
+            fallback: 'Diff JSON disponible pero sin HTML Archify compare.',
+          }),
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
