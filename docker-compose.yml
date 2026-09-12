@@ -184,6 +184,9 @@ services:
       - falkor-net
 
   # Servidor MCP (El Oráculo). Streamable HTTP para producción (Dokploy).
+  # Dokploy Domains UI: ariadne.kreoint.mx path /mcp → 8080
+  # Dokploy Domains UI: ariadne.kreoint.mx path /.well-known → 8080 (OAuth discovery MCP)
+  # NO enrutar path / al MCP — la UI es el servicio frontend (puerto 80).
   # Cursor/IA por URL Streamable MCP. Bearer a `/mcp`: Secret MCP `ari_*` del usuario (validado vía ingest), reenvío al Nest.
   mcp-ariadne:
     build:

@@ -4907,7 +4907,26 @@ function serveWellKnown(path: string, req: IncomingMessage, res: ServerResponse)
 async function requestHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const path = req.url?.split("?")[0] ?? "/";
   const pathNorm = path.startsWith("/") ? path : `/${path}`;
-  const isMcpPath = pathNorm === MCP_PATH || pathNorm === `${MCP_PATH}/` || pathNorm === "/";
+  const isMcpPath = pathNorm === MCP_PATH || pathNorm === `${MCP_PATH}/`;
+
+  // Raíz del host MCP: no es la UI (evita 401 confuso si Dokploy enruta / al contenedor equivocado).
+  if (pathNorm === "/" && req.method === "GET") {
+    const webUi =
+      process.env.ARIADNE_UI_URL?.trim() ||
+      process.env.MCP_PUBLIC_URL?.trim()?.replace(/\/mcp\/?$/i, "") ||
+      "https://ariadne.kreoint.mx";
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        service: "mcp-ariadne",
+        message:
+          "Este es el servidor MCP, no la aplicación web. En Dokploy enruta path / → frontend:80 y /mcp → mcp-ariadne:8080.",
+        web_ui: webUi.replace(/\/$/, ""),
+        mcp_endpoint: MCP_PATH,
+      }),
+    );
+    return;
+  }
 
   // Healthcheck endpoint
   if (pathNorm === "/health") {
