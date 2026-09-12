@@ -7,7 +7,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
-import type { ArchifyArchitectureIr, ArchifySequenceIr } from 'ariadne-common';
+import {
+  sanitizeArchifyArchitectureIr,
+  sanitizeArchifySequenceIr,
+  type ArchifyArchitectureIr,
+  type ArchifySequenceIr,
+} from 'ariadne-common';
 import { getC4Settings } from './c4-settings.util';
 
 export interface ArchifyRenderResult {
@@ -77,7 +82,8 @@ export class C4ArchifyRenderer {
     await mkdir(base, { recursive: true });
     const jsonPath = join(base, `${level}.architecture.json`);
     const htmlPath = join(base, `${level}.architecture.html`);
-    await writeFile(jsonPath, JSON.stringify(ir, null, 2), 'utf8');
+    const sanitized = sanitizeArchifyArchitectureIr(ir);
+    await writeFile(jsonPath, JSON.stringify(sanitized, null, 2), 'utf8');
 
     const bin = this.resolveArchifyBin();
     if (!bin) {
@@ -136,8 +142,16 @@ export class C4ArchifyRenderer {
     const headPath = join(base, `diff-${toSnapshotId.slice(0, 8)}.head.json`);
     const htmlPath = join(base, `diff-${fromSnapshotId.slice(0, 8)}-${toSnapshotId.slice(0, 8)}.html`);
 
-    await writeFile(basePath, JSON.stringify(baseIr, null, 2), 'utf8');
-    await writeFile(headPath, JSON.stringify(headIr, null, 2), 'utf8');
+    await writeFile(
+      basePath,
+      JSON.stringify(sanitizeArchifyArchitectureIr(baseIr), null, 2),
+      'utf8',
+    );
+    await writeFile(
+      headPath,
+      JSON.stringify(sanitizeArchifyArchitectureIr(headIr), null, 2),
+      'utf8',
+    );
 
     const bin = this.resolveArchifyBin();
     if (!bin) {
@@ -172,7 +186,8 @@ export class C4ArchifyRenderer {
     await mkdir(base, { recursive: true });
     const jsonPath = join(base, 'sequence.json');
     const htmlPath = join(base, 'sequence.html');
-    await writeFile(jsonPath, JSON.stringify(ir, null, 2), 'utf8');
+    const sanitized = sanitizeArchifySequenceIr(ir);
+    await writeFile(jsonPath, JSON.stringify(sanitized, null, 2), 'utf8');
 
     const bin = this.resolveArchifyBin();
     if (!bin) {

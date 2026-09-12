@@ -159,3 +159,7 @@ export {
   type ArchifyArchitectureIr,
   type ArchifyComponentType,
 } from './c4/to-archify.mapper.js';
+export {
+  sanitizeArchifyArchitectureIr,
+  sanitizeArchifySequenceIr,
+} from './c4/archify-ir-sanitize.js';
