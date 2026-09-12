@@ -1,3 +1,11 @@
+export const ARCHIFY_WIRE_PROTOCOL =
+  /^(REST|HTTP|HTTPS|GRPC|SOAP|MQTT|AMQP|SQL|TCP|UDP|GRAPHQL|WEBSOCKET|WEBHOOK)$/i;
+
+/** Protocolos que caben en aristas Archify showcase (context/container). */
+export function isArchifyWireProtocol(value: string | undefined): boolean {
+  return Boolean(value?.trim() && ARCHIFY_WIRE_PROTOCOL.test(value.trim()));
+}
+
 /** Formatea llamada HTTP sin duplicar método (`GET GET /api`). */
 export function formatHttpCallLabel(method: string | undefined, path: string | undefined): string {
   const rawPath = path?.trim() ?? '';

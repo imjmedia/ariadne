@@ -79,6 +79,27 @@ describe('c4ModelToArchifyArchitecture', () => {
     expect(ir.connections?.[0]?.variant).toBe('dashed');
   });
 
+  it('no pone descripciones de inferencia como label en context', () => {
+    const model = domainContextSpecToC4Model({
+      projectId: 'p1',
+      projectName: 'Memoria',
+      repos: [{ id: 'repo-11111111-aaaa-bbbb-cccc-dddddddddddd', label: 'memoria-generacional' }],
+      dependencies: [
+        {
+          dependencyId: 'dep-2',
+          domainId: 'dom-msg',
+          domainName: 'Mensajería',
+          connectionType: 'eventos',
+          description: 'Bus o cola detectada en package.json (@nestjs/bullmq)',
+        },
+      ],
+      visibilityEdges: [],
+    });
+    const ir = c4ModelToArchifyArchitecture(model);
+    expect(ir.connections?.every((c) => !c.label?.includes('package.json'))).toBe(true);
+    expect(ir.connections?.every((c) => !c.label || c.label === 'REST')).toBe(true);
+  });
+
   it('no usa connectionType custom (eventos) como label en context', () => {
     const model = domainContextSpecToC4Model({
       projectId: 'p1',

@@ -164,7 +164,9 @@ export {
   sanitizeArchifySequenceIr,
 } from './c4/archify-ir-sanitize.js';
 export {
+  ARCHIFY_WIRE_PROTOCOL,
   formatHttpCallLabel,
   inferMonorepoSegmentLabel,
+  isArchifyWireProtocol,
 } from './c4/api-flow-labels.util.js';
 export type { C4SequenceRouteOption } from './c4/c4-sequence.types.js';

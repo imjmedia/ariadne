@@ -2,11 +2,9 @@
  * Parches mínimos Archify showcase aplicados en ingest (antes del sanitize de ariadne-common).
  * Cubre: labels org/repo, self-loops sequence, y labels RENDERS/IMPORTS/CALLS en componentes.
  */
-import type { ArchifyArchitectureIr, ArchifySequenceIr } from 'ariadne-common';
+import { isArchifyWireProtocol, type ArchifyArchitectureIr, type ArchifySequenceIr } from 'ariadne-common';
 
 const IMPLICIT_EDGE_LABELS = new Set(['renders', 'imports', 'calls']);
-/** connectionType de dominio usado como label de arista (redundante con el nodo external). */
-const REDUNDANT_CONTEXT_EDGE_LABELS = new Set(['eventos', 'visibilidad de dominio']);
 
 const ARCHIFY_MIN_COMPONENT_W = 130;
 const ARCHIFY_LABEL_FACTOR = 6.6;
@@ -44,9 +42,10 @@ export function fixArchifyArchitectureIr(ir: ArchifyArchitectureIr): ArchifyArch
     };
   });
   const connections = (ir.connections ?? []).map((conn) => {
-    const normalized = conn.label?.trim().toLowerCase() ?? '';
-    if (!normalized) return conn;
-    if (IMPLICIT_EDGE_LABELS.has(normalized) || REDUNDANT_CONTEXT_EDGE_LABELS.has(normalized)) {
+    const label = conn.label?.trim() ?? '';
+    if (!label) return conn;
+    const normalized = label.toLowerCase();
+    if (IMPLICIT_EDGE_LABELS.has(normalized) || !isArchifyWireProtocol(label)) {
       const { label: _label, ...rest } = conn;
       return { ...rest, variant: conn.variant ?? 'dashed' };
     }
