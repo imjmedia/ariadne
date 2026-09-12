@@ -121,8 +121,9 @@ Configuración del webhook en Bitbucket: ver [docs/notebooklm/bitbucket_webhook.
 ## C4 / Archify (terceros)
 
 La imagen Docker instala [Archify](https://github.com/tt-a1i/archify) en `/opt/archify`
-(versión fijada con `ARG ARCHIFY_VERSION` en el `Dockerfile`). Licencia **MIT**; aviso en
-[NOTICE](../../NOTICE). El build falla si falta `/opt/archify/LICENSE` o `bin/archify.mjs`.
+(versión fijada con `ARG ARCHIFY_VERSION`; desde v2.9 el paquete vive en subcarpeta `archify/`
+del repo y se normaliza en el build). Licencia **MIT**; aviso en [NOTICE](../../NOTICE).
+El build ejecuta `npm install` en `/opt/archify` y falla si falta `LICENSE` o `bin/archify.mjs`.
 
 Comprobación local: `node scripts/verify-archify-third-party.mjs` (desde la raíz del repo).
 

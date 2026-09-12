@@ -18,9 +18,13 @@ WORKDIR /app
 # tree-sitter y tree-sitter-* requieren compilación nativa; git para shallow clone (sync)
 # Archify (MIT): pin de versión + comprobación de LICENSE en build (ver NOTICE).
 ARG ARCHIFY_VERSION=v2.9.0
+# v2.9+ ships CLI under archify/ subfolder; normalize to /opt/archify + npm deps (ajv).
 RUN apk add --no-cache python3 make g++ git \
   && git clone --depth 1 --branch "${ARCHIFY_VERSION}" \
-    https://github.com/tt-a1i/archify.git /opt/archify \
+    https://github.com/tt-a1i/archify.git /tmp/archify-src \
+  && mv /tmp/archify-src/archify /opt/archify \
+  && rm -rf /tmp/archify-src \
+  && cd /opt/archify && npm install --omit=dev \
   && test -f /opt/archify/LICENSE \
   && test -f /opt/archify/bin/archify.mjs
 

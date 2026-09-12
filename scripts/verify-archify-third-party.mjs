@@ -46,6 +46,18 @@ if (!/test -f \/opt\/archify\/LICENSE/.test(dockerfile)) {
   ok('Dockerfile asserts Archify LICENSE at build');
 }
 
+if (!/mv \/tmp\/archify-src\/archify \/opt\/archify/.test(dockerfile)) {
+  fail('Dockerfile must normalize Archify v2.9+ layout (mv archify/ subfolder to /opt/archify)');
+} else {
+  ok('Dockerfile normalizes Archify package path');
+}
+
+if (!/npm install --omit=dev/.test(dockerfile)) {
+  fail('Dockerfile must npm install Archify runtime deps');
+} else {
+  ok('Dockerfile installs Archify npm dependencies');
+}
+
 const localLicense = '/opt/archify/LICENSE';
 if (existsSync(localLicense)) {
   const text = readFileSync(localLicense, 'utf8');

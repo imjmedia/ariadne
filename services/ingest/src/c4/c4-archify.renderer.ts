@@ -26,6 +26,7 @@ export class C4ArchifyRenderer {
     const candidates = [
       configured,
       '/opt/archify/bin/archify.mjs',
+      '/opt/archify/archify/bin/archify.mjs',
       join(homedir(), '.agents/skills/archify/bin/archify.mjs'),
       join(homedir(), '.cursor/skills/archify/bin/archify.mjs'),
     ].filter(Boolean) as string[];
