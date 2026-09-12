@@ -8,6 +8,10 @@ import { DomainEntity } from './entities/domain.entity';
 import { ProjectDomainDependencyEntity } from './entities/project-domain-dependency.entity';
 import { DomainDomainVisibilityEntity } from './entities/domain-domain-visibility.entity';
 import { ProjectEntity } from '../projects/entities/project.entity';
+import {
+  DEFAULT_ARCHITECTURE_DOMAINS,
+  normalizeDomainNameKey,
+} from './default-domains';
 
 export interface DomainDto {
   id: string;
@@ -65,7 +69,28 @@ export class DomainsService {
     };
   }
 
+  /** Inserta bounded contexts iniciales si el catálogo no los tiene aún (idempotente por nombre). */
+  async ensureDefaultDomains(): Promise<void> {
+    const existing = await this.domainRepo.find({ select: ['name'] });
+    const existingNames = new Set(existing.map((row) => normalizeDomainNameKey(row.name)));
+    const missing = DEFAULT_ARCHITECTURE_DOMAINS.filter(
+      (preset) => !existingNames.has(normalizeDomainNameKey(preset.name)),
+    );
+    if (missing.length === 0) return;
+    await this.domainRepo.save(
+      missing.map((preset) =>
+        this.domainRepo.create({
+          name: preset.name,
+          description: preset.description,
+          color: preset.color,
+          metadata: { seed: 'default' },
+        }),
+      ),
+    );
+  }
+
   async findAll(): Promise<DomainDto[]> {
+    await this.ensureDefaultDomains();
     const rows = await this.domainRepo.find({ order: { name: 'ASC' } });
     if (rows.length === 0) return [];
     const ids = rows.map((r) => r.id);

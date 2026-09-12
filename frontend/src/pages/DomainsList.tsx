@@ -43,88 +43,16 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 const DOMAINS_MODULE_HELP =
   "Gobierno de arquitectura: agrupa proyectos, define visibilidad dirigida entre dominios para shards Falkor, y la whitelist proyecto→dominio en la pestaña Arquitectura del proyecto."
 
-/** Bounded contexts habituales para gobierno de dominios (no son URLs ni hosts). */
-const ARCHITECTURE_DOMAIN_PRESETS = [
-  {
-    id: "plataforma",
-    name: "Plataforma",
-    description: "Capacidades transversales, configuración y servicios compartidos del ecosistema.",
-    color: "#6366f1",
-  },
-  {
-    id: "identidad",
-    name: "Identidad y acceso",
-    description: "Autenticación, autorización, usuarios, roles y permisos.",
-    color: "#8b5cf6",
-  },
-  {
-    id: "pagos",
-    name: "Pagos",
-    description: "Cobros, reembolsos, conciliación y pasarelas de pago.",
-    color: "#10b981",
-  },
-  {
-    id: "catalogo",
-    name: "Catálogo",
-    description: "Productos, servicios, precios y disponibilidad.",
-    color: "#f59e0b",
-  },
-  {
-    id: "ordenes",
-    name: "Órdenes",
-    description: "Pedidos, flujos de compra y ciclo de vida de transacciones.",
-    color: "#ef4444",
-  },
-  {
-    id: "crm",
-    name: "CRM",
-    description: "Gestión de clientes, oportunidades, pipeline comercial y relaciones.",
-    color: "#ec4899",
-  },
-  {
-    id: "notificaciones",
-    name: "Notificaciones",
-    description: "Email, SMS, push y mensajería transaccional.",
-    color: "#06b6d4",
-  },
-  {
-    id: "reporting",
-    name: "Reporting y analítica",
-    description: "KPIs, dashboards, exportaciones y métricas de negocio.",
-    color: "#64748b",
-  },
-  {
-    id: "integraciones",
-    name: "Integraciones",
-    description: "APIs externas, ETL, buses de eventos y conectores.",
-    color: "#a855f7",
-  },
-  {
-    id: "infraestructura",
-    name: "Infraestructura",
-    description: "Despliegue, observabilidad, CI/CD y plataforma técnica.",
-    color: "#475569",
-  },
-] as const
-
-/** Opción del select para motores o microservicios con nombre propio del tenant. */
-const CUSTOM_DOMAIN_OPTION_ID = "__custom__"
-
 const panelClass = cn(
   "rounded-3xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm",
   "transition-shadow duration-[var(--transition-base)] hover:shadow-md",
 )
 
-function normalizeDomainName(value: string): string {
-  return value.trim().toLocaleLowerCase()
-}
-
 export function DomainsList() {
   const [domains, setDomains] = useState<Domain[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedPresetId, setSelectedPresetId] = useState("")
-  const [customName, setCustomName] = useState("")
+  const [name, setName] = useState("")
   const [color, setColor] = useState("#6366f1")
   const [desc, setDesc] = useState("")
   const [saving, setSaving] = useState(false)
@@ -161,43 +89,6 @@ export function DomainsList() {
     () => domains.filter((d) => (d.assignedProjectCount ?? 0) === 0).length,
     [domains],
   )
-
-  const existingDomainNames = useMemo(
-    () => new Set(domains.map((d) => normalizeDomainName(d.name))),
-    [domains],
-  )
-
-  const availablePresets = useMemo(
-    () => ARCHITECTURE_DOMAIN_PRESETS.filter((preset) => !existingDomainNames.has(normalizeDomainName(preset.name))),
-    [existingDomainNames],
-  )
-
-  const selectedPreset = useMemo(
-    () => ARCHITECTURE_DOMAIN_PRESETS.find((preset) => preset.id === selectedPresetId) ?? null,
-    [selectedPresetId],
-  )
-
-  const isCustomSelection = selectedPresetId === CUSTOM_DOMAIN_OPTION_ID
-
-  const resolvedDomainName = useMemo(() => {
-    if (isCustomSelection) return customName.trim()
-    return selectedPreset?.name ?? ""
-  }, [customName, isCustomSelection, selectedPreset])
-
-  const canCreateDomain = useMemo(() => {
-    if (!resolvedDomainName) return false
-    return !existingDomainNames.has(normalizeDomainName(resolvedDomainName))
-  }, [existingDomainNames, resolvedDomainName])
-
-  useEffect(() => {
-    if (
-      selectedPresetId &&
-      selectedPresetId !== CUSTOM_DOMAIN_OPTION_ID &&
-      !availablePresets.some((preset) => preset.id === selectedPresetId)
-    ) {
-      setSelectedPresetId("")
-    }
-  }, [availablePresets, selectedPresetId])
 
   const openProjectsDialog = (d: Domain) => {
     setProjectsDialogDomain(d)
@@ -258,33 +149,18 @@ export function DomainsList() {
     }
   }
 
-  const handlePresetChange = (presetId: string) => {
-    setSelectedPresetId(presetId)
-    if (presetId === CUSTOM_DOMAIN_OPTION_ID) {
-      setCustomName("")
-      setColor("#6366f1")
-      setDesc("")
-      return
-    }
-    const preset = ARCHITECTURE_DOMAIN_PRESETS.find((item) => item.id === presetId)
-    if (!preset) return
-    setCustomName("")
-    setColor(preset.color)
-    setDesc(preset.description)
-  }
-
   const create = async () => {
-    if (!canCreateDomain) return
+    const trimmedName = name.trim()
+    if (!trimmedName) return
     setSaving(true)
     setError(null)
     try {
       await api.createDomain({
-        name: resolvedDomainName,
+        name: trimmedName,
         color,
-        description: desc.trim() || (selectedPreset?.description ?? null),
+        description: desc.trim() || null,
       })
-      setSelectedPresetId("")
-      setCustomName("")
+      setName("")
       setColor("#6366f1")
       setDesc("")
       load()
@@ -403,55 +279,26 @@ export function DomainsList() {
         <div>
           <h2 className="text-sm font-semibold tracking-tight text-[var(--foreground)]">Crear dominio</h2>
           <p className="mt-1 text-xs leading-relaxed text-[var(--foreground-muted)]">
-            Elige un bounded context de arquitectura (no es un dominio web). Para motores o microservicios propios del
-            tenant, usa <span className="font-medium text-[var(--foreground)]">Personalizado</span>.
+            Nombre legible del bounded context (no es un dominio web). El catálogo incluye presets iniciales; aquí puedes
+            añadir motores o microservicios propios (p. ej. Motor de costos, Media Manager).
           </p>
         </div>
         <div className="mt-8 grid gap-8 lg:grid-cols-12 lg:items-stretch">
           <div className="flex min-w-0 flex-col gap-5 lg:col-span-8">
             <div className="space-y-2">
               <Label htmlFor="dn" className="text-xs font-medium text-[var(--foreground-muted)]">
-                Dominio de arquitectura
+                Nombre del dominio
               </Label>
-              <Select value={selectedPresetId || undefined} onValueChange={handlePresetChange} disabled={saving}>
-                <SelectTrigger id="dn" className={cn(inputClass, "w-full")}>
-                  <SelectValue placeholder="Elegir bounded context" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availablePresets.map((preset) => (
-                    <SelectItem key={preset.id} value={preset.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="inline-block size-3 shrink-0 rounded-full border border-[var(--border)]"
-                          style={{ backgroundColor: preset.color }}
-                          aria-hidden
-                        />
-                        {preset.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                  <SelectItem value={CUSTOM_DOMAIN_OPTION_ID}>Personalizado (motor / microservicio)</SelectItem>
-                </SelectContent>
-              </Select>
-              {isCustomSelection ? (
-                <div className="space-y-2">
-                  <Label htmlFor="dcn" className="text-xs font-medium text-[var(--foreground-muted)]">
-                    Nombre del motor o microservicio
-                  </Label>
-                  <Input
-                    id="dcn"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    placeholder="Ej. Motor de costos, Listas de precios, Media Manager"
-                    className={inputClass}
-                    disabled={saving}
-                  />
-                </div>
-              ) : null}
+              <Input
+                id="dn"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ej. Motor de costos, Listas de precios, Media Manager"
+                className={inputClass}
+                disabled={saving}
+              />
               <p className="text-[11px] leading-snug text-[var(--foreground-muted)]">
-                Los presets cubren contextos de negocio amplios. Motores dedicados (costos, precios, media, etc.) créalos
-                con <span className="font-medium text-[var(--foreground)]">Personalizado</span> usando el nombre que ya
-                usa tu equipo — no hace falta URL ni prefijo técnico.
+                Los proyectos asignan dominio desde su ficha (select). Usa el mismo nombre que ya emplea tu equipo.
               </p>
             </div>
             <div className="min-h-0 flex-1 space-y-2">
@@ -491,7 +338,7 @@ export function DomainsList() {
               type="button"
               className="h-11 w-full shrink-0 rounded-xl"
               onClick={() => void create()}
-              disabled={saving || !canCreateDomain}
+              disabled={saving || !name.trim()}
             >
               {saving ? "Guardando…" : "Crear dominio"}
             </Button>
