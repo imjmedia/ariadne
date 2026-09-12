@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { c4ModelToArchifyArchitecture } from './to-archify.mapper.js';
+import { falkorSubgraphToC4ComponentModel } from './from-falkor.components.js';
 import { infrastructureSpecToC4Model } from './from-infrastructure.js';
 import { domainContextSpecToC4Model } from './from-domains.js';
 
@@ -39,6 +40,43 @@ describe('c4ModelToArchifyArchitecture', () => {
     expect(ir.components.find((c) => c.id.includes('api'))?.type).toBe('backend');
     expect(ir.components.find((c) => c.label === 'postgres')?.type).toBe('database');
     expect(ir.connections?.[0]).not.toHaveProperty('id');
+  });
+
+  it('omite label en RENDERS/IMPORTS/CALLS a nivel componente', () => {
+    const model = falkorSubgraphToC4ComponentModel({
+      projectId: 'p1',
+      containerKey: 'web',
+      containerName: 'Web',
+      pathPrefixes: ['apps/web/'],
+      nodes: [
+        {
+          id: 'Parent::apps/web/a.tsx',
+          name: 'Parent',
+          filePath: 'apps/web/a.tsx',
+          containerKey: 'web',
+          nodeKind: 'component',
+        },
+        {
+          id: 'Child::apps/web/b.tsx',
+          name: 'Child',
+          filePath: 'apps/web/b.tsx',
+          containerKey: 'web',
+          nodeKind: 'component',
+        },
+      ],
+      edges: [
+        {
+          id: 'e1',
+          fromId: 'Parent::apps/web/a.tsx',
+          toId: 'Child::apps/web/b.tsx',
+          label: 'renders',
+          relType: 'RENDERS',
+        },
+      ],
+    });
+    const ir = c4ModelToArchifyArchitecture(model);
+    expect(ir.connections?.[0]?.label).toBeUndefined();
+    expect(ir.connections?.[0]?.variant).toBe('dashed');
   });
 
   it('mapea context sin layout legacy', () => {

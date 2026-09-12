@@ -1,8 +1,10 @@
 /**
  * Parches mínimos Archify showcase aplicados en ingest (antes del sanitize de ariadne-common).
- * Cubre: labels org/repo demasiado anchos y mensajes sequence from===to (0px span).
+ * Cubre: labels org/repo, self-loops sequence, y labels RENDERS/IMPORTS/CALLS en componentes.
  */
 import type { ArchifyArchitectureIr, ArchifySequenceIr } from 'ariadne-common';
+
+const IMPLICIT_EDGE_LABELS = new Set(['renders', 'imports', 'calls']);
 
 const ARCHIFY_MIN_COMPONENT_W = 130;
 const ARCHIFY_LABEL_FACTOR = 6.6;
@@ -39,7 +41,18 @@ export function fixArchifyArchitectureIr(ir: ArchifyArchitectureIr): ArchifyArch
       size: [width, baseH] as [number, number],
     };
   });
-  return { ...ir, components };
+  const connections = (ir.connections ?? []).map((conn) => {
+    const normalized = conn.label?.trim().toLowerCase() ?? '';
+    if (!normalized || !IMPLICIT_EDGE_LABELS.has(normalized)) return conn;
+    const { label: _label, ...rest } = conn;
+    return { ...rest, variant: conn.variant ?? 'dashed' };
+  });
+
+  return {
+    ...ir,
+    components,
+    ...(connections.length ? { connections } : {}),
+  };
 }
 
 /** Elimina self-loops (web→web) que Archify rechaza (<60px span). */

@@ -21,6 +21,21 @@ describe('c4-archify-ir-fix', () => {
     expect(out.components[0]?.sublabel).toContain('kreodevs/memoria-generacional');
   });
 
+  it('quita label RENDERS en conexiones de componente', () => {
+    const out = fixArchifyArchitectureIr({
+      schema_version: 1,
+      diagram_type: 'architecture',
+      meta: { title: 'C4 Component' },
+      components: [
+        { id: 'a', type: 'frontend', label: 'Parent', pos: [40, 80], size: [130, 60] },
+        { id: 'b', type: 'frontend', label: 'Child', pos: [250, 80], size: [130, 60] },
+      ],
+      connections: [{ from: 'a', to: 'b', label: 'RENDERS', variant: 'emphasis' }],
+    });
+    expect(out.connections?.[0]?.label).toBeUndefined();
+    expect(out.connections?.[0]?.variant).toBe('emphasis');
+  });
+
   it('elimina mensaje sequence from===to', () => {
     const out = fixArchifySequenceIr({
       schema_version: 1,

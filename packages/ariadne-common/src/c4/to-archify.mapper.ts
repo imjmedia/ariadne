@@ -108,6 +108,29 @@ function diagramRelationships(model: C4Model): C4Relationship[] {
   return model.relationships.filter((r) => ids.has(r.from) && ids.has(r.to) && r.label !== 'contains');
 }
 
+/** En nivel componente, RENDERS/IMPORTS/CALLS no llevan label (Archify showcase en grafos densos). */
+const IMPLICIT_COMPONENT_PROTOCOLS = new Set(['RENDERS', 'IMPORTS', 'CALLS']);
+
+function archifyConnectionFromRelationship(
+  rel: C4Relationship,
+  level: C4Model['level'],
+): NonNullable<ArchifyArchitectureIr['connections']>[number] {
+  const protocol = rel.protocol?.toUpperCase();
+  if (level === 'component' && protocol && IMPLICIT_COMPONENT_PROTOCOLS.has(protocol)) {
+    return { from: rel.from, to: rel.to, variant: 'dashed' };
+  }
+  const label =
+    level === 'component' && protocol === 'ROUTE_TO_COMPONENT'
+      ? rel.label
+      : rel.protocol ?? rel.label;
+  return {
+    from: rel.from,
+    to: rel.to,
+    ...(label ? { label } : {}),
+    variant: rel.protocol ? ('emphasis' as const) : ('default' as const),
+  };
+}
+
 /**
  * Mapea C4Model → JSON IR Archify architecture (pos/size grid, schema v2.9).
  */
@@ -148,12 +171,9 @@ export function c4ModelToArchifyArchitecture(
     };
   });
 
-  const connections = diagramRelationships(model).map((rel) => ({
-    from: rel.from,
-    to: rel.to,
-    label: rel.protocol ?? rel.label,
-    variant: rel.protocol ? ('emphasis' as const) : ('default' as const),
-  }));
+  const connections = diagramRelationships(model).map((rel) =>
+    archifyConnectionFromRelationship(rel, model.level),
+  );
 
   const dbCount = components.filter((c) => c.type === 'database').length;
   const personCount = model.elements.filter((e) => e.kind === 'person').length;
