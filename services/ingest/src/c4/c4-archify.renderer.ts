@@ -14,6 +14,7 @@ import {
   type ArchifySequenceIr,
 } from 'ariadne-common';
 import { getC4Settings } from './c4-settings.util';
+import { fixArchifyArchitectureIr, fixArchifySequenceIr } from './c4-archify-ir-fix';
 
 export interface ArchifyRenderResult {
   htmlPath: string;
@@ -82,7 +83,7 @@ export class C4ArchifyRenderer {
     await mkdir(base, { recursive: true });
     const jsonPath = join(base, `${level}.architecture.json`);
     const htmlPath = join(base, `${level}.architecture.html`);
-    const sanitized = sanitizeArchifyArchitectureIr(ir);
+    const sanitized = sanitizeArchifyArchitectureIr(fixArchifyArchitectureIr(ir));
     await writeFile(jsonPath, JSON.stringify(sanitized, null, 2), 'utf8');
 
     const bin = this.resolveArchifyBin();
@@ -144,12 +145,12 @@ export class C4ArchifyRenderer {
 
     await writeFile(
       basePath,
-      JSON.stringify(sanitizeArchifyArchitectureIr(baseIr), null, 2),
+      JSON.stringify(sanitizeArchifyArchitectureIr(fixArchifyArchitectureIr(baseIr)), null, 2),
       'utf8',
     );
     await writeFile(
       headPath,
-      JSON.stringify(sanitizeArchifyArchitectureIr(headIr), null, 2),
+      JSON.stringify(sanitizeArchifyArchitectureIr(fixArchifyArchitectureIr(headIr)), null, 2),
       'utf8',
     );
 
@@ -186,7 +187,7 @@ export class C4ArchifyRenderer {
     await mkdir(base, { recursive: true });
     const jsonPath = join(base, 'sequence.json');
     const htmlPath = join(base, 'sequence.html');
-    const sanitized = sanitizeArchifySequenceIr(ir);
+    const sanitized = sanitizeArchifySequenceIr(fixArchifySequenceIr(ir));
     await writeFile(jsonPath, JSON.stringify(sanitized, null, 2), 'utf8');
 
     const bin = this.resolveArchifyBin();

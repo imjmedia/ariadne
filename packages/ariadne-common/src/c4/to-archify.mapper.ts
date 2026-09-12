@@ -124,14 +124,25 @@ export function c4ModelToArchifyArchitecture(
 
   const components = nodes.map((el, index) => {
     const { pos, size } = gridPosition(index, cols);
+    const slash = el.name.lastIndexOf('/');
+    const label =
+      slash > 0 && slash < el.name.length - 1
+        ? el.name.slice(slash + 1).trim() || el.name
+        : el.name;
+    const pathSublabel =
+      slash > 0 && slash < el.name.length - 1 ? el.name.trim().slice(0, 64) : undefined;
+    const baseSublabel =
+      model.level === 'context'
+        ? el.description?.slice(0, 64) ?? el.technology?.slice(0, 64)
+        : el.technology?.slice(0, 64);
+    const sublabel = pathSublabel && baseSublabel && baseSublabel !== pathSublabel
+      ? `${pathSublabel} · ${baseSublabel}`.slice(0, 64)
+      : pathSublabel ?? baseSublabel;
     return {
       id: el.id,
       type: archifyTypeForElement(el, model.level),
-      label: el.name,
-      sublabel:
-        model.level === 'context'
-          ? el.description?.slice(0, 64) ?? el.technology?.slice(0, 64)
-          : el.technology?.slice(0, 64),
+      label,
+      sublabel,
       pos,
       size,
     };

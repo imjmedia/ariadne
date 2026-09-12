@@ -49,13 +49,15 @@ export interface ArchifySequenceIr {
 export function apiFlowToArchifySequence(spec: ApiFlowSpec): ArchifySequenceIr {
   const yStart = 180;
   const yStep = 48;
-  const messages = spec.steps.map((step, index) => ({
-    from: step.from,
-    to: step.to,
-    y: yStart + index * yStep,
-    label: step.label,
-    variant: step.variant ?? (step.label.toLowerCase().includes('200') ? 'return' : 'default'),
-  }));
+  const messages = spec.steps
+    .filter((step) => step.from !== step.to)
+    .map((step, index) => ({
+      from: step.from,
+      to: step.to,
+      y: yStart + index * yStep,
+      label: step.label,
+      variant: step.variant ?? (step.label.toLowerCase().includes('200') ? 'return' : 'default'),
+    }));
 
   const cards: ArchifySequenceIr['cards'] = [];
   if (spec.routePath) {
