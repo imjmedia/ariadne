@@ -53,14 +53,18 @@
  * | `get_sync_status` | Estado de sync/indexación. |
  * | `get_debt_report` | Deuda técnica agregada (huérfanos, complejidad). |
  * | `find_duplicates` | Duplicados cross-package (fingerprints). |
+ * | `get_c4_model` | C4Model JSON por nivel (`context` \| `container` \| `component`); ingest `GET/POST /c4`. |
+ * | `generate_c4_diagram` | Regenera snapshots C4 + URLs HTML Archify (`POST /c4/generate`). |
+ * | `diff_c4_model` | Diff entre snapshot ids (`GET /c4/diff`); compare HTML opcional. |
  *
  * @see {@link ./index.ts} registro `ListToolsRequestSchema` y despacho `CallToolRequestSchema`
  * @see Documentación de producto: `docs/notebooklm/mcp_server_specs.md`
  * @see Brownfield Forge: `docs_mcp/guias/brownfield-forge-mcp.md` → `docs://guias/brownfield-forge-mcp`
+ * @see C4 / Archify: `docs_mcp/guias/c4-architecture-mcp.md` → `docs://guias/c4-architecture-mcp`
  */
 
 /**
  * Revisión del catálogo documentado; subir si se añade/elimina una tool en `index.ts`.
  * @constant
  */
-export const MCP_ARIADNE_TOOLS_DOC_REVISION = 2;
+export const MCP_ARIADNE_TOOLS_DOC_REVISION = 3;

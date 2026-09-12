@@ -5,6 +5,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **C4 + Archify:** diagramas Context (dominios), Container (compose), Component (Falkor), secuencias API (Archify sequence), snapshots/diff, export Markdown (6 archivos), chat intent `architecture_diagram`, campos C4 en brownfield parity pack. Configuración en **Ajustes → Sistema → C4 / Diagramas** (`c4Enabled`, `c4AutoOnFullSync`, `c4ArchifyBin`). MCP: `get_c4_model`, `diff_c4_model`.
+- **Compliance Archify:** aviso en `NOTICE`, pin `ARCHIFY_VERSION` en imagen ingest, script `scripts/verify-archify-third-party.mjs` + job CI.
+
 ## [1.4.0] — 2026-07-18
 
 ### Added

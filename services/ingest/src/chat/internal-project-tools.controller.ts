@@ -7,10 +7,14 @@ import {
   type AnalyzeOrchestratorPrepDto,
   type ChatScope,
 } from './chat.service';
+import { C4ChatBridgeService } from '../c4/c4-chat-bridge.service';
 
 @Controller('internal/projects')
 export class InternalProjectToolsController {
-  constructor(private readonly chat: ChatService) {}
+  constructor(
+    private readonly chat: ChatService,
+    private readonly c4Chat: C4ChatBridgeService,
+  ) {}
 
   @Post(':projectId/analyze-prep')
   async analyzePrep(
@@ -68,5 +72,11 @@ export class InternalProjectToolsController {
     @Body() body: { scope?: ChatScope },
   ): Promise<{ answer: string; cypher?: string; result?: unknown[] }> {
     return this.chat.buildSchemaDatabaseAnalysis(projectId, body.scope);
+  }
+
+  /** Diagrama C4 (container/context) — early-return orchestrator. */
+  @Post(':projectId/architecture-diagram')
+  async architectureDiagram(@Param('projectId') projectId: string): Promise<{ answer: string }> {
+    return this.c4Chat.buildChatAnswer(projectId);
   }
 }

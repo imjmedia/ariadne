@@ -2,7 +2,7 @@
 id: graph-tools-catalog
 title: Catálogo de tools del grafo (MCP)
 category: Guías
-last_updated: 2026-06-29
+last_updated: 2026-09-11
 ---
 
 # Catálogo de tools del grafo (mcp-ariadne)
@@ -19,6 +19,7 @@ last_updated: 2026-06-29
 // "grafo/impacto de un componente"    -> get_component_graph / get_legacy_impact
 // "dónde se menciona X (término)"     -> semantic_search
 // "qué archivos tocar para feature Y" -> get_modification_plan
+// "diagrama C4 / arquitectura sistema" -> get_c4_model / generate_c4_diagram
 // pregunta exploratoria multi-fuente  -> ask_codebase (la más cara)
 ```
 
@@ -34,6 +35,9 @@ last_updated: 2026-06-29
 | Dependientes (impacto inverso)                    | `get_legacy_impact`                             |
 | Deuda / duplicados / código muerto / seguridad    | `get_project_analysis` (con `mode`)             |
 | Archivos candidatos para feature/refactor         | `get_modification_plan`                         |
+| Diagrama C4 / arquitectura (context, containers)  | `get_c4_model`, `generate_c4_diagram`           |
+| Evolución del modelo C4 entre syncs               | `diff_c4_model`                                 |
+| Grafo fino de un componente (props, imports)      | `get_component_graph` (no sustituye C4)         |
 | "Dónde se menciona X" (término suelto)            | `semantic_search` / `find_similar_implementations` |
 | Pregunta abierta multi-fuente                     | `ask_codebase` (último recurso)                 |
 
@@ -46,3 +50,4 @@ last_updated: 2026-06-29
 - **Regla 3:** `semantic_search` **no** acepta `scope` ni `currentFilePath`; para acotar a un repo pasa su `roots[].id` como `projectId`. El `scope` (repoIds/prefijos/globs) va en `ask_codebase` y `get_modification_plan`.
 - **Regla 4:** `get_modification_plan` es una **pista**, no lista exhaustiva: cruza con `rg`/grep para literales (clases, imports).
 - **Regla 5:** Si los resultados parecen viejos, comprueba `get_sync_status` antes de confiar en ellos.
+- **Regla 6:** C4 es vista arquitectónica (ingest + Archify); detalle de código sigue en `get_component_graph` / `get_references`. Guía: `docs://guias/c4-architecture-mcp`.

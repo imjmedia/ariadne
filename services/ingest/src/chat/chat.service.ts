@@ -4,7 +4,11 @@
  */
 
 import { HttpException, Injectable, Logger } from '@nestjs/common';
-import { LlmContextLengthError, parseIntegrationHandoffMessage } from 'ariadne-common';
+import {
+  LlmContextLengthError,
+  parseIntegrationHandoffMessage,
+  wantsArchitectureDiagramQuestion,
+} from 'ariadne-common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { IndexedFile } from '../repositories/entities/indexed-file.entity';
@@ -181,6 +185,7 @@ import { buildMddMultiRootBlock } from './mdd-multi-root.util';
 import { enrichBusinessLogicFromEvidencePaths, MDD_BUSINESS_LOGIC_FILE_PATH_CYPHER } from './mdd-business-logic.util';
 import { getMddPhysicalEvidenceLimits } from './mdd-limits';
 import type { MddEvidenceDocument, MddMultiRootBlock } from './mdd-document.types';
+import { C4ChatBridgeService } from '../c4/c4-chat-bridge.service';
 
 /** Mensaje del historial de chat (usuario o asistente). */
 export interface ChatMessage {
@@ -442,6 +447,7 @@ export class ChatService {
     private readonly analyzeDistributedCache: AnalyzeDistributedCacheService,
     private readonly modificationPlanEvidence: ModificationPlanEvidenceService,
     private readonly falkor: FalkorClientService,
+    private readonly c4Chat: C4ChatBridgeService,
   ) {}
 
   private async getIndexFingerprintForAnalyzeCache(
@@ -4611,6 +4617,9 @@ PROHIBIDO: instrucciones genéricas tipo "revisa los controladores", "asegúrate
     }
     if (wantsReengineeringQuestion(message) && !process.env.ORCHESTRATOR_URL?.trim()) {
       return this.buildReengineeringChatResponse(repositoryId, message, scope);
+    }
+    if (wantsArchitectureDiagramQuestion(message)) {
+      return this.c4Chat.buildChatAnswer(projectId);
     }
     if (wantsSchemaDatabaseQuestion(message)) {
       return this.buildSchemaDatabaseResponse(projectId, scope);

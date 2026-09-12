@@ -61,6 +61,8 @@ import { GraphExportService } from '../artifact/graph-export.service';
 import { GraphImportService } from '../artifact/graph-import.service';
 import { MddPersistenceService } from '../mdd-persistence/mdd-persistence.service';
 import { DesignSystemLinkService } from '../pipeline/design-system-link.service';
+import { C4IngestService } from '../c4/c4-ingest.service';
+import { C4Service } from '../c4/c4.service';
 import { shouldSyncIndexPath } from '../providers/sync-path-filter';
 
 /**
@@ -128,6 +130,8 @@ export class SyncService {
     private readonly graphImport: GraphImportService,
     private readonly mddPersistence: MddPersistenceService,
     private readonly designSystemLink: DesignSystemLinkService,
+    private readonly c4Ingest: C4IngestService,
+    private readonly c4Service: C4Service,
   ) {}
 
   /**
@@ -774,6 +778,17 @@ export class SyncService {
           );
         }
 
+        await this.c4Ingest.ingestDuringSync({
+          projectId,
+          repoId,
+          systemName: projectName,
+          pathSet,
+          getContent,
+          shardMode,
+          ensuredGraphs,
+          prepareGraph,
+        });
+
         if (projRow) {
           await this.projectEntityRepo.update(projectId, {
             falkorDomainSegments: shardMode === 'domain' ? [...domainSegmentsSeen] : [],
@@ -934,6 +949,7 @@ export class SyncService {
       if (primaryProjectId) {
         void this.designSystemLink.linkAfterSync(primaryProjectId, repositoryId);
         void this.mddPersistence.persistAfterFullSync(repositoryId, primaryProjectId, commitSha ?? null);
+        void this.c4Service.persistAfterFullSync(repositoryId, primaryProjectId);
       }
       return { jobId: job.id, indexed: indexedPaths.length };
     } catch (err) {

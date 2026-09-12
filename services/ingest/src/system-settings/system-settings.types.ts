@@ -26,6 +26,13 @@ export interface SystemChatEffective {
   modificationPlanMaxFiles: number;
 }
 
+export interface SystemC4Effective {
+  enabled: boolean;
+  autoOnFullSync: boolean;
+  /** Vacío = autodetectar (/opt/archify en Docker, skill local en dev). */
+  archifyBin: string | null;
+}
+
 export interface SystemSettingsEffective {
   corsOrigin: string | null;
   emailOtp: string | null;
@@ -35,6 +42,7 @@ export interface SystemSettingsEffective {
   falkor: SystemFalkorEffective;
   observability: SystemObservabilityEffective;
   chat: SystemChatEffective;
+  c4: SystemC4Effective;
 }
 
 export interface SystemSettingsMasked {
@@ -53,6 +61,7 @@ export interface SystemSettingsMasked {
   falkor: SystemFalkorEffective;
   observability: SystemObservabilityEffective;
   chat: SystemChatEffective;
+  c4: SystemC4Effective;
 }
 
 export interface UpdateSystemSettingsDto {
@@ -74,4 +83,7 @@ export interface UpdateSystemSettingsDto {
   chatTelemetryLog?: boolean;
   chatTwoPhase?: boolean;
   modificationPlanMaxFiles?: number | null;
+  c4Enabled?: boolean;
+  c4AutoOnFullSync?: boolean;
+  c4ArchifyBin?: string | null;
 }

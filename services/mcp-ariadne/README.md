@@ -39,6 +39,23 @@ npm publish
 - **ask_codebase** — Preguntas NL (Q&A). **Doc. legacy:** usar tools brownfield arriba, no `ask_codebase`.
 - **get_project_analysis** — Deuda técnica, duplicados, reingeniería, código muerto o **seguridad** (heurística; requiere INGEST_URL). `projectId` puede ser id de **proyecto** o **`roots[].id`** (repo); si es proyecto multi-root, usa **`currentFilePath`** o pasa el id del repo. Opcional: **`scope`** (mismo shape que `ask_codebase`), **`crossPackageDuplicates`** (modo duplicados). El MCP llama a `POST /projects/.../analyze` o `POST /repositories/.../analyze`. Si la respuesta trae **`reportMeta`**, se añade un bloque JSON al final del markdown.
 - **get_modification_plan** — Plan vía `POST /projects/:id/modification-plan` (`userDescription`, opcional **`scope`**, **`currentFilePath`**, **`questionsMode`**: `business` | `technical` | `both`). Respuesta puede incluir **`warnings`** y **`diagnostic`**. `projectId` = proyecto o `roots[].id`.
+### C4 / Arquitectura
+
+Diagramas **C4** (Context, Container, Component) persistidos en ingest + render Archify. Guía atómica: **`docs://guias/c4-architecture-mcp`**.
+
+| Tool | Descripción |
+| ---- | ----------- |
+| **get_c4_model** | JSON **C4Model** por nivel. Params: `projectId` (UUID proyecto), `level` (`context` \| `container` \| `component`), `regenerate`, `useLlm` (solo context), `containerKey` (solo component). Si no hay snapshot, intenta `POST /c4/generate`. |
+| **generate_c4_diagram** | Regenera snapshots + HTML Archify. Params: `level` o `levels[]`, `useLlm`, `containerKey`. Respuesta incluye `htmlUrls[]` con URL absoluta al ingest (`…/c4/html?level=`). |
+| **diff_c4_model** | Diff JSON entre dos snapshots + HTML compare Archify si existe. Params: `fromSnapshotId`, `toSnapshotId` (ids de `GET /projects/:id/c4/snapshots`). |
+
+**Requisitos:** C4 habilitado en **Ajustes → Sistema → C4 / Diagramas** (`c4Enabled`). HTML requiere Archify en la imagen ingest (`/opt/archify`) o ruta configurada en `c4ArchifyBin`. **`projectId`** = UUID del **proyecto** (`list_known_projects[].id`), no `roots[].id`.
+
+**Flujo típico:** `get_sync_status` → `generate_c4_diagram` (o `get_c4_model` con `regenerate`) → abrir `htmlUrls` o parsear `model`. Tras cambios de infra/código: regenerar y `diff_c4_model` entre snapshots.
+
+**Secuencias API** (Route → endpoint): solo REST ingest (`POST …/c4/sequence/generate`); no hay tool MCP dedicada.
+
+**Brownfield:** `export_brownfield_project_parity_pack` puede incluir `c4ContainerHtmlUrl`, `c4ContextHtmlUrl`, `c4ModelJson` si hay snapshots.
 
 ### Refactorización segura (árbol de llamadas)
 - **get_definitions** — Origen exacto de clase/función (archivo, líneas). Evita alucinaciones al refactorizar.

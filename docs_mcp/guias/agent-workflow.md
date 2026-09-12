@@ -32,6 +32,7 @@ await detect_changes({ mode: "staged" });
 | Leer        | `get_file_content`, `get_file_context`               | Si aplica   |
 | Pre-edición | `validate_before_edit`, `get_references`             | **Sí**      |
 | Brownfield  | `export_brownfield_project_parity_pack` (multi-root Forge), `generate_merged_project_mdd`, `generate_legacy_documentation`, `export_brownfield_parity_pack` | Ver `docs://guias/brownfield-forge-mcp` |
+| Arquitectura C4 | `get_c4_model`, `generate_c4_diagram`, `diff_c4_model` | Ver `docs://guias/c4-architecture-mcp` |
 | Scaffold    | `generate_scaffold_from_mdd`                         | Esqueleto desde MDD |
 | Pre-commit  | `detect_changes`, `check_breaking_changes`           | Recomendado |
 

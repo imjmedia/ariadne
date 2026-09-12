@@ -37,6 +37,8 @@ import { AnalysisModule } from './analysis/analysis.module';
 import { LlmSettingsModule } from './llm-settings/llm-settings.module';
 import { LlmSettingsEntity } from './llm-settings/entities/llm-settings.entity';
 import { MddSnapshotEntity } from './mdd-persistence/entities/mdd-snapshot.entity';
+import { C4SnapshotEntity } from './c4/entities/c4-snapshot.entity';
+import { C4Module } from './c4/c4.module';
 import { ChatConversationEntity } from './chat/entities/chat-conversation.entity';
 import { ChatIntegrationBatchEntity } from './chat/entities/chat-integration-batch.entity';
 import { ChatMessageEntity } from './chat/entities/chat-message.entity';
@@ -72,6 +74,7 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
         UserEntity,
         LlmSettingsEntity,
         MddSnapshotEntity,
+        C4SnapshotEntity,
         ChatConversationEntity,
         ChatMessageEntity,
         ChatIntegrationBatchEntity,
@@ -98,6 +101,7 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
     SystemSettingsModule,
     MddPersistenceModule,
     BrownfieldModule,
+    C4Module,
   ],
 })
 /** Módulo principal del microservicio Ingest. */

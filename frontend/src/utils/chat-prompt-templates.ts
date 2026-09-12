@@ -31,6 +31,13 @@ export const CHAT_PROMPT_TEMPLATES: ChatPromptTemplate[] = [
       'Muéstrame un diagrama entidad-relación (Mermaid erDiagram) del esquema de datos indexado en este repo: modelos ORM/ODM, Prisma, migraciones SQL o schemas OpenAPI. Usa solo lo que exista en el código indexado; no inventes tablas ni asumas Strapi.',
   },
   {
+    id: 'architecture-c4',
+    label: 'Diagrama C4',
+    hint: 'Arquitectura container/context (Archify)',
+    message:
+      'Genera o muéstrame el diagrama C4 de arquitectura del proyecto (nivel container y contexto). Incluye enlace al HTML y resumen de contenedores y sistemas externos.',
+  },
+  {
     id: 'flow-impact',
     label: 'Impacto de un cambio',
     hint: 'Q&A con retrieve',

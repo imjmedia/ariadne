@@ -16,6 +16,7 @@ Resolución: **BD → env → defaults** (`system-settings.defaults.ts`).
 
 - **Auth y correo:** `EMAIL_OTP`, SMTP, `SSO_URL`, `WEB_APP_HOST`
 - **Red y Falkor:** `CORS_ORIGIN`, sharding, soft limit, debug Cypher
+- **C4 / Diagramas:** habilitar C4 en sync, auto-generar tras full sync, ruta Archify CLI
 - **Observabilidad:** métricas, telemetría chat, two-phase, modification plan
 
 ## Fuera de system_settings

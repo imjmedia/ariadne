@@ -7,6 +7,7 @@ import {
   wantsReengineeringQuestion,
   wantsSchemaDatabaseQuestion,
   wantsIntegrationHandoffQuestion,
+  wantsArchitectureDiagramQuestion,
 } from 'ariadne-common';
 import { wantsUnusedBackendApiEndpointsAnalysis } from '../chat-unused-api-endpoints.util';
 import { OrchestratorLlmService } from '../orchestrator-llm.service';
@@ -21,10 +22,11 @@ const ROUTER_SYSTEM = `<rol>Clasificador de intención para chat sobre código i
 - integration_handoff — Handoff NEW-LEG de The Forge: mensaje con "## Handoff de integración", id NEW-LEG, criterios de aceptación; mapear cambios LEG vs microservicio NEW. NO confundir con reingeniería genérica.
 - reengineering — Propuesta de arquitectura, desacoplar, refactor brownfield, plan de cambio con reglas de negocio (sin handoff estructurado).
 - unused_api_endpoints — Endpoints del backend (Strapi/Nest) sin uso en el frontend.
+- architecture_diagram — Diagrama C4 / mapa de arquitectura del sistema (context, container, HTML Archify). NO usar para ERD ni esquema de tablas.
 </intents>
 
 <salida>JSON único sin markdown:
-{"intent":"codebase_qa|schema_database|integration_handoff|reengineering|unused_api_endpoints","confidence":0.0-1.0,"reasoning":"una frase","focusTerms":["término1"]}
+{"intent":"codebase_qa|schema_database|integration_handoff|reengineering|unused_api_endpoints|architecture_diagram","confidence":0.0-1.0,"reasoning":"una frase","focusTerms":["término1"]}
 </salida>`;
 
 function intentRouterEnabled(): boolean {
@@ -45,6 +47,7 @@ function parseRouterJson(raw: string): ChatIntentRouteResult | null {
       'reengineering',
       'integration_handoff',
       'unused_api_endpoints',
+      'architecture_diagram',
     ];
     if (!valid.includes(intent)) return null;
     const confidence = Math.min(1, Math.max(0, Number(o.confidence) || 0.5));
@@ -88,6 +91,14 @@ function keywordFallback(message: string): ChatIntentRouteResult {
       intent: 'schema_database',
       confidence: 0.85,
       reasoning: 'Esquema o diagrama de base de datos',
+      source: 'keyword_fallback',
+    };
+  }
+  if (wantsArchitectureDiagramQuestion(message)) {
+    return {
+      intent: 'architecture_diagram',
+      confidence: 0.88,
+      reasoning: 'Diagrama C4 / arquitectura del sistema',
       source: 'keyword_fallback',
     };
   }

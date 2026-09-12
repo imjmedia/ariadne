@@ -66,6 +66,15 @@ export class SystemSettingsEntity {
   @Column({ name: 'modification_plan_max_files', type: 'int', nullable: true })
   modificationPlanMaxFiles!: number | null;
 
+  @Column({ name: 'c4_enabled', type: 'boolean', nullable: true })
+  c4Enabled!: boolean | null;
+
+  @Column({ name: 'c4_auto_on_full_sync', type: 'boolean', nullable: true })
+  c4AutoOnFullSync!: boolean | null;
+
+  @Column({ name: 'c4_archify_bin', type: 'varchar', length: 512, nullable: true })
+  c4ArchifyBin!: string | null;
+
   @Column({ name: 'updated_by', type: 'varchar', length: 64, nullable: true })
   updatedBy!: string | null;
 

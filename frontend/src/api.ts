@@ -138,6 +138,109 @@ export const api = {
   deleteProject: (id: string) =>
     request<void>(`/projects/${id}`, { method: 'DELETE' }),
 
+  getC4Model: (projectId: string, level = 'container') =>
+    request<{ model: Record<string, unknown> }>(
+      `/projects/${projectId}/c4?level=${encodeURIComponent(level)}`,
+    ),
+
+  generateC4: (
+    projectId: string,
+    opts?: {
+      level?: string;
+      levels?: string[];
+      useLlm?: boolean;
+      containerKey?: string;
+      repoId?: string;
+    },
+  ) =>
+    request<
+      | {
+          model: Record<string, unknown>;
+          snapshotId: string;
+          htmlReady: boolean;
+          archifyHtmlPath: string | null;
+        }
+      | { levels: Record<string, { model: Record<string, unknown>; htmlReady: boolean }> }
+    >(`/projects/${projectId}/c4/generate`, {
+      method: 'POST',
+      body: JSON.stringify(
+        opts?.levels
+          ? {
+              levels: opts.levels,
+              useLlm: opts.useLlm,
+              containerKey: opts.containerKey,
+              repoId: opts.repoId,
+            }
+          : {
+              level: opts?.level ?? 'container',
+              useLlm: opts?.useLlm,
+              containerKey: opts?.containerKey,
+              repoId: opts?.repoId,
+            },
+      ),
+    }),
+
+  listC4Snapshots: (projectId: string, level?: string, limit = 20) =>
+    request<{
+      snapshots: Array<{
+        id: string;
+        level: string;
+        contentHash: string;
+        createdAt: string;
+        generator: string;
+      }>;
+    }>(
+      `/projects/${projectId}/c4/snapshots?${level ? `level=${encodeURIComponent(level)}&` : ''}limit=${limit}`,
+    ),
+
+  generateC4Sequence: (projectId: string, routePath?: string) =>
+    request<{ htmlReady: boolean; durationMs: number }>(
+      `/projects/${projectId}/c4/sequence/generate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ routePath }),
+      },
+    ),
+
+  getC4SequenceHtml: async (projectId: string): Promise<string> => {
+    const res = await fetch(`${BASE}/projects/${projectId}/c4/sequence/html`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      const { message } = parseApiError(text);
+      throw new Error(`${res.status}: ${message || res.statusText}`);
+    }
+    return res.text();
+  },
+
+  exportC4Markdown: (projectId: string) =>
+    request<{ files: Array<{ name: string; content: string }>; merged: string }>(
+      `/projects/${projectId}/c4/export`,
+    ),
+
+  diffC4Snapshots: (projectId: string, fromId: string, toId: string) =>
+    request<{
+      diff: Record<string, unknown>;
+      archifyCompareHtml: string | null;
+      archifyComparePath: string | null;
+    }>(
+      `/projects/${projectId}/c4/diff?from=${encodeURIComponent(fromId)}&to=${encodeURIComponent(toId)}`,
+    ),
+
+  getC4Html: async (projectId: string, level = 'container'): Promise<string> => {
+    const res = await fetch(
+      `${BASE}/projects/${projectId}/c4/html?level=${encodeURIComponent(level)}`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      const { message } = parseApiError(text);
+      throw new Error(`${res.status}: ${message || res.statusText}`);
+    }
+    return res.text();
+  },
+
   getDomains: () => request<import('./types').Domain[]>('/domains'),
   createDomain: (dto: {
     name: string;

@@ -10,6 +10,7 @@ START → route_intent (modelo router en Ajustes)
   → unused_api_endpoints → handle_unused_api (determinista ingest)
   → reengineering       → retrieve (WORKER) → reengineering_audit (ROUTER)
   → integration_handoff → integration_handoff_audit (ROUTER; plan multi-query en ingest)
+  → architecture_diagram → handle_architecture_diagram (ingest C4 + enlaces HTML)
   → codebase_qa         → retrieve (WORKER) → synthesize (WORKER)
 ```
 
@@ -19,7 +20,7 @@ START → route_intent (modelo router en Ajustes)
 `evidence_first` y `raw_evidence` omiten el router y van directo a retrieve → synthesize.
 
 - **`POST /codebase/chat/repository/:repositoryId`** — ask_codebase (LangGraph: retrieve → synthesize). Body: `message`, `history?`, `scope?`, `twoPhase?`, **`responseMode?`** (`default` \| `evidence_first` \| `raw_evidence`), **`deterministicRetriever?`** (solo efecto con `raw_evidence`), `threadId?`. Con **`evidence_first`**, la respuesta **`answer`** es **JSON string** del MDD (7 claves); **`mddDocument`** se rellena parseando ese JSON cuando aplica. Con **`raw_evidence`**, **`answer`** es JSON `{ mode, deterministicRetriever, gatheredContext, collectedResults, cypher }` sin LLM de síntesis ni **mdd-evidence**; The Forge debe parsear y sintetizar. Si **`deterministicRetriever: true`**, el nodo retrieve llama a ingest **`raw-evidence-deterministic`** (sin LLM ReAct); si no, retrieve con tools y **`evidenceVerbosity: full`** vía **retriever-tool**.
-- **`POST /codebase/chat/project/:projectId`** — Igual, alcance proyecto multi-repo. Preguntas de **endpoints Strapi no usados** → early-return a ingest **`POST /internal/projects/:projectId/unused-api-endpoints`** (sin LangGraph). El ingest, en **`execute_cypher`**, usa los **cypherShardContexts** del proyecto (whitelist de dominios) para unir resultados de varios grafos Falkor con el `projectId` correcto por nodo.
+- **`POST /codebase/chat/project/:projectId`** — Igual, alcance proyecto multi-repo. Preguntas de **endpoints Strapi no usados** → early-return a ingest **`POST /internal/projects/:projectId/unused-api-endpoints`** (sin LangGraph). Preguntas de **diagrama C4 / arquitectura** → intent `architecture_diagram` → ingest **`POST /internal/projects/:projectId/architecture-diagram`**. El ingest, en **`execute_cypher`**, usa los **cypherShardContexts** del proyecto (whitelist de dominios) para unir resultados de varios grafos Falkor con el `projectId` correcto por nodo.
 - **`POST /codebase/analyze/repository/:repositoryId`** — Body `{ mode }`. Llama a ingest `internal/.../analyze-prep` (sin LLM en ingest salvo recopilar datos) y ejecuta la síntesis LLM aquí si `kind === 'llm'`.
 - **`POST /codebase/analyze/project/:projectId`** — Body `{ mode: 'agents' | 'skill' }` para AGENTS.md / SKILL.md vía prep por proyecto.
 - **`POST /codebase/modification-plan/repository/:repositoryId`** — Body `{ userDescription, scope? }`. Lista de archivos desde ingest **`POST /internal/repositories/:id/modification-plan-files`** (solo grafo; **no** el endpoint público `…/modification-plan`, que reenvía al orchestrator y provocaría un bucle + timeout 120s). Preguntas de afinación con LLM aquí.

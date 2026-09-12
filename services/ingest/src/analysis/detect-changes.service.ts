@@ -11,6 +11,7 @@ import {
 } from 'ariadne-common';
 import { RepositoriesService } from '../repositories/repositories.service';
 import { DetectChangesGraphService } from './detect-changes-graph.service';
+import { C4DiffService } from '../c4/c4-diff.service';
 
 export type DetectChangesRequest = {
   mode?: string;
@@ -23,12 +24,19 @@ export class DetectChangesService {
   constructor(
     private readonly repos: RepositoriesService,
     private readonly graph: DetectChangesGraphService,
+    private readonly c4Diff: C4DiffService,
   ) {}
 
   async detectForRepository(
     repositoryId: string,
     body: DetectChangesRequest,
-  ): Promise<DetectChangesResult & { projectId: string; repositoryId: string }> {
+  ): Promise<
+    DetectChangesResult & {
+      projectId: string;
+      repositoryId: string;
+      c4TopologyChanged?: boolean;
+    }
+  > {
     const diff = body.diff?.trim();
     if (!diff) {
       throw new BadRequestException(
@@ -46,6 +54,12 @@ export class DetectChangesService {
     const dependentCounts = await this.graph.batchDependentCounts(projectId, allNames, repo.id);
 
     const result = buildDetectChangesResult(mode, diff, dependentCounts);
-    return { ...result, projectId, repositoryId: repo.id };
+    let c4TopologyChanged = false;
+    try {
+      c4TopologyChanged = await this.c4Diff.topologyChangedSinceLastSync(projectId, 'container');
+    } catch {
+      /* C4 opcional */
+    }
+    return { ...result, projectId, repositoryId: repo.id, c4TopologyChanged };
   }
 }

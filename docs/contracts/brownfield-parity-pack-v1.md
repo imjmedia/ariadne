@@ -18,6 +18,9 @@ JSON bundle produced by **`export_brownfield_parity_pack`** (MCP + `POST /intern
 | `navigationMapHint` | Instruction to run `generate_navigation_map` |
 | `scaffoldPreview` | `{ fileCount, paths[] }` |
 | `modificationPlanSeed` | JSON string with `filesToModify` sample |
+| `c4ContainerHtmlUrl` | Ruta ingest relativa al HTML C4 container (`GET …/c4/html?level=container`) |
+| `c4ContextHtmlUrl` | Ruta ingest relativa al HTML C4 context |
+| `c4ModelJson` | Último `C4Model` container snapshot (JSON) o `null` |
 
 ## Project merge (multi-root)
 

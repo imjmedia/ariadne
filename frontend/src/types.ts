@@ -708,6 +708,11 @@ export interface SystemSettingsMasked {
     twoPhase: boolean;
     modificationPlanMaxFiles: number;
   };
+  c4: {
+    enabled: boolean;
+    autoOnFullSync: boolean;
+    archifyBin: string | null;
+  };
 }
 
 export interface UpdateSystemSettingsDto {
@@ -729,4 +734,7 @@ export interface UpdateSystemSettingsDto {
   chatTelemetryLog?: boolean;
   chatTwoPhase?: boolean;
   modificationPlanMaxFiles?: number | null;
+  c4Enabled?: boolean;
+  c4AutoOnFullSync?: boolean;
+  c4ArchifyBin?: string | null;
 }

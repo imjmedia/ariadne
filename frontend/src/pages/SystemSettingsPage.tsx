@@ -23,11 +23,12 @@ import {
   settingsToggleFieldClass,
 } from './settingsUiClasses';
 
-type SystemSettingsTabId = 'auth' | 'network' | 'observability';
+type SystemSettingsTabId = 'auth' | 'network' | 'architecture' | 'observability';
 
 const SYSTEM_SETTINGS_TABS: Array<{ id: SystemSettingsTabId; label: string }> = [
   { id: 'auth', label: 'Auth y correo' },
   { id: 'network', label: 'Red y Falkor' },
+  { id: 'architecture', label: 'C4 / Diagramas' },
   { id: 'observability', label: 'Observabilidad' },
 ];
 
@@ -51,6 +52,9 @@ interface FormState {
   chatTelemetryLog: boolean;
   chatTwoPhase: boolean;
   modificationPlanMaxFiles: string;
+  c4Enabled: boolean;
+  c4AutoOnFullSync: boolean;
+  c4ArchifyBin: string;
 }
 
 function defaultForm(settings?: SystemSettingsMasked): FormState {
@@ -74,6 +78,9 @@ function defaultForm(settings?: SystemSettingsMasked): FormState {
     chatTelemetryLog: settings?.observability.chatTelemetryLog ?? false,
     chatTwoPhase: settings?.chat.twoPhase ?? true,
     modificationPlanMaxFiles: String(settings?.chat.modificationPlanMaxFiles ?? 150),
+    c4Enabled: settings?.c4.enabled ?? false,
+    c4AutoOnFullSync: settings?.c4.autoOnFullSync ?? false,
+    c4ArchifyBin: settings?.c4.archifyBin ?? '',
   };
 }
 
@@ -131,6 +138,9 @@ export function SystemSettingsPage() {
         chatTelemetryLog: form.chatTelemetryLog,
         chatTwoPhase: form.chatTwoPhase,
         modificationPlanMaxFiles: parseInt(form.modificationPlanMaxFiles, 10) || 150,
+        c4Enabled: form.c4Enabled,
+        c4AutoOnFullSync: form.c4AutoOnFullSync,
+        c4ArchifyBin: form.c4ArchifyBin.trim() || null,
       };
       if (form.smtpPassTouched) {
         payload.smtpPass = form.smtpPass.trim() ? form.smtpPass.trim() : null;
@@ -279,6 +289,43 @@ export function SystemSettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="falkorLimit">Soft limit nodos/grafos</Label>
                   <Input id="falkorLimit" value={form.falkorGraphNodeSoftLimit} onChange={(e) => setForm({ ...form, falkorGraphNodeSoftLimit: e.target.value })} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'architecture' && (
+              <div className={`${settingsSectionBodyClass} grid gap-4 md:grid-cols-2`}>
+                <label className={settingsToggleFieldClass}>
+                  <input
+                    type="checkbox"
+                    className={settingsCheckboxClass}
+                    checked={form.c4Enabled}
+                    onChange={(e) => setForm({ ...form, c4Enabled: e.target.checked })}
+                  />
+                  C4 habilitado (nodos :System/:Container en sync)
+                </label>
+                <label className={settingsToggleFieldClass}>
+                  <input
+                    type="checkbox"
+                    className={settingsCheckboxClass}
+                    checked={form.c4AutoOnFullSync}
+                    disabled={!form.c4Enabled}
+                    onChange={(e) => setForm({ ...form, c4AutoOnFullSync: e.target.checked })}
+                  />
+                  Generar diagrama C4 tras full sync
+                </label>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="c4ArchifyBin">Ruta Archify CLI (opcional)</Label>
+                  <Input
+                    id="c4ArchifyBin"
+                    value={form.c4ArchifyBin}
+                    onChange={(e) => setForm({ ...form, c4ArchifyBin: e.target.value })}
+                    placeholder="/opt/archify/bin/archify.mjs — vacío = autodetectar"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    La generación manual desde Proyecto → Arquitectura → Diagramas C4 no requiere activar el
+                    sync automático.
+                  </p>
                 </div>
               </div>
             )}

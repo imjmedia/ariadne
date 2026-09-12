@@ -36,6 +36,7 @@ import {
 } from './chat-integration.controller';
 import { ChatConversationService } from './chat-conversation.service';
 import { TheForgeModule } from '../theforge/theforge.module';
+import { C4Module } from '../c4/c4.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { TheForgeModule } from '../theforge/theforge.module';
     EmbeddingModule,
     ProjectsModule,
     forwardRef(() => TheForgeModule),
+    forwardRef(() => C4Module),
   ],
   controllers: [
     ChatController,

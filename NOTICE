@@ -6,3 +6,20 @@ This product includes software developed as part of the Ariadne project.
 For a list of authors and contributors, see AUTHORS.md.
 
 The full license text is in the LICENSE file (Apache License, Version 2.0).
+
+## Third-party software
+
+### Archify (C4 diagram rendering)
+
+The **ingest** Docker image installs [Archify](https://github.com/tt-a1i/archify)
+at `/opt/archify` (pinned release; see `ARG ARCHIFY_VERSION` in
+`services/ingest/Dockerfile`). Ariadne invokes it as an external CLI
+(`validate`, `deliver`, `compare`); mapper code in this repository is original
+and is not a copy of Archify sources.
+
+- **Copyright:** tt-a1i (Archify), Cocoon AI
+- **License:** MIT License
+- **Full license text in image:** `/opt/archify/LICENSE`
+
+[Litho](https://github.com/sopaco/deepwiki-rs) / Terrain are design references only;
+no Litho or Terrain source code is bundled in this project.

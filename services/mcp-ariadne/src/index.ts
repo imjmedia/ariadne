@@ -1050,6 +1050,82 @@ function createMcpServer(): Server {
       },
     },
     {
+      name: "get_c4_model",
+      description:
+        "Devuelve el modelo C4 (JSON) del proyecto. Niveles: context, container, component (Falkor). Si no hay snapshot, intenta POST generate.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: { type: "string", description: "UUID del proyecto Ariadne" },
+          level: {
+            type: "string",
+            description: "Nivel C4",
+            enum: ["context", "container", "component"],
+          },
+          regenerate: {
+            type: "boolean",
+            description: "Si true, fuerza POST /c4/generate antes de leer",
+          },
+          useLlm: {
+            type: "boolean",
+            description: "Solo context: narrativa LLM (actores + descripciones)",
+          },
+          containerKey: {
+            type: "string",
+            description: "Solo component: clave del container (ej. frontend, ingest)",
+          },
+        },
+        required: ["projectId"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "generate_c4_diagram",
+      description:
+        "Regenera diagramas C4 (Archify HTML) y devuelve URLs relativas al ingest. Niveles: context, container, component.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: { type: "string", description: "UUID del proyecto Ariadne" },
+          level: {
+            type: "string",
+            description: "Nivel C4 a regenerar",
+            enum: ["context", "container", "component"],
+          },
+          levels: {
+            type: "array",
+            items: { type: "string", enum: ["context", "container", "component"] },
+            description: "Varios niveles en una sola llamada (opcional)",
+          },
+          useLlm: {
+            type: "boolean",
+            description: "Solo context: narrativa LLM",
+          },
+          containerKey: {
+            type: "string",
+            description: "Solo component: clave del container",
+          },
+        },
+        required: ["projectId"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "diff_c4_model",
+      description:
+        "Compara dos snapshots C4 (JSON diff + HTML Archify compare si está disponible). Requiere ids de GET /c4/snapshots.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectId: { type: "string", description: "UUID del proyecto Ariadne" },
+          fromSnapshotId: { type: "string", description: "Snapshot origen (más antiguo)" },
+          toSnapshotId: { type: "string", description: "Snapshot destino (más reciente)" },
+        },
+        required: ["projectId", "fromSnapshotId", "toSnapshotId"],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "get_debt_report",
       description:
         "Genera un informe descriptivo sobre la deuda técnica: archivos huérfanos (dead code) y componentes con alta complejidad estructural.",
@@ -2557,6 +2633,146 @@ async function fetchFileFromIngest(
       return { content: [{ type: "text", text: `### Estado de Sincronización\n\n${text}` }] };
     } catch (err: any) {
       return { content: [{ type: "text", text: `**Error de red (Ingest):** ${err.message}` }], isError: true };
+    }
+  }
+
+  if (name === "get_c4_model") {
+    const projectId = args?.projectId as string | undefined;
+    const level = ((args?.level as string) ?? "container").toLowerCase();
+    const regenerate = Boolean(args?.regenerate);
+    const useLlm = Boolean(args?.useLlm);
+    const containerKey = args?.containerKey as string | undefined;
+    const genBody = {
+      level,
+      useLlm: level === "context" ? useLlm : undefined,
+      containerKey: level === "component" ? containerKey : undefined,
+    };
+    if (!projectId) {
+      return {
+        content: [{ type: "text", text: "**Error:** Se requiere `projectId` (list_known_projects)." }],
+        isError: true,
+      };
+    }
+    const ingestUrl = (process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002").replace(/\/$/, "");
+    try {
+      if (regenerate) {
+        const gen = await fetch(`${ingestUrl}/projects/${projectId}/c4/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(genBody),
+        });
+        if (!gen.ok) {
+          const errText = await gen.text();
+          return { content: [{ type: "text", text: `**Error ${gen.status}:** ${errText}` }], isError: true };
+        }
+      }
+      let res = await fetch(`${ingestUrl}/projects/${projectId}/c4?level=${encodeURIComponent(level)}`);
+      if (res.status === 404 && !regenerate) {
+        const gen = await fetch(`${ingestUrl}/projects/${projectId}/c4/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(genBody),
+        });
+        if (!gen.ok) {
+          const errText = await gen.text();
+          return { content: [{ type: "text", text: `**Error ${gen.status}:** ${errText}` }], isError: true };
+        }
+        res = await fetch(`${ingestUrl}/projects/${projectId}/c4?level=${encodeURIComponent(level)}`);
+      }
+      if (!res.ok) {
+        const errText = await res.text();
+        return { content: [{ type: "text", text: `**Error ${res.status}:** ${errText}` }], isError: true };
+      }
+      const data = await res.json();
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2),
+          },
+        ],
+      };
+    } catch (err: any) {
+      return { content: [{ type: "text", text: `**Error C4:** ${err.message}` }], isError: true };
+    }
+  }
+
+  if (name === "generate_c4_diagram") {
+    const projectId = args?.projectId as string | undefined;
+    const level = args?.level as string | undefined;
+    const levels = args?.levels as string[] | undefined;
+    const useLlm = Boolean(args?.useLlm);
+    const containerKey = args?.containerKey as string | undefined;
+    if (!projectId) {
+      return {
+        content: [{ type: "text", text: "**Error:** Se requiere `projectId` (list_known_projects)." }],
+        isError: true,
+      };
+    }
+    const ingestUrl = (process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002").replace(/\/$/, "");
+    const genBody: Record<string, unknown> = {};
+    if (levels?.length) genBody.levels = levels;
+    else if (level) genBody.level = level;
+    if (useLlm) genBody.useLlm = true;
+    if (containerKey) genBody.containerKey = containerKey;
+    try {
+      const gen = await fetch(`${ingestUrl}/projects/${projectId}/c4/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(genBody),
+      });
+      if (!gen.ok) {
+        const errText = await gen.text();
+        return { content: [{ type: "text", text: `**Error ${gen.status}:** ${errText}` }], isError: true };
+      }
+      const result = await gen.json();
+      const generatedLevels: string[] = result.levels
+        ? Object.keys(result.levels)
+        : level
+          ? [level]
+          : levels?.length
+            ? levels
+            : ["container"];
+      const htmlUrls = generatedLevels.map((lv) => ({
+        level: lv,
+        htmlUrl: `${ingestUrl}/projects/${projectId}/c4/html?level=${encodeURIComponent(lv)}`,
+      }));
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ projectId, generated: result, htmlUrls }, null, 2),
+          },
+        ],
+      };
+    } catch (err: any) {
+      return { content: [{ type: "text", text: `**Error generate C4:** ${err.message}` }], isError: true };
+    }
+  }
+
+  if (name === "diff_c4_model") {
+    const projectId = args?.projectId as string | undefined;
+    const fromSnapshotId = args?.fromSnapshotId as string | undefined;
+    const toSnapshotId = args?.toSnapshotId as string | undefined;
+    if (!projectId || !fromSnapshotId || !toSnapshotId) {
+      return {
+        content: [{ type: "text", text: "**Error:** Se requieren projectId, fromSnapshotId y toSnapshotId." }],
+        isError: true,
+      };
+    }
+    const ingestUrl = (process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002").replace(/\/$/, "");
+    try {
+      const res = await fetch(
+        `${ingestUrl}/projects/${projectId}/c4/diff?from=${encodeURIComponent(fromSnapshotId)}&to=${encodeURIComponent(toSnapshotId)}`,
+      );
+      if (!res.ok) {
+        const errText = await res.text();
+        return { content: [{ type: "text", text: `**Error ${res.status}:** ${errText}` }], isError: true };
+      }
+      const data = await res.json();
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    } catch (err: any) {
+      return { content: [{ type: "text", text: `**Error diff C4:** ${err.message}` }], isError: true };
     }
   }
 

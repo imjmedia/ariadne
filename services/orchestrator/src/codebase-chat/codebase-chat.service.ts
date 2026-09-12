@@ -277,6 +277,7 @@ export class CodebaseChatService {
       .addNode('route_intent', (s) => svc.nodeRouteIntent(s))
       .addNode('handle_schema', (s) => svc.nodeHandleSchema(s))
       .addNode('handle_unused_api', (s) => svc.nodeHandleUnusedApi(s))
+      .addNode('handle_architecture_diagram', (s) => svc.nodeHandleArchitectureDiagram(s))
       .addNode('retrieve', (s) => svc.nodeRetrieve(s))
       .addNode('reengineering_audit', (s) => svc.nodeReengineeringAudit(s))
       .addNode('integration_handoff_audit', (s) => svc.nodeIntegrationHandoffAudit(s))
@@ -285,11 +286,13 @@ export class CodebaseChatService {
       .addConditionalEdges('route_intent', (s) => svc.routeAfterIntent(s), {
         handle_schema: 'handle_schema',
         handle_unused_api: 'handle_unused_api',
+        handle_architecture_diagram: 'handle_architecture_diagram',
         integration_handoff: 'integration_handoff_audit',
         retrieve: 'retrieve',
       })
       .addEdge('handle_schema', END)
       .addEdge('handle_unused_api', END)
+      .addEdge('handle_architecture_diagram', END)
       .addEdge('integration_handoff_audit', END)
       .addConditionalEdges('retrieve', (s) =>
         s.chatIntent === 'reengineering' ? 'reengineering_audit' : 'synthesize',
@@ -301,12 +304,19 @@ export class CodebaseChatService {
 
   private routeAfterIntent(
     state: CodebaseChatState,
-  ): 'handle_schema' | 'handle_unused_api' | 'integration_handoff' | 'retrieve' {
+  ):
+    | 'handle_schema'
+    | 'handle_unused_api'
+    | 'handle_architecture_diagram'
+    | 'integration_handoff'
+    | 'retrieve' {
     switch (state.chatIntent) {
       case 'schema_database':
         return 'handle_schema';
       case 'unused_api_endpoints':
         return 'handle_unused_api';
+      case 'architecture_diagram':
+        return 'handle_architecture_diagram';
       case 'integration_handoff':
         return 'integration_handoff';
       default:
@@ -358,6 +368,19 @@ export class CodebaseChatService {
       lastCypher: res.cypher,
       resultOut: res.result,
     };
+  }
+
+  private async nodeHandleArchitectureDiagram(
+    state: CodebaseChatState,
+  ): Promise<Partial<CodebaseChatState>> {
+    if (!state.projectScope) {
+      return {
+        answer:
+          'El diagrama C4 requiere alcance de **proyecto** (multi-root). Usa chat por proyecto o asigna el repo a un proyecto.',
+      };
+    }
+    const res = await this.ingest.fetchArchitectureDiagramProject(state.projectId);
+    return { answer: res.answer };
   }
 
   private async nodeReengineeringAudit(state: CodebaseChatState): Promise<Partial<CodebaseChatState>> {

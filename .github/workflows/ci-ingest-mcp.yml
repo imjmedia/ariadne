@@ -6,14 +6,28 @@ on:
     paths:
       - "services/ingest/**"
       - "services/mcp-ariadne/**"
+      - "NOTICE"
+      - "scripts/verify-archify-third-party.mjs"
       - ".github/workflows/ci-ingest-mcp.yml"
   pull_request:
     paths:
       - "services/ingest/**"
       - "services/mcp-ariadne/**"
+      - "NOTICE"
+      - "scripts/verify-archify-third-party.mjs"
       - ".github/workflows/ci-ingest-mcp.yml"
 
 jobs:
+  archify-third-party:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify Archify NOTICE + Dockerfile pin
+        run: node scripts/verify-archify-third-party.mjs
+
   ingest-test:
     runs-on: ubuntu-latest
     defaults:

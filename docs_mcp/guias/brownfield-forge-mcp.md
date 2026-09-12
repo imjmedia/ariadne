@@ -62,6 +62,18 @@ await export_brownfield_parity_pack({
 | `cross_repo_links` | Enlaces Falkor front↔back (`CALLS_STRAPI_ROUTE`, etc.). |
 | `notes` | **Multi-repo Git ≠ deploy independiente** — revisar Strapi/Docker. |
 
+### Campos C4 en parity pack (opcional)
+
+Si hay snapshots C4 generados, el parity pack puede incluir:
+
+| Campo | Contenido |
+| ----- | --------- |
+| `c4ContainerHtmlUrl` | Ruta ingest al HTML container |
+| `c4ContextHtmlUrl` | Ruta ingest al HTML context |
+| `c4ModelJson` | Último `C4Model` container (JSON) o `null` |
+
+Regenerar antes del export: `generate_c4_diagram` o UI Arquitectura. Ver `docs://guias/c4-architecture-mcp`.
+
 ## 3. Decisiones de Diseño y Restricciones
 
 - **Regla 1:** Para Forge LEGACY con front+back indexados juntos, **no** uses solo `generate_legacy_documentation` sobre el repo backend — falta evidencia del front. Usa **`export_brownfield_project_parity_pack`**.

@@ -7,6 +7,7 @@ export const CHAT_INTENTS = [
   'reengineering',
   'integration_handoff',
   'unused_api_endpoints',
+  'architecture_diagram',
 ] as const;
 
 export type ChatIntent = (typeof CHAT_INTENTS)[number];

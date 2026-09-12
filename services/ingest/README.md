@@ -118,6 +118,14 @@ PORT=3002 npm run start
 
 Configuración del webhook en Bitbucket: ver [docs/notebooklm/bitbucket_webhook.md](../../docs/notebooklm/bitbucket_webhook.md) en la raíz del proyecto.
 
+## C4 / Archify (terceros)
+
+La imagen Docker instala [Archify](https://github.com/tt-a1i/archify) en `/opt/archify`
+(versión fijada con `ARG ARCHIFY_VERSION` en el `Dockerfile`). Licencia **MIT**; aviso en
+[NOTICE](../../NOTICE). El build falla si falta `/opt/archify/LICENSE` o `bin/archify.mjs`.
+
+Comprobación local: `node scripts/verify-archify-third-party.mjs` (desde la raíz del repo).
+
 ## Migraciones
 
 En producción se usa `synchronize: false`. Ejecutar migraciones una vez antes de arrancar la app:

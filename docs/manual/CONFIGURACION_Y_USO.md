@@ -47,6 +47,18 @@ Guía completa para configurar y usar el sistema: variables de entorno, credenci
 
 \* En Docker las variables vienen del compose; en local hay que definirlas.
 
+#### C4 / Diagramas (Ajustes → Sistema)
+
+La configuración C4 **no usa variables de entorno**. En `/settings/system`, pestaña **C4 / Diagramas**:
+
+| Campo | Efecto |
+| ----- | ------ |
+| **C4 habilitado** | MERGE nodos C4 en Falkor durante sync |
+| **Generar tras full sync** | Snapshots Context + Container (+ HTML Archify) al terminar sync completo |
+| **Ruta Archify CLI** | Opcional; vacío = autodetect `/opt/archify` en Docker |
+
+Generación manual: Proyecto → **Arquitectura** → **Diagramas C4**. API: `POST /projects/:id/c4/generate`, secuencia `POST …/c4/sequence/generate`, export `GET …/c4/export`.
+
 **Embeddings (RAG):** ejemplos de configuración:
 
 ```bash

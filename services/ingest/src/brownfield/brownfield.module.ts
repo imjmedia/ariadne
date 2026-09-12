@@ -9,12 +9,14 @@ import { MddPersistenceModule } from '../mdd-persistence/mdd-persistence.module'
 import { ChatModule } from '../chat/chat.module';
 import { ScaffoldFromMddService } from '../scaffold/scaffold-from-mdd.service';
 import { RepositoriesModule } from '../repositories/repositories.module';
+import { C4Module } from '../c4/c4.module';
 
 @Module({
   imports: [
     forwardRef(() => ChatModule),
     MddPersistenceModule,
     RepositoriesModule,
+    forwardRef(() => C4Module),
   ],
   controllers: [BrownfieldInternalController, BrownfieldProjectInternalController],
   providers: [BrownfieldParityPackService, ScaffoldFromMddService],

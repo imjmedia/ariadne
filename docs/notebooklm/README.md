@@ -17,6 +17,7 @@
 | Doc | Descripción |
 |-----|-------------|
 | **architecture.md** | Stack (NestJS, TypeORM, PostgreSQL, FalkorDB, Redis), modelo repo/webhook, credenciales cifradas. |
+| **PLAN_C4_ARCHIFY.md** | Plan incremental C4: Ariadne (grafo) + patrón Litho + renderer Archify; entregas 1–4. |
 | **indexing_engine.md** | Pipeline de indexación (esta carpeta). |
 | **ingestion_flow.md** | Flujo de ingesta masiva (esta carpeta). |
 | **db_schema.md** | Grafo FalkorDB (nodos, relaciones) y tablas PostgreSQL (dominios, dependencias). |

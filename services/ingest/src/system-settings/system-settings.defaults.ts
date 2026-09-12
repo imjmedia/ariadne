@@ -54,5 +54,10 @@ export function buildSystemSettingsFromEnv(): SystemSettingsEffective {
       twoPhase: falsyEnv('CHAT_TWO_PHASE', true),
       modificationPlanMaxFiles: intEnv('MODIFICATION_PLAN_MAX_FILES', 150),
     },
+    c4: {
+      enabled: false,
+      autoOnFullSync: false,
+      archifyBin: null,
+    },
   };
 }

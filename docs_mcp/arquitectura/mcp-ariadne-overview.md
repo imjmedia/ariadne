@@ -2,7 +2,7 @@
 id: mcp-ariadne-overview
 title: MCP AriadneSpecs (grafo de código)
 category: Arquitectura
-last_updated: 2026-06-29
+last_updated: 2026-09-11
 ---
 
 # MCP AriadneSpecs (`services/mcp-ariadne`)
@@ -40,6 +40,9 @@ last_updated: 2026-06-29
 | `export_brownfield_project_parity_pack` | Import The Forge multi-root (MDD fusionado).   |
 | `generate_merged_project_mdd` | MDD fusionado sin parity pack completo.                    |
 | `analyze_local_changes`       | Pre-commit: diff vs grafo.                                 |
+| `get_c4_model`                | Modelo C4 JSON (context / container / component).          |
+| `generate_c4_diagram`         | Regenera C4 + URLs HTML Archify.                           |
+| `diff_c4_model`               | Diff entre snapshots C4.                                   |
 
 **Capacidades MCP:** solo `tools` (no expone `resources` MCP). Para documentación estática del repo Ariadne usa `services/mcp-docs`.
 
@@ -50,3 +53,4 @@ last_updated: 2026-06-29
 - **Regla 3:** Preferir herramientas baratas (`get_definitions`, `get_references`) cuando ya conoces el símbolo; reservar `ask_codebase` para preguntas abiertas.
 - **Regla 4:** Verificar frescura con `get_sync_status` si los resultados parecen desactualizados.
 - **Regla 5 (Forge multi-root):** Usar `export_brownfield_project_parity_pack` con UUID del **proyecto** (`id`), no `roots[].id`. Guía: `docs://guias/brownfield-forge-mcp`.
+- **Regla 6 (C4):** Diagramas de arquitectura vía `get_c4_model` / `generate_c4_diagram`; requiere C4 habilitado en Ajustes → Sistema. Guía: `docs://guias/c4-architecture-mcp`.

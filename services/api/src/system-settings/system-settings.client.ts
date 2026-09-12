@@ -30,6 +30,11 @@ export interface SystemSettingsRuntime {
     twoPhase: boolean;
     modificationPlanMaxFiles: number;
   };
+  c4: {
+    enabled: boolean;
+    autoOnFullSync: boolean;
+    archifyBin: string | null;
+  };
 }
 
 function buildFromEnv(): SystemSettingsRuntime {
@@ -71,6 +76,11 @@ function buildFromEnv(): SystemSettingsRuntime {
         process.env.CHAT_TWO_PHASE?.toLowerCase() !== 'false' &&
         process.env.CHAT_TWO_PHASE?.toLowerCase() !== 'off',
       modificationPlanMaxFiles: int('MODIFICATION_PLAN_MAX_FILES', 150),
+    },
+    c4: {
+      enabled: false,
+      autoOnFullSync: false,
+      archifyBin: null,
     },
   };
 }

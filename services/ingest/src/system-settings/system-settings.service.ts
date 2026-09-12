@@ -142,6 +142,13 @@ export class SystemSettingsService implements OnModuleInit {
         dto.modificationPlanMaxFiles !== undefined && dto.modificationPlanMaxFiles !== null
           ? dto.modificationPlanMaxFiles
           : existing?.modificationPlanMaxFiles ?? base.chat.modificationPlanMaxFiles,
+      c4Enabled: dto.c4Enabled ?? existing?.c4Enabled ?? base.c4.enabled,
+      c4AutoOnFullSync:
+        dto.c4AutoOnFullSync ?? existing?.c4AutoOnFullSync ?? base.c4.autoOnFullSync,
+      c4ArchifyBin:
+        dto.c4ArchifyBin !== undefined
+          ? dto.c4ArchifyBin?.trim() || null
+          : existing?.c4ArchifyBin ?? base.c4.archifyBin,
       updatedBy: userId ?? null,
     });
 
@@ -191,6 +198,11 @@ export class SystemSettingsService implements OnModuleInit {
         modificationPlanMaxFiles:
           row.modificationPlanMaxFiles ?? env.chat.modificationPlanMaxFiles,
       },
+      c4: {
+        enabled: row.c4Enabled ?? env.c4.enabled,
+        autoOnFullSync: row.c4AutoOnFullSync ?? env.c4.autoOnFullSync,
+        archifyBin: row.c4ArchifyBin ?? env.c4.archifyBin,
+      },
     };
   }
 
@@ -221,6 +233,7 @@ export class SystemSettingsService implements OnModuleInit {
       falkor: runtime.falkor,
       observability: runtime.observability,
       chat: runtime.chat,
+      c4: runtime.c4,
     };
   }
 

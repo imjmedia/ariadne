@@ -22,6 +22,7 @@ import { SYNC_QUEUE } from '../constants';
 import { TheForgeModule } from '../theforge/theforge.module';
 import { ArtifactModule } from '../artifact/artifact.module';
 import { MddPersistenceModule } from '../mdd-persistence/mdd-persistence.module';
+import { C4Module } from '../c4/c4.module';
 import { DesignSystemLinkService } from '../pipeline/design-system-link.service';
 import { ChatModule } from '../chat/chat.module';
 
@@ -35,6 +36,7 @@ import { ChatModule } from '../chat/chat.module';
     TheForgeModule,
     ArtifactModule,
     MddPersistenceModule,
+    C4Module,
     ChatModule,
     SharedBullModule,
     BullModule.registerQueue({ name: SYNC_QUEUE }),

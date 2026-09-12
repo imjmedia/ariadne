@@ -108,3 +108,54 @@ export {
   mapOpenRouterHttpError,
   parseContextLengthFromMessage,
 } from './llm-openrouter-error.util.js';
+export type {
+  C4Level,
+  C4ElementKind,
+  C4EvidenceSource,
+  C4Evidence,
+  C4Element,
+  C4Relationship,
+  C4Model,
+} from './c4/c4-model.types.js';
+export { hashC4ModelPayload } from './c4/content-hash.js';
+export {
+  infrastructureSpecToC4Model,
+  mergeC4ContainerModels,
+  type C4ContainerKind,
+  type C4ContainerSpec,
+  type C4CommunicationSpec,
+  type C4InfrastructureSpec,
+} from './c4/from-infrastructure.js';
+export {
+  domainContextSpecToC4Model,
+  type C4ContextSpec,
+  type C4ContextDomainRef,
+  type C4ContextRepoRef,
+  type C4ContextDependency,
+  type C4ContextVisibilityEdge,
+} from './c4/from-domains.js';
+export {
+  falkorSubgraphToC4ComponentModel,
+  type C4ComponentGraphNode,
+  type C4ComponentGraphEdge,
+  type C4ComponentBuildInput,
+} from './c4/from-falkor.components.js';
+export {
+  diffC4Models,
+  type C4ModelDiff,
+  type C4ElementDiff,
+  type C4RelationshipDiff,
+} from './c4/c4-model.diff.js';
+export {
+  apiFlowToArchifySequence,
+  type ApiFlowSpec,
+  type ApiFlowStep,
+  type ArchifySequenceIr,
+} from './c4/to-archify-sequence.js';
+export { buildC4MarkdownBundle, type C4MarkdownFile } from './c4/c4-markdown-export.js';
+export { wantsArchitectureDiagramQuestion } from './c4/chat-architecture-diagram.util.js';
+export {
+  c4ModelToArchifyArchitecture,
+  type ArchifyArchitectureIr,
+  type ArchifyComponentType,
+} from './c4/to-archify.mapper.js';

@@ -238,6 +238,22 @@ export class IngestChatClient {
     return (await res.json()) as { answer: string; cypher?: string; result?: unknown[] };
   }
 
+  async fetchArchitectureDiagramProject(
+    projectId: string,
+  ): Promise<{ answer: string }> {
+    const url = `${this.ingestBase()}/internal/projects/${encodeURIComponent(projectId)}/architecture-diagram`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`ingest architecture-diagram ${res.status}: ${t}`);
+    }
+    return (await res.json()) as { answer: string };
+  }
+
   async fetchSchemaDatabaseProject(
     projectId: string,
     scope?: ChatScope,

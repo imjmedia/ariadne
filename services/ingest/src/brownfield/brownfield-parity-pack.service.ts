@@ -7,6 +7,7 @@ import { MddProjectMergeService } from '../mdd-persistence/mdd-project-merge.ser
 import { ChatService } from '../chat/chat.service';
 import { ScaffoldFromMddService } from '../scaffold/scaffold-from-mdd.service';
 import type { MddEvidenceDocument } from '../chat/mdd-document.types';
+import { C4Service } from '../c4/c4.service';
 
 export interface BrownfieldParityPack {
   schemaVersion: '1.0';
@@ -28,6 +29,10 @@ export interface BrownfieldParityPack {
   navigationMapHint: string;
   scaffoldPreview: { fileCount: number; paths: string[] };
   modificationPlanSeed: string;
+  /** Rutas ingest relativas al HTML C4 (container/context). */
+  c4ContainerHtmlUrl?: string;
+  c4ContextHtmlUrl?: string;
+  c4ModelJson?: Record<string, unknown> | null;
 }
 
 @Injectable()
@@ -37,6 +42,7 @@ export class BrownfieldParityPackService {
     private readonly mddMerge: MddProjectMergeService,
     private readonly chat: ChatService,
     private readonly scaffold: ScaffoldFromMddService,
+    private readonly c4: C4Service,
   ) {}
 
   async build(
@@ -65,6 +71,7 @@ export class BrownfieldParityPackService {
       { repoIds: [repositoryId] },
     );
     const scaffold = await this.scaffold.generate(repositoryId, projectId, ['react', 'nest'], undefined);
+    const c4Pack = await this.c4.getParityPackC4Fields(projectId);
     return {
       schemaVersion: '1.0',
       source: 'ariadne',
@@ -79,6 +86,9 @@ export class BrownfieldParityPackService {
         paths: scaffold.files.map((f) => f.path).slice(0, 30),
       },
       modificationPlanSeed: JSON.stringify({ filesToModify: mod.slice(0, 50) }),
+      c4ContainerHtmlUrl: c4Pack.c4ContainerHtmlUrl,
+      c4ContextHtmlUrl: c4Pack.c4ContextHtmlUrl,
+      c4ModelJson: c4Pack.c4ModelJson as Record<string, unknown> | null,
     };
   }
 
@@ -102,6 +112,7 @@ export class BrownfieldParityPackService {
       merged.mdd as MddEvidenceDocument,
     );
     const multiRoot = merged.sources.length > 1;
+    const c4Pack = await this.c4.getParityPackC4Fields(projectId);
     return {
       schemaVersion: '1.0',
       source: 'ariadne',
@@ -124,6 +135,9 @@ export class BrownfieldParityPackService {
         paths: scaffold.files.map((f) => f.path).slice(0, 30),
       },
       modificationPlanSeed: JSON.stringify({ filesToModify: mod.slice(0, 80) }),
+      c4ContainerHtmlUrl: c4Pack.c4ContainerHtmlUrl,
+      c4ContextHtmlUrl: c4Pack.c4ContextHtmlUrl,
+      c4ModelJson: c4Pack.c4ModelJson as Record<string, unknown> | null,
     };
   }
 }
