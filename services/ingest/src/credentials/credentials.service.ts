@@ -256,7 +256,8 @@ export class CredentialsService {
   }
 
   /**
-   * Ref efectiva para sync: token del usuario que disparó el job, luego credentialsRef del repo, luego null (env).
+   * Ref efectiva para sync: credentialsRef del repo, luego token del usuario (solo si el repo no tiene),
+   * luego null (variables de entorno).
    */
   async resolveRefForSync(options: {
     repoCredentialsRef: string | null;
@@ -264,6 +265,8 @@ export class CredentialsService {
     triggeredByUserId?: string | null;
   }): Promise<string | null> {
     const { repoCredentialsRef, provider, triggeredByUserId } = options;
+    const repoRef = repoCredentialsRef?.trim() || null;
+    if (repoRef) return repoRef;
     if (
       triggeredByUserId &&
       (provider === 'bitbucket' || provider === 'github')
@@ -274,7 +277,7 @@ export class CredentialsService {
       );
       if (userRef) return userRef;
     }
-    return repoCredentialsRef;
+    return null;
   }
 
   async resolveForBitbucket(credentialsRef: string | null): Promise<BitbucketAuth | null> {

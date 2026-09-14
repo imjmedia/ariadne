@@ -29,6 +29,6 @@ Cada credencial de tipo `token` / `app_password` se guarda con `user_id` (cabece
 
 ## Uso en sync
 
-Al encolar sync desde la UI (`POST /repositories/:id/sync`), se usa la credencial del usuario que dispara el job; si no tiene, `repositories.credentialsRef`; si no, variables de entorno.
+Al encolar sync desde la UI (`POST /repositories/:id/sync`), se usa `repositories.credentialsRef` si está configurada; si no, la credencial del usuario que dispara el job; si no, variables de entorno.
 
 Al crear un repo puedes fijar `credentialsRef` explícito (p. ej. credencial compartida legada). Webhooks sin usuario siguen con `credentialsRef` del repo o env.
