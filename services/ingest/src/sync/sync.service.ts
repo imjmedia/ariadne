@@ -272,7 +272,7 @@ export class SyncService {
    * Escribe nodos en cada proyecto al que pertenece el repo (standalone + project_repositories).
    * @param {string} repositoryId - ID del repositorio.
    * @param {string} [existingSyncJobId] - ID de job ya creado (opcional).
-   * @param {object} [options] - onlyProjectId; triggeredByUserId: token personal del usuario que encoló el sync.
+   * @param {object} [options] - onlyProjectId; triggeredByUserId: fallback si el repo no tiene credentialsRef.
    * @returns {Promise<{ jobId: string; indexed: number }>}
    */
   async runFullSync(

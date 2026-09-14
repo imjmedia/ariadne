@@ -204,8 +204,8 @@ export function EditCredential() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-[var(--foreground-muted)]">
-                    El sync manual usa la credencial del usuario que pulsa Sync. Asigna esta entrada a quien
-                    deba poseer el token.
+                    El sync usa la credencial asignada al repositorio. Si el repo no tiene ninguna, se usa la del
+                    usuario que dispara el sync. Asigna esta entrada a quien deba poseer el token.
                   </p>
                 </div>
               )}

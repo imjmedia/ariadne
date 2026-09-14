@@ -156,9 +156,8 @@ export function CredentialsList() {
       <div className={panelIntroClass}>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Credenciales</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
-          Tu token personal de Bitbucket o GitHub (cifrado en base de datos). Al sincronizar un repositorio se usa
-          automáticamente tu credencial; solo tú ves y editas las tuyas. Opcionalmente puedes asignar una credencial
-          concreta al dar de alta un repo.
+          Tu token personal de Bitbucket o GitHub (cifrado en base de datos). Al sincronizar un repositorio se usa la
+          credencial asignada al repo; si no hay ninguna, se usa la tuya. Solo tú ves y editas las tuyas.
         </p>
       </div>
 
