@@ -43,6 +43,30 @@ describe('c4ModelToArchifyArchitecture', () => {
     expect(ir.connections?.[0]).not.toHaveProperty('id');
   });
 
+  it('sanitize hace válidos los ids container multi-repo (uuid8_key)', () => {
+    const model = infrastructureSpecToC4Model(
+      {
+        systemName: 'desarrollo_imj/oohbp2',
+        containers: [
+          {
+            key: 'application',
+            name: 'Application',
+            pathPrefixes: ['frontend/'],
+            technology: 'vite',
+            c4Kind: 'software',
+          },
+        ],
+        communications: [],
+      },
+      'proj-1',
+      { repoId: '8ca79cef-aaaa-bbbb-cccc-dddddddddddd' },
+    );
+    const ir = sanitizeArchifyArchitectureIr(c4ModelToArchifyArchitecture(model));
+    for (const component of ir.components) {
+      expect(component.id).toMatch(/^[a-zA-Z][a-zA-Z0-9_-]*$/);
+    }
+  });
+
   it('omite label en RENDERS/IMPORTS/CALLS a nivel componente', () => {
     const model = falkorSubgraphToC4ComponentModel({
       projectId: 'p1',
