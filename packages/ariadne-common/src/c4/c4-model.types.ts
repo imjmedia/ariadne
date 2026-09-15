@@ -11,7 +11,11 @@ export type C4EvidenceSource =
   | 'compose'
   | 'domain'
   | 'navigation_map'
-  | 'llm';
+  | 'llm'
+  | 'package_json';
+
+/** Rol del repo cuando no hay docker-compose (front/back en repos separados). */
+export type C4StackRole = 'frontend' | 'backend';
 
 export interface C4Evidence {
   source: C4EvidenceSource;
@@ -30,6 +34,7 @@ export interface C4Element {
   /** Clave estable del container en infra (slug) */
   containerKey?: string;
   repoId?: string;
+  stackRole?: C4StackRole;
   evidence: C4Evidence[];
 }
 

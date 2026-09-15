@@ -7,7 +7,7 @@ Pipeline: dominios / docker-compose / Falkor → `C4Model` → Archify HTML.
 | Nivel | Fuente | Generador |
 | ----- | ------ | --------- |
 | **context** | `project.domainId`, `project_domain_dependencies`, `domain_domain_visibility`, multi-root | `sync` o `hybrid` (LLM opcional) |
-| **container** | `docker-compose`, workspaces | `sync` |
+| **container** | `docker-compose`, workspaces, o `package.json` (repo front/back suelto) | `sync` |
 | **component** | Subgrafo Falkor por `pathPrefix` del container (`IMPORTS`, `RENDERS`, rutas web) | `sync` |
 
 ## Configuración
@@ -38,7 +38,7 @@ Pipeline: dominios / docker-compose / Falkor → `C4Model` → Archify HTML.
 - `POST /projects/:id/c4/sequence/generate` — flujo Route → API → backend (`body.routePath` opcional)
 - `GET /projects/:id/c4/sequence/html` — HTML Archify sequence
 
-Antes de invocar Archify CLI, `C4ArchifyRenderer` aplica `c4-archify-ir-fix.ts` (ingest: labels `org/repo`, sin self-loops, sin label `RENDERS`/`IMPORTS`/`CALLS` en componentes) y luego `sanitizeArchifySequenceIr` / `sanitizeArchifyArchitectureIr` (`ariadne-common`, incluye reflow del grid tras ensanchar componentes, normalización de `component.id` al patrón Archify `^[a-zA-Z][a-zA-Z0-9_-]*$` — p. ej. `8ca79cef_application` → `c_8ca79cef_application` — y deduplicación). Los ids de componente Falkor usan hash estable (`compElementId`) para paths largos. Tras `validate`, usa `deliver` si el CLI lo soporta; si no, cae a `render` (Archify v2.9 en Docker). `npm run build` en ingest ejecuta `prebuild` de `ariadne-common`.
+Antes de invocar Archify CLI, `C4ArchifyRenderer` aplica `c4-archify-ir-fix.ts` (ingest: labels `org/repo`, sin self-loops, sin label `RENDERS`/`IMPORTS`/`CALLS` en componentes) y luego `sanitizeArchifySequenceIr` / `sanitizeArchifyArchitectureIr` (`ariadne-common`, incluye reflow del grid tras ensanchar componentes, normalización de `component.id` al patrón Archify `^[a-zA-Z][a-zA-Z0-9_-]*$` — p. ej. `8ca79cef_application` → `c_8ca79cef_application` — y deduplicación). Repos sin compose: se infiere **Web UI** (React/Vite) o **API** (NestJS) desde `package.json` raíz; en multi-root se enlaza front→back con **REST**. Los ids de componente Falkor usan hash estable (`compElementId`) para paths largos. Tras `validate`, usa `deliver` si el CLI lo soporta; si no, cae a `render` (Archify v2.9 en Docker). `npm run build` en ingest ejecuta `prebuild` de `ariadne-common`.
 
 ## Export / chat / parity
 

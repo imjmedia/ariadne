@@ -112,6 +112,7 @@ export type {
   C4Level,
   C4ElementKind,
   C4EvidenceSource,
+  C4StackRole,
   C4Evidence,
   C4Element,
   C4Relationship,
