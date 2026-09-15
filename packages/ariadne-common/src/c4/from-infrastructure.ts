@@ -1,5 +1,10 @@
 import { hashC4ModelPayload } from './content-hash.js';
-import type { C4Element, C4Model, C4Relationship } from './c4-model.types.js';
+import type {
+  C4Element,
+  C4Model,
+  C4Relationship,
+  C4StackRole,
+} from './c4-model.types.js';
 
 export type C4ContainerKind = 'software' | 'database' | 'external';
 
@@ -9,6 +14,7 @@ export interface C4ContainerSpec {
   pathPrefixes: string[];
   technology?: string;
   c4Kind: C4ContainerKind;
+  stackRole?: C4StackRole;
 }
 
 export interface C4CommunicationSpec {
@@ -66,11 +72,14 @@ export function infrastructureSpecToC4Model(
       technology: c.technology,
       containerKey: c.key,
       repoId,
+      stackRole: c.stackRole,
       evidence: [
         {
-          source: 'compose',
-          filePath: opts?.composePath,
-          reason: `Container ${c.c4Kind} (${c.key})`,
+          source: c.stackRole ? 'package_json' : 'compose',
+          filePath: c.stackRole ? 'package.json' : opts?.composePath,
+          reason: c.stackRole
+            ? `Container ${c.stackRole} inferido desde package.json (${c.key})`
+            : `Container ${c.c4Kind} (${c.key})`,
         },
       ],
     });
@@ -123,6 +132,49 @@ export function infrastructureSpecToC4Model(
   };
 }
 
+function containerStackRole(el: C4Element): C4StackRole | null {
+  if (el.kind !== 'container') return null;
+  if (el.stackRole) return el.stackRole;
+  const hint = `${el.technology ?? ''} ${el.name} ${el.containerKey ?? ''}`.toLowerCase();
+  if (/frontend|react|vite|web ui|oohbp|static/.test(hint)) return 'frontend';
+  if (/nestjs|backend|typeorm|nest|erp|api gateway/.test(hint)) return 'backend';
+  return null;
+}
+
+/** Enlaza repos front/back separados (sin compose) con REST entre contenedores. */
+function mergeCrossRepoStackLinks(
+  elements: C4Element[],
+  relationships: C4Relationship[],
+  seen: Set<string>,
+): void {
+  const containers = elements.filter((e) => e.kind === 'container');
+  const fronts = containers.filter((c) => containerStackRole(c) === 'frontend');
+  const backs = containers.filter((c) => containerStackRole(c) === 'backend');
+  if (fronts.length === 0 || backs.length === 0) return;
+
+  for (const front of fronts) {
+    for (const back of backs) {
+      if (front.repoId && front.repoId === back.repoId) continue;
+      const rid = `${front.id}::${back.id}::REST`;
+      if (seen.has(rid)) continue;
+      seen.add(rid);
+      relationships.push({
+        id: `multi_${front.id}_rest_${back.id}`,
+        from: front.id,
+        to: back.id,
+        label: 'REST',
+        protocol: 'REST',
+        evidence: [
+          {
+            source: 'package_json',
+            reason: 'Multi-root: repo frontend → repo backend (sin docker-compose)',
+          },
+        ],
+      });
+    }
+  }
+}
+
 /** Fusiona varios C4Model container (multi-root) en uno por proyecto. */
 export function mergeC4ContainerModels(models: C4Model[], projectId: string): C4Model {
   const elements: C4Element[] = [];
@@ -142,6 +194,8 @@ export function mergeC4ContainerModels(models: C4Model[], projectId: string): C4
       relationships.push({ ...rel, id: `${m.repoId ?? 'r'}_${rel.id}` });
     }
   }
+
+  mergeCrossRepoStackLinks(elements, relationships, seen);
 
   const contentHash = hashC4ModelPayload({
     projectId,

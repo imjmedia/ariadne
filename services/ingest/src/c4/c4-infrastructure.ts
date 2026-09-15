@@ -7,6 +7,7 @@ import type {
   C4ContainerKind,
   C4ContainerSpec,
   C4InfrastructureSpec,
+  C4StackRole,
 } from 'ariadne-common';
 
 export type { C4ContainerKind, C4ContainerSpec, C4CommunicationSpec, C4InfrastructureSpec };
@@ -172,6 +173,111 @@ async function parseKubernetesDeployments(
   return out;
 }
 
+function hasPathPrefix(pathSet: Set<string>, prefix: string): boolean {
+  const norm = normPrefix(prefix);
+  return [...pathSet].some((p) => p === norm.slice(0, -1) || p.startsWith(norm));
+}
+
+function packageDependencyNames(pkg: Record<string, unknown>): string[] {
+  const buckets = ['dependencies', 'devDependencies', 'peerDependencies'] as const;
+  const names: string[] = [];
+  for (const bucket of buckets) {
+    const block = pkg[bucket];
+    if (block && typeof block === 'object') {
+      names.push(...Object.keys(block as Record<string, unknown>));
+    }
+  }
+  return names;
+}
+
+/** Repo suelto front o back (sin compose/workspaces) desde package.json raíz. */
+export async function inferRepoStackContainer(
+  getContent: (p: string) => Promise<string | null>,
+  pathSet: Set<string>,
+  systemName: string,
+): Promise<C4ContainerSpec | null> {
+  const raw = await getContent('package.json');
+  if (!raw) return null;
+
+  let pkg: Record<string, unknown>;
+  try {
+    pkg = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+
+  const deps = packageDependencyNames(pkg);
+  const depSet = new Set(deps.map((d) => d.toLowerCase()));
+  const has = (name: string) => depSet.has(name.toLowerCase());
+
+  const frontendSignals =
+    has('react') ||
+    has('react-dom') ||
+    has('vue') ||
+    has('vite') ||
+    deps.some((d) => d.startsWith('@vitejs/')) ||
+    deps.some((d) => d.includes('@imj_media/ui')) ||
+    has('react-router') ||
+    has('react-router-dom') ||
+    pathSet.has('vite.config.ts') ||
+    pathSet.has('vite.config.mts') ||
+    pathSet.has('vite.config.js');
+
+  const backendSignals =
+    deps.some((d) => d.startsWith('@nestjs/')) ||
+    has('typeorm') ||
+    has('@nestjs/typeorm') ||
+    pathSet.has('nest-cli.json') ||
+    pathSet.has('ormconfig.ts') ||
+    pathSet.has('ormconfig.js');
+
+  let role: C4StackRole | null = null;
+  if (frontendSignals && !backendSignals) role = 'frontend';
+  else if (backendSignals && !frontendSignals) role = 'backend';
+  else if (frontendSignals && backendSignals) {
+    role = backendSignals && deps.some((d) => d.startsWith('@nestjs/')) ? 'backend' : 'frontend';
+  }
+  if (!role) return null;
+
+  const pathCandidates =
+    role === 'frontend'
+      ? ['src/', 'frontend/', 'apps/web/', 'web/', 'app/']
+      : ['src/', 'api/', 'backend/', 'services/api/', 'erp_obp/'];
+  const pathPrefixes = pathCandidates.filter((p) => hasPathPrefix(pathSet, p));
+  if (pathPrefixes.length === 0 && hasPathPrefix(pathSet, 'src/')) {
+    pathPrefixes.push('src/');
+  }
+
+  const pkgName = typeof pkg.name === 'string' ? pkg.name.trim() : '';
+  const repoLabel = systemName.includes('/') ? systemName.split('/').pop()! : systemName;
+  const displayName =
+    role === 'frontend'
+      ? pkgName && !pkgName.includes('erp')
+        ? `Web UI (${pkgName})`
+        : `Web UI (${repoLabel})`
+      : pkgName
+        ? `API (${pkgName})`
+        : `API (${repoLabel})`;
+
+  const technology =
+    role === 'frontend'
+      ? deps.some((d) => d.includes('vite'))
+        ? 'React + Vite'
+        : 'React'
+      : deps.some((d) => d.startsWith('@nestjs/'))
+        ? 'NestJS'
+        : 'Node API';
+
+  return {
+    key: role === 'frontend' ? 'frontend' : 'backend',
+    name: displayName,
+    pathPrefixes,
+    technology,
+    c4Kind: 'software',
+    stackRole: role,
+  };
+}
+
 async function parsePackageJsonWorkspaces(
   getContent: (p: string) => Promise<string | null>,
   paths: Set<string>,
@@ -300,6 +406,13 @@ export async function scanC4Infrastructure(
 
   for (const w of await parsePackageJsonWorkspaces(getContent, pathSet)) {
     add(w);
+  }
+
+  if (containers.length === 0) {
+    const stackContainer = await inferRepoStackContainer(getContent, pathSet, systemName);
+    if (stackContainer) {
+      add(stackContainer);
+    }
   }
 
   if (containers.length === 0) {

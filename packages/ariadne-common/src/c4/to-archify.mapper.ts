@@ -73,6 +73,9 @@ function archifyTypeForElement(el: C4Element, level: C4Model['level']): ArchifyC
     return 'backend';
   }
 
+  if (el.stackRole === 'frontend') return 'frontend';
+  if (el.stackRole === 'backend') return 'backend';
+
   const tech = (el.technology ?? '').toLowerCase();
   const name = el.name.toLowerCase();
   if (/postgres|mysql|mongo|redis|falkor|database|mariadb|elasticsearch/.test(tech + name)) {
