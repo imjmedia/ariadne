@@ -70,6 +70,40 @@ describe('sanitizeArchifyArchitectureIr', () => {
     expect(out.meta.viewBox?.[0]).toBeGreaterThanOrEqual(820);
   });
 
+  it('prefija ids que empiezan con dígito (container slugId + repoId)', () => {
+    const out = sanitizeArchifyArchitectureIr({
+      schema_version: 1,
+      diagram_type: 'architecture',
+      meta: { title: 'C4 Container' },
+      components: [
+        {
+          id: '8ca79cef_application',
+          type: 'backend',
+          label: 'Application',
+          pos: [40, 80],
+          size: [130, 60],
+        },
+        {
+          id: '89698d97_application',
+          type: 'backend',
+          label: 'Application',
+          pos: [250, 80],
+          size: [130, 60],
+        },
+      ],
+      connections: [
+        { from: '8ca79cef_application', to: '89698d97_application', label: 'REST' },
+      ],
+    });
+
+    for (const component of out.components) {
+      expect(component.id).toMatch(/^[a-zA-Z][a-zA-Z0-9_-]*$/);
+    }
+    expect(out.components[0]?.id).toBe('c_8ca79cef_application');
+    expect(out.connections?.[0]?.from).toBe('c_8ca79cef_application');
+    expect(out.connections?.[0]?.to).toBe('c_89698d97_application');
+  });
+
   it('deduplica ids de componentes duplicados en el IR', () => {
     const out = sanitizeArchifyArchitectureIr({
       schema_version: 1,

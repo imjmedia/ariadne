@@ -122,6 +122,66 @@ type LegacyArchitectureIr = Omit<ArchifyArchitectureIr, 'components' | 'meta' | 
 
 type ArchifyComponent = ArchifyArchitectureIr['components'][number];
 
+/** Patrón Archify `architecture.schema.json` para `components[].id`. */
+const ARCHIFY_COMPONENT_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+
+/** Normaliza un id C4 (p. ej. `8ca79cef_application` desde slugId+repo) al schema Archify. */
+export function normalizeArchifyComponentId(id: string): string {
+  const trimmed = id.trim() || 'component';
+  const sanitized = trimmed
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  let candidate = (sanitized || 'component').slice(0, 60);
+  if (!ARCHIFY_COMPONENT_ID_PATTERN.test(candidate)) {
+    candidate = `c_${candidate}`.slice(0, 60);
+  }
+  return ARCHIFY_COMPONENT_ID_PATTERN.test(candidate) ? candidate : 'c_component';
+}
+
+/**
+ * Archify rechaza ids que no empiezan por letra (container multi-repo: `{uuid8}_{key}`).
+ * Remapea componentes y actualiza conexiones/boundaries.
+ */
+function normalizeArchifyComponentIds(
+  components: ArchifyComponent[],
+  connections: ArchifyConnection[],
+  boundaries: ArchifyArchitectureIr['boundaries'],
+): {
+  components: ArchifyComponent[];
+  connections: ArchifyConnection[];
+  boundaries: ArchifyArchitectureIr['boundaries'];
+} {
+  const idRemap = new Map<string, string>();
+
+  const nextComponents = components.map((component) => {
+    const nextId = normalizeArchifyComponentId(component.id);
+    if (nextId !== component.id) {
+      idRemap.set(component.id, nextId);
+    }
+    return { ...component, id: nextId };
+  });
+
+  const resolveId = (rawId: string) => idRemap.get(rawId) ?? normalizeArchifyComponentId(rawId);
+
+  const nextConnections = connections.map((conn) => ({
+    ...conn,
+    from: resolveId(conn.from),
+    to: resolveId(conn.to),
+  }));
+
+  const nextBoundaries = boundaries?.map((boundary) => ({
+    ...boundary,
+    wraps: boundary.wraps.map((wrapId) => resolveId(wrapId)),
+  }));
+
+  return {
+    components: nextComponents,
+    connections: nextConnections,
+    boundaries: nextBoundaries,
+  };
+}
+
 /**
  * Archify rechaza IR con ids duplicados (`Component ids must be unique`).
  * Garantiza unicidad y remapea conexiones/boundaries.
@@ -278,10 +338,11 @@ export function sanitizeArchifyArchitectureIr(ir: LegacyArchitectureIr): Archify
     return rest;
   });
 
+  const normalized = normalizeArchifyComponentIds(sizedComponents, connections, ir.boundaries);
   const deduped = dedupeArchifyComponentIds(
-    sizedComponents,
-    connections,
-    ir.boundaries,
+    normalized.components,
+    normalized.connections,
+    normalized.boundaries,
   );
   const components = reflowArchifyArchitectureLayout(deduped.components, cols);
   const viewBox = computeArchitectureViewBox(components);
