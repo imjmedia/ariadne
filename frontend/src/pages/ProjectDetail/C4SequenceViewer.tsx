@@ -64,7 +64,11 @@ export function C4SequenceViewer({ projectId }: { projectId: string }) {
       setHtml(await api.getC4SequenceHtml(projectId));
     } catch (e) {
       setHtml(null);
-      setError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      // Sin secuencia generada aún: estado vacío, no error de Archify.
+      if (!/^404:/.test(message)) {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }

@@ -70,6 +70,19 @@ describe('sanitizeArchifyArchitectureIr', () => {
     expect(out.meta.viewBox?.[0]).toBeGreaterThanOrEqual(820);
   });
 
+  it('deduplica ids de componentes duplicados en el IR', () => {
+    const out = sanitizeArchifyArchitectureIr({
+      schema_version: 1,
+      diagram_type: 'architecture',
+      meta: { title: 'C4 Component' },
+      components: [
+        { id: 'same', type: 'frontend', label: 'One', pos: [40, 80], size: [130, 60] },
+        { id: 'same', type: 'backend', label: 'Two', pos: [250, 80], size: [130, 60] },
+      ],
+    });
+    expect(out.components.map((c) => c.id)).toEqual(['same', 'same_d1']);
+  });
+
   it('ensancha el componente cuando el label no cabe ni tras acortar', () => {
     const out = sanitizeArchifyArchitectureIr({
       schema_version: 1,
