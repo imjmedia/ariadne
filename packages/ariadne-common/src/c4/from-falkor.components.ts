@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { hashC4ModelPayload } from './content-hash.js';
 import type { C4Element, C4Model, C4Relationship } from './c4-model.types.js';
 
@@ -28,8 +29,11 @@ export interface C4ComponentBuildInput {
   edges: C4ComponentGraphEdge[];
 }
 
-function compElementId(nodeId: string): string {
-  return `cmp_${nodeId.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}`;
+/** ID estable y único para Archify (evita colisiones al truncar paths largos). */
+export function compElementId(nodeId: string): string {
+  const hash = createHash('sha256').update(nodeId).digest('hex').slice(0, 10);
+  const sanitized = nodeId.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 28);
+  return `cmp_${sanitized}_${hash}`;
 }
 
 /**

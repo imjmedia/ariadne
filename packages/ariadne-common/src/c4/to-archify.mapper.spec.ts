@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { sanitizeArchifyArchitectureIr } from './archify-ir-sanitize.js';
 import { c4ModelToArchifyArchitecture } from './to-archify.mapper.js';
-import { falkorSubgraphToC4ComponentModel } from './from-falkor.components.js';
+import { compElementId, falkorSubgraphToC4ComponentModel } from './from-falkor.components.js';
 import { infrastructureSpecToC4Model } from './from-infrastructure.js';
 import { domainContextSpecToC4Model } from './from-domains.js';
 
@@ -117,6 +118,56 @@ describe('c4ModelToArchifyArchitecture', () => {
     });
     const ir = c4ModelToArchifyArchitecture(model);
     expect(ir.connections?.every((c) => c.label?.toLowerCase() !== 'eventos')).toBe(true);
+  });
+
+  it('genera ids únicos para paths largos que colisionaban al truncar', () => {
+    const pathA =
+      'Parent::apps/web/features/very/long/module/alpha/components/ScreenA.tsx';
+    const pathB =
+      'Parent::apps/web/features/very/long/module/beta/components/ScreenB.tsx';
+    expect(compElementId(pathA)).not.toBe(compElementId(pathB));
+
+    const model = falkorSubgraphToC4ComponentModel({
+      projectId: 'p1',
+      containerKey: 'web',
+      containerName: 'Web',
+      pathPrefixes: ['apps/web/'],
+      nodes: [
+        {
+          id: pathA,
+          name: 'ScreenA',
+          filePath: 'apps/web/a.tsx',
+          containerKey: 'web',
+          nodeKind: 'component',
+        },
+        {
+          id: pathB,
+          name: 'ScreenB',
+          filePath: 'apps/web/b.tsx',
+          containerKey: 'web',
+          nodeKind: 'component',
+        },
+      ],
+      edges: [],
+    });
+    const ir = c4ModelToArchifyArchitecture(model);
+    const ids = ir.components.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('sanitize deduplica ids de componentes antes de Archify render', () => {
+    const out = sanitizeArchifyArchitectureIr({
+      schema_version: 1,
+      diagram_type: 'architecture',
+      meta: { title: 'C4 Component' },
+      components: [
+        { id: 'dup', type: 'frontend', label: 'A', pos: [40, 80], size: [130, 60] },
+        { id: 'dup', type: 'frontend', label: 'B', pos: [250, 80], size: [130, 60] },
+      ],
+      connections: [{ from: 'dup', to: 'dup', label: 'loop' }],
+    });
+    const ids = out.components.map((c) => c.id);
+    expect(new Set(ids).size).toBe(2);
   });
 
   it('mapea context sin layout legacy', () => {

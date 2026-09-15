@@ -122,6 +122,68 @@ type LegacyArchitectureIr = Omit<ArchifyArchitectureIr, 'components' | 'meta' | 
 
 type ArchifyComponent = ArchifyArchitectureIr['components'][number];
 
+/**
+ * Archify rechaza IR con ids duplicados (`Component ids must be unique`).
+ * Garantiza unicidad y remapea conexiones/boundaries.
+ */
+function dedupeArchifyComponentIds(
+  components: ArchifyComponent[],
+  connections: ArchifyConnection[],
+  boundaries: ArchifyArchitectureIr['boundaries'],
+): {
+  components: ArchifyComponent[];
+  connections: ArchifyConnection[];
+  boundaries: ArchifyArchitectureIr['boundaries'];
+} {
+  const used = new Set<string>();
+  const idRemap = new Map<string, string>();
+  const occurrence = new Map<string, number>();
+
+  const nextComponents = components.map((component, index) => {
+    const count = occurrence.get(component.id) ?? 0;
+    occurrence.set(component.id, count + 1);
+    if (count === 0 && !used.has(component.id)) {
+      used.add(component.id);
+      return component;
+    }
+
+    let candidate = `${component.id.slice(0, 44)}_d${count}`;
+    let seq = count + 1;
+    while (used.has(candidate)) {
+      candidate = `${component.id.slice(0, 40)}_d${index}_${seq}`;
+      seq += 1;
+    }
+    used.add(candidate);
+    idRemap.set(`${component.id}#${index}`, candidate);
+    return { ...component, id: candidate };
+  });
+
+  const resolveId = (rawId: string, indexHint?: number): string => {
+    if (indexHint != null) {
+      const mapped = idRemap.get(`${rawId}#${indexHint}`);
+      if (mapped) return mapped;
+    }
+    return rawId;
+  };
+
+  const nextConnections = connections.map((conn) => ({
+    ...conn,
+    from: resolveId(conn.from),
+    to: resolveId(conn.to),
+  }));
+
+  const nextBoundaries = boundaries?.map((boundary) => ({
+    ...boundary,
+    wraps: boundary.wraps.map((wrapId) => resolveId(wrapId)),
+  }));
+
+  return {
+    components: nextComponents,
+    connections: nextConnections,
+    boundaries: nextBoundaries,
+  };
+}
+
 /** Recoloca el grid usando el ancho/alto real de cada celda (evita solapes tras ensanchar labels). */
 function reflowArchifyArchitectureLayout(
   components: ArchifyComponent[],
@@ -211,13 +273,18 @@ export function sanitizeArchifyArchitectureIr(ir: LegacyArchitectureIr): Archify
       size,
     };
   });
-  const components = reflowArchifyArchitectureLayout(sizedComponents, cols);
-  const viewBox = computeArchitectureViewBox(components);
-
   const connections: ArchifyConnection[] = (ir.connections ?? []).map((conn) => {
     const { id: _id, ...rest } = conn;
     return rest;
   });
+
+  const deduped = dedupeArchifyComponentIds(
+    sizedComponents,
+    connections,
+    ir.boundaries,
+  );
+  const components = reflowArchifyArchitectureLayout(deduped.components, cols);
+  const viewBox = computeArchitectureViewBox(components);
 
   const { quality_profile: _qp, ...meta } = ir.meta ?? { title: 'Architecture' };
 
@@ -232,8 +299,8 @@ export function sanitizeArchifyArchitectureIr(ir: LegacyArchitectureIr): Archify
       viewBox,
     },
     components,
-    ...(ir.boundaries?.length ? { boundaries: ir.boundaries } : {}),
-    ...(connections.length ? { connections } : {}),
+    ...(deduped.boundaries?.length ? { boundaries: deduped.boundaries } : {}),
+    ...(deduped.connections.length ? { connections: deduped.connections } : {}),
     ...(ir.cards?.length ? { cards: ir.cards } : {}),
   };
 }

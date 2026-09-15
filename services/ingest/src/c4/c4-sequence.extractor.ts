@@ -193,46 +193,72 @@ export class C4SequenceExtractor {
       const contexts = await this.projects.getCypherShardContexts(projectId, {
         includeSiblingProjects: false,
       });
-      const shard = contexts[0] ?? {
-        graphName: graphNameForProject(isProjectShardingEnabled() ? projectId : undefined),
-        cypherProjectId: projectId,
-      };
-      const graph = client.selectGraph(shard.graphName);
-      const pid = shard.cypherProjectId;
+      const shards =
+        contexts.length > 0
+          ? contexts
+          : [
+              {
+                graphName: graphNameForProject(isProjectShardingEnabled() ? projectId : undefined),
+                cypherProjectId: projectId,
+              },
+            ];
 
-      const q = `
-        MATCH (rt:Route {projectId: $projectId})
-        WHERE rt.path IS NOT NULL
-        MATCH (rt)-[:ROUTE_TO_COMPONENT]->(comp:Component)
-        MATCH (sf:File)-[:CONTAINS]->(comp)
-        OPTIONAL MATCH (rt)-[:ENTRY_REACHES_API]->(acr:ApiClientReference)
-        OPTIONAL MATCH (acr)-[:CALLS_NEST_ROUTE]->(nr:NestRoute)
-        OPTIONAL MATCH (acr)-[:CALLS_API]->(op:OpenApiOperation)-[:SAME_REST_AS]->(nr2:NestRoute)
-        WITH rt, comp, sf, acr, op, coalesce(nr, nr2) AS nr
-        OPTIONAL MATCH (nc:NestController)-[:DECLARES_ROUTE]->(nr)
-        OPTIONAL MATCH (cf:File)-[:CONTAINS]->(nc)
-        RETURN rt.path AS routePath,
-               comp.name AS screenName,
-               sf.path AS screenFilePath,
-               coalesce(acr.normalizedPath, acr.apiPath) AS apiPath,
-               coalesce(nr.fullPath, nr.path) AS backendPath,
-               coalesce(nr.httpMethod, op.method, 'GET') AS method,
-               nr.handlerName AS handlerName,
-               coalesce(nc.name, nr.controllerName) AS controllerName,
-               cf.path AS controllerFilePath,
-               rt.path AS routeId,
-               coalesce(rt.isPublicEntry, 'false') AS isPublicEntry,
-               (acr IS NOT NULL AND nr IS NOT NULL) AS hasApiLink
-        ORDER BY
-          CASE WHEN coalesce(rt.isPublicEntry, 'false') = 'true' THEN 0 ELSE 1 END,
-          CASE WHEN acr IS NOT NULL AND nr IS NOT NULL THEN 0 ELSE 1 END,
-          rt.path
-        LIMIT 80
-      `;
-      const res = (await graph.query(q, { params: { projectId: pid } })) as {
-        data?: Array<Record<string, unknown>>;
-      };
-      return (res.data ?? []).map((row) => this.normalizeFlowRow(row));
+      const rows: SequenceFlowRow[] = [];
+      const seenPaths = new Set<string>();
+
+      for (const shard of shards) {
+        const graph = client.selectGraph(shard.graphName);
+        const pid = shard.cypherProjectId;
+
+        const q = `
+          MATCH (rt:Route {projectId: $projectId})
+          WHERE rt.path IS NOT NULL
+          OPTIONAL MATCH (rt)-[:ROUTE_TO_COMPONENT]->(comp:Component)
+          OPTIONAL MATCH (sf:File)-[:CONTAINS]->(comp)
+          OPTIONAL MATCH (rt)-[:ENTRY_REACHES_API]->(acr:ApiClientReference)
+          OPTIONAL MATCH (acr)-[:CALLS_NEST_ROUTE]->(nr:NestRoute)
+          OPTIONAL MATCH (acr)-[:CALLS_API]->(op:OpenApiOperation)-[:SAME_REST_AS]->(nr2:NestRoute)
+          WITH rt, comp, sf, acr, op, coalesce(nr, nr2) AS nr
+          OPTIONAL MATCH (nc:NestController)-[:DECLARES_ROUTE]->(nr)
+          OPTIONAL MATCH (cf:File)-[:CONTAINS]->(nc)
+          RETURN rt.path AS routePath,
+                 coalesce(comp.name, rt.componentName) AS screenName,
+                 sf.path AS screenFilePath,
+                 coalesce(acr.normalizedPath, acr.apiPath) AS apiPath,
+                 coalesce(nr.fullPath, nr.path) AS backendPath,
+                 coalesce(nr.httpMethod, op.method, 'GET') AS method,
+                 nr.handlerName AS handlerName,
+                 coalesce(nc.name, nr.controllerName) AS controllerName,
+                 cf.path AS controllerFilePath,
+                 rt.path AS routeId,
+                 coalesce(rt.isPublicEntry, 'false') AS isPublicEntry,
+                 (acr IS NOT NULL AND nr IS NOT NULL) AS hasApiLink
+          ORDER BY
+            CASE WHEN coalesce(rt.isPublicEntry, 'false') = 'true' THEN 0 ELSE 1 END,
+            CASE WHEN acr IS NOT NULL AND nr IS NOT NULL THEN 0 ELSE 1 END,
+            rt.path
+          LIMIT 80
+        `;
+        const res = (await graph.query(q, { params: { projectId: pid } })) as {
+          data?: Array<Record<string, unknown>>;
+        };
+        for (const row of res.data ?? []) {
+          const normalized = this.normalizeFlowRow(row);
+          const path = normalized.routePath;
+          if (!path || seenPaths.has(path)) continue;
+          seenPaths.add(path);
+          rows.push(normalized);
+        }
+      }
+
+      rows.sort((a, b) => {
+        const rank = (r: SequenceFlowRow) =>
+          (r.isPublicEntry ? 0 : 1) * 4 + (r.hasApiLink ? 0 : 2);
+        const diff = rank(a) - rank(b);
+        return diff !== 0 ? diff : String(a.routePath).localeCompare(String(b.routePath));
+      });
+
+      return rows.slice(0, 80);
     } catch (err) {
       this.logger.warn(
         `C4 sequence list routes: ${err instanceof Error ? err.message : String(err)}`,
@@ -252,12 +278,15 @@ export class C4SequenceExtractor {
       const contexts = await this.projects.getCypherShardContexts(projectId, {
         includeSiblingProjects: false,
       });
-      const shard = contexts[0] ?? {
-        graphName: graphNameForProject(isProjectShardingEnabled() ? projectId : undefined),
-        cypherProjectId: projectId,
-      };
-      const graph = client.selectGraph(shard.graphName);
-      const pid = shard.cypherProjectId;
+      const shards =
+        contexts.length > 0
+          ? contexts
+          : [
+              {
+                graphName: graphNameForProject(isProjectShardingEnabled() ? projectId : undefined),
+                cypherProjectId: projectId,
+              },
+            ];
 
       const fallbackQ = `
         MATCH (f:File)-[:REFERENCES_API]->(acr:ApiClientReference)
@@ -277,11 +306,17 @@ export class C4SequenceExtractor {
                true AS hasApiLink
         LIMIT 1
       `;
-      const fb = (await graph.query(fallbackQ, { params: { projectId: pid } })) as {
-        data?: Array<Record<string, unknown>>;
-      };
-      const first = fb.data?.[0];
-      return first ? this.normalizeFlowRow(first) : null;
+
+      for (const shard of shards) {
+        const graph = client.selectGraph(shard.graphName);
+        const pid = shard.cypherProjectId;
+        const fb = (await graph.query(fallbackQ, { params: { projectId: pid } })) as {
+          data?: Array<Record<string, unknown>>;
+        };
+        const first = fb.data?.[0];
+        if (first) return this.normalizeFlowRow(first);
+      }
+      return null;
     } catch (err) {
       this.logger.warn(
         `C4 sequence extract fallback: ${err instanceof Error ? err.message : String(err)}`,
