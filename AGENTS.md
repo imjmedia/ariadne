@@ -35,7 +35,8 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 ## Tool catalog
 
 ### Discovery (find things)
-- **`semantic_search`** — Hybrid vector+keyword search. Most common entry point. Pass `query` + optional `projectId`/`limit`.
+- **`semantic_search`** — Hybrid vector+keyword search. Most common entry point. Automatically returns 1-hop **Ego-Graphs** & TypeScript type contracts for top nodes to eliminate hallucinations and save Cursor prompt tokens. Pass `query` + optional `projectId`/`limit`.
+- **`sync_local_file`** — Real-time live delta sync from IDE buffer/disk to FalkorDB without requiring commit/push to remote.
 - **`query_graph`** — Read-only Cypher against FalkorDB (no LLM). Fast structural queries (dead code, CALLS, IMPORTS). Blocks writes; auto-scopes by `projectId` when sharding.
 - **`find_similar_implementations`** — Before writing a new function, check if something similar already exists.
 - **`ask_codebase`** — Natural language Q&A over the codebase. Requires `question`. Pass `responseMode: "raw_evidence"` for structured JSON. **Route to cheaper tools** (get_file_content, get_definitions) when you already know the path/symbol.
@@ -93,3 +94,4 @@ This gives you project IDs, repo names, and branches. Use the `roots[].id` (repo
 6. **Pre-commit review** — `detect_changes()` (or legacy `analyze_local_changes()`) before every commit to catch broken dependencies.
 7. **Graph freshness** — Call `get_sync_status` before Gate 1/2; if `stale: true`, resync first.
 8. **Two gates for refactors** — `get_modification_plan` then `validate_change_plan`; never skip Gate 2 on multi-file work.
+9. **Live Local Sync** — When editing files without committing, use `sync_local_file(filePath, content)` or run `pnpm --filter ariadne-mcp daemon` so FalkorDB always reflects your working tree.

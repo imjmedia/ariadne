@@ -106,4 +106,33 @@ export class SyncController {
     });
     return { jobId: syncJob.id, queued: true };
   }
+
+  /**
+   * Sincronización Local Live: indexa al instante un archivo guardado en el editor.
+   */
+  @Post(':id/local-sync/file')
+  async syncLocalFileWithRepo(
+    @Param('id') id: string,
+    @Body() body: { path: string; content?: string; projectId?: string },
+  ) {
+    return this.syncService.syncLocalFile({
+      path: body.path,
+      content: body.content,
+      projectId: body.projectId,
+      repoId: id,
+    });
+  }
+
+  @Post('local-sync/file')
+  async syncLocalFileGeneral(
+    @Body() body: { path: string; content?: string; projectId?: string; repoId?: string },
+  ) {
+    return this.syncService.syncLocalFile({
+      path: body.path,
+      content: body.content,
+      projectId: body.projectId,
+      repoId: body.repoId,
+    });
+  }
 }
+

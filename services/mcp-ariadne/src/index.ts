@@ -611,6 +611,22 @@ function createMcpServer(): Server {
       },
     },
     {
+      name: "sync_local_file",
+      description:
+        "Sincronización Local Live: consume los eventos de guardado o buffer del editor (Cursor) para alimentar el grafo FalkorDB de inmediato sin commit ni push a Bitbucket.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          filePath: { type: "string", description: "Ruta del archivo (relativa al workspace o absoluta)" },
+          content: { type: "string", description: "Contenido del archivo en el editor de Cursor (opcional; si se omite, se lee del disco local)" },
+          projectId: { type: "string", description: "UUID de proyecto o repo (`roots[].id`). Opcional, se infiere si se omite." },
+          repoId: { type: "string", description: "UUID de repositorio (opcional)" },
+        },
+        required: ["filePath"],
+        additionalProperties: false,
+      },
+    },
+    {
       name: "query_graph",
       description:
         "Ejecuta Cypher read-only contra FalkorDB (sin LLM). Rechaza MERGE/CREATE/DELETE/SET/REMOVE/DROP/CALL {. Con sharding activo, `projectId` es obligatorio. Añade LIMIT si falta (default 50).",
@@ -1567,6 +1583,184 @@ async function runOnProjectGraphs(
   });
 }
 
+/**
+ * Extrae y compacta el Ego-Graph (vecinos a 1-hop y contratos de tipos) para los nodos
+ * encontrados en la búsqueda, serializándolos en un bloque TypeScript de alta densidad.
+ */
+async function buildEgoGraphSignatures(
+  items: Array<{ type: string; name: string; rawName?: string; path?: string; projectId?: string }>,
+  graphRouteId?: string,
+  scopeRepoId?: string,
+): Promise<string> {
+  const topCandidates = items
+    .filter((it) => ["Component", "Function", "Model"].includes(it.type))
+    .slice(0, 5);
+  if (topCandidates.length === 0) return "";
+
+  const signatures: string[] = [];
+
+  for (const item of topCandidates) {
+    const rawName = item.rawName || item.name.split(" — ")[0]?.trim() || item.name;
+    const path = item.path || (item.name.includes(" — ") ? item.name.split(" — ")[1]?.trim() : undefined);
+
+    if (item.type === "Component") {
+      let contract: string | null = null;
+      let hooks: string[] = [];
+      let renders: string[] = [];
+      let renderedBy: string[] = [];
+
+      await runOnProjectGraphs(graphRouteId, async (g) => {
+        try {
+          const cypher = `MATCH (c:Component {name: $name})
+            WHERE ($path IS NULL OR c.path = $path)
+            OPTIONAL MATCH (c)-[:USES_HOOK]->(h:Hook)
+            OPTIONAL MATCH (c)-[:RENDERS]->(child:Component)
+            OPTIONAL MATCH (parent:Component)-[:RENDERS]->(c)
+            RETURN c.propsContract AS contract,
+                   collect(DISTINCT h.name) AS hooks,
+                   collect(DISTINCT child.name) AS renders,
+                   collect(DISTINCT parent.name) AS renderedBy
+            LIMIT 1`;
+          const res = (await g.query(cypher, { params: { name: rawName, path: path ?? null } })) as {
+            data?: Array<Record<string, unknown>>;
+          };
+          const row = res.data?.[0];
+          if (row) {
+            contract = _rv<string>(row, "contract") ?? contract;
+            hooks = _rv<string[]>(row, "hooks") ?? hooks;
+            renders = _rv<string[]>(row, "renders") ?? renders;
+            renderedBy = _rv<string[]>(row, "renderedBy") ?? renderedBy;
+          }
+        } catch {
+          /* ignore */
+        }
+      });
+
+      const comments: string[] = [];
+      comments.push(`// [Component] ${rawName}${path ? ` (${path})` : ""}`);
+      if (renderedBy && renderedBy.length > 0) comments.push(`// Rendered by: ${renderedBy.filter(Boolean).slice(0, 5).join(", ")}`);
+      if (renders && renders.length > 0) comments.push(`// Renders: ${renders.filter(Boolean).slice(0, 8).join(", ")}`);
+      if (hooks && hooks.length > 0) comments.push(`// Hooks: ${hooks.filter(Boolean).slice(0, 8).join(", ")}`);
+
+      let propsInterface = "";
+      if (contract) {
+        try {
+          const parsedProps = JSON.parse(contract) as Array<{ name: string; type?: string; required?: boolean; description?: string }>;
+          if (Array.isArray(parsedProps) && parsedProps.length > 0) {
+            propsInterface =
+              `export interface ${rawName}Props {\n` +
+              parsedProps
+                .map(
+                  (p) =>
+                    `  ${p.name}${p.required === false ? "?" : ""}: ${p.type || "unknown"};${p.description ? ` // ${p.description}` : ""}`,
+                )
+                .join("\n") +
+              `\n}`;
+          }
+        } catch {
+          /* ignore json parse error */
+        }
+      }
+
+      const compDecl = propsInterface
+        ? `${propsInterface}\nexport function ${rawName}(props: ${rawName}Props): JSX.Element;`
+        : `export function ${rawName}(props?: Record<string, unknown>): JSX.Element;`;
+
+      signatures.push(`${comments.join("\n")}\n${compDecl}`);
+    } else if (item.type === "Function") {
+      let calls: string[] = [];
+      let calledBy: string[] = [];
+      let loc: number | null = null;
+      let complexity: number | null = null;
+      let description: string | null = null;
+
+      await runOnProjectGraphs(graphRouteId, async (g) => {
+        try {
+          const cypher = `MATCH (fn:Function {name: $name})
+            WHERE ($path IS NULL OR fn.path = $path)
+            OPTIONAL MATCH (fn)-[:CALLS]->(callee)
+            OPTIONAL MATCH (caller)-[:CALLS]->(fn)
+            RETURN fn.loc AS loc, fn.complexity AS complexity, fn.description AS description,
+                   collect(DISTINCT callee.name) AS calls,
+                   collect(DISTINCT caller.name) AS calledBy
+            LIMIT 1`;
+          const res = (await g.query(cypher, { params: { name: rawName, path: path ?? null } })) as {
+            data?: Array<Record<string, unknown>>;
+          };
+          const row = res.data?.[0];
+          if (row) {
+            loc = _rv<number>(row, "loc") ?? loc;
+            complexity = _rv<number>(row, "complexity") ?? complexity;
+            description = _rv<string>(row, "description") ?? description;
+            calls = _rv<string[]>(row, "calls") ?? calls;
+            calledBy = _rv<string[]>(row, "calledBy") ?? calledBy;
+          }
+        } catch {
+          /* ignore */
+        }
+      });
+
+      const comments: string[] = [];
+      comments.push(
+        `// [Function] ${rawName}${path ? ` (${path})` : ""}${loc ? ` [${loc} lines]` : ""}${complexity ? ` [complexity: ${complexity}]` : ""}`,
+      );
+      if (description) comments.push(`// Description: ${description}`);
+      if (calledBy && calledBy.length > 0) comments.push(`// Called by: ${calledBy.filter(Boolean).slice(0, 5).join(", ")}`);
+      if (calls && calls.length > 0) comments.push(`// Calls: ${calls.filter(Boolean).slice(0, 8).join(", ")}`);
+
+      const fnDecl = `export function ${rawName}(...args: unknown[]): unknown;`;
+      signatures.push(`${comments.join("\n")}\n${fnDecl}`);
+    } else if (item.type === "Model") {
+      let fieldSummary: string | null = null;
+      let tableName: string | null = null;
+      let relations: string[] = [];
+
+      await runOnProjectGraphs(graphRouteId, async (g) => {
+        try {
+          const cypher = `MATCH (m:Model {name: $name})
+            WHERE ($path IS NULL OR m.path = $path)
+            OPTIONAL MATCH (m)-[r:RELATES_TO]->(target:Model)
+            RETURN m.tableName AS tableName, m.fieldSummary AS fieldSummary,
+                   collect(DISTINCT target.name) AS relations
+            LIMIT 1`;
+          const res = (await g.query(cypher, { params: { name: rawName, path: path ?? null } })) as {
+            data?: Array<Record<string, unknown>>;
+          };
+          const row = res.data?.[0];
+          if (row) {
+            tableName = _rv<string>(row, "tableName") ?? tableName;
+            fieldSummary = _rv<string>(row, "fieldSummary") ?? fieldSummary;
+            relations = _rv<string[]>(row, "relations") ?? relations;
+          }
+        } catch {
+          /* ignore */
+        }
+      });
+
+      const comments: string[] = [];
+      comments.push(`// [Model] ${rawName}${tableName ? ` (table: ${tableName})` : ""}${path ? ` in ${path}` : ""}`);
+      if (relations && relations.length > 0) comments.push(`// Relates to: ${relations.filter(Boolean).join(", ")}`);
+
+      let fieldsStr = "  [key: string]: unknown;";
+      if (fieldSummary) {
+        try {
+          const fields = JSON.parse(fieldSummary) as Array<{ name: string; type?: string }>;
+          if (Array.isArray(fields) && fields.length > 0) {
+            fieldsStr = fields.slice(0, 15).map((f) => `  ${f.name}: ${f.type || "unknown"};`).join("\n");
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      signatures.push(`${comments.join("\n")}\nexport interface ${rawName} {\n${fieldsStr}\n}`);
+    }
+  }
+
+  if (signatures.length === 0) return "";
+  return `### 🧠 Ego-Graph Context & Type Contracts (Graph-Augmented RAG)\n\`\`\`typescript\n${signatures.join("\n\n")}\n\`\`\``;
+}
+
 async function applyShardingInference(
   explicitProjectId: string | undefined,
   currentFilePath: string | undefined,
@@ -2167,6 +2361,80 @@ async function fetchFileFromIngest(
     }
   }
 
+  if (name === "sync_local_file") {
+    const rawPath = ((args?.filePath as string) ?? "").trim();
+    let content = args?.content as string | undefined;
+    let projectId = args?.projectId as string | undefined;
+    const repoId = args?.repoId as string | undefined;
+
+    if (!rawPath) {
+      return {
+        content: [{ type: "text", text: "**Error:** El parámetro `filePath` es requerido." }],
+        isError: true,
+      };
+    }
+
+    if (!projectId) {
+      projectId = (await applyShardingInference(undefined, rawPath)) ?? undefined;
+    }
+
+    const ingestUrl = (process.env.INGEST_URL ?? process.env.ARIADNESPEC_INGEST_URL ?? "http://localhost:3002").replace(/\/$/, "");
+
+    if (content === undefined) {
+      try {
+        const fs = await import("node:fs/promises");
+        const path = await import("node:path");
+        const absPath = path.isAbsolute(rawPath) ? rawPath : path.resolve(process.cwd(), rawPath);
+        content = await fs.readFile(absPath, "utf-8");
+      } catch {
+        content = "";
+      }
+    }
+
+    try {
+      const res = await fetch(`${ingestUrl}/repositories/local-sync/file`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: rawPath,
+          content,
+          projectId,
+          repoId,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        return {
+          content: [{ type: "text", text: `**Error ${res.status}:** No se pudo sincronizar el archivo localmente: ${text}` }],
+          isError: true,
+        };
+      }
+
+      const data = (await res.json()) as {
+        status: string;
+        path: string;
+        componentsIndexed?: number;
+        functionsIndexed?: number;
+      };
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `### ⚡ Sincronización Local Live Exitosa\n\n- **Archivo:** \`${data.path}\`\n- **Estado:** \`${data.status}\`\n- **Componentes indexados:** ${data.componentsIndexed ?? 0}\n- **Funciones indexadas:** ${data.functionsIndexed ?? 0}\n\n*El grafo delta local en FalkorDB ha sido actualizado sin requerir commit ni push remoto.*`,
+          },
+        ],
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: "text", text: `**Error de conexión con Ingest:** ${msg}` }],
+        isError: true,
+      };
+    }
+  }
+
   if (name === "semantic_search") {
     const query = ((args?.query as string) ?? "").trim();
     const projectId = args?.projectId as string | undefined;
@@ -2203,7 +2471,7 @@ async function fetchFileFromIngest(
       scopeRepoId = scope.repoId;
     }
     const hasRepoScope = Boolean(scopeRepoId);
-    const results: { type: string; name: string; projectId?: string }[] = [];
+    const results: { type: string; name: string; rawName?: string; path?: string; projectId?: string }[] = [];
     let usedVector = false;
     try {
       const embedParams = new URLSearchParams();
@@ -2220,7 +2488,7 @@ async function fetchFileFromIngest(
           const vecStr = `[${embedding!.join(",")}]`;
           const k = Math.min(Math.max(limit, 20), mcpLimits.semanticVectorKMax);
           const funcVecQ = `CALL db.idx.vector.queryNodes('Function', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
-          const compVecQ = `CALL db.idx.vector.queryNodes('Component', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.name AS name, node.projectId AS projectId, node.repoId AS repoId, score`;
+          const compVecQ = `CALL db.idx.vector.queryNodes('Component', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.name AS name, node.path AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
           const docVecQ = `CALL db.idx.vector.queryNodes('Document', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.path AS path, node.heading AS heading, node.chunkIndex AS chunkIndex, node.projectId AS projectId, node.repoId AS repoId, score`;
           const sbVecQ = `CALL db.idx.vector.queryNodes('StorybookDoc', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.title AS name, node.sourcePath AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
           const mdVecQ = `CALL db.idx.vector.queryNodes('MarkdownDoc', '${vecProp}', ${k}, vecf32(${vecStr})) YIELD node, score RETURN node.title AS name, node.sourcePath AS path, node.projectId AS projectId, node.repoId AS repoId, score`;
@@ -2253,9 +2521,7 @@ async function fetchFileFromIngest(
                     (mdRes.data?.length ?? 0) +
                     (modelVecRes.data?.length ?? 0) +
                     (enumVecRes.data?.length ?? 0) +
-                    (openApiVecRes.data?.length ?? 0) +
-                    (strapiCtVecRes.data?.length ?? 0) +
-                    (strapiSrVecRes.data?.length ?? 0) >
+                    (openApiVecRes.data?.length ?? 0) >
                   0
                 )
                   usedVector = true;
@@ -2272,19 +2538,28 @@ async function fetchFileFromIngest(
                   results.push({
                     type: "Function",
                     name: path ? `${name ?? ""} — ${path}` : (name ?? ""),
+                    rawName: name,
+                    path,
                     projectId: pid,
                   });
                 }
                 for (const row of cRes.data ?? []) {
                   if (results.length >= limit) return;
-                  const name = _rv<string>(row, "name");
+                  const name = _rv<string>(row, "name") ?? "";
+                  const path = _rv<string>(row, "path") ?? "";
                   const pid = _rv<string>(row, "projectId");
                   if (ctx.cypherProjectId && pid !== ctx.cypherProjectId) continue;
                   if (scopeRepoId && _rv<string>(row, "repoId") !== scopeRepoId) continue;
-                  const key = `Component:${name}`;
+                  const key = `Component:${name}:${path}`;
                   if (seen.has(key)) continue;
                   seen.add(key);
-                  results.push({ type: "Component", name: name ?? "", projectId: pid });
+                  results.push({
+                    type: "Component",
+                    name: path ? `${name} — ${path}` : name,
+                    rawName: name,
+                    path,
+                    projectId: pid,
+                  });
                 }
                 for (const row of dRes.data ?? []) {
                   if (results.length >= limit) return;
@@ -2345,6 +2620,8 @@ async function fetchFileFromIngest(
                   results.push({
                     type: "Model",
                     name: path ? `${name} — ${path}` : name,
+                    rawName: name,
+                    path,
                     projectId: pid,
                   });
                 }
@@ -2472,23 +2749,26 @@ async function fetchFileFromIngest(
         mergeRows(mdQ),
       ]);
       const seenKeys = new Set(results.map((r) => `${r.type}:${r.name}`));
-      const pushUnique = (type: string, name: string, pid?: string) => {
+      const pushUnique = (type: string, name: string, pid?: string, rawName?: string, path?: string) => {
         if (results.length >= limit) return;
         const key = `${type}:${name}`;
         if (seenKeys.has(key)) return;
         seenKeys.add(key);
-        results.push({ type, name, projectId: pid });
+        results.push({ type, name, rawName, path, projectId: pid });
       };
       for (const row of asObjRows(compRes.data)) {
         const n = _rv<string>(row, "name");
-        if (n != null && textMatchesQuery(n, query)) pushUnique("Component", n);
+        const path = _rv<string>(row, "path") ?? "";
+        if (n != null && textMatchesQuery(n, query)) {
+          pushUnique("Component", path ? `${n} — ${path}` : n, undefined, n, path);
+        }
       }
       for (const row of asObjRows(funcRes.data)) {
-        const name = _rv<string>(row, "name");
-        const path = _rv<string>(row, "path");
+        const name = _rv<string>(row, "name") ?? "";
+        const path = _rv<string>(row, "path") ?? "";
         const blob = [name, path].filter(Boolean).join(" ");
         if (textMatchesQuery(blob, query)) {
-          pushUnique("Function", path ? `${name ?? ""} — ${path}` : (name ?? ""));
+          pushUnique("Function", path ? `${name} — ${path}` : name, undefined, name, path);
         }
       }
       for (const row of asObjRows(fileRes.data)) {
@@ -2496,11 +2776,11 @@ async function fetchFileFromIngest(
         if (textMatchesQuery(path, query)) pushUnique("File", path);
       }
       for (const row of asObjRows(modelRes.data)) {
-        const name = _rv<string>(row, "name");
-        const path = _rv<string>(row, "path");
+        const name = _rv<string>(row, "name") ?? "";
+        const path = _rv<string>(row, "path") ?? "";
         const blob = [name, path].filter(Boolean).join(" ");
         if (textMatchesQuery(blob, query)) {
-          pushUnique("Model", path ? `${name ?? ""} — ${path}` : (name ?? ""));
+          pushUnique("Model", path ? `${name} — ${path}` : name, undefined, name, path);
         }
       }
       for (const row of asObjRows(enumRes.data)) {
@@ -2605,6 +2885,11 @@ async function fetchFileFromIngest(
         "",
         "_Sugerencias: `projectId` puede ser el id del **repositorio** (`roots[].id`); el MCP resuelve el `projectId` de Falkor. Si sigue vacío: `POST /repositories/:id/embed-index`, términos del código (p. ej. `paciente`, `cita`) o Cypher._",
       );
+    } else {
+      const egoSignatures = await buildEgoGraphSignatures(results.slice(0, limit), graphRouteId, scopeRepoId);
+      if (egoSignatures) {
+        lines.push("", egoSignatures);
+      }
     }
     const semText = lines.join("\n");
     await cache.set(cacheKeySem, semText, 300);

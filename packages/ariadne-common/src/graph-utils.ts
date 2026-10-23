@@ -81,3 +81,28 @@ export async function runCypherBatch(
     }
   }
 }
+
+/**
+ * Ejecuta una sentencia Cypher vectorizada usando UNWIND $batch AS item.
+ * Divide los items en lotes (batchSize) y realiza una única llamada parametrizada por lote a FalkorDB.
+ */
+export async function executeUnwindBatch<T>(
+  client: GraphClient,
+  cypherTemplate: string,
+  items: T[],
+  batchSize: number = DEFAULT_BATCH_SIZE,
+  extraParams?: Record<string, unknown>,
+): Promise<void> {
+  if (!items || items.length === 0) return;
+  const size = batchSize > 0 ? batchSize : DEFAULT_BATCH_SIZE;
+  for (let i = 0; i < items.length; i += size) {
+    const chunk = items.slice(i, i + size);
+    await client.query(cypherTemplate, {
+      params: {
+        ...(extraParams ?? {}),
+        batch: chunk,
+      },
+    });
+  }
+}
+

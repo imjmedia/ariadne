@@ -66,6 +66,7 @@ export {
 } from './graph-types.js';
 export {
   buildExportsMap,
+  executeUnwindBatch,
   resolveCrossFileCalls,
   runCypherBatch,
   type GraphClient,

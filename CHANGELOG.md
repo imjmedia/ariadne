@@ -7,6 +7,34 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ### Added
 
+- **Sincronización Local Live (Cursor Workspace Daemon & `sync_local_file`):**
+  - Tool MCP `sync_local_file` para actualizar deltas locales de archivos directamente en FalkorDB desde Cursor sin esperar commit/push a remoto.
+  - Endpoint `POST /repositories/local-sync/file` en `services/ingest` que ejecuta purga atómica de entidades obsoletas (`buildCypherPurgeFileEntities`) e indexa con Tree-sitter en < 50ms.
+  - Daemon local de observación de archivos `live-watcher.ts` con debounce inteligente (300ms) ejecutable mediante `pnpm --filter ariadne-mcp daemon` o binario `ariadne-daemon`.
+- **Batching Masivo vía `UNWIND`:**
+  - `executeUnwindBatch<T>` en `ariadne-common` para ejecutar sentencias Cypher vectorizadas mediante `$batch` parametrizado.
+  - Funciones `buildUnwindIngestPayload` y `executeUnwindIngestion` en `services/ingest/src/pipeline/producer.ts` para carga masiva de Files, Components, Hooks, Functions, Models, Routes, Imports, Calls y Renders.
+  - Integración en `sync.service.ts` agrupado por shard de grafo con fallback automático, reduciendo el tiempo de sincronización completa de minutos a segundos.
+- **Graph-Augmented RAG con Ego-Graphs:**
+  - Expansión topológica a 1 salto en `semantic_search` (`services/mcp-ariadne/src/index.ts` vía `buildEgoGraphSignatures`).
+  - Generación automática de contratos de interfaces TypeScript (`propsContract`), dependencias de renderizado (`@renderedBy`, `@renders`), hooks (`@hooks`), dependencias de llamada (`@calls`, `@calledBy`) y esquemas de datos.
+  - Formateado compacto en bloque TypeScript inyectado en el prompt de Cursor, eliminando alucinaciones de props y ahorrando miles de tokens de contexto.
+
+### Changed
+
+- **Identidad de Nodos Component & Props Inlined:**
+  - Clave unívoca de `Component` ampliada a `{name, path, projectId, repoId}` con índice `CREATE INDEX FOR (c:Component) ON (c.path)`.
+  - Inlining de props en `c.propsContract` (JSON serializado) y `c.propsSummary` en el nodo `Component`, eliminando nodos `(p:Prop)` y aristas `:HAS_PROP` (reducción de ~40% en nodos del grafo).
+- **Límites de Traversal en FalkorDB:**
+  - Reemplazo de traversals ilimitados `<-[:CALLS|RENDERS*]-` por recorridos acotados `<-[:CALLS|RENDERS*1..3]-` con `LIMIT 100` en MCP y API, evitando sobrecarga en el worker mono-hilo de FalkorDB.
+- **Fallback Nativo en `semantic_search`:**
+  - Búsqueda nativa con `CONTAINS toLower($q)` en FalkorDB con filtrado de scope, eliminando la carga descontrolada de cientos de entidades a memoria JavaScript.
+
+### Fixed
+
+- **Cypher Guard Lexical:** normalización con `stripLiteralsAndComments` en `packages/ariadne-common/src/cypher-guard.ts` para evitar falsos bloqueos en consultas con palabras clave reservadas (`DELETE`, `DROP`) dentro de strings literales.
+- **Falsos Ciclos de Renderizado:** prevención de autorreferencias recursivas (`rName === c.name`) en `services/ingest/src/pipeline/producer.ts`.
+
 - **C4 + Archify:** diagramas Context (dominios), Container (compose), Component (Falkor), secuencias API (Archify sequence), snapshots/diff, export Markdown (6 archivos), chat intent `architecture_diagram`, campos C4 en brownfield parity pack. Configuración en **Ajustes → Sistema → C4 / Diagramas** (`c4Enabled`, `c4AutoOnFullSync`, `c4ArchifyBin`). MCP: `get_c4_model`, `diff_c4_model`.
 - **Compliance Archify:** aviso en `NOTICE`, pin `ARCHIFY_VERSION` en imagen ingest, script `scripts/verify-archify-third-party.mjs` + job CI.
 - **fix(ingest):** Docker Archify v2.9+ — normalizar subcarpeta `archify/` a `/opt/archify` e instalar deps npm.

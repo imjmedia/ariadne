@@ -7,6 +7,7 @@
 import {
   cypherSafe,
   buildExportsMap,
+  executeUnwindBatch,
   resolveCrossFileCalls,
   runCypherBatch,
   type GraphClient,
@@ -867,4 +868,524 @@ export function buildCypherPurgeFileEntities(relativePath: string, projectId: st
     `MATCH (f:File {path: ${path}, projectId: ${pid}, repoId: ${rid}})-[r:IMPORTS]->() DELETE r`,
   ];
 }
+
+export interface UnwindFileItem {
+  path: string;
+  extension: string;
+  lastScan: string;
+  commitSha: string | null;
+  fileRole: string | null;
+}
+
+export interface UnwindComponentItem {
+  name: string;
+  path: string;
+  type: string;
+  isLegacy: boolean;
+  propsContract: string | null;
+  propsSummary: string | null;
+  description: string | null;
+}
+
+export interface UnwindFileChildItem {
+  path: string;
+  name: string;
+}
+
+export interface UnwindHookItem {
+  name: string;
+}
+
+export interface UnwindCompHookItem {
+  compName: string;
+  path: string;
+  hookName: string;
+}
+
+export interface UnwindCompRenderItem {
+  parentName: string;
+  parentPath: string;
+  childName: string;
+}
+
+export interface UnwindFunctionItem {
+  path: string;
+  name: string;
+  startLine: number | null;
+  endLine: number | null;
+  loc: number | null;
+  complexity: number | null;
+  nestingDepth: number | null;
+  commitSha: string | null;
+  description: string | null;
+  endpointCalls: string | null;
+}
+
+export interface UnwindImportItem {
+  fromPath: string;
+  toPath: string;
+}
+
+export interface UnwindCallItem {
+  callerPath: string;
+  callerName: string;
+  calleePath: string;
+  calleeName: string;
+}
+
+export interface UnwindRouteItem {
+  path: string;
+  componentName: string;
+  isPublicEntry: boolean;
+  routeSource: string | null;
+}
+
+export interface UnwindContextItem {
+  path: string;
+  name: string;
+}
+
+export interface UnwindModelItem {
+  path: string;
+  name: string;
+  source: string | null;
+  tableName: string | null;
+  embeddable: boolean;
+  indexSummary: string | null;
+  fieldSummary: string | null;
+  description: string | null;
+}
+
+export interface UnwindIngestPayload {
+  files: UnwindFileItem[];
+  components: UnwindComponentItem[];
+  fileComponents: UnwindFileChildItem[];
+  hooks: UnwindHookItem[];
+  compHooks: UnwindCompHookItem[];
+  compRenders: UnwindCompRenderItem[];
+  functions: UnwindFunctionItem[];
+  fileFunctions: UnwindFileChildItem[];
+  imports: UnwindImportItem[];
+  calls: UnwindCallItem[];
+  routes: UnwindRouteItem[];
+  contexts: UnwindContextItem[];
+  models: UnwindModelItem[];
+}
+
+/**
+ * Agrupa los artefactos de múltiples archivos parseados en un único payload optimizado
+ * para inserciones masivas vectorizadas con UNWIND $batch en FalkorDB.
+ */
+export function buildUnwindIngestPayload(
+  parsedFiles: ParsedFile[],
+  resolvedImportsMap: Map<string, string[]>,
+  allFilePaths: Set<string>,
+  resolvedCalls: ResolvedCallInfo[] = [],
+  context?: ChunkingContext,
+): UnwindIngestPayload {
+  const now = new Date().toISOString();
+  const files: UnwindFileItem[] = [];
+  const components: UnwindComponentItem[] = [];
+  const fileComponents: UnwindFileChildItem[] = [];
+  const hooksMap = new Map<string, UnwindHookItem>();
+  const compHooks: UnwindCompHookItem[] = [];
+  const compRenders: UnwindCompRenderItem[] = [];
+  const functions: UnwindFunctionItem[] = [];
+  const fileFunctions: UnwindFileChildItem[] = [];
+  const imports: UnwindImportItem[] = [];
+  const calls: UnwindCallItem[] = [];
+  const routes: UnwindRouteItem[] = [];
+  const contexts: UnwindContextItem[] = [];
+  const models: UnwindModelItem[] = [];
+
+  for (const parsed of parsedFiles) {
+    const path = parsed.path;
+    const ext = path.slice(path.lastIndexOf('.')) || '.js';
+    files.push({
+      path,
+      extension: ext,
+      lastScan: now,
+      commitSha: context?.commitSha ?? null,
+      fileRole: parsed.fileRole ?? null,
+    });
+
+    for (const c of parsed.components ?? []) {
+      const props = parsed.propsByComponent?.[c.name] ?? [];
+      components.push({
+        name: c.name,
+        path,
+        type: c.type,
+        isLegacy: Boolean(c.isLegacy),
+        propsContract: props.length ? JSON.stringify(props) : null,
+        propsSummary: props.length ? JSON.stringify(props.map((p) => p.name)) : null,
+        description: c.description && c.description.trim() ? c.description.trim() : null,
+      });
+      fileComponents.push({ path, name: c.name });
+
+      const hooksToLink = c.hooksUsed && c.hooksUsed.length > 0 ? c.hooksUsed : parsed.hooksUsed.map((h) => h.name);
+      for (const hName of hooksToLink) {
+        hooksMap.set(hName, { name: hName });
+        compHooks.push({ compName: c.name, path, hookName: hName });
+      }
+
+      const rendersToLink = c.renders && c.renders.length > 0 ? c.renders : parsed.renders.map((r) => r.componentName);
+      for (const rName of rendersToLink) {
+        if (rName === c.name) continue;
+        compRenders.push({ parentName: c.name, parentPath: path, childName: rName });
+      }
+    }
+
+    for (const r of parsed.routes ?? []) {
+      const parents: string[] = [];
+      if (r.enclosingComponent && parsed.components.some((c) => c.name === r.enclosingComponent)) {
+        parents.push(r.enclosingComponent);
+      } else if (parsed.components.length === 1) {
+        parents.push(parsed.components[0]!.name);
+      }
+      for (const parentName of parents) {
+        if (parentName === r.componentName) continue;
+        compRenders.push({ parentName, parentPath: path, childName: r.componentName });
+      }
+      routes.push({
+        path: r.path,
+        componentName: r.componentName,
+        isPublicEntry: Boolean(r.isPublicEntry),
+        routeSource: r.routeSource ?? null,
+      });
+    }
+
+    for (const ctx of parsed.contexts ?? []) {
+      contexts.push({ path, name: ctx.name });
+    }
+
+    for (const h of parsed.hooksDefined ?? []) {
+      hooksMap.set(h.name, { name: h.name });
+    }
+
+    for (const fn of parsed.functions ?? []) {
+      const loc = fn.lineRange ? fn.lineRange.end - fn.lineRange.start + 1 : null;
+      functions.push({
+        path,
+        name: fn.name,
+        startLine: fn.lineRange?.start ?? null,
+        endLine: fn.lineRange?.end ?? null,
+        loc,
+        complexity: fn.complexity ?? null,
+        nestingDepth: fn.nestingDepth ?? null,
+        commitSha: context?.commitSha ?? null,
+        description: fn.description && fn.description.trim() ? fn.description.trim() : null,
+        endpointCalls: fn.endpointCalls?.length ? JSON.stringify(fn.endpointCalls) : null,
+      });
+      fileFunctions.push({ path, name: fn.name });
+    }
+
+    for (const call of parsed.calls ?? []) {
+      calls.push({
+        callerPath: path,
+        callerName: call.caller,
+        calleePath: path,
+        calleeName: call.callee,
+      });
+    }
+
+    const resolvedImports = resolvedImportsMap.get(path) ?? [];
+    for (const targetPath of resolvedImports) {
+      if (allFilePaths.has(targetPath) && targetPath !== path) {
+        imports.push({ fromPath: path, toPath: targetPath });
+      }
+    }
+
+    for (const m of parsed.models ?? []) {
+      models.push({
+        path,
+        name: m.name,
+        source: m.source ?? null,
+        tableName: m.tableName?.trim() ?? null,
+        embeddable: Boolean(m.embeddable),
+        indexSummary: m.indexSummary?.trim() ?? null,
+        fieldSummary: m.entityFields?.length ? JSON.stringify(m.entityFields.slice(0, 120)) : null,
+        description: m.description?.trim() ?? null,
+      });
+    }
+  }
+
+  for (const rc of resolvedCalls) {
+    calls.push({
+      callerPath: rc.callerPath,
+      callerName: rc.callerName,
+      calleePath: rc.calleePath,
+      calleeName: rc.calleeName,
+    });
+  }
+
+  return {
+    files,
+    components,
+    fileComponents,
+    hooks: Array.from(hooksMap.values()),
+    compHooks,
+    compRenders,
+    functions,
+    fileFunctions,
+    imports,
+    calls,
+    routes,
+    contexts,
+    models,
+  };
+}
+
+/**
+ * Ejecuta la inserción masiva vectorizada de entidades y relaciones usando UNWIND $batch.
+ * Sustituye miles de MERGEs individuales por pocas llamadas por lote parametrizadas,
+ * reduciendo el tiempo de sincronización completa en FalkorDB de minutos a segundos.
+ */
+export async function executeUnwindIngestion(
+  client: GraphClient,
+  payload: UnwindIngestPayload,
+  projectId: string,
+  repoId: string,
+  batchSize: number = 500,
+): Promise<void> {
+  const staticParams = { projectId, repoId };
+
+  // 1. Files
+  if (payload.files.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS f
+       MERGE (file:File {path: f.path, projectId: $projectId, repoId: $repoId})
+       ON CREATE SET file.extension = f.extension, file.lastScan = f.lastScan, file.commitSha = f.commitSha, file.fileRole = f.fileRole
+       ON MATCH SET file.extension = f.extension, file.lastScan = f.lastScan, file.commitSha = f.commitSha, file.fileRole = f.fileRole`,
+      payload.files,
+      batchSize,
+      staticParams,
+    );
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS f
+       MATCH (p:Project {projectId: $projectId})
+       MATCH (file:File {path: f.path, projectId: $projectId, repoId: $repoId})
+       MERGE (p)-[:CONTAINS]->(file)`,
+      payload.files,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 2. Components
+  if (payload.components.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS c
+       MERGE (comp:Component {name: c.name, path: c.path, projectId: $projectId, repoId: $repoId})
+       ON CREATE SET comp.type = c.type, comp.isLegacy = c.isLegacy, comp.propsContract = c.propsContract, comp.propsSummary = c.propsSummary, comp.description = c.description
+       ON MATCH SET comp.type = c.type, comp.isLegacy = c.isLegacy, comp.propsContract = c.propsContract, comp.propsSummary = c.propsSummary, comp.description = c.description`,
+      payload.components,
+      batchSize,
+      staticParams,
+    );
+  }
+  if (payload.fileComponents.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS fc
+       MATCH (file:File {path: fc.path, projectId: $projectId, repoId: $repoId})
+       MATCH (comp:Component {name: fc.name, path: fc.path, projectId: $projectId, repoId: $repoId})
+       MERGE (file)-[:CONTAINS]->(comp)`,
+      payload.fileComponents,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 3. Hooks & USES_HOOK
+  if (payload.hooks.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS h
+       MERGE (hook:Hook {name: h.name, projectId: $projectId, repoId: $repoId})`,
+      payload.hooks,
+      batchSize,
+      staticParams,
+    );
+  }
+  if (payload.compHooks.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS ch
+       MATCH (comp:Component {name: ch.compName, path: ch.path, projectId: $projectId, repoId: $repoId})
+       MATCH (hook:Hook {name: ch.hookName, projectId: $projectId, repoId: $repoId})
+       MERGE (comp)-[:USES_HOOK]->(hook)`,
+      payload.compHooks,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 4. Component RENDERS
+  if (payload.compRenders.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS r
+       MERGE (child:Component {name: r.childName, projectId: $projectId, repoId: $repoId})`,
+      payload.compRenders,
+      batchSize,
+      staticParams,
+    );
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS r
+       MATCH (parent:Component {name: r.parentName, path: r.parentPath, projectId: $projectId, repoId: $repoId})
+       MATCH (child:Component {name: r.childName, projectId: $projectId, repoId: $repoId})
+       MERGE (parent)-[:RENDERS]->(child)`,
+      payload.compRenders,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 5. Functions
+  if (payload.functions.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS fn
+       MERGE (f:Function {path: fn.path, name: fn.name, projectId: $projectId, repoId: $repoId})
+       ON CREATE SET f.startLine = fn.startLine, f.endLine = fn.endLine, f.loc = fn.loc, f.complexity = fn.complexity, f.nestingDepth = fn.nestingDepth, f.commitSha = fn.commitSha, f.description = fn.description, f.endpointCalls = fn.endpointCalls
+       ON MATCH SET f.startLine = fn.startLine, f.endLine = fn.endLine, f.loc = fn.loc, f.complexity = fn.complexity, f.nestingDepth = fn.nestingDepth, f.commitSha = fn.commitSha, f.description = fn.description, f.endpointCalls = fn.endpointCalls`,
+      payload.functions,
+      batchSize,
+      staticParams,
+    );
+  }
+  if (payload.fileFunctions.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS ff
+       MATCH (file:File {path: ff.path, projectId: $projectId, repoId: $repoId})
+       MATCH (f:Function {path: ff.path, name: ff.name, projectId: $projectId, repoId: $repoId})
+       MERGE (file)-[:CONTAINS]->(f)`,
+      payload.fileFunctions,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 6. IMPORTS
+  if (payload.imports.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS imp
+       MATCH (a:File {path: imp.fromPath, projectId: $projectId, repoId: $repoId})
+       MATCH (b:File {path: imp.toPath, projectId: $projectId, repoId: $repoId})
+       MERGE (a)-[:IMPORTS]->(b)`,
+      payload.imports,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 7. CALLS
+  if (payload.calls.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS c
+       MATCH (caller:Function {path: c.callerPath, name: c.callerName, projectId: $projectId, repoId: $repoId})
+       MATCH (callee:Function {path: c.calleePath, name: c.calleeName, projectId: $projectId, repoId: $repoId})
+       MERGE (caller)-[:CALLS]->(callee)`,
+      payload.calls,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 8. Routes
+  if (payload.routes.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS rt
+       MERGE (r:Route {path: rt.path, projectId: $projectId, repoId: $repoId})
+       ON CREATE SET r.componentName = rt.componentName, r.isPublicEntry = rt.isPublicEntry, r.routeSource = rt.routeSource
+       ON MATCH SET r.componentName = rt.componentName, r.isPublicEntry = rt.isPublicEntry, r.routeSource = rt.routeSource`,
+      payload.routes,
+      batchSize,
+      staticParams,
+    );
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS rt
+       MATCH (p:Project {projectId: $projectId})
+       MATCH (r:Route {path: rt.path, projectId: $projectId, repoId: $repoId})
+       MERGE (p)-[:HAS_ROUTE]->(r)`,
+      payload.routes,
+      batchSize,
+      staticParams,
+    );
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS rt
+       MERGE (comp:Component {name: rt.componentName, projectId: $projectId, repoId: $repoId})`,
+      payload.routes,
+      batchSize,
+      staticParams,
+    );
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS rt
+       MATCH (r:Route {path: rt.path, projectId: $projectId, repoId: $repoId})
+       MATCH (comp:Component {name: rt.componentName, projectId: $projectId, repoId: $repoId})
+       MERGE (r)-[:ROUTE_TO_COMPONENT]->(comp)`,
+      payload.routes,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 9. Contexts
+  if (payload.contexts.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS ctx
+       MERGE (c:Context {name: ctx.name, projectId: $projectId, repoId: $repoId})`,
+      payload.contexts,
+      batchSize,
+      staticParams,
+    );
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS ctx
+       MATCH (f:File {path: ctx.path, projectId: $projectId, repoId: $repoId})
+       MATCH (c:Context {name: ctx.name, projectId: $projectId, repoId: $repoId})
+       MERGE (f)-[:CONTAINS]->(c)`,
+      payload.contexts,
+      batchSize,
+      staticParams,
+    );
+  }
+
+  // 10. Models
+  if (payload.models.length > 0) {
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS m
+       MERGE (model:Model {path: m.path, name: m.name, projectId: $projectId, repoId: $repoId})
+       ON CREATE SET model.source = m.source, model.tableName = m.tableName, model.embeddable = m.embeddable, model.indexSummary = m.indexSummary, model.fieldSummary = m.fieldSummary, model.description = m.description
+       ON MATCH SET model.source = m.source, model.tableName = m.tableName, model.embeddable = m.embeddable, model.indexSummary = m.indexSummary, model.fieldSummary = m.fieldSummary, model.description = m.description`,
+      payload.models,
+      batchSize,
+      staticParams,
+    );
+    await executeUnwindBatch(
+      client,
+      `UNWIND $batch AS m
+       MATCH (f:File {path: m.path, projectId: $projectId, repoId: $repoId})
+       MATCH (model:Model {path: m.path, name: m.name, projectId: $projectId, repoId: $repoId})
+       MERGE (f)-[:CONTAINS]->(model)`,
+      payload.models,
+      batchSize,
+      staticParams,
+    );
+  }
+}
+
 

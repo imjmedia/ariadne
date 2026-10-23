@@ -27,6 +27,9 @@ import { extractDomainConcepts, inferDomainConfig } from '../pipeline/domain-ext
 import {
   buildCypherForFile,
   buildCypherDeleteFile,
+  buildCypherPurgeFileEntities,
+  buildUnwindIngestPayload,
+  executeUnwindIngestion,
   resolveCrossFileCalls,
   resolveImportPath,
   runCypherBatch,
@@ -671,32 +674,67 @@ export class SyncService {
           return graphClient;
         };
 
+        // Batching Masivo vía UNWIND: Agrupa archivos por shard y vectoriza la inserción
+        const filesByGraphKey = new Map<string, typeof parsedFilesEnriched>();
         for (const parsed of parsedFilesEnriched) {
+          const seg = shardMode === 'domain' ? domainSegmentFromRepoPath(parsed.path) : 'default';
+          const list = filesByGraphKey.get(seg) ?? [];
+          list.push(parsed);
+          filesByGraphKey.set(seg, list);
+        }
+
+        for (const [, groupFiles] of filesByGraphKey) {
+          const firstPath = groupFiles[0]?.path ?? 'src/index.ts';
+          const graphClient = await prepareGraph(firstPath);
           try {
-            const resolvedImports: string[] = [];
-            for (const imp of parsed.imports) {
-              const r = resolvePath(parsed.path, imp.specifier);
-              if (r && !resolvedImports.includes(r)) resolvedImports.push(r);
+            const resolvedImportsMap = new Map<string, string[]>();
+            for (const parsed of groupFiles) {
+              const resolved: string[] = [];
+              for (const imp of parsed.imports) {
+                const r = resolvePath(parsed.path, imp.specifier);
+                if (r && !resolved.includes(r)) resolved.push(r);
+              }
+              resolvedImportsMap.set(parsed.path, resolved);
             }
-            const callsForFile = resolvedCalls.filter(
-              (rc) => rc.callerPath === parsed.path,
-            );
-            const statements = buildCypherForFile(
-              parsed,
-              resolvedImports,
+            const payload = buildUnwindIngestPayload(
+              groupFiles,
+              resolvedImportsMap,
               pathSet,
-              callsForFile,
-              projectId,
-              repoId,
+              resolvedCalls,
               chunkingContext,
-              resolveOpts,
             );
-            const graphClient = await prepareGraph(parsed.path);
-            await runCypherBatch(graphClient, statements);
-            if (projectId === projectIds[0]) indexedPaths.push(parsed.path);
-          } catch (err) {
-            console.error(`Sync: error indexing ${parsed.path}:`, err);
-            if (projectId === projectIds[0]) skippedIndex.push(parsed.path);
+            await executeUnwindIngestion(graphClient, payload, projectId, repoId);
+            if (projectId === projectIds[0]) {
+              for (const p of groupFiles) indexedPaths.push(p.path);
+            }
+          } catch (unwindErr) {
+            console.warn(
+              `Sync UNWIND batch failed, falling back to statement-by-statement for group:`,
+              unwindErr,
+            );
+            for (const parsed of groupFiles) {
+              try {
+                const resolvedImports = resolvedImportsMap.get(parsed.path) ?? [];
+                const callsForFile = resolvedCalls.filter(
+                  (rc) => rc.callerPath === parsed.path,
+                );
+                const statements = buildCypherForFile(
+                  parsed,
+                  resolvedImports,
+                  pathSet,
+                  callsForFile,
+                  projectId,
+                  repoId,
+                  chunkingContext,
+                  resolveOpts,
+                );
+                await runCypherBatch(graphClient, statements);
+                if (projectId === projectIds[0]) indexedPaths.push(parsed.path);
+              } catch (err) {
+                console.error(`Sync: error indexing ${parsed.path}:`, err);
+                if (projectId === projectIds[0]) skippedIndex.push(parsed.path);
+              }
+            }
           }
         }
         for (const pf of prismaFiles) {
@@ -1089,5 +1127,69 @@ export class SyncService {
       }
     }
     return null;
+  }
+
+  /**
+   * Sincronización Local Live: indexa en milisegundos un archivo modificado o guardado localmente
+   * en el IDE sin requerir commit ni push remoto a Bitbucket/GitHub.
+   */
+  async syncLocalFile(dto: {
+    path: string;
+    content?: string;
+    projectId?: string;
+    repoId?: string;
+  }): Promise<{ status: string; path: string; componentsIndexed: number; functionsIndexed: number }> {
+    const { path, content } = dto;
+    const repoId = dto.repoId || dto.projectId || 'local';
+    const projectId = dto.projectId || dto.repoId || 'local';
+
+    const config = getFalkorConfig();
+    const client = await FalkorDB.connect({
+      socket: { host: config.host, port: config.port },
+    });
+
+    try {
+      const gname = graphNameForProject(isProjectShardingEnabled() ? projectId : undefined);
+      const graph = client.selectGraph(gname);
+      const graphClient = { query: (cypher: string) => graph.query(cypher) };
+
+      if (!content || !content.trim()) {
+        const deleteCy = buildCypherDeleteFile(path, projectId, repoId);
+        await runCypherBatch(graphClient, deleteCy);
+        return { status: 'deleted', path, componentsIndexed: 0, functionsIndexed: 0 };
+      }
+
+      // Purga atómica de entidades viejas del archivo para evitar nodos zombis
+      const purgeCy = buildCypherPurgeFileEntities(path, projectId, repoId);
+      if (purgeCy.length > 0) {
+        await runCypherBatch(graphClient, purgeCy);
+      }
+
+      // Parseo con Tree-sitter
+      const out = parseSource(path, content, { extractDomainConcepts });
+      const parsed = out && 'root' in out ? out.parsed : out;
+      if (!parsed) {
+        return { status: 'unparseable', path, componentsIndexed: 0, functionsIndexed: 0 };
+      }
+
+      const statements = buildCypherForFile(
+        parsed,
+        [],
+        new Set([path]),
+        [],
+        projectId,
+        repoId,
+      );
+      await runCypherBatch(graphClient, statements);
+
+      return {
+        status: 'synced',
+        path,
+        componentsIndexed: parsed.components?.length ?? 0,
+        functionsIndexed: parsed.functions?.length ?? 0,
+      };
+    } finally {
+      await client.close();
+    }
   }
 }
