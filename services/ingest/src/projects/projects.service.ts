@@ -284,6 +284,29 @@ export class ProjectsService {
       add(g, projectId);
     }
 
+    // Si projectId es un Proyecto, agrega también los shards y cypherProjectId de sus repositorios vinculados
+    const prs = await this.projectRepoRepo.find({
+      where: { projectId },
+      select: ['repoId'],
+    });
+    for (const pr of prs) {
+      for (const g of await this.graphShardNamesForProjectId(pr.repoId)) {
+        add(g, pr.repoId);
+      }
+      add(graphNameForProject(isProjectShardingEnabled() ? pr.repoId : undefined), pr.repoId);
+    }
+
+    // Si projectId es un repositoryId, agrega también los proyectos a los que pertenece
+    const parentPrs = await this.projectRepoRepo.find({
+      where: { repoId: projectId },
+      select: ['projectId'],
+    });
+    for (const ppr of parentPrs) {
+      for (const g of await this.graphShardNamesForProjectId(ppr.projectId)) {
+        add(g, ppr.projectId);
+      }
+    }
+
     if (!includeSiblings) return out;
 
     const deps = await this.projectDomainDepRepo.find({

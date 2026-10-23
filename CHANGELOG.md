@@ -32,6 +32,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ### Fixed
 
+- **Resolución de Identidad en Chat y Modification-Plan (`projectId` vs `repoId`):**
+  - Enrutamiento directo en `chatProject` hacia `chatRepository` cuando el proyecto tiene un único repositorio vinculado, evitando consultas a grafos vacíos.
+  - Expansión bidireccional en `ProjectsService.getCypherShardContexts` para incluir los shards de todos los repositorios vinculados al proyecto y viceversa.
+  - Resiliencia en consultas Cypher de `collectModificationPlanFiles` soportando indistintamente `WHERE (f.projectId = $projectId OR f.projectId = $repoId OR f.repoId = $repoId)` para evitar discrepancias cuando los nodos fueron indexados en modo standalone.
+  - Alcance de `restrictRepos` en `collectModificationPlanFiles` tolerante a `projectId` y `repoId`.
+- **Ámbito de `resolvedImportsMap` en Fallback de Ingest:**
+  - Extraída la declaración fuera del bloque `try` para garantizar visibilidad en el bloque de recuperación `catch` archivo por archivo durante el despliegue.
 - **Cypher Guard Lexical:** normalización con `stripLiteralsAndComments` en `packages/ariadne-common/src/cypher-guard.ts` para evitar falsos bloqueos en consultas con palabras clave reservadas (`DELETE`, `DROP`) dentro de strings literales.
 - **Falsos Ciclos de Renderizado:** prevención de autorreferencias recursivas (`rName === c.name`) en `services/ingest/src/pipeline/producer.ts`.
 

@@ -1050,11 +1050,11 @@ Sé conciso en los párrafos pedagógicos. Usa bullet points y tablas. Incluye T
     const repo = await this.repos.findOne(repositoryId);
     const projectId = await this.resolveProjectIdForRepo(repo.id);
     const sc = modificationPlanScopeCypher(scope);
-    const scopeParams = sc.params;
+    const scopeParams = { ...sc.params, projectId, repoId: repo.id };
 
     const indexedRows = (await this.cypher.executeCypher(
       projectId,
-      `MATCH (f:File) WHERE f.projectId = $projectId${sc.fileClause} RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId`,
+      `MATCH (f:File) WHERE (f.projectId = $projectId OR f.projectId = $repoId OR f.repoId = $repoId)${sc.fileClause} RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId`,
       { ...scopeParams },
     )) as Array<{ path: string; repoId: string }>;
 
@@ -1072,21 +1072,21 @@ Sé conciso en los párrafos pedagógicos. Usa bullet points y tablas. Incluye T
     for (const term of termPairs) {
       const filesByPath = (await this.cypher.executeCypher(
         projectId,
-        `MATCH (f:File) WHERE f.projectId = $projectId${sc.fileClause} AND (f.path CONTAINS $term) RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId`,
+        `MATCH (f:File) WHERE (f.projectId = $projectId OR f.projectId = $repoId OR f.repoId = $repoId)${sc.fileClause} AND (f.path CONTAINS $term) RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId`,
         { ...scopeParams, term },
       )) as Array<{ path: string; repoId: string }>;
       filesByPath.forEach((r) => addIfScoped(r.path, r.repoId));
 
       const filesByComponent = (await this.cypher.executeCypher(
         projectId,
-        `MATCH (f:File)-[:CONTAINS]->(c:Component) WHERE f.projectId = $projectId AND c.projectId = $projectId${sc.fileClause} AND (c.name CONTAINS $term) RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId`,
+        `MATCH (f:File)-[:CONTAINS]->(c:Component) WHERE (f.projectId = $projectId OR f.projectId = $repoId OR f.repoId = $repoId) AND (c.projectId = $projectId OR c.projectId = $repoId OR c.repoId = $repoId)${sc.fileClause} AND (c.name CONTAINS $term) RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId`,
         { ...scopeParams, term },
       )) as Array<{ path: string; repoId: string }>;
       filesByComponent.forEach((r) => addIfScoped(r.path, r.repoId));
 
       const filesByFunction = (await this.cypher.executeCypher(
         projectId,
-        `MATCH (fn:Function) WHERE fn.projectId = $projectId${sc.fnClause} AND (fn.path CONTAINS $term OR fn.name CONTAINS $term) RETURN fn.path as path, coalesce(fn.repoId, fn.projectId) as repoId`,
+        `MATCH (fn:Function) WHERE (fn.projectId = $projectId OR fn.projectId = $repoId OR fn.repoId = $repoId)${sc.fnClause} AND (fn.path CONTAINS $term OR fn.name CONTAINS $term) RETURN fn.path as path, coalesce(fn.repoId, fn.projectId) as repoId`,
         { ...scopeParams, term },
       )) as Array<{ path: string; repoId: string }>;
       filesByFunction.forEach((r) => addIfScoped(r.path, r.repoId));
@@ -1120,8 +1120,8 @@ Sé conciso en los párrafos pedagógicos. Usa bullet points y tablas. Incluye T
       if (row.tipo === 'Component' && row.name) {
         const fileRows = (await this.cypher.executeCypher(
           projectId,
-          `MATCH (f:File)-[:CONTAINS]->(c:Component {name: $name, projectId: $projectId}) WHERE f.projectId = $projectId${sc.fileClause} RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId LIMIT 5`,
-          { ...scopeParams, name: row.name, projectId },
+          `MATCH (f:File)-[:CONTAINS]->(c:Component {name: $name}) WHERE (f.projectId = $projectId OR f.projectId = $repoId OR f.repoId = $repoId) AND (c.projectId = $projectId OR c.projectId = $repoId OR c.repoId = $repoId)${sc.fileClause} RETURN f.path as path, coalesce(f.repoId, f.projectId) as repoId LIMIT 5`,
+          { ...scopeParams, name: row.name },
         )) as Array<{ path: string; repoId: string }>;
         fileRows.forEach((r) => addIfScoped(r.path, r.repoId));
       }
@@ -1131,8 +1131,10 @@ Sé conciso en los párrafos pedagógicos. Usa bullet points y tablas. Incluye T
       .filter((r) => candidatePathRepoSet.has(`${r.path}\t${r.repoId}`))
       .map((r) => ({ path: r.path, repoId: r.repoId }))
       .sort((a, b) => a.path.localeCompare(b.path) || a.repoId.localeCompare(b.repoId));
-    const restrictRepos = scope?.repoIds?.length ? new Set(scope.repoIds) : new Set([repositoryId]);
-    let filesToModify = sortedFull.filter((f) => restrictRepos.has(f.repoId));
+    const restrictRepos = scope?.repoIds?.length ? new Set(scope.repoIds) : new Set([repositoryId, projectId, repo.id]);
+    let filesToModify = sortedFull.filter(
+      (f) => restrictRepos.has(f.repoId) || f.repoId === repositoryId || f.repoId === repo.id || f.repoId === projectId,
+    );
     if (scope) {
       filesToModify = filesToModify.filter((f) => matchesChatScope(f.path, f.repoId, scope));
     }

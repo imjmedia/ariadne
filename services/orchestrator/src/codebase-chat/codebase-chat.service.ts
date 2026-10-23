@@ -198,6 +198,10 @@ export class CodebaseChatService {
         return this.chatRepository(only, req);
       }
     }
+    // Si el proyecto tiene un único repositorio vinculado, consultar directamente ese repo
+    if (repos.length === 1) {
+      return this.chatRepository(repos[0].id, req);
+    }
     const firstRepoId = repos[0].id;
     return this.runChat(initialStateFromRequest(firstRepoId, projectId, true, req));
   }
