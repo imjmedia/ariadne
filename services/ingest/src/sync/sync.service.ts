@@ -686,16 +686,16 @@ export class SyncService {
         for (const [, groupFiles] of filesByGraphKey) {
           const firstPath = groupFiles[0]?.path ?? 'src/index.ts';
           const graphClient = await prepareGraph(firstPath);
-          try {
-            const resolvedImportsMap = new Map<string, string[]>();
-            for (const parsed of groupFiles) {
-              const resolved: string[] = [];
-              for (const imp of parsed.imports) {
-                const r = resolvePath(parsed.path, imp.specifier);
-                if (r && !resolved.includes(r)) resolved.push(r);
-              }
-              resolvedImportsMap.set(parsed.path, resolved);
+          const resolvedImportsMap = new Map<string, string[]>();
+          for (const parsed of groupFiles) {
+            const resolved: string[] = [];
+            for (const imp of parsed.imports) {
+              const r = resolvePath(parsed.path, imp.specifier);
+              if (r && !resolved.includes(r)) resolved.push(r);
             }
+            resolvedImportsMap.set(parsed.path, resolved);
+          }
+          try {
             const payload = buildUnwindIngestPayload(
               groupFiles,
               resolvedImportsMap,
