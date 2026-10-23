@@ -302,7 +302,7 @@ export const EXPLORER_TOOLS_ALL = [
         properties: {
           cypher: {
             type: 'string',
-            description: 'Consulta Cypher. DEBE incluir projectId = $projectId en el WHERE. NO usar LIMIT.',
+            description: 'Consulta Cypher de solo lectura. Debe filtrar por projectId = $projectId. Límite máximo 50 filas.',
           },
         },
         required: ['cypher'],

@@ -72,6 +72,10 @@ export interface ComponentInfo {
   isLegacy: boolean;
   /** JSDoc/TSDoc description si existe */
   description?: string;
+  /** Componentes JSX renderizados directamente por este componente */
+  renders?: string[];
+  /** Hooks invocados directamente por este componente */
+  hooksUsed?: string[];
 }
 
 export interface HookUsage {

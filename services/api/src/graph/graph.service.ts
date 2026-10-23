@@ -455,7 +455,7 @@ export class GraphService {
 
     const runImpact = async (graph: FalkorGraph) => {
       const result = (await graph.query(
-        `MATCH (n {name: $nodeName${matchProj}})<-[:CALLS|RENDERS*]-(dependent) RETURN dependent.name AS name, labels(dependent) AS labels`,
+        `MATCH (n {name: $nodeName${matchProj}})<-[:CALLS|RENDERS*1..3]-(dependent) RETURN DISTINCT dependent.name AS name, labels(dependent) AS labels LIMIT 100`,
         { params },
       )) as FalkorResult;
       const rows = this.mapImpactQueryRows(result);

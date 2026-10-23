@@ -53,6 +53,14 @@ const BLOCKED_PATTERNS: Array<{ clause: BlockedCypherClause; re: RegExp }> = [
   { clause: 'CALL {', re: /\bCALL\s*\{/i },
 ];
 
+/** Strips comments and string literals to prevent false positives on keywords inside strings. */
+function stripLiteralsAndComments(query: string): string {
+  const noComments = query.replace(/\/\/.*$/gm, '');
+  return noComments
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+}
+
 /**
  * Validates that a Cypher query is read-only. Throws {@link CypherGuardError} on blocked clauses.
  */
@@ -61,8 +69,9 @@ export function validateReadOnlyCypher(query: string): void {
   if (!trimmed) {
     throw new CypherGuardError('Cypher query is empty', 'EMPTY');
   }
+  const sanitized = stripLiteralsAndComments(trimmed);
   for (const { clause, re } of BLOCKED_PATTERNS) {
-    if (re.test(trimmed)) {
+    if (re.test(sanitized)) {
       throw new CypherGuardError(
         `Blocked write/destructive Cypher clause: ${clause}. query_graph is read-only.`,
         clause,

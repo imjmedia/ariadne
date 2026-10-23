@@ -204,36 +204,36 @@ export function buildCypherForFile(
       c.description != null && c.description.trim()
         ? `, c.description = ${cypherSafe(c.description.trim())}`
         : '';
+    const props = parsed.propsByComponent?.[c.name] ?? [];
+    const propsContractProp = props.length
+      ? `, c.propsContract = ${cypherSafe(JSON.stringify(props))}`
+      : ', c.propsContract = null';
+    const propsSummaryProp = props.length
+      ? `, c.propsSummary = ${cypherSafe(JSON.stringify(props.map((p) => p.name)))}`
+      : ', c.propsSummary = null';
+
     statements.push(
-      `MERGE (c:Component {name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET c.type = ${cypherSafe(c.type)}, c.isLegacy = ${c.isLegacy}${descProp} ON MATCH SET c.type = ${cypherSafe(c.type)}, c.isLegacy = ${c.isLegacy}${descProp}`,
+      `MERGE (c:Component {name: ${cypherSafe(c.name)}, path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET c.type = ${cypherSafe(c.type)}, c.isLegacy = ${c.isLegacy}${propsContractProp}${propsSummaryProp}${descProp} ON MATCH SET c.type = ${cypherSafe(c.type)}, c.isLegacy = ${c.isLegacy}${propsContractProp}${propsSummaryProp}${descProp}`,
     );
     statements.push(
-      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (comp:Component {name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(comp)`,
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (comp:Component {name: ${cypherSafe(c.name)}, path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(comp)`,
     );
 
-    for (const h of parsed.hooksUsed) {
-      statements.push(`MERGE (h:Hook {name: ${cypherSafe(h.name)}, projectId: ${pid}, repoId: ${rid}})`);
+    const hooksToLink = c.hooksUsed && c.hooksUsed.length > 0 ? c.hooksUsed : parsed.hooksUsed.map((h) => h.name);
+    for (const hName of hooksToLink) {
+      statements.push(`MERGE (h:Hook {name: ${cypherSafe(hName)}, projectId: ${pid}, repoId: ${rid}})`);
       statements.push(
-        `MATCH (comp:Component {name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) MATCH (h:Hook {name: ${cypherSafe(h.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (comp)-[:USES_HOOK]->(h)`,
+        `MATCH (comp:Component {name: ${cypherSafe(c.name)}, path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (h:Hook {name: ${cypherSafe(hName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (comp)-[:USES_HOOK]->(h)`,
       );
     }
 
-    for (const r of parsed.renders) {
-      statements.push(`MERGE (child:Component {name: ${cypherSafe(r.componentName)}, projectId: ${pid}, repoId: ${rid}})`);
+    const rendersToLink = c.renders && c.renders.length > 0 ? c.renders : parsed.renders.map((r) => r.componentName);
+    for (const rName of rendersToLink) {
+      if (rName === c.name) continue; // Previene autorreferencias y falsos ciclos circulares
+      statements.push(`MERGE (child:Component {name: ${cypherSafe(rName)}, projectId: ${pid}, repoId: ${rid}})`);
       statements.push(
-        `MATCH (parent:Component {name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) MATCH (child:Component {name: ${cypherSafe(r.componentName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (parent)-[:RENDERS]->(child)`,
+        `MATCH (parent:Component {name: ${cypherSafe(c.name)}, path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (child:Component {name: ${cypherSafe(rName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (parent)-[:RENDERS]->(child)`,
       );
-    }
-    const props = parsed.propsByComponent?.[c.name];
-    if (props?.length) {
-      for (const p of props) {
-        statements.push(
-          `MERGE (p:Prop {name: ${cypherSafe(p.name)}, componentName: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) SET p.required = ${p.required}`,
-        );
-        statements.push(
-          `MATCH (comp:Component {name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) MATCH (p:Prop {name: ${cypherSafe(p.name)}, componentName: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (comp)-[:HAS_PROP]->(p)`,
-        );
-      }
     }
   }
 
@@ -249,9 +249,10 @@ export function buildCypherForFile(
       parents.push(parsed.components[0]!.name);
     }
     for (const parentName of parents) {
+      if (parentName === r.componentName) continue;
       statements.push(`MERGE (child:Component {name: ${cypherSafe(r.componentName)}, projectId: ${pid}, repoId: ${rid}})`);
       statements.push(
-        `MATCH (parent:Component {name: ${cypherSafe(parentName)}, projectId: ${pid}, repoId: ${rid}}) MATCH (child:Component {name: ${cypherSafe(r.componentName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (parent)-[:RENDERS]->(child)`,
+        `MATCH (parent:Component {name: ${cypherSafe(parentName)}, path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (child:Component {name: ${cypherSafe(r.componentName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (parent)-[:RENDERS]->(child)`,
       );
     }
   }
@@ -724,6 +725,7 @@ const FALKOR_INDEXES = [
   'CREATE INDEX FOR (fn:Function) ON (fn.name)',
   'CREATE INDEX FOR (c:Component) ON (c.projectId)',
   'CREATE INDEX FOR (c:Component) ON (c.name)',
+  'CREATE INDEX FOR (c:Component) ON (c.path)',
   'CREATE INDEX FOR (m:Model) ON (m.projectId)',
   'CREATE INDEX FOR (m:Model) ON (m.projectId, m.repoId)',
   'CREATE INDEX FOR (m:Model) ON (m.name)',
@@ -847,3 +849,22 @@ export function buildCypherDeleteFile(relativePath: string, projectId: string, r
     `MATCH (f:File {path: ${path}, projectId: ${pid}, repoId: ${rid}}) OPTIONAL MATCH (f)-[:CONTAINS]->(child) DETACH DELETE child, f`,
   ];
 }
+
+/**
+ * Build Cypher to purge entities contained in an edited file before re-indexing, preventing zombies.
+ * Leaves the File node intact so it can be updated and re-linked.
+ */
+export function buildCypherPurgeFileEntities(relativePath: string, projectId: string, repoId: string): string[] {
+  const path = cypherSafe(relativePath);
+  const pid = cypherSafe(projectId);
+  const rid = cypherSafe(repoId);
+  return [
+    `MATCH (dc:DomainConcept {sourcePath: ${path}, projectId: ${pid}, repoId: ${rid}})-[:DEFINED_IN]->(:File {path: ${path}, projectId: ${pid}, repoId: ${rid}}) DETACH DELETE dc`,
+    `MATCH (d:Document {path: ${path}, projectId: ${pid}, repoId: ${rid}}) DETACH DELETE d`,
+    `MATCH (f:File {path: ${path}, projectId: ${pid}, repoId: ${rid}}) OPTIONAL MATCH (f)-[:HAS_STORYBOOK_DOC]->(sd:StorybookDoc) DETACH DELETE sd`,
+    `MATCH (f:File {path: ${path}, projectId: ${pid}, repoId: ${rid}}) OPTIONAL MATCH (f)-[:HAS_MARKDOWN_DOC]->(md:MarkdownDoc) DETACH DELETE md`,
+    `MATCH (f:File {path: ${path}, projectId: ${pid}, repoId: ${rid}}) OPTIONAL MATCH (f)-[:CONTAINS]->(child) DETACH DELETE child`,
+    `MATCH (f:File {path: ${path}, projectId: ${pid}, repoId: ${rid}})-[r:IMPORTS]->() DELETE r`,
+  ];
+}
+

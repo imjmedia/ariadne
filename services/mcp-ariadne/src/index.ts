@@ -1973,7 +1973,7 @@ async function fetchFileFromIngest(
       );
     }
     const where = whereParts.length ? ` WHERE ${whereParts.join(" AND ")}` : "";
-    const q = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*]-(dependent)${where} RETURN dependent.name AS name, labels(dependent) AS labels`;
+    const q = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*1..3]-(dependent)${where} RETURN DISTINCT dependent.name AS name, labels(dependent) AS labels LIMIT 100`;
     const result = (await graph.query(q, { params })) as {
       headers?: string[];
       data?: unknown[][];
@@ -2025,17 +2025,29 @@ async function fetchFileFromIngest(
     const params: Record<string, string> = { componentName: resolvedComponentName };
     const matchProject = projectId ? ", projectId: $projectId" : "";
     if (projectId) params.projectId = projectId;
-    const descQ = `MATCH (c:Component {name: $componentName${matchProject}}) RETURN c.description AS description`;
+    const descQ = `MATCH (c:Component {name: $componentName${matchProject}}) RETURN c.description AS description, c.propsContract AS propsContract LIMIT 1`;
     const descRes = await graph.query(descQ, { params }) as { data?: Array<Record<string, unknown>> };
     const descRow = (descRes.data ?? [])[0] as Record<string, unknown> | undefined;
     const description = descRow ? _rv<string | null>(descRow, "description") : null;
-    const q = `MATCH (c:Component {name: $componentName${matchProject}})-[:HAS_PROP]->(p:Prop) RETURN p.name AS name, p.required AS required`;
-    const result = await graph.query(q, { params }) as {
-      headers?: string[];
-      data?: unknown[][];
-    };
-    const data = result.data ?? [];
-    const headers = result.headers ?? ["name", "required"];
+    const propsContractRaw = descRow ? _rv<string | null>(descRow, "propsContract") : null;
+    let data: unknown[][] = [];
+    if (propsContractRaw) {
+      try {
+        const parsed = JSON.parse(propsContractRaw) as Array<{ name: string; required?: boolean }>;
+        data = parsed.map((p) => [p.name, p.required ?? false]);
+      } catch {
+        /* fallback */
+      }
+    }
+    if (data.length === 0) {
+      const q = `MATCH (c:Component {name: $componentName${matchProject}})-[:HAS_PROP]->(p:Prop) RETURN p.name AS name, p.required AS required LIMIT 100`;
+      const result = await graph.query(q, { params }) as {
+        headers?: string[];
+        data?: unknown[][];
+      };
+      data = result.data ?? [];
+    }
+    const headers = ["name", "required"];
     const markdown = formatContractSpecs(componentName, data, headers, description);
     return { content: [{ type: "text", text: markdown }] };
   }
@@ -2418,25 +2430,29 @@ async function fetchFileFromIngest(
     /** Vector puede ejecutarse pero devolver 0 filas (proyecto, índice vacío o filtro projectId). */
     if (!usedVector || results.length === 0) {
       const kwLim = mcpLimits.semanticKeywordSubqueryLimit;
-      const projFilter = requestedScopeId ? ` WHERE ${whereProjectRepo("n", hasRepoScope)}` : "";
-      const compQ = `MATCH (n:Component)${projFilter} RETURN n.name AS name LIMIT ${kwLim}`;
-      const funcQ = `MATCH (n:Function)${projFilter} RETURN n.name AS name, n.path AS path LIMIT ${kwLim}`;
-      const fileQ = `MATCH (n:File)${projFilter} RETURN n.path AS path LIMIT ${kwLim}`;
-      const modelQ = `MATCH (n:Model)${projFilter} RETURN n.name AS name, n.path AS path LIMIT ${kwLim}`;
-      const enumQ = `MATCH (n:Enum)${projFilter} RETURN n.name AS name, n.path AS path LIMIT ${kwLim}`;
+      const lowerQ = query.toLowerCase();
+      const projFilter = requestedScopeId ? ` AND ${whereProjectRepo("n", hasRepoScope)}` : "";
+      const compQ = `MATCH (n:Component) WHERE toLower(n.name) CONTAINS $q${projFilter} RETURN n.name AS name, n.path AS path LIMIT ${kwLim}`;
+      const funcQ = `MATCH (n:Function) WHERE (toLower(n.name) CONTAINS $q OR toLower(coalesce(n.path, '')) CONTAINS $q)${projFilter} RETURN n.name AS name, n.path AS path LIMIT ${kwLim}`;
+      const fileQ = `MATCH (n:File) WHERE toLower(n.path) CONTAINS $q${projFilter} RETURN n.path AS path LIMIT ${kwLim}`;
+      const modelQ = `MATCH (n:Model) WHERE (toLower(n.name) CONTAINS $q OR toLower(coalesce(n.path, '')) CONTAINS $q)${projFilter} RETURN n.name AS name, n.path AS path LIMIT ${kwLim}`;
+      const enumQ = `MATCH (n:Enum) WHERE (toLower(n.name) CONTAINS $q OR toLower(coalesce(n.path, '')) CONTAINS $q)${projFilter} RETURN n.name AS name, n.path AS path LIMIT ${kwLim}`;
       const nestQ = requestedScopeId
-        ? `MATCH (n) WHERE (n:NestController OR n:NestService OR n:NestModule) AND ${whereProjectRepo("n", hasRepoScope)} RETURN labels(n)[0] AS typ, n.name AS name, n.path AS path, n.route AS route LIMIT ${kwLim}`
-        : `MATCH (n) WHERE n:NestController OR n:NestService OR n:NestModule RETURN labels(n)[0] AS typ, n.name AS name, n.path AS path, n.route AS route LIMIT ${kwLim}`;
-      const routeQ = `MATCH (n:Route)${projFilter} RETURN n.path AS path, n.componentName AS componentName LIMIT ${kwLim}`;
-      const domainQ = `MATCH (n:DomainConcept)${projFilter} RETURN n.name AS name, n.category AS category LIMIT ${kwLim}`;
-      const sbQ = `MATCH (n:StorybookDoc)${projFilter} RETURN n.title AS title, n.sourcePath AS path LIMIT ${kwLim}`;
-      const mdQ = `MATCH (n:MarkdownDoc)${projFilter} RETURN n.title AS title, n.sourcePath AS path LIMIT ${kwLim}`;
+        ? `MATCH (n) WHERE (n:NestController OR n:NestService OR n:NestModule) AND (toLower(n.name) CONTAINS $q OR toLower(coalesce(n.path, '')) CONTAINS $q) AND ${whereProjectRepo("n", hasRepoScope)} RETURN labels(n)[0] AS typ, n.name AS name, n.path AS path, n.route AS route LIMIT ${kwLim}`
+        : `MATCH (n) WHERE (n:NestController OR n:NestService OR n:NestModule) AND (toLower(n.name) CONTAINS $q OR toLower(coalesce(n.path, '')) CONTAINS $q) RETURN labels(n)[0] AS typ, n.name AS name, n.path AS path, n.route AS route LIMIT ${kwLim}`;
+      const routeQ = `MATCH (n:Route) WHERE (toLower(n.path) CONTAINS $q OR toLower(coalesce(n.componentName, '')) CONTAINS $q)${projFilter} RETURN n.path AS path, n.componentName AS componentName LIMIT ${kwLim}`;
+      const domainQ = `MATCH (n:DomainConcept) WHERE toLower(n.name) CONTAINS $q${projFilter} RETURN n.name AS name, n.category AS category LIMIT ${kwLim}`;
+      const sbQ = `MATCH (n:StorybookDoc) WHERE (toLower(n.title) CONTAINS $q OR toLower(coalesce(n.sourcePath, '')) CONTAINS $q)${projFilter} RETURN n.title AS title, n.sourcePath AS path LIMIT ${kwLim}`;
+      const mdQ = `MATCH (n:MarkdownDoc) WHERE (toLower(n.title) CONTAINS $q OR toLower(coalesce(n.sourcePath, '')) CONTAINS $q)${projFilter} RETURN n.title AS title, n.sourcePath AS path LIMIT ${kwLim}`;
       const mergeRows = async (q: string) => {
         const rows: unknown[] = [];
         await runOnProjectGraphs(graphRouteId, async (g, ctx) => {
-          const p = requestedScopeId
-            ? { params: { projectId: ctx.cypherProjectId, ...(hasRepoScope ? { repoId: scopeRepoId! } : {}) } }
-            : {};
+          const p = {
+            params: {
+              q: lowerQ,
+              ...(requestedScopeId ? { projectId: ctx.cypherProjectId, ...(hasRepoScope ? { repoId: scopeRepoId! } : {}) } : {}),
+            },
+          };
           const res = (await g.query(q, p)) as { data?: unknown[] };
           for (const row of res.data ?? []) rows.push(row);
         });
@@ -3364,15 +3380,29 @@ async function fetchFileFromIngest(
       );
     }
     const where = whereParts.length ? ` WHERE ${whereParts.join(" AND ")}` : "";
-    const impactQ = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*]-(dependent)${where} RETURN dependent.name AS name, labels(dependent) AS labels`;
+    const impactQ = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*1..3]-(dependent)${where} RETURN DISTINCT dependent.name AS name, labels(dependent) AS labels LIMIT 100`;
     const impactRes = (await graph.query(impactQ, { params })) as { data?: unknown[][] };
     const impactData = impactRes.data ?? [];
     const contractParams: Record<string, string> = { componentName: resolvedName };
     const matchProject = projectId ? ", projectId: $projectId" : "";
     if (projectId) contractParams.projectId = projectId;
-    const contractQ = `MATCH (c:Component {name: $componentName${matchProject}})-[:HAS_PROP]->(p:Prop) RETURN p.name AS name, p.required AS required`;
-    const contractRes = await graph.query(contractQ, { params: contractParams }) as { data?: unknown[][] };
-    const contractData = contractRes.data ?? [];
+    const contractQ = `MATCH (c:Component {name: $componentName${matchProject}}) RETURN c.propsContract AS propsContract LIMIT 1`;
+    const contractRes = await graph.query(contractQ, { params: contractParams }) as { data?: Array<Record<string, unknown>> };
+    let contractData: unknown[][] = [];
+    const propsContractRaw = (contractRes.data ?? [])[0] ? _rv<string | null>((contractRes.data ?? [])[0], "propsContract") : null;
+    if (propsContractRaw) {
+      try {
+        const parsedProps = JSON.parse(propsContractRaw) as Array<{ name: string; required?: boolean }>;
+        contractData = parsedProps.map((p) => [p.name, p.required ?? false]);
+      } catch {
+        /* fallback */
+      }
+    }
+    if (contractData.length === 0) {
+      const fallbackContractQ = `MATCH (c:Component {name: $componentName${matchProject}})-[:HAS_PROP]->(p:Prop) RETURN p.name AS name, p.required AS required LIMIT 100`;
+      const fallbackRes = await graph.query(fallbackContractQ, { params: contractParams }) as { data?: unknown[][] };
+      contractData = fallbackRes.data ?? [];
+    }
     const funcParams: Record<string, string> = { nodeName: resolvedName };
     if (projectId) funcParams.projectId = projectId;
     const funcProjFilter = projectId ? " AND f.projectId = $projectId" : "";

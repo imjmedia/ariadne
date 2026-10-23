@@ -42,6 +42,12 @@ describe('validateReadOnlyCypher', () => {
   it('rejects empty query', () => {
     assert.throws(() => validateReadOnlyCypher('   '), CypherGuardError);
   });
+
+  it('allows queries where blocked keywords only appear inside string literals', () => {
+    assert.doesNotThrow(() =>
+      validateReadOnlyCypher("MATCH (n:Function) WHERE n.name = 'DELETE_USER' RETURN n"),
+    );
+  });
 });
 
 describe('injectProjectScope', () => {

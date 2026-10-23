@@ -4,6 +4,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { guardCypherQuery } from 'ariadne-common';
 import { graphNameForProject, isProjectShardingEnabled } from '../pipeline/falkor';
 import { FalkorClientService } from '../pipeline/falkor-client.service';
 import { AsyncSemaphore } from '../pipeline/async-semaphore';
@@ -366,6 +367,9 @@ export class ChatCypherService {
     cypher: string,
     extraParams?: Record<string, unknown>,
   ): Promise<unknown[]> {
+    const guarded = guardCypherQuery(cypher, { projectId, limit: 50 });
+    const guardedCypher = guarded.query;
+
     return this.querySemaphore.run(async () => {
       const client = await this.falkor.getClient();
       const contexts = await this.projects.getCypherShardContexts(projectId);
@@ -383,8 +387,8 @@ export class ChatCypherService {
       try {
         for (const s of shards) {
           const graph = client.selectGraph(s.graphName);
-          const params = { projectId: s.cypherProjectId, ...extraParams };
-          const res = await graph.query(cypher, { params });
+          const params = { projectId: s.cypherProjectId, ...guarded.params, ...extraParams };
+          const res = await graph.query(guardedCypher, { params });
           const rows = (res as { data?: Record<string, unknown>[] })?.data ?? [];
           for (const row of rows) {
             const key = JSON.stringify(row);

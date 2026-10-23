@@ -47,7 +47,7 @@ async function countDependents(
     '(n.projectId = $projectId OR n.projectId IS NULL)',
     '(dep.projectId = $projectId OR dep.projectId IS NULL)',
   ];
-  const countQ = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*]-(dep) WHERE ${whereParts.join(' AND ')} RETURN count(dep) AS cnt`;
+  const countQ = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*1..3]-(dep) WHERE ${whereParts.join(' AND ')} RETURN count(DISTINCT dep) AS cnt`;
   try {
     const countRes = (await graph.query(countQ, {
       params: { nodeName: symbolName, projectId },

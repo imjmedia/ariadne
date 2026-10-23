@@ -17,6 +17,7 @@ import { extractDomainConcepts } from '../pipeline/domain-extract';
 import {
   buildCypherForFile,
   buildCypherDeleteFile,
+  buildCypherPurgeFileEntities,
   resolveCrossFileCalls,
   resolveImportPath,
   runCypherBatch,
@@ -257,6 +258,12 @@ export class WebhooksService {
             (rc) => rc.callerPath === parsed.path,
           );
           for (const projectId of allProjectIds) {
+            const g = client.selectGraph(
+              graphNameForProject(isProjectShardingEnabled() ? projectId : undefined),
+            );
+            const graphClient = { query: (cypher: string) => g.query(cypher) };
+            await runCypherBatch(graphClient, buildCypherPurgeFileEntities(parsed.path, projectId, repoId));
+
             const statements = buildCypherForFile(
               parsed,
               resolvedImports,
@@ -267,10 +274,6 @@ export class WebhooksService {
               chunkingContext,
               resolveOpts,
             );
-            const g = client.selectGraph(
-              graphNameForProject(isProjectShardingEnabled() ? projectId : undefined),
-            );
-            const graphClient = { query: (cypher: string) => g.query(cypher) };
             await runCypherBatch(graphClient, statements);
           }
           const existing = await this.indexedFileRepo.findOne({
