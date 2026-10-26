@@ -7,6 +7,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ### Added
 
+- **Normalización Léxica Multilingüe Automática (ES ↔ EN) en Cypher Fallback:**
+  - Diccionario y mapeador bilingüe de sinónimos de dominio (`BILINGUAL_DOMAIN_SYNONYMS` en `modification-plan-terms.util.ts`).
+  - Expansión automática de términos de negocio de español a inglés (p. ej. *cobro/pago* ➔ *billing/charge/payment*, *membresía* ➔ *membership/subscription*, *compra* ➔ *checkout/purchase*, *evento* ➔ *event*) y viceversa con todas las permutaciones de capitalización (lowercase, PascalCase, uppercase).
+  - Recuperación de archivos y símbolos mediante búsqueda Cypher pura aun cuando el repositorio no tenga vector embeddings y las consultas se formulen en español sobre código en inglés.
+- **Expansión del Parser AST a Arquitecturas Políglotas (Python / Go / Rust):**
+  - Módulo extractor sintáctico `multi-lang-extract.ts` para microservicios y backend en Python (FastAPI/Django/Pydantic), Go (structs, funciones y handlers Gin) y Rust (structs, funciones y handlers Actix).
+  - Extracción completa de imports, funciones, modelos, docstrings y rutas HTTP integradas de forma transparente en `parseSource` y el filtro `sync-path-filter.ts` (`.py`, `.go`, `.rs`).
+- **Cache WAL Local del Daemon ante Caídas de Conexión (Resiliencia Offline):**
+  - Write-Ahead Log transaccional en disco (`LocalSyncWal` en `services/mcp-ariadne/src/local-sync-wal.ts` persistido en `.ariadne/live-sync.wal` o directorio temporal).
+  - Deduplicación y encolado automático de deltas de archivos en vivo cuando Ingest o FalkorDB están inaccesibles (modo avión, cortes de red o reinicios de contenedor).
+  - Heartbeat y bucle de reintento (`flushPendingWal`) que aplica en bloque todas las modificaciones pendientes en cuanto la conexión se restablece.
 - **Sincronización Local Live (Cursor Workspace Daemon & `sync_local_file`):**
   - Tool MCP `sync_local_file` para actualizar deltas locales de archivos directamente en FalkorDB desde Cursor sin esperar commit/push a remoto.
   - Endpoint `POST /repositories/local-sync/file` en `services/ingest` que ejecuta purga atómica de entidades obsoletas (`buildCypherPurgeFileEntities`) e indexa con Tree-sitter en < 50ms.

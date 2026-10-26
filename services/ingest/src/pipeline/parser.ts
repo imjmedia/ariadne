@@ -53,6 +53,7 @@ import {
   isStrapiRoutesJsonPath,
   matchStrapiSchemaJsonPath,
 } from './strapi-path-patterns';
+import { extractMultiLangSource } from './multi-lang-extract';
 
 const ts = TypeScript as unknown as { typescript: unknown; tsx: unknown };
 const LANG_JS = JavaScript as unknown;
@@ -847,6 +848,21 @@ export function parseSource(
       return { parsed: result, root: stubParser.parse('').rootNode, source };
     }
     result.domainConcepts = [];
+    return result;
+  }
+
+  const multiLang = extractMultiLangSource(path, source);
+  if (multiLang) {
+    if (multiLang.imports.length > 0) result.imports.push(...multiLang.imports);
+    if (multiLang.functions.length > 0) result.functions.push(...multiLang.functions);
+    if (multiLang.components.length > 0) result.components.push(...multiLang.components);
+    if (multiLang.models.length > 0) result.models.push(...multiLang.models);
+    if (multiLang.routes.length > 0) result.routes.push(...multiLang.routes);
+    if (options.returnAst) {
+      const stubParser = new Parser();
+      stubParser.setLanguage(LANG_TS as Parameters<Parser['setLanguage']>[0]);
+      return { parsed: result, root: stubParser.parse('').rootNode, source };
+    }
     return result;
   }
 

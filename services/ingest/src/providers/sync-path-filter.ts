@@ -20,8 +20,8 @@ import {
   isStrapiRoutesJsonPath,
 } from '../pipeline/strapi-path-patterns';
 
-const CODE_EXT = ['.js', '.jsx', '.ts', '.tsx'];
-/** CSS/SCSS y HTML indexados como :StaticAsset (Python/Rust/SQL → ROADMAP_INDEX_LANGUAGES.md). */
+const CODE_EXT = ['.js', '.jsx', '.ts', '.tsx', '.py', '.go', '.rs'];
+/** CSS/SCSS y HTML indexados como :StaticAsset. */
 const STATIC_ASSET_EXT = ['.css', '.scss', '.html', '.htm'];
 
 /** Segmentos de ruta que nunca se indexan (artefactos, deps, entornos). */
