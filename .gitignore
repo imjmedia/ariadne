@@ -18,6 +18,7 @@ coverage
 .idea
 .cursor/
 .gemini/
+.ariadne/
 tmp
 temp
 pastes/
