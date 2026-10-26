@@ -33,17 +33,33 @@ El MCP AriadneSpecs expone herramientas que permiten a la IA (Cursor, Antigravit
 En la raíz del proyecto que vas a programar en Cursor, ejecuta un único comando:
 
 ```bash
-# Para cualquier desarrollador (descarga directa desde GitHub sin clonar Ariadne):
-npx -y github:kreodevs/ariadne link
-
-# Si te conectas a un servidor remoto (Dokploy) con tu Secret MCP / Bearer Token:
-npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
-
-# O si tienes el binario enlazado localmente en tu máquina:
+# Caso 1: Desarrollo local en tu máquina (asume http://localhost:3002 por defecto):
 ariadne link
+
+# Caso 2: Conectar a servidor en producción (Dokploy) con tu Secret MCP:
+ariadne link --server https://ariadne.kreoint.mx --token ari_...
+
+# Caso 3: Para desarrolladores sin Ariadne clonado (descarga directa desde GitHub):
+npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
 ```
 
-**¿Qué hace automáticamente?**
+### Parámetros de conexión y URLs según el entorno
+
+| Entorno | URL del Servidor (`--server`) | Token (`--token`) | ¿Cuándo usarlo? |
+|---|---|---|---|
+| **Local (Docker / Dev)** | `http://localhost:3002` *(Default)* | Opcional (si local no tiene auth) | Cuando tienes Ariadne corriendo en tu propia computadora (`pnpm run dev:infra`, `pnpm run dev:ingest`). |
+| **Dokploy / Producción** | `https://ariadne.kreoint.mx` | **Obligatorio:** Secret MCP (`ari_...`) | Cuando Ariadne está desplegado en un VPS o servidor con Dokploy. |
+
+> 🔑 **¿Dónde obtengo mi token `ari_...`?**
+> 1. Entra a tu panel web de Ariadne: `https://ariadne.kreoint.mx`
+> 2. Haz clic en tu avatar o menú de **Perfil** (arriba a la derecha).
+> 3. En la sección **Secret MCP**, copia tu clave secreta personal (comienza con `ari_...`).
+
+> 💡 **Nota sobre la ruta `/mcp`:**
+> - `https://ariadne.kreoint.mx` (sin `/mcp`) es la URL base que se pasa al flag `--server` para que el watcher y el CLI se comuniquen con la API/Ingest.
+> - `https://ariadne.kreoint.mx/mcp` (con `/mcp`) es únicamente el endpoint HTTP si decides conectar Cursor directamente por URL en modo remoto sin usar el comando local.
+
+**¿Qué hace automáticamente el comando `link`?**
 1. Auto-detecta el repositorio Git actual y genera `.cursor/mcp.json` configurado en transporte nativo **STDIO**.
 2. Crea el archivo de reglas [AGENTS.md](../AGENTS.md) canónico para que Cursor consulte el grafo antes de editar.
 3. Registra `.ariadne/config.json` con los metadatos de sincronización.

@@ -11,15 +11,29 @@ Guía para configurar el MCP AriadneSpecs Oracle en Cursor. Permite a la IA cons
 En la raíz del proyecto que vas a programar en Cursor, ejecuta un único comando:
 
 ```bash
-# Para cualquier desarrollador (descarga directa desde GitHub sin clonar Ariadne):
-npx -y github:kreodevs/ariadne link
-
-# Si te conectas a un servidor remoto (Dokploy) con tu Secret MCP / Bearer Token:
-npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
-
-# O si tienes el comando instalado localmente en tu terminal:
+# Caso 1: Desarrollo local en tu máquina (usa http://localhost:3002 por defecto):
 ariadne link
+
+# Caso 2: Conectar a tu servidor en producción (Dokploy) con tu Secret MCP:
+ariadne link --server https://ariadne.kreoint.mx --token ari_...
+
+# Caso 3: Para desarrolladores sin Ariadne clonado (directo desde GitHub):
+npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
 ```
+
+### URLs del Servidor según el entorno
+
+| Entorno | Valor de `--server` | Token (`--token`) | ¿Cuándo usarlo? |
+|---|---|---|---|
+| **Local (Dev)** | `http://localhost:3002` *(Default)* | Opcional | Cuando tienes Ariadne corriendo en tu propia computadora (`pnpm run dev:ingest`). |
+| **Dokploy (Prod)** | `https://ariadne.kreoint.mx` | **Obligatorio:** Secret MCP (`ari_...`) | Cuando Ariadne está desplegado en Dokploy / VPS. |
+
+> 🔑 **¿Dónde obtengo mi token `ari_...`?**
+> Entra a `https://ariadne.kreoint.mx` ➔ clic en tu **Perfil** (arriba a la derecha) ➔ copia tu **Secret MCP**.
+
+> 💡 **Ruta `/mcp` vs Base:**
+> - `https://ariadne.kreoint.mx` (sin `/mcp`) es la URL que recibe el flag `--server` para que el CLI y el watcher sincronicen archivos con la API.
+> - `https://ariadne.kreoint.mx/mcp` (con `/mcp`) es el endpoint que se usa si configuras Cursor directamente por URL HTTP.
 
 Este comando:
 1. Detecta automáticamente tu repositorio Git y genera `.cursor/mcp.json` en transporte nativo **STDIO**.

@@ -31,12 +31,18 @@ Arquitectura: **Ingest** (repos remotos + sync) + **PostgreSQL** (metadatos: rep
 Para conectar cualquier proyecto a Ariadne en un solo paso:
 
 ```bash
-# Para cualquier desarrollador (directo desde GitHub sin clonar Ariadne):
-npx -y github:kreodevs/ariadne link
+# Caso 1: En tu máquina local (asume http://localhost:3002 por defecto):
+ariadne link
 
-# Si te conectas a tu servidor en producción (Dokploy) con tu Secret MCP / Bearer Token:
+# Caso 2: Conectar a servidor en producción (Dokploy) con tu Secret MCP:
+ariadne link --server https://ariadne.kreoint.mx --token ari_...
+
+# Caso 3: Para desarrolladores sin Ariadne clonado (directo desde GitHub):
 npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
 ```
+
+> 🔑 **Token de acceso:** Tu token se obtiene en el panel web (`https://ariadne.kreoint.mx`) ➔ clic en **Perfil** ➔ **Secret MCP** (`ari_...`).
+> 💡 En Dokploy la URL base es `https://ariadne.kreoint.mx`. La ruta `/mcp` solo se usa si configuras Cursor directamente por URL HTTP.
 
 Este comando:
 1. Auto-detecta tu repositorio Git y genera `.cursor/mcp.json` en transporte nativo **STDIO**.
