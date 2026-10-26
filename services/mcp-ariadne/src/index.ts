@@ -17,6 +17,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createLogger, isProjectShardingEnabled, guardCypherQuery, CypherGuardError } from "ariadne-common";
 import { getGraph, closeFalkor, forEachProjectShardGraph } from "./falkor.js";
@@ -5313,7 +5314,49 @@ async function requestHandler(req: IncomingMessage, res: ServerResponse): Promis
   });
 }
 
-async function main() {
+async function runStdio(): Promise<void> {
+  // Redirigir console.log/info/warn a stderr para no interferir con los paquetes JSON-RPC en stdout
+  console.log = (...args: unknown[]) => console.error(...args);
+  console.info = (...args: unknown[]) => console.error(...args);
+  console.warn = (...args: unknown[]) => console.error(...args);
+
+  console.error("[AriadneSpecs MCP] Inicializando transporte STDIO (Cursor / IDE local)...");
+  const server = createMcpServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("[AriadneSpecs MCP] Conexión STDIO establecida.");
+
+  // Arranque automático transparente del watcher local si no está deshabilitado
+  let watcherClose: (() => void) | undefined;
+  const isWatcherDisabled =
+    process.env.ARIADNE_DISABLE_WATCHER === "1" ||
+    process.env.ARIADNE_DISABLE_WATCHER?.toLowerCase() === "true";
+
+  if (!isWatcherDisabled) {
+    try {
+      const { startLiveWatcher } = await import("./live-watcher.js");
+      const root = process.env.ARIADNE_WORKSPACE_ROOT || process.cwd();
+      const watcher = startLiveWatcher({ workspaceRoot: root });
+      watcherClose = watcher.close;
+      console.error(`[AriadneSpecs MCP] 👁️ Live Watcher activo en segundo plano (${root})`);
+    } catch (err) {
+      console.error("[AriadneSpecs MCP] ⚠️ No se pudo iniciar el watcher automático:", err);
+    }
+  }
+
+  const cleanup = () => {
+    console.error("[AriadneSpecs MCP] Cerrando...");
+    watcherClose?.();
+    closeFalkor();
+    closeRedis();
+    process.exit(0);
+  };
+
+  process.on("SIGTERM", cleanup);
+  process.on("SIGINT", cleanup);
+}
+
+async function runHttp(): Promise<void> {
   const port = parseInt(process.env.PORT ?? process.env.MCP_HTTP_PORT ?? "8080", 10);
   console.log("[AriadneSpecs MCP] Starting Streamable HTTP server (stateless)...");
   const allowUnauth =
@@ -5360,7 +5403,27 @@ async function main() {
   });
 }
 
+async function main() {
+  const isExplicitStdio =
+    process.argv.includes("--stdio") ||
+    process.env.MCP_TRANSPORT === "stdio";
+
+  const isExplicitHttp =
+    process.argv.includes("--http") ||
+    process.env.MCP_TRANSPORT === "http";
+
+  if (isExplicitStdio) {
+    await runStdio();
+  } else if (isExplicitHttp || process.env.PORT) {
+    await runHttp();
+  } else {
+    // Por defecto sin puerto asignado: STDIO para integración fluida con Cursor
+    await runStdio();
+  }
+}
+
 main().catch((err) => {
   console.error("[AriadneSpecs MCP] Fatal error:", err);
   process.exit(1);
 });
+

@@ -7,6 +7,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
 ### Added
 
+- **Configuración Zero-Config de 1 Paso (`npx ariadne link` / `init`):**
+  - CLI `ariadne-link` (`cli.ts`) para inicializar cualquier proyecto cliente con un solo comando.
+  - Detección automática del repositorio remoto Git, generación de `.cursor/mcp.json` con configuración exacta de servidor y token, colocación de `AGENTS.md` canónico y creación de `.ariadne/config.json`.
+- **Transporte Dual STDIO / HTTP con Auto-Watcher Integrado en MCP:**
+  - Soporte nativo para transporte `StdioServerTransport` en `services/mcp-ariadne/src/index.ts` ejecutado mediante `npx -y ariadne-mcp --stdio` (estándar nativo para Cursor, Claude Desktop y VS Code).
+  - Redirección automática de stdout a stderr para proteger el canal JSON-RPC.
+  - Auto-arranque transparente del `startLiveWatcher` en segundo plano al inicializar el servidor MCP, eliminando la necesidad de abrir terminales adicionales para correr el daemon manualmente.
 - **Normalización Léxica Multilingüe Automática (ES ↔ EN) en Cypher Fallback:**
   - Diccionario y mapeador bilingüe de sinónimos de dominio (`BILINGUAL_DOMAIN_SYNONYMS` en `modification-plan-terms.util.ts`).
   - Expansión automática de términos de negocio de español a inglés (p. ej. *cobro/pago* ➔ *billing/charge/payment*, *membresía* ➔ *membership/subscription*, *compra* ➔ *checkout/purchase*, *evento* ➔ *event*) y viceversa con todas las permutaciones de capitalización (lowercase, PascalCase, uppercase).

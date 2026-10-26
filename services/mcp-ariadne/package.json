@@ -8,7 +8,9 @@
   "main": "dist/index.js",
   "bin": {
     "ariadne-mcp": "./dist/index.js",
-    "ariadne-daemon": "./dist/live-watcher.js"
+    "ariadne-daemon": "./dist/live-watcher.js",
+    "ariadne-link": "./dist/cli.js",
+    "ariadne": "./dist/cli.js"
   },
   "files": [
     "dist"
