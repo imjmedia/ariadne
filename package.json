@@ -5,6 +5,10 @@
   "description": "Ariadne / FalkorSpecs — Cartographer + FalkorDB + MCP",
   "author": "Jorge Correa <jcorrea@e-personal.net>",
   "license": "Apache-2.0",
+  "bin": {
+    "ariadne": "./scripts/link.mjs",
+    "ariadne-link": "./scripts/link.mjs"
+  },
   "scripts": {
     "dev:setup": "pnpm install && pnpm -C services/api install && pnpm -C services/ingest install && pnpm -C services/orchestrator install && pnpm -C frontend install",
     "dev:infra": "INFRA_ONLY=1 node scripts/ensure-docker.js",
