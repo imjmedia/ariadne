@@ -8,11 +8,12 @@ El **Cartographer** es el servicio de análisis estático encargado de mapear la
 
 ## 2. Requisitos Funcionales
 
-- **Análisis de Archivos:** Debe recorrer directorios de forma recursiva buscando archivos `.js`, `.jsx`, `.ts` y `.tsx`.
-- **Extracción de AST:** Utilizar **Tree-sitter** con las gramáticas de JavaScript y TSX para entender la estructura del código sin ejecutarlo.
-- **Mapeo de Dependencias:** Identificar sentencias `import` y `export` para conectar archivos entre sí.
-- **Detección de Componentes:** Identificar componentes funcionales y de clase, extrayendo sus nombres y marcas de "legacy" (ej. si heredan de `React.Component`).
-- **Sincronización de Grafo:** Traducir los hallazgos en consultas **Cypher** y ejecutarlas en FalkorDB mediante el driver oficial.
+- **Análisis Políglota de Archivos:** Recorre directorios de forma recursiva indexando archivos `.js`, `.jsx`, `.ts`, `.tsx`, `.py`, `.go`, `.rs`, `.prisma`, `.json` de configuración y `.md`.
+- **Extracción de AST:** Utiliza **Tree-sitter** para JavaScript/TypeScript y el extractor nativo `multi-lang-extract` para **Python** (FastAPI/Django/Pydantic), **Go** (structs/Gin) y **Rust** (structs/Actix).
+- **Mapeo de Dependencias y Rutas:** Identifica sentencias `import`/`export`/`use`, modelos de datos y rutas HTTP expuestas.
+- **Detección de Componentes y Funciones:** Extrae componentes, complejidad ciclomática de McCabe, profundidad de anidación y docstrings.
+- **Sincronización Vectorizada:** Carga masiva parametrizada mediante lotes Cypher con `UNWIND $batch AS item MERGE ...`, reduciendo el tiempo de sincronización completa a segundos.
+- **Live Sync con WAL Offline:** Ingesta de deltas locales atómicos en vivo (<50ms) con tolerancia a caídas mediante cola WAL en disco.
 
 ## 3. Esquema de Datos (FalkorDB)
 

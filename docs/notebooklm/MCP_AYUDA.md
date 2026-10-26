@@ -6,9 +6,26 @@ Guía para configurar el MCP AriadneSpecs Oracle en Cursor. Permite a la IA cons
 
 ---
 
-## 1. Configuración (recomendada)
+## 1. Configuración Rápida: Zero-Config (Recomendada)
 
-Si Ariadne está desplegado (ariadne.kreoint.mx), Cursor se conecta por URL. **No requiere túnel SSH, ni clonar el repo, ni configurar variables.**
+En la raíz del proyecto que vas a programar en Cursor, ejecuta un único comando:
+
+```bash
+npx ariadne link
+```
+
+*(Si utilizas un servidor remoto o Dokploy: `npx ariadne link --server https://ariadne.kreoint.mx --token <tu-token-mcp>`)*
+
+Este comando:
+1. Detecta automáticamente tu repositorio Git y genera `.cursor/mcp.json` en modo **STDIO** (`npx -y ariadne-mcp --stdio`).
+2. Crea el archivo de reglas `AGENTS.md` canónico para Cursor.
+3. Activa automáticamente el **Live Watcher en segundo plano** dentro del MCP, con Write-Ahead Log (WAL) para trabajar sin conexión en modo avión o tolerar reinicios de servidor.
+
+---
+
+## 2. Configuración Manual por URL (Cursor Remoto)
+
+Si prefieres conectar Cursor directamente por URL HTTP a Dokploy:
 
 En Cursor: **Settings** → **MCP** → editar `~/.cursor/mcp.json`:
 
@@ -63,14 +80,16 @@ Reiniciar Cursor. Listo.
 | Herramienta | Uso |
 |-------------|-----|
 | `list_known_projects` | Mapear IDs a nombres (ejecutar al inicio) |
+| `validate_before_edit` | **Obligatorio** antes de editar: impacto + contrato en un solo llamado |
+| `sync_local_file` | Sincronización delta local instantánea desde el buffer/disco hacia FalkorDB (<50ms) |
+| `detect_changes` | Análisis de blast radius pre-commit (símbolos afectados y nivel de riesgo) |
+| `semantic_search` | Búsqueda híbrida con Ego-Graphs topológicos a 1 salto y expansión léxica ES ↔ EN |
 | `get_component_graph` | Árbol de dependencias de un componente |
 | `get_legacy_impact` | Ver qué se rompe si modificas un nodo |
 | `get_contract_specs` | Props reales de un componente |
 | `get_functions_in_file` | Funciones y componentes que contiene un archivo |
 | `get_import_graph` | Grafo de imports de un archivo (qué importa/exporta) |
 | `get_file_content` | Contenido de un archivo (Bitbucket/GitHub, requiere INGEST_URL) |
-| `validate_before_edit` | **Obligatorio** antes de editar: impacto + contrato en un solo llamado |
-| `semantic_search` | Búsqueda por palabra clave en componentes, funciones, archivos |
 | `get_project_analysis` | Deuda técnica, duplicados, reingeniería, código muerto, **seguridad** (heurística). Multi-root: `currentFilePath` ayuda a resolver el repo vía ingest |
 | `ask_codebase` | Preguntas en NL sobre el código. Opcional **`scope`**, **`twoPhase`**, **`responseMode`** (`default` \| `evidence_first` \| `raw_evidence`), **`deterministicRetriever`** (solo con `raw_evidence`). Ver **§3.1** (paridad con modos del chat en `/repos/:id/chat`). |
 | `get_definitions` | Origen exacto de clase/función (archivo, líneas) |

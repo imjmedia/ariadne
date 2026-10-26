@@ -8,43 +8,62 @@ Documento de instalación y configuración del servidor MCP AriadneSpecs Oracle 
 
 ## 1. Resumen
 
-El MCP AriadneSpecs expone herramientas que permiten a la IA (Cursor, Antigravity, etc.) consultar el grafo de FalkorDB **antes** de modificar código legacy, reduciendo alucinaciones y rupturas. Incluye:
+El MCP AriadneSpecs expone herramientas que permiten a la IA (Cursor, Antigravity, etc.) consultar el grafo de FalkorDB **antes** de modificar código, reduciendo alucinaciones y rupturas:
 
+- **Configuración Zero-Config de 1 Paso:** `npx ariadne link` conecta cualquier proyecto automáticamente con Cursor.
+- **Sincronización Local Live (Live Daemon + WAL Offline):** Sincroniza deltas locales al grafo en tiempo real (<50ms) sin necesidad de commit/push a Bitbucket, con tolerancia a caídas mediante Write-Ahead Log en disco.
+- **Graph RAG con Ego-Graphs:** Recupera contratos TypeScript exactos y relaciones a 1 salto para eliminar alucinaciones de props.
+- **Soporte Políglota y Bilingüe:** Análisis de TypeScript, JavaScript, Prisma, Strapi, Python (FastAPI/Django), Go (Gin) y Rust (Actix), con expansión léxica automática español ↔ inglés.
 - **validate_before_edit** — Obligatorio antes de editar: impacto + contrato + endpoints de funciones.
-- **get_legacy_impact**, **get_contract_specs** — Impacto y props reales.
-- **get_file_content** — Contenido de archivos desde el repo indexado.
-- **semantic_search**, **get_project_analysis** — Búsqueda y diagnósticos.
-- **get_modification_plan** — Plan quirúrgico (`filesToModify` + `questionsToRefine`). En proyectos multi-root, el consumidor debe pasar como `projectId` el **`roots[].id` del repositorio** donde está el código (p. ej. frontend); el ingest lo acepta en `POST /projects/:id/modification-plan`.
+- **detect_changes** — Análisis de radio de impacto pre-commit.
+- **get_modification_plan** — Plan quirúrgico (`filesToModify` + `questionsToRefine`).
 
 ---
 
 ## 2. Requisitos
 
 - **Node.js** >= 20
-- **Cursor** (o IDE con soporte MCP)
-- **Conexión** a FalkorDB y al servicio Ingest (ver sección 3)
+- **Cursor** (o IDE compatible con MCP)
+- **Conexión** a FalkorDB y al servicio Ingest
 
 ---
 
-## 3. Escenarios de conexión
+## 3. Instalación Rápida (Recomendada: Zero-Config)
+
+En la raíz del proyecto que vas a programar en Cursor:
+
+```bash
+npx ariadne link
+```
+
+*(Si utilizas un servidor remoto: `npx ariadne link --server https://apiariadne.kreoint.mx --token <tu-token-mcp>`)*
+
+**¿Qué hace automáticamente?**
+1. Genera `.cursor/mcp.json` configurado en modo **STDIO** (`npx -y ariadne-mcp --stdio`).
+2. Crea el archivo de reglas [AGENTS.md](../AGENTS.md) optimizado para Cursor.
+3. Activa el **Live Watcher en segundo plano**: Cursor inicia la observación de archivos locales automáticamente sin que tengas que abrir terminales secundarias.
+
+---
+
+## 4. Escenarios de conexión manual
 
 ### Escenario A: Desarrollo local (recomendado para mantenimiento del propio Ariadne)
 
-Infraestructura y servicios corriendo en tu máquina. El MCP usa **Streamable HTTP** (puerto 8080).
+Infraestructura y servicios corriendo en tu máquina. El MCP soporta transporte dual **STDIO** y **Streamable HTTP** (puerto 8080).
 
 | Variable | Valor |
 |----------------|----------------------|
 | FALKORDB_HOST | `localhost` |
 | FALKORDB_PORT | `6379` |
 | INGEST_URL | `http://localhost:3002` |
-| PORT | `8080` (default) |
+| PORT | `8080` (en modo HTTP) |
 
 **Previo:**
 ```bash
 pnpm run dev:infra # FalkorDB, Postgres, Redis
 pnpm run dev:ingest # Ingest (puerto 3002)
 pnpm -C services/mcp-ariadne build
-PORT=8080 node services/mcp-ariadne/dist/index.js # MCP en segundo plano
+# Opcional en modo HTTP: PORT=8080 node services/mcp-ariadne/dist/index.js
 ```
 
 ---
@@ -281,14 +300,16 @@ La IA debería poder invocar las herramientas del MCP. Si aparecen errores de co
 |------------------------|--------------------------------------------------------|
 | `list_known_projects` | Al inicio: mapear IDs de repos a nombres |
 | `validate_before_edit` | **OBLIGATORIO** antes de editar componente o función |
+| `sync_local_file` | Sincronización delta instantánea desde IDE/disco hacia FalkorDB (<50ms) |
+| `detect_changes` | Blast radius pre-commit: símbolos afectados y riesgo antes de commit |
 | `get_legacy_impact` | Ver qué se rompe si modificas un nodo |
-| `get_contract_specs` | Props reales de un componente |
-| `get_component_graph` | Árbol de dependencias de un componente |
+| `get_contract_specs` | Props reales y firmas de contrato de un componente |
+| `get_component_graph` | Árbol de dependencias (RENDERS, IMPORTS, USES_HOOK) |
 | `get_functions_in_file`| Funciones y componentes en un archivo |
 | `get_import_graph` | Imports y contenido estructural de un archivo |
 | `get_file_content` | Contenido crudo de un archivo (requiere INGEST_URL) |
-| `semantic_search` | Búsqueda en componentes, funciones y archivos |
-| `get_project_analysis` | Diagnóstico, duplicados, reingeniería, código muerto, seguridad (ingest); multi-root: conviene `currentFilePath` |
+| `semantic_search` | Búsqueda híbrida con Ego-Graphs topológicos a 1 salto y expansión léxica ES↔EN |
+| `get_project_analysis` | Diagnóstico, duplicados, reingeniería, código muerto, seguridad (ingest) |
 
 ---
 
