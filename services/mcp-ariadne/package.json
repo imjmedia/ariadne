@@ -1,11 +1,20 @@
 {
-  "name": "ariadne-mcp",
+  "name": "@kreodevs/ariadne",
   "version": "1.4.0",
-  "description": "MCP server AriadneSpecs: get_component_graph, get_legacy_impact, validate_before_edit, semantic_search",
+  "description": "Ariadne Codebase Intelligence MCP Server & CLI",
   "author": "Jorge Correa <jcorrea@e-personal.net>",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kreodevs/ariadne.git",
+    "directory": "services/mcp-ariadne"
+  },
   "bin": {
     "ariadne-mcp": "./dist/index.js",
     "ariadne-daemon": "./dist/live-watcher.js",
@@ -30,6 +39,9 @@
     "ioredis": "^5.4.2",
     "pino": "^9.14.0"
   },
+  "bundledDependencies": [
+    "ariadne-common"
+  ],
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.2"

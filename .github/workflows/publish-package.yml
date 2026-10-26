@@ -1,0 +1,49 @@
+name: Publish to GitHub Packages
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "services/mcp-ariadne/**"
+      - "packages/ariadne-common/**"
+      - ".github/workflows/publish-package.yml"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@kreodevs"
+
+      - name: Build ariadne-common
+        working-directory: packages/ariadne-common
+        run: |
+          npm install
+          npm run build
+
+      - name: Install dependencies & build @kreodevs/ariadne
+        working-directory: services/mcp-ariadne
+        run: |
+          npm install
+          npm run build
+
+      - name: Publish package to GitHub Packages
+        working-directory: services/mcp-ariadne
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
