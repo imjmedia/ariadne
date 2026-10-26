@@ -25,8 +25,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 - **Identidad de Nodos Component & Props Inlined:**
   - Clave unívoca de `Component` ampliada a `{name, path, projectId, repoId}` con índice `CREATE INDEX FOR (c:Component) ON (c.path)`.
   - Inlining de props en `c.propsContract` (JSON serializado) y `c.propsSummary` en el nodo `Component`, eliminando nodos `(p:Prop)` y aristas `:HAS_PROP` (reducción de ~40% en nodos del grafo).
-- **Límites de Traversal en FalkorDB:**
-  - Reemplazo de traversals ilimitados `<-[:CALLS|RENDERS*]-` por recorridos acotados `<-[:CALLS|RENDERS*1..3]-` con `LIMIT 100` en MCP y API, evitando sobrecarga en el worker mono-hilo de FalkorDB.
+  - Inlining de `roles` en `NestController` y `roles` + `guards` en `NestRoute`, eliminando la creación de supernodos accesorios `:AccessRole` y `:NestGuard` y sus aristas (`:ALLOWS_ACCESS_ROLE`, `:REQUIRES_ROLE`, `:USES_GUARD`).
+- **Límites de Traversal y Distancia Topológica en FalkorDB:**
+  - Reemplazo de traversals ilimitados `<-[:CALLS|RENDERS*]-` por recorridos acotados `<-[:CALLS|RENDERS*1..3]-` con `LIMIT 100` en MCP y API, devolviendo `distance` (hop mínimo) y `callChain` para análisis contextual en Cursor (`get_legacy_impact`, `validate_before_edit`).
+  - Supresión estricta de ruido por barrel files (`index.*`) y archivos de tipos (`types.*`) en el análisis de impacto de componentes vía `IMPORTS`.
 - **Fallback Nativo en `semantic_search`:**
   - Búsqueda nativa con `CONTAINS toLower($q)` en FalkorDB con filtrado de scope, eliminando la carga descontrolada de cientos de entidades a memoria JavaScript.
 

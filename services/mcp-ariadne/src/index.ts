@@ -2139,10 +2139,13 @@ async function fetchFileFromIngest(
       if (res.ok) {
         const payload = (await res.json()) as {
           nodeId: string;
-          dependents: Array<{ name?: unknown; labels?: unknown }>;
+          dependents: Array<{ name?: unknown; labels?: unknown; distance?: unknown; callChain?: unknown }>;
         };
-        const data = (payload.dependents ?? []).map((d) => [d.name, d.labels]) as unknown[][];
-        const headers = ["name", "labels"];
+        const hasExtra = (payload.dependents ?? []).some((d) => d.distance !== undefined);
+        const headers = hasExtra ? ["name", "labels", "distance", "callChain"] : ["name", "labels"];
+        const data = (payload.dependents ?? []).map((d) =>
+          hasExtra ? [d.name, d.labels, d.distance, d.callChain] : [d.name, d.labels],
+        ) as unknown[][];
         const apiNote =
           "**Fuente:** API Nest `GET /api/graph/impact` (mismo criterio que GraphService.getImpact).\n\n";
         const markdown = apiNote + formatLegacyImpact(nodeName, data, headers);
@@ -2167,7 +2170,11 @@ async function fetchFileFromIngest(
       );
     }
     const where = whereParts.length ? ` WHERE ${whereParts.join(" AND ")}` : "";
-    const q = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*1..3]-(dependent)${where} RETURN DISTINCT dependent.name AS name, labels(dependent) AS labels LIMIT 100`;
+    const q = `MATCH path = (n {name: $nodeName})<-[:CALLS|RENDERS*1..3]-(dependent)${where}
+WITH dependent, min(length(path)) AS distance, collect([x IN nodes(path) | x.name])[0] AS callChain
+RETURN dependent.name AS name, labels(dependent) AS labels, distance, callChain
+ORDER BY distance ASC
+LIMIT 100`;
     const result = (await graph.query(q, { params })) as {
       headers?: string[];
       data?: unknown[][];
@@ -2178,8 +2185,8 @@ async function fetchFileFromIngest(
       const hookImpactParams: Record<string, string> = { nodeName: resolvedName };
       if (projectId) hookImpactParams.projectId = projectId;
       const hookImpactQ = projectId
-        ? `MATCH (h:Hook {name: $nodeName, projectId: $projectId})<-[:USES_HOOK]-(consumer:Component {projectId: $projectId}) RETURN consumer.name AS name, labels(consumer) AS labels`
-        : `MATCH (h:Hook {name: $nodeName})<-[:USES_HOOK]-(consumer:Component) RETURN consumer.name AS name, labels(consumer) AS labels`;
+        ? `MATCH (h:Hook {name: $nodeName, projectId: $projectId})<-[:USES_HOOK]-(consumer:Component {projectId: $projectId}) RETURN consumer.name AS name, labels(consumer) AS labels, 1 AS distance, [consumer.name, h.name] AS callChain`
+        : `MATCH (h:Hook {name: $nodeName})<-[:USES_HOOK]-(consumer:Component) RETURN consumer.name AS name, labels(consumer) AS labels, 1 AS distance, [consumer.name, h.name] AS callChain`;
       const hookImpactRes = (await graph.query(hookImpactQ, { params: hookImpactParams })) as {
         headers?: string[];
         data?: unknown[][];
@@ -2189,7 +2196,7 @@ async function fetchFileFromIngest(
     } catch {
       /* ignore */
     }
-    const headers = result.headers ?? ["name", "labels"];
+    const headers = result.headers ?? ["name", "labels", "distance", "callChain"];
     const fallbackNote =
       impactApiAuthHint +
       "> **Nota (fallback Falkor):** `CALLS|RENDERS*` más consumidores **`USES_HOOK`** si el foco es Hook; sin API Nest no hay fusión IMPORTS multi-shard. Envía Bearer (Secret MCP o JWT web) desde Cursor al MCP para reenvío al Nest.\n\n";
@@ -3665,7 +3672,11 @@ async function fetchFileFromIngest(
       );
     }
     const where = whereParts.length ? ` WHERE ${whereParts.join(" AND ")}` : "";
-    const impactQ = `MATCH (n {name: $nodeName})<-[:CALLS|RENDERS*1..3]-(dependent)${where} RETURN DISTINCT dependent.name AS name, labels(dependent) AS labels LIMIT 100`;
+    const impactQ = `MATCH path = (n {name: $nodeName})<-[:CALLS|RENDERS*1..3]-(dependent)${where}
+WITH dependent, min(length(path)) AS distance, collect([x IN nodes(path) | x.name])[0] AS callChain
+RETURN dependent.name AS name, labels(dependent) AS labels, distance, callChain
+ORDER BY distance ASC
+LIMIT 100`;
     const impactRes = (await graph.query(impactQ, { params })) as { data?: unknown[][] };
     const impactData = impactRes.data ?? [];
     const contractParams: Record<string, string> = { componentName: resolvedName };
@@ -3707,7 +3718,16 @@ async function fetchFileFromIngest(
         const name = _rv<string>(row, "name") ?? (Array.isArray(row) ? row[0] : null);
         if (!name || seen.has(name)) continue;
         seen.add(name);
-        lines.push(`- **${name}**`);
+        const distance = _rv<number | string>(row, "distance") ?? (Array.isArray(row) ? row[2] : null);
+        const callChain = _rv<string[]>(row, "callChain") ?? (Array.isArray(row) ? row[3] : null);
+        let extra = "";
+        if (distance != null) {
+          extra += ` [hop ${distance}]`;
+        }
+        if (Array.isArray(callChain) && callChain.length > 1) {
+          extra += ` (vía: ${callChain.slice().reverse().join(" -> ")})`;
+        }
+        lines.push(`- **${name}**${extra}`);
       }
     }
     lines.push("", "### 2. Contrato (props)");
@@ -5114,10 +5134,19 @@ function formatLegacyImpact(nodeName: string, rows: unknown[][], headers: string
   for (const row of rows as unknown[]) {
     const name = (fmtGetRow(row as Record<string, unknown> | unknown[], "name", headers) ?? "") as string;
     const labelsVal = fmtGetRow(row as Record<string, unknown> | unknown[], "labels", headers);
+    const distanceVal = fmtGetRow(row as Record<string, unknown> | unknown[], "distance", headers);
+    const callChainVal = fmtGetRow(row as Record<string, unknown> | unknown[], "callChain", headers);
     if (!name || seen.has(name)) continue;
     seen.add(name);
     const labels = Array.isArray(labelsVal) ? labelsVal.join(", ") : String(labelsVal ?? "");
-    lines.push(`- **${name}** (${labels})`);
+    let extra = "";
+    if (distanceVal != null) {
+      extra += ` [hop ${distanceVal}]`;
+    }
+    if (Array.isArray(callChainVal) && callChainVal.length > 1) {
+      extra += ` (vía: ${callChainVal.slice().reverse().join(" -> ")})`;
+    }
+    lines.push(`- **${name}** (${labels})${extra}`);
   }
   return lines.join("\n");
 }

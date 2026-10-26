@@ -420,21 +420,16 @@ export function buildCypherForFile(
   }
 
   for (const c of parsed.nestControllers ?? []) {
+    const rolesProp =
+      c.roles && c.roles.length > 0
+        ? `, c.roles = ${cypherSafe(JSON.stringify(c.roles))}`
+        : ', c.roles = null';
     statements.push(
-      `MERGE (c:NestController {path: ${cypherSafe(path)}, name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET c.route = ${c.route != null ? cypherSafe(c.route) : 'null'} ON MATCH SET c.route = ${c.route != null ? cypherSafe(c.route) : 'null'}`,
+      `MERGE (c:NestController {path: ${cypherSafe(path)}, name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET c.route = ${c.route != null ? cypherSafe(c.route) : 'null'}${rolesProp} ON MATCH SET c.route = ${c.route != null ? cypherSafe(c.route) : 'null'}${rolesProp}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (c:NestController {path: ${cypherSafe(path)}, name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(c)`,
     );
-    for (const role of c.roles ?? []) {
-      const roleSafe = cypherSafe(role);
-      statements.push(
-        `MERGE (ar:AccessRole {name: ${roleSafe}, projectId: ${pid}, repoId: ${rid}})`,
-      );
-      statements.push(
-        `MATCH (nc:NestController {path: ${cypherSafe(path)}, name: ${cypherSafe(c.name)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ar:AccessRole {name: ${roleSafe}, projectId: ${pid}, repoId: ${rid}}) MERGE (nc)-[:ALLOWS_ACCESS_ROLE]->(ar)`,
-      );
-    }
   }
 
   const controllerRouteByName = new Map<string, string | undefined>();
@@ -445,8 +440,16 @@ export function buildCypherForFile(
     const fullPath = nestHttpFullPath(controllerRouteByName.get(rt.controllerName), rt.routeSegment);
     const segProp = rt.routeSegment !== undefined ? cypherSafe(rt.routeSegment) : 'null';
     const fp = cypherSafe(fullPath);
+    const rolesProp =
+      rt.roles && rt.roles.length > 0
+        ? `, nr.roles = ${cypherSafe(JSON.stringify(rt.roles))}`
+        : ', nr.roles = null';
+    const guardsProp =
+      rt.guardNames && rt.guardNames.length > 0
+        ? `, nr.guards = ${cypherSafe(JSON.stringify(rt.guardNames))}`
+        : ', nr.guards = null';
     statements.push(
-      `MERGE (nr:NestRoute {path: ${cypherSafe(path)}, controllerName: ${cypherSafe(rt.controllerName)}, handlerName: ${cypherSafe(rt.handlerName)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET nr.httpMethod = ${cypherSafe(rt.httpMethod)}, nr.handlerLine = ${rt.handlerLine}, nr.routeSegment = ${segProp}, nr.fullPath = ${fp}${rt.httpStatusCode != null ? `, nr.httpStatusCode = ${rt.httpStatusCode}` : ''} ON MATCH SET nr.httpMethod = ${cypherSafe(rt.httpMethod)}, nr.handlerLine = ${rt.handlerLine}, nr.routeSegment = ${segProp}, nr.fullPath = ${fp}${rt.httpStatusCode != null ? `, nr.httpStatusCode = ${rt.httpStatusCode}` : ''}`,
+      `MERGE (nr:NestRoute {path: ${cypherSafe(path)}, controllerName: ${cypherSafe(rt.controllerName)}, handlerName: ${cypherSafe(rt.handlerName)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET nr.httpMethod = ${cypherSafe(rt.httpMethod)}, nr.handlerLine = ${rt.handlerLine}, nr.routeSegment = ${segProp}, nr.fullPath = ${fp}${rt.httpStatusCode != null ? `, nr.httpStatusCode = ${rt.httpStatusCode}` : ''}${rolesProp}${guardsProp} ON MATCH SET nr.httpMethod = ${cypherSafe(rt.httpMethod)}, nr.handlerLine = ${rt.handlerLine}, nr.routeSegment = ${segProp}, nr.fullPath = ${fp}${rt.httpStatusCode != null ? `, nr.httpStatusCode = ${rt.httpStatusCode}` : ''}${rolesProp}${guardsProp}`,
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (nr:NestRoute {path: ${cypherSafe(path)}, controllerName: ${cypherSafe(rt.controllerName)}, handlerName: ${cypherSafe(rt.handlerName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(nr)`,
@@ -454,23 +457,6 @@ export function buildCypherForFile(
     statements.push(
       `MATCH (nc:NestController {path: ${cypherSafe(path)}, name: ${cypherSafe(rt.controllerName)}, projectId: ${pid}, repoId: ${rid}}) MATCH (nr:NestRoute {path: ${cypherSafe(path)}, controllerName: ${cypherSafe(rt.controllerName)}, handlerName: ${cypherSafe(rt.handlerName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (nc)-[:DECLARES_ROUTE]->(nr)`,
     );
-    for (const role of rt.roles ?? []) {
-      const roleSafe = cypherSafe(role);
-      statements.push(`MERGE (ar:AccessRole {name: ${roleSafe}, projectId: ${pid}, repoId: ${rid}})`);
-      statements.push(
-        `MATCH (nr:NestRoute {path: ${cypherSafe(path)}, controllerName: ${cypherSafe(rt.controllerName)}, handlerName: ${cypherSafe(rt.handlerName)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ar:AccessRole {name: ${roleSafe}, projectId: ${pid}, repoId: ${rid}}) MERGE (nr)-[:REQUIRES_ROLE]->(ar)`,
-      );
-    }
-    for (const gName of rt.guardNames ?? []) {
-      const gSafe = cypherSafe(gName);
-      statements.push(`MERGE (ng:NestGuard {path: ${cypherSafe(path)}, name: ${gSafe}, projectId: ${pid}, repoId: ${rid}})`);
-      statements.push(
-        `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ng:NestGuard {path: ${cypherSafe(path)}, name: ${gSafe}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(ng)`,
-      );
-      statements.push(
-        `MATCH (nr:NestRoute {path: ${cypherSafe(path)}, controllerName: ${cypherSafe(rt.controllerName)}, handlerName: ${cypherSafe(rt.handlerName)}, projectId: ${pid}, repoId: ${rid}}) MATCH (ng:NestGuard {path: ${cypherSafe(path)}, name: ${gSafe}, projectId: ${pid}, repoId: ${rid}}) MERGE (nr)-[:USES_GUARD]->(ng)`,
-      );
-    }
   }
 
   for (const s of parsed.nestServices ?? []) {

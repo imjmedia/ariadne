@@ -284,13 +284,35 @@ export class GraphService {
     return this.falkor.getGraph(projectId);
   }
 
-  private mapImpactQueryRows(result: FalkorResult): { name: unknown; labels: unknown }[] {
+  private mapImpactQueryRows(result: FalkorResult): {
+    name: unknown;
+    labels: unknown;
+    distance?: unknown;
+    callChain?: unknown;
+  }[] {
     const data = result.data ?? [];
     const headers =
       result.headers && result.headers.length ? result.headers : ['name', 'labels'];
     return data.map((row: unknown) => {
       const [name, labels] = extractFalkorTwoColumnRow(row, 'name', 'labels', headers);
-      return { name, labels };
+      let distance: unknown;
+      let callChain: unknown;
+      if (row && typeof row === 'object' && !Array.isArray(row)) {
+        const obj = row as Record<string, unknown>;
+        distance = obj.distance;
+        callChain = obj.callChain;
+      } else if (Array.isArray(row)) {
+        const dIdx = headers.indexOf('distance');
+        if (dIdx >= 0) distance = row[dIdx];
+        const cIdx = headers.indexOf('callChain');
+        if (cIdx >= 0) callChain = row[cIdx];
+      }
+      return {
+        name,
+        labels,
+        ...(distance !== undefined ? { distance } : {}),
+        ...(callChain !== undefined ? { callChain } : {}),
+      };
     });
   }
 
@@ -455,12 +477,17 @@ export class GraphService {
 
     const runImpact = async (graph: FalkorGraph) => {
       const result = (await graph.query(
-        `MATCH (n {name: $nodeName${matchProj}})<-[:CALLS|RENDERS*1..3]-(dependent) RETURN DISTINCT dependent.name AS name, labels(dependent) AS labels LIMIT 100`,
+        `MATCH path = (n {name: $nodeName${matchProj}})<-[:CALLS|RENDERS*1..3]-(dependent) ` +
+          `WITH dependent, min(length(path)) AS distance, collect([x IN nodes(path) | x.name])[0] AS callChain ` +
+          `RETURN dependent.name AS name, labels(dependent) AS labels, distance, callChain ` +
+          `ORDER BY distance ASC LIMIT 100`,
         { params },
       )) as FalkorResult;
       const rows = this.mapImpactQueryRows(result);
       const seen = new Set(rows.map((r) => `${String(r.name)}\0${JSON.stringify(r.labels)}`));
-      const mergeImpactRows = (extra: { name: unknown; labels: unknown }[]) => {
+      const mergeImpactRows = (
+        extra: { name: unknown; labels: unknown; distance?: unknown; callChain?: unknown }[],
+      ) => {
         for (const r of extra) {
           const k = `${String(r.name)}\0${JSON.stringify(r.labels)}`;
           if (seen.has(k)) continue;
@@ -471,26 +498,29 @@ export class GraphService {
       /** React custom hooks (:Hook): consumidores son componentes con arista USES_HOOK (no siempre hay CALLS al hook). */
       const hookConsumersQ = projectId
         ? `MATCH (h:Hook {name: $nodeName, projectId: $projectId})<-[:USES_HOOK]-(consumer:Component {projectId: $projectId}) ` +
-          `RETURN consumer.name AS name, labels(consumer) AS labels`
+          `RETURN consumer.name AS name, labels(consumer) AS labels, 1 AS distance, [consumer.name, h.name] AS callChain`
         : `MATCH (h:Hook {name: $nodeName})<-[:USES_HOOK]-(consumer:Component) ` +
-          `RETURN consumer.name AS name, labels(consumer) AS labels`;
+          `RETURN consumer.name AS name, labels(consumer) AS labels, 1 AS distance, [consumer.name, h.name] AS callChain`;
       mergeImpactRows(
         this.mapImpactQueryRows((await graph.query(hookConsumersQ, { params })) as FalkorResult),
       );
       if (!projectId) return rows;
-      /** Consumidores vía IMPORTS entre archivos (módulos API / utils sin aristas RENDERS hacia otros Component). */
+      /** Consumidores vía IMPORTS entre archivos (módulos API / utils sin aristas RENDERS hacia otros Component).
+       * Suprime ruido de barrel files (index.*, types.*) para evitar falsos positivos masivos. */
       const importCons = (await graph.query(
         `MATCH (c:Component {name: $nodeName, projectId: $projectId})<-[:CONTAINS]-(f:File {projectId: $projectId}) ` +
+          `WHERE NOT (f.path =~ '.*(/index\\.[^/]+|/types\\.[^/]+|types/.*)$') ` +
           `MATCH (f2:File {projectId: $projectId})-[:IMPORTS]->(f) ` +
+          `WHERE NOT (f2.path =~ '.*(/index\\.[^/]+|/types\\.[^/]+|types/.*)$') ` +
           `MATCH (f2)-[:CONTAINS]->(consumer:Component {projectId: $projectId}) ` +
-          `RETURN consumer.name AS name, labels(consumer) AS labels`,
+          `RETURN consumer.name AS name, labels(consumer) AS labels, 1 AS distance, [consumer.name, c.name] AS callChain`,
         { params },
       )) as FalkorResult;
       mergeImpactRows(this.mapImpactQueryRows(importCons));
       return rows;
     };
 
-    let dependents: { name: unknown; labels: unknown }[];
+    let dependents: { name: unknown; labels: unknown; distance?: unknown; callChain?: unknown }[];
 
     if (!projectId || scopePath) {
       const graph = await this.pickShardGraph(projectId, scopePath, async (g) => {
@@ -510,9 +540,11 @@ export class GraphService {
       dependents = await runImpact(graph);
     } else {
       const names = await this.falkor.getProjectGraphNames(projectId);
-      const merged: { name: unknown; labels: unknown }[] = [];
+      const merged: { name: unknown; labels: unknown; distance?: unknown; callChain?: unknown }[] = [];
       const seen = new Set<string>();
-      const pushDeduped = (rows: { name: unknown; labels: unknown }[]) => {
+      const pushDeduped = (
+        rows: { name: unknown; labels: unknown; distance?: unknown; callChain?: unknown }[],
+      ) => {
         for (const r of rows) {
           const k = `${String(r.name)}\0${JSON.stringify(r.labels)}`;
           if (seen.has(k)) continue;
@@ -661,7 +693,7 @@ export class GraphService {
         ? {
             suggestResync: true,
             messageEs:
-              'Sin aristas depends salientes ni consumidores (RENDERS/CALLS/IMPORTS→Component) hacia este foco. En repos **Nest/backend** suele ser **normal**: el índice pone servicios/controladores en :NestService/:NestController y el grafo de **componente** prioriza React (:Component, RENDERS). Tras reindexar, **RBAC**: **:AccessRole** con **ALLOWS_ACCESS_ROLE** desde **:NestController** y, por ruta HTTP, **:NestRoute** con **REQUIRES_ROLE** / **USES_GUARD** hacia **:NestGuard** (no en esta vista). Para acoplamiento usa **índice del repo** o Cypher sobre :Function / :NestService / :NestRoute / :AccessRole. Si crees que es React mal enlazado: resync, alcance «solo este repo» y comprueba projectId en Falkor.',
+              'Sin aristas depends salientes ni consumidores (RENDERS/CALLS/IMPORTS→Component) hacia este foco. En repos **Nest/backend** suele ser **normal**: el índice pone servicios/controladores en :NestService/:NestController y el grafo de **componente** prioriza React (:Component, RENDERS). Tras reindexar, **RBAC**: roles inlined en `roles` de **:NestController** y, por ruta HTTP, **:NestRoute** con `roles` y `guards` inlined. Para acoplamiento usa **índice del repo** o Cypher sobre :Function / :NestService / :NestRoute. Si crees que es React mal enlazado: resync, alcance «solo este repo» y comprueba projectId en Falkor.',
           }
         : undefined;
 
