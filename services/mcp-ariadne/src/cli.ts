@@ -126,9 +126,18 @@ export async function runAriadneLink(): Promise<void> {
     mcpEnv.ARIADNE_TOKEN = token;
   }
 
+  let mcpCommand = "ariadne-mcp";
+  let mcpArgs = ["--stdio"];
+  try {
+    execSync("which ariadne-mcp", { stdio: "ignore" });
+  } catch {
+    mcpCommand = "npx";
+    mcpArgs = ["-y", "ariadne-mcp", "--stdio"];
+  }
+
   mcpConfig.mcpServers.ariadne = {
-    command: "npx",
-    args: ["-y", "ariadne-mcp", "--stdio"],
+    command: mcpCommand,
+    args: mcpArgs,
     env: mcpEnv,
   };
 
@@ -169,9 +178,8 @@ export async function runAriadneLink(): Promise<void> {
 }
 
 // Invocación CLI directa
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runAriadneLink().catch((err) => {
-    console.error(`\x1b[31mError vinculando proyecto:\x1b[0m`, err);
-    process.exit(1);
-  });
-}
+void runAriadneLink().catch((err) => {
+  console.error(`\x1b[31mError vinculando proyecto:\x1b[0m`, err);
+  process.exit(1);
+});
+
