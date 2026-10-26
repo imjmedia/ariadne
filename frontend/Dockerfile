@@ -11,7 +11,7 @@ COPY services/mcp-ariadne/package.json services/mcp-ariadne/tsconfig.json ./
 COPY services/mcp-ariadne/src ./src
 RUN --mount=type=cache,target=/root/.npm \
     npm install --ignore-scripts && npm run build && \
-    npm pack && mkdir -p /export && mv ariadne-mcp-*.tgz /export/ariadne-mcp.tgz
+    npm pack && mkdir -p /export && mv *.tgz /export/ariadne-mcp.tgz
 
 ARG MCP_EXPORT_IMAGE
 FROM ${MCP_EXPORT_IMAGE:-mcp-tarball-local} AS mcp-tarball

@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 # Tarball estático para frontend (dist/mcp/) — evita recompilar MCP en frontend/Dockerfile
 FROM builder AS mcp-export
-RUN npm pack && mkdir -p /export && mv ariadne-mcp-*.tgz /export/ariadne-mcp.tgz
+RUN npm pack && mkdir -p /export && mv *.tgz /export/ariadne-mcp.tgz
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
