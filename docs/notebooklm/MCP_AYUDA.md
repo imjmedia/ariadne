@@ -11,15 +11,20 @@ Guía para configurar el MCP AriadneSpecs Oracle en Cursor. Permite a la IA cons
 En la raíz del proyecto que vas a programar en Cursor, ejecuta un único comando:
 
 ```bash
-npx ariadne link
+# Para cualquier desarrollador (descarga directa desde GitHub sin clonar Ariadne):
+npx -y github:kreodevs/ariadne link
+
+# Si te conectas a un servidor remoto (Dokploy) con tu Secret MCP / Bearer Token:
+npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
+
+# O si tienes el comando instalado localmente en tu terminal:
+ariadne link
 ```
 
-*(Si utilizas un servidor remoto o Dokploy: `npx ariadne link --server https://ariadne.kreoint.mx --token <tu-token-mcp>`)*
-
 Este comando:
-1. Detecta automáticamente tu repositorio Git y genera `.cursor/mcp.json` en modo **STDIO** (`npx -y ariadne-mcp --stdio`).
-2. Crea el archivo de reglas `AGENTS.md` canónico para Cursor.
-3. Activa automáticamente el **Live Watcher en segundo plano** dentro del MCP, con Write-Ahead Log (WAL) para trabajar sin conexión en modo avión o tolerar reinicios de servidor.
+1. Detecta automáticamente tu repositorio Git y genera `.cursor/mcp.json` en transporte nativo **STDIO**.
+2. Crea el archivo de reglas `AGENTS.md` canónico para que la IA consulte el grafo antes de editar código.
+3. Activa automáticamente el **Live Watcher en segundo plano** dentro del MCP, con Write-Ahead Log (WAL) para trabajar sin conexión en modo avión o tolerar reinicios del servidor.
 
 ---
 

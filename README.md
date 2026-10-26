@@ -26,6 +26,25 @@ Arquitectura: **Ingest** (repos remotos + sync) + **PostgreSQL** (metadatos: rep
 
 ---
 
+## ⚡ Conectar un proyecto a Cursor (Zero-Config)
+
+Para conectar cualquier proyecto a Ariadne en un solo paso:
+
+```bash
+# Para cualquier desarrollador (directo desde GitHub sin clonar Ariadne):
+npx -y github:kreodevs/ariadne link
+
+# Si te conectas a tu servidor en producción (Dokploy) con tu Secret MCP / Bearer Token:
+npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
+```
+
+Este comando:
+1. Auto-detecta tu repositorio Git y genera `.cursor/mcp.json` en transporte nativo **STDIO**.
+2. Crea el archivo de reglas [AGENTS.md](AGENTS.md) canónico para que la IA consulte el grafo antes de editar código.
+3. Activa automáticamente el **Live Watcher en segundo plano** dentro del MCP, sincronizando tus deltas locales en `<50ms` con Write-Ahead Log (WAL) tolerante a fallas.
+
+---
+
 ## Estructura del monorepo
 
 ```

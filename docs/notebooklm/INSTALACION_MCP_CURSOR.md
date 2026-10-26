@@ -30,18 +30,24 @@ El MCP AriadneSpecs expone herramientas que permiten a la IA (Cursor, Antigravit
 
 ## 3. Instalación Rápida (Recomendada: Zero-Config)
 
-En la raíz del proyecto que vas a programar en Cursor:
+En la raíz del proyecto que vas a programar en Cursor, ejecuta un único comando:
 
 ```bash
-npx ariadne link
+# Para cualquier desarrollador (descarga directa desde GitHub sin clonar Ariadne):
+npx -y github:kreodevs/ariadne link
+
+# Si te conectas a un servidor remoto (Dokploy) con tu Secret MCP / Bearer Token:
+npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
+
+# O si tienes el binario enlazado localmente en tu máquina:
+ariadne link
 ```
 
-*(Si utilizas un servidor remoto: `npx ariadne link --server https://apiariadne.kreoint.mx --token <tu-token-mcp>`)*
-
 **¿Qué hace automáticamente?**
-1. Genera `.cursor/mcp.json` configurado en modo **STDIO** (`npx -y ariadne-mcp --stdio`).
-2. Crea el archivo de reglas [AGENTS.md](../AGENTS.md) optimizado para Cursor.
-3. Activa el **Live Watcher en segundo plano**: Cursor inicia la observación de archivos locales automáticamente sin que tengas que abrir terminales secundarias.
+1. Auto-detecta el repositorio Git actual y genera `.cursor/mcp.json` configurado en transporte nativo **STDIO**.
+2. Crea el archivo de reglas [AGENTS.md](../AGENTS.md) canónico para que Cursor consulte el grafo antes de editar.
+3. Registra `.ariadne/config.json` con los metadatos de sincronización.
+4. Activa el **Live Watcher en segundo plano**: Cursor inicia la observación de archivos locales automáticamente sin que tengas que abrir terminales secundarias, con Write-Ahead Log (WAL) para trabajar sin conexión en modo avión o tolerar reinicios del servidor.
 
 ---
 
