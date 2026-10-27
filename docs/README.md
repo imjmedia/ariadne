@@ -35,9 +35,6 @@
 | Doc | Descripción |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | **notebooklm/DEPLOYMENT_DOKPLOY.md** | Deployment en Dokploy (ariadne.kreoint.mx: frontend, /api, /mcp). |
-| **notebooklm/RESUMEN_RELIC_PARA_OTRO_PROYECTO.md** | Cómo integrar otro proyecto con Ariadne y MCP (`.ariadne-project`, list_known_projects). |
-| **notebooklm/RELIC_ESTRATEGIA_INVERSION.md** | Estrategia de inversión / roadmap. |
-| **notebooklm/RELIC_PRESENTACION_EJECUTIVA.md** | Presentación ejecutiva para stakeholders. |
 
 ## Calidad, límites y observabilidad
 
@@ -60,7 +57,6 @@
 | **ariadne-project.example** | Ejemplo de `.ariadne-project` para fijar `projectId` en el repo que se mantiene con Ariadne. |
 | **cursor-rule-relic-project.mdc** | Regla de Cursor: usar `projectId` de `.ariadne-project` en llamadas al MCP. |
 | **notebooklm/constitution.md** | Principios y convenciones del proyecto. |
-| **notebooklm/Mejoras_Ariadne_Marzo.md** | Mejoras / plan (histórico vivo). |
 
 **Shell frontend (sidebar):** grupo **Gobierno** — Dashboard, Dominios, Proyectos; **Ingeniería** — Repositorios (`/repos`), Cola de Sync (`/jobs`), Nuevo Repo (`/repos/new`); **Plataforma** — Grafo, Credenciales, Ayuda. La raíz `/` redirige a `/dashboard`.
 

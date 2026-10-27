@@ -31,14 +31,11 @@
 | **bitbucket_webhook.md** | Webhook Bitbucket (esta carpeta). |
 | **BROWNFIELD-CONVERGE-THEFORGE.md** | Post-reindex → The Forge `converge/trigger` por repo. |
 
-## Deployment y negocio
-
+## Deployment
+ 
 | Doc | Descripción |
 |-----|-------------|
 | **DEPLOYMENT_DOKPLOY.md** | Deployment Dokploy (esta carpeta). |
-| **RESUMEN_RELIC_PARA_OTRO_PROYECTO.md** | Integración con Ariadne (esta carpeta). |
-| **RELIC_ESTRATEGIA_INVERSION.md** | Estrategia / roadmap (esta carpeta). |
-| **RELIC_PRESENTACION_EJECUTIVA.md** | Presentación ejecutiva (esta carpeta). |
 
 ## Calidad y límites
 
@@ -61,7 +58,6 @@
 | **ariadne-project.example** | Ejemplo de `.ariadne-project` para fijar `projectId` en el repo que se mantiene con Ariadne. |
 | **cursor-rule-relic-project.mdc** | Regla de Cursor: usar `projectId` de `.ariadne-project` en llamadas al MCP. |
 | **constitution.md** | Principios y convenciones del proyecto. |
-| **Mejoras_Ariadne_Marzo.md** | Mejoras / roadmap. |
 
 **Shell frontend:** Gobierno (Dashboard, Dominios, Proyectos); Ingeniería (Repositorios, Cola de Sync, Nuevo Repo); Plataforma (Grafo, Credenciales, Ayuda). `/` → `/dashboard`.
 

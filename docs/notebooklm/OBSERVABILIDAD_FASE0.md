@@ -69,5 +69,5 @@ Valores **iniciales** a refinar después de 1–2 semanas de histogram\_\* en pr
 
 ## Referencias
 
-- Plan de producto: [Mejoras_Ariadne_Marzo.md](./Mejoras_Ariadne_Marzo.md)
+- Arquitectura: [architecture.md](./architecture.md)
 - Código: `services/ingest/src/metrics/`, instrumentación en `chat.service.ts`, `sync.service.ts`, `webhooks.service.ts`, `pipeline/parser.ts`
