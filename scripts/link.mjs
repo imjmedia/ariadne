@@ -114,31 +114,50 @@ export function runLink() {
     }
   }
 
-  const mcpEnv = {
-    INGEST_URL: serverUrl,
-    FALKORDB_HOST: falkorHost,
-  };
-  if (token) {
-    mcpEnv.ARIADNE_TOKEN = token;
-  }
+  const isRemote = !serverUrl.includes("localhost") && !serverUrl.includes("127.0.0.1");
 
-  let mcpCommand = "ariadne-mcp";
-  let mcpArgs = ["--stdio"];
-  try {
-    execSync("which ariadne-mcp", { stdio: "ignore" });
-  } catch {
-    mcpCommand = "npx";
-    mcpArgs = ["-y", "@kreodevs/ariadne", "--stdio"];
-  }
+  if (isRemote) {
+    // Modo Remoto (Dokploy / Servidor Cloud):
+    // FalkorDB no está expuesto a internet. Cursor se conecta vía HTTP al servicio mcp-ariadne
+    const cleanUrl = serverUrl.replace(/\/mcp\/?$/, "");
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
 
-  mcpConfig.mcpServers.ariadne = {
-    command: mcpCommand,
-    args: mcpArgs,
-    env: mcpEnv,
-  };
+    mcpConfig.mcpServers.ariadne = {
+      url: `${cleanUrl}/mcp`,
+      ...(token ? { headers } : {}),
+    };
+    console.log(`✅ \x1b[32mConfigurado .cursor/mcp.json\x1b[0m (conexión HTTP remota a ${cleanUrl}/mcp)`);
+  } else {
+    // Modo Local (Ariadne corriendo en localhost)
+    const mcpEnv = {
+      INGEST_URL: serverUrl,
+      FALKORDB_HOST: falkorHost,
+    };
+    if (token) {
+      mcpEnv.ARIADNE_TOKEN = token;
+    }
+
+    let mcpCommand = "ariadne-mcp";
+    let mcpArgs = ["--stdio"];
+    try {
+      execSync("which ariadne-mcp", { stdio: "ignore" });
+    } catch {
+      mcpCommand = "npx";
+      mcpArgs = ["-y", "@kreodevs/ariadne", "--stdio"];
+    }
+
+    mcpConfig.mcpServers.ariadne = {
+      command: mcpCommand,
+      args: mcpArgs,
+      env: mcpEnv,
+    };
+    console.log(`✅ \x1b[32mConfigurado .cursor/mcp.json\x1b[0m (servidor STDIO local con auto-watcher)`);
+  }
 
   writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2) + "\n", "utf-8");
-  console.log(`✅ \x1b[32mConfigurado .cursor/mcp.json\x1b[0m (servidor STDIO con auto-watcher)`);
 
   // 2. Colocar AGENTS.md si no existe
   const agentsMdPath = join(cwd, "AGENTS.md");
