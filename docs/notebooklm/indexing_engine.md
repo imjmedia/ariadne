@@ -29,18 +29,21 @@ El Cartographer debe poblar los siguientes nodos y relaciones:
 - `(:Prop {name: string, componentName: string, projectId: string, required: boolean})`
 - `(:Function {path, name, projectId, startLine?, endLine?, loc?, complexity?, nestingDepth?, description?})` — funciones nombradas; `loc` = líneas de código; `complexity` = McCabe; `nestingDepth` = profundidad de bloques.
 - **NestJS (opcional):** `(:NestModule {path, name})`, `(:NestController {path, name, route?})`, `(:NestService {path, name})` — detectados por decoradores `@Module()`, `@Controller()`, `@Injectable()`.
-- **Strapi v4 (opcional):** `(:StrapiContentType)`, `(:StrapiController)`, `(:StrapiService)`, `(:StrapiRoute)` — paths `src/api/**` y **`src/extensions/**/content-types/**/schema.*`**, `**/routes/*.{json,js}`.
+- **GraphQL:** `(:GraphQlType {name, kind, fields, path})` — tipos, interfaces, inputs, enums y unions definidos en `.graphql` / `.gql`; `(:GraphQlQuery {name, operationKind, path})` — queries, mutations y subscriptions declaradas o ejecutables.
+- **Documentación Markdown:** `(:MarkdownDoc {sourcePath, title, documentationText})` — indexado para RAG y conectado semánticamente al código.
 
 ### Relaciones
 
 - `(Project)-[:CONTAINS]->(File)` — jerarquía multi-proyecto
 - `(File)-[:CONTAINS]->(Component)`, `(File)-[:CONTAINS]->(Hook)` (custom), `(File)-[:CONTAINS]->(Context)`
-- `(File)-[:CONTAINS]->(Function)`
+- `(File)-[:CONTAINS]->(Function)`, `(File)-[:CONTAINS]->(GraphQlType|GraphQlQuery)`
 - `(File)-[:IMPORTS]->(File)`
 - `(Component)-[:USES_HOOK]->(Hook)`
 - `(Component)-[:RENDERS]->(Component)`
 - `(Component)-[:HAS_PROP]->(Prop)`
 - `(Function)-[:CALLS]->(Function)` — llamadas entre funciones del mismo archivo (caller → callee).
+- `(GraphQlClientReference)-[:RESOLVES_OPERATION]->(GraphQlQuery)` — enlace entre llamadas GraphQL en frontend y operaciones en backend.
+- `(MarkdownDoc)-[:MARKDOWN_DESCRIBES]->(Component|NestService|NestModule)` — enlace semántico entre especificaciones/docs y código real.
 - NestJS: `(File)-[:CONTAINS]->(NestModule|NestController|NestService)`, `(NestModule)-[:DECLARES]->(NestController|NestService)` (según arrays del decorador `@Module({ controllers, providers })` en el mismo archivo).
 - Strapi: `(File)-[:CONTAINS]->(StrapiContentType|StrapiController|StrapiService)`.
 
