@@ -55,15 +55,20 @@ npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token 
 > 2. Haz clic en tu avatar o menú de **Perfil** (arriba a la derecha).
 > 3. En la sección **Secret MCP**, copia tu clave secreta personal (comienza con `ari_...`).
 
-> 💡 **Nota sobre la ruta `/mcp`:**
-> - `https://ariadne.kreoint.mx` (sin `/mcp`) es la URL base que se pasa al flag `--server` para que el watcher y el CLI se comuniquen con la API/Ingest.
-> - `https://ariadne.kreoint.mx/mcp` (con `/mcp`) es únicamente el endpoint HTTP si decides conectar Cursor directamente por URL en modo remoto sin usar el comando local.
+> 💡 **Nota sobre la ruta `/mcp` y la URL:**
+> - Puedes pasar `https://ariadne.kreoint.mx` o `https://ariadne.kreoint.mx/mcp` al flag `--server`. El CLI normaliza la ruta automáticamente.
+> 
+> 🔒 **¿Por qué FalkorDB no está expuesto en Dokploy?**
+> Por seguridad y aislamiento de red en Docker, **FalkorDB (`falkordb:6379`) vive dentro de una red interna privada (`falkor-net`) y nunca debe exponerse a internet**.
+> El contenedor de **`mcp-ariadne`** es el único que se comunica de forma interna y privada con FalkorDB en el puerto 6379. Cursor se conecta a `mcp-ariadne` a través de HTTPS en `/mcp` mediante transporte **HTTP Streamable / Server-Sent Events (SSE)** autenticado con Bearer Token (`ari_...`).
 
 **¿Qué hace automáticamente el comando `link`?**
-1. Auto-detecta el repositorio Git actual y genera `.cursor/mcp.json` configurado en transporte nativo **STDIO**.
+1. **Configuración inteligente según el entorno en `.cursor/mcp.json`:**
+   - **Si el servidor es remoto (`https://...` como en Dokploy):** Configura la conexión directa por **HTTP Streamable / SSE** (`url: "https://.../mcp"`) con la cabecera `Authorization: Bearer <token>`. **No necesitas túneles SSH ni exponer puertos de base de datos.**
+   - **Si el servidor es local (`localhost`):** Configura el proceso local por **STDIO** (`command: "ariadne-mcp"`) conectándose al FalkorDB local (`FALKORDB_HOST: "localhost"`).
 2. Crea el archivo de reglas [AGENTS.md](../AGENTS.md) canónico para que Cursor consulte el grafo antes de editar.
-3. Registra `.ariadne/config.json` con los metadatos de sincronización.
-4. Activa el **Live Watcher en segundo plano**: Cursor inicia la observación de archivos locales automáticamente sin que tengas que abrir terminales secundarias, con Write-Ahead Log (WAL) para trabajar sin conexión en modo avión o tolerar reinicios del servidor.
+3. Registra `.ariadne/config.json` con los metadatos de sincronización del proyecto.
+4. Activa el **Live Watcher en segundo plano**: para sincronización continua de archivos locales en tiempo real con Write-Ahead Log (WAL).
 
 ---
 

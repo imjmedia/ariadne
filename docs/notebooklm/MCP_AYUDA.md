@@ -32,11 +32,15 @@ npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token 
 > Entra a `https://ariadne.kreoint.mx` ➔ clic en tu **Perfil** (arriba a la derecha) ➔ copia tu **Secret MCP**.
 
 > 💡 **Ruta `/mcp` vs Base:**
-> - `https://ariadne.kreoint.mx` (sin `/mcp`) es la URL que recibe el flag `--server` para que el CLI y el watcher sincronicen archivos con la API.
-> - `https://ariadne.kreoint.mx/mcp` (con `/mcp`) es el endpoint que se usa si configuras Cursor directamente por URL HTTP.
+> - Puedes pasar tanto `https://ariadne.kreoint.mx` como `https://ariadne.kreoint.mx/mcp` a `--server`.
+> 
+> 🔒 **¿Por qué FalkorDB no está expuesto en Dokploy?**
+> Por seguridad, la base de datos de grafos **FalkorDB no está expuesta públicamente a internet**; vive en la red interna de Docker (`falkor-net`). Quien se comunica con FalkorDB es el contenedor **`mcp-ariadne`**. Por eso, Cursor se conecta de forma segura a `https://ariadne.kreoint.mx/mcp` mediante transporte HTTP Streamable (SSE) con autenticación Bearer (`ari_...`), sin necesidad de exponer puertos de base de datos ni túneles SSH.
 
 Este comando:
-1. Detecta automáticamente tu repositorio Git y genera `.cursor/mcp.json` en transporte nativo **STDIO**.
+1. **Configura `.cursor/mcp.json` automáticamente según el destino:**
+   - **Remoto (`https://...`):** Configura Cursor con `url: "https://ariadne.kreoint.mx/mcp"` y `headers: { "Authorization": "Bearer ari_..." }`.
+   - **Local (`http://localhost...`):** Configura Cursor en modo STDIO conectando a tu instancia local de FalkorDB.
 2. Crea el archivo de reglas `AGENTS.md` canónico para que la IA consulte el grafo antes de editar código.
 3. Activa automáticamente el **Live Watcher en segundo plano** dentro del MCP, con Write-Ahead Log (WAL) para trabajar sin conexión en modo avión o tolerar reinicios del servidor.
 
