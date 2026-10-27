@@ -34,7 +34,7 @@
 
 | Doc | Descripción |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **notebooklm/DEPLOYMENT_DOKPLOY.md** | Deployment en Dokploy (apiariadne.kreoint.mx / ariadne.kreoint.mx). |
+| **notebooklm/DEPLOYMENT_DOKPLOY.md** | Deployment en Dokploy (ariadne.kreoint.mx: frontend, /api, /mcp). |
 | **notebooklm/RESUMEN_RELIC_PARA_OTRO_PROYECTO.md** | Cómo integrar otro proyecto con Ariadne y MCP (`.ariadne-project`, list_known_projects). |
 | **notebooklm/RELIC_ESTRATEGIA_INVERSION.md** | Estrategia de inversión / roadmap. |
 | **notebooklm/RELIC_PRESENTACION_EJECUTIVA.md** | Presentación ejecutiva para stakeholders. |

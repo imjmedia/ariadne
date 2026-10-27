@@ -2,7 +2,7 @@
 
 Documento de instalación y configuración del servidor MCP AriadneSpecs Oracle para dar mantenimiento al proyecto **Ariadne** con **Cursor** u otros IDEs compatibles con MCP.
 
-**Deployment:** Frontend [ariadne.kreoint.mx](https://ariadne.kreoint.mx) | Backend [apiariadne.kreoint.mx](https://apiariadne.kreoint.mx)
+**Deployment:** [ariadne.kreoint.mx](https://ariadne.kreoint.mx) (Frontend en `/`, API en `/api`, MCP en `/mcp`)
 
 ---
 
@@ -118,9 +118,9 @@ Conectarse al backend con MCP corriendo localmente (HTTP en 8080) y túnel:
 |----------------|------------------------------------|
 | FALKORDB_HOST | `localhost` (vía túnel) |
 | FALKORDB_PORT | `6379` |
-| INGEST_URL | `https://apiariadne.kreoint.mx` |
+| INGEST_URL | `https://ariadne.kreoint.mx` |
 
-**Previo:** `ssh -L 6379:127.0.0.1:6379 usuario@apiariadne.kreoint.mx` (y exponer FalkorDB en el host).
+**Previo:** `ssh -L 6379:127.0.0.1:6379 usuario@ariadne.kreoint.mx` (y exponer FalkorDB en el host).
 
 ### Escenario D: Dokploy + túnel SSH (alternativa a B)
 
@@ -147,10 +147,10 @@ falkordb:
 #### 2. Crear túnel SSH
 
 ```bash
-ssh -L 6379:127.0.0.1:6379 usuario@HOST_RELIC
+ssh -L 6379:127.0.0.1:6379 usuario@ariadne.kreoint.mx
 ```
 
-- Reemplaza `HOST_RELIC` por la IP o dominio del servidor (ej. `apiariadne.kreoint.mx`).
+- Reemplaza `usuario` por tu usuario SSH en el servidor (ej. `dev-mcp@ariadne.kreoint.mx`).
 - Mantén la sesión abierta mientras uses el MCP.
 - Opcional: `-f -N` para dejarlo en segundo plano.
 
@@ -203,7 +203,7 @@ Con el túnel activo, inicia el MCP localmente (en otra terminal):
 
 ```bash
 cd ariadne
-FALKORDB_HOST=localhost FALKORDB_PORT=6379 INGEST_URL=https://apiariadne.kreoint.mx PORT=8080 node services/mcp-ariadne/dist/index.js
+FALKORDB_HOST=localhost FALKORDB_PORT=6379 INGEST_URL=https://ariadne.kreoint.mx PORT=8080 node services/mcp-ariadne/dist/index.js
 ```
 
 Luego en Cursor usa la URL local:
@@ -298,7 +298,7 @@ Previo: arrancar el MCP en tu máquina (`PORT=8080 node dist/index.js` con FALKO
 
 **Producción con MCP local + túnel (Escenario C, D):**
 
-Previo: túnel SSH activo + arrancar el MCP con `FALKORDB_HOST=localhost`, `INGEST_URL=https://apiariadne.kreoint.mx`. Luego:
+Previo: túnel SSH activo + arrancar el MCP con `FALKORDB_HOST=localhost`, `INGEST_URL=https://ariadne.kreoint.mx`. Luego:
 
 ```json
 {
