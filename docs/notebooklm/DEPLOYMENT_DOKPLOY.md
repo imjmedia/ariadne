@@ -14,31 +14,24 @@ Despliegue del stack Ariadne con un solo dominio.
 
 **Un solo dominio** — El frontend hace peticiones a `ariadne.kreoint.mx/api/repositories` etc. Traefik enruta todo lo que empiece con `/api` al contenedor API (api:3000). Internamente la API reenvía al ingest.
 
-## 2. Variables de entorno para producción
+## 2. Variables de entorno estrictamente necesarias
 
-En **Dokploy** → tu aplicación → **Environment**, o en `.env` del proyecto:
+En **Dokploy** → tu aplicación → **Environment**, o en `.env` del proyecto, **solo necesitas 3 variables obligatorias**:
 
 ```env
-# CORS — permitir requests desde el frontend
-CORS_ORIGIN=https://ariadne.kreoint.mx
-
-# Build del frontend — mismo origen (las rutas API se enrutan internamente)
-VITE_API_URL=https://ariadne.kreoint.mx
-
-# Embeddings y credenciales (obligatorio)
-EMBEDDING_PROVIDER=openai
-OPENAI_API_KEY=<tu-key>
-# Opcional — modelo para chat/analyze/modification-plan (default en compose: gpt-4o-mini)
-LLM_CHAT_MODEL=gpt-4o-mini
+# 1. Clave de cifrado de base de datos (AES-256-GCM para tokens Git y API keys en Postgres)
 CREDENTIALS_ENCRYPTION_KEY=<generar con: openssl rand -base64 32>
 
-# MCP Ariadne: cada desarrollador pone Bearer en ~/.cursor/mcp.json (Secret MCP `ari_…` en Perfil o JWT de sesión). No uses `ARIADNE_API_*` en Environment para eso.
+# 2. Secreto criptográfico para firma de JWT y autenticación OTP
+JWT_SECRET=<generar con: openssl rand -base64 32>
 
-# API Nest — firma JWT OTP/SSO (obligatorio en producción para la web)
-JWT_SECRET=<openssl rand -base64 32>
+# 3. Build del frontend — URL pública de la plataforma (las rutas /api se enrutan internamente)
+VITE_API_URL=https://ariadne.kreoint.mx
 ```
 
-El contenedor MCP recibe típicamente **`ARIADNE_API_URL=http://api:3000`** vía Compose; los **Bearer personales no van ahí.**
+> 🔒 **Cero secretos en `.env`:** Los proveedores de IA (OpenRouter, OpenAI, LemonData), modelos y API keys se configuran de forma segura y cifrada directamente desde la web en **`/settings/llm`**. Las opciones de SMTP, CORS y Falkor Sharding se gestionan en **`/settings/system`**, y las credenciales Git en **`/credentials`**.
+>
+> 🔑 **MCP Ariadne:** Cada desarrollador coloca su propio Bearer en `~/.cursor/mcp.json` (Secret MCP `ari_…` generado desde su perfil web o JWT de sesión). No se configuran tokens personales en las variables de entorno del servidor.
 
 ## 3. Enrutamiento Traefik (docker-compose)
 

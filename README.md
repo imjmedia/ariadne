@@ -265,166 +265,78 @@ Infraestructura (una vez): pnpm run dev:infra
  - pnpm run dev:orchestrator (en otra terminal)
  - pnpm run dev:front (en otra terminal)
 
-## Variables de Entorno — Referencia Completa
+## Despliegue y Configuración Simplificada
 
-A continuación se listan todas las variables de entorno organizadas por servicio y categoría. Los valores por defecto mostrados aplican al `docker-compose.yml` — en Dokploy puedes sobrescribirlos en la sección **Environment** de cada servicio.
+El despliegue de Ariadne está diseñado para ser **prácticamente zero-config**. A diferencia de arquitecturas tradicionales que requieren decenas de variables de entorno estáticas, Ariadne utiliza un modelo híbrido:
+1. **Solo 3 variables de entorno obligatorias** en tu archivo `.env` o en Dokploy.
+2. **Configuración dinámica en caliente desde la UI** (Ajustes de Sistema y Proveedores IA) persistida en PostgreSQL con cifrado AES-256-GCM.
+3. **Conexiones internas pre-cableadas** dentro de la red Docker (`falkor-net`).
 
 ---
 
-### 🔷 Core — Compartidas entre servicios
+### 1. Variables de Entorno Estrictamente Necesarias (Producción / Dokploy)
 
-| Variable | Default | Servicios | Qué hace |
+Para desplegar una nueva instancia de Ariadne, únicamente necesitas definir las siguientes variables en tu panel de Dokploy o en tu archivo `.env`:
+
+| Variable | Tipo / Ejemplo | Requerida en | Descripción y Propósito |
 |---|---|---|---|
-| `FALKORDB_HOST` | `falkordb` | ingest, api, mcp-ariadne | Host de FalkorDB |
-| `FALKORDB_PORT` | `6379` | ingest, api, mcp-ariadne | Puerto de FalkorDB |
-| `REDIS_URL` | `redis://redis:6379` | ingest, api, orchestrator | Redis para cola BullMQ (ingest), caché (api, orchestrator) |
-| `CORS_ORIGIN` | — | ingest, api | Origen permitido para CORS (ej. `https://ariadne.kreoint.mx`) |
-| *(Ajustes UI)* | — | ingest, orchestrator | **API key LLM** — Plataforma → Ajustes → Proveedores IA (Postgres cifrado). `LLM_API_KEY` env **deprecada**. |
-| `LLM_PROVIDER` | `openrouter` | ingest, orchestrator | **Proveedor LLM.** Default: `openrouter`. Para migrar a LemonData: cambiar en Ajustes o aquí. |
-| `LLM_MODEL_INGEST` | — | ingest | **Modelo específico para ingest.** Prioridad sobre `LLM_CHAT_MODEL`. |
-| `ORCHESTRATOR_LLM_MODEL` | — | orchestrator | **Modelo específico para orquestador.** Prioridad sobre `LLM_CHAT_MODEL`. |
-| `LLM_TEMPERATURE` | `0.1` | ingest, orchestrator | Temperatura del LLM |
-| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | ingest, orchestrator | URL base de OpenRouter (válido mientras `LLM_PROVIDER=openrouter`) |
-| `LLM_CHAT_MODEL` | `google/gemini-2.0-flash-001` | ingest, orchestrator | Modelo de chat (fallback global) |
-| `LLM_EMBEDDING_MODEL` | `openai/text-embedding-3-small` | ingest | Modelo de embeddings |
-| `LLM_EMBEDDING_DIM` | `1536` | ingest | Dimensión de vectores de embedding |
-| `LLM_HTTP_REFERER` | — | ingest, orchestrator | HTTP Referer para OpenRouter |
-| `LLM_APP_TITLE` | — | ingest, orchestrator | Título de app para OpenRouter |
-| `EMBEDDING_PROVIDER` | `openrouter` | ingest | Proveedor de embeddings (`openrouter` o `openai`) |
-| `INGEST_URL` | `http://ingest:3002` | api, orchestrator, mcp-ariadne | URL del servicio ingest (para delegar consultas de grafo) |
+| `CREDENTIALS_ENCRYPTION_KEY` | `openssl rand -base64 32` | `ingest` | **Obligatoria.** Clave simétrica de 32 bytes en base64 para cifrar con AES-256-GCM todas las credenciales de repositorios (GitHub, Bitbucket) y las API keys de LLM almacenadas en PostgreSQL. |
+| `JWT_SECRET` | `openssl rand -base64 32` | `api` | **Obligatoria.** Secreto criptográfico para la firma y verificación de tokens de sesión y autenticación OTP. |
+| `VITE_API_URL` | `https://ariadne.tudominio.com` | `frontend` | **Obligatoria.** URL pública del backend consumida por el frontend SPA. *(Se pasa como build-arg de Docker al compilar).* |
 
----
+> 💡 **Generación rápida de secretos:**
+> ```bash
+> openssl rand -base64 32
+> ```
 
-### 🔷 FalkorDB & Sharding (ingest + api + mcp-ariadne)
+#### Variables Opcionales de Arranque / Bootstrap
 
-Estas variables controlan cómo se particionan los datos entre grafos FalkorDB.
-
-| Variable | Default | Servicios | Qué hace |
-|---|---|---|---|
-| `FALKOR_SHARD_BY_PROJECT` | `false` | ingest, api, mcp-ariadne | **`true`:** un grafo Falkor separado por proyecto (`AriadneSpecs:<uuid>`). Necesario para +3 proyectos medianos o uno solo >80k nodos. **`false` (default):** todo en el grafo monolítico `AriadneSpecs`. Más simple, sin riesgo de consulta en shard equivocado. |
-| `FALKOR_SHARD_BY_DOMAIN` | `false` | ingest, api, mcp-ariadne | **`true`:** sub-partición del proyecto por primer segmento de ruta (`apps/` → `AriadneSpecs:<uuid>:apps`). Requiere `FALKOR_SHARD_BY_PROJECT=true`. Para monorepos enormes. |
-| `FALKOR_AUTO_DOMAIN_OVERFLOW` | `false` | ingest, api | **`true`:** si el grafo supera `FALKOR_GRAPH_NODE_SOFT_LIMIT`, actualiza automáticamente el modo a `domain`. Requiere **resync** posterior. |
-| `FALKOR_GRAPH_NODE_SOFT_LIMIT` | `100000` | ingest, api | Umbral de nodos por grafo para el overflow automático |
-| `FALKOR_FLUSH_ALL_ONCE` | — | ingest | **`1`/`true`:** vacía FalkorDB (FLUSHALL) **solo el primer arranque**. Guarda marca en Postgres para no repetir. Para otro reset: borrar flag en BD. |
-| `FALKORDB_BATCH_SIZE` | `500` | ingest | Tamaño de batch para operaciones Cypher por lote |
-| `FALKOR_DEBUG_CYPHER` | — | api | **`1`:** habilita Cypher debug en el explorador de grafo (`POST /api/graph/falkor-debug-query`) |
-
----
-
-### 🔷 Ingest (microservicio de ingesta — puerto 3002)
-
-| Variable | Default | Qué hace |
+| Variable | Default | Uso |
 |---|---|---|
-| `PORT` | `3002` | Puerto HTTP del servicio |
-| `PGHOST` | `postgres` | Host PostgreSQL |
-| `PGPORT` | `5432` | Puerto PostgreSQL |
-| `PGUSER` | `falkorspecs` | Usuario PostgreSQL |
-| `PGPASSWORD` | `falkorspecs` | Contraseña PostgreSQL |
-| `PGDATABASE` | `falkorspecs` | Base de datos PostgreSQL |
-| `INGEST_SKIP_MIGRATIONS` | — | **`1`/`true`:** omite migraciones al arrancar (solo emergencia) |
-| `NODE_ENV` | `production` | Si no es `production`, TypeORM usa `synchronize: true` |
-| `CREDENTIALS_ENCRYPTION_KEY` | — | Clave 32-bytes base64 para cifrar credenciales en BD (obligatorio si usas credenciales) |
-| `GITHUB_TOKEN` | — | Token GitHub (fallback si no hay `credentialsRef` en BD) |
-| `BITBUCKET_TOKEN` / `BITBUCKET_APP_PASSWORD` | — | Token Bitbucket (fallback) |
-| `CHAT_TELEMETRY_LOG` | `0` | **`1`/`true`:** log JSON por request del pipeline (tamaños, pathGroundingRatio) |
-| `METRICS_ENABLED` | `true` | **`0`/`false`:** desactiva Prometheus (`GET /metrics` responde 503) |
-| `CHAT_TWO_PHASE` | `1` (activo) | **`0`/`false`/`off`:** desactiva el bloque JSON de retrieval en el sintetizador |
-| `CHAT_EVIDENCE_FIRST_MAX_CHARS` | `18000` | Tope de caracteres del contexto hacia el builder MDD en modo `evidence_first` (mín. 4000, máx. 100000) |
-| `CHAT_TOOL_CALL_MAX_TOKENS` | `8192` | `max_tokens` para tool_calls del retriever |
-| `MODIFICATION_PLAN_MAX_FILES` | `150` | Tope de entradas en `get_modification_plan` (máx. 2000) |
-| `INDEX_TESTS` | — | **`1`/`true`:** incluir `*.test.*` y `*.spec.*` en el indexado (default: excluidos) |
-| `INDEX_E2E` | — | **`1`/`true`:** incluir carpetas e2e/cypress/playwright y `*.e2e.*` (default: excluidos) |
-| `INDEX_MIGRATIONS` | — | **`1`/`true`:** incluir rutas bajo `migrations/` (default: excluidos — suelen añadir ruido) |
-| `TRUNCATE_PARSE_MAX_BYTES` | `25000` | Límite de bytes para truncar archivos grandes antes de parsear |
-| `DOMAIN_COMPONENT_PATTERNS` / `DOMAIN_CONST_NAMES` | — | Fallback global si el proyecto no tiene domain_config |
-| `ORCHESTRATOR_URL` | `http://orchestrator:3001` | URL del orquestador LangGraph. Si está definido, el chat delega en él |
+| `OTP_DEV_MODE` | `false` | Activar con `true` en entornos locales o de prueba sin servidor SMTP para imprimir el código OTP directamente en la consola / respuesta. |
+| `JWT_EXPIRES` | `604800` (7 días) | Tiempo de validez en segundos de las sesiones de usuario. |
+| `COMPOSE_PARALLEL_LIMIT` | `3` | Recomendado en VPS con recursos limitados (2–4 GB RAM) para limitar builds concurrentes. |
 
 ---
 
-### 🔷 API REST (NestJS — puerto 3000)
+### 2. Configuración Dinámica desde la Interfaz Web (Ariadne UI)
 
-| Variable | Default | Qué hace |
-|---|---|---|
-| `PORT` | `3000` | Puerto HTTP |
-| `JWT_SECRET` | — | **Obligatorio en producción.** Secreto para firmar tokens JWT (auth OTP) |
-| `JWT_EXPIRES` | `604800` | Tiempo de expiración del JWT en segundos (default: 7 días) |
-| `EMAIL_OTP` | — | **Whitelist:** si se define, solo ese email puede solicitar OTP |
-| `OTP_DEV_MODE` | — | **`true`:** devuelve el código OTP en la respuesta (solo desarrollo) |
-| `SMTP_HOST` | — | Host SMTP para envío de OTP por correo |
-| `SMTP_PORT` | — | Puerto SMTP (ej. 587) |
-| `SMTP_USER` | — | Usuario SMTP |
-| `SMTP_PASS` | — | Contraseña SMTP |
-| `SMTP_FROM` | — | Remitente del correo OTP |
+**No reinicies contenedores para cambiar credenciales, correo o modelos.** Todo lo operativo se administra desde la plataforma web con recarga inmediata:
 
----
+#### 🤖 Proveedores IA y Modelos (`/settings/llm`)
+- **Proveedor activo:** Alterna entre OpenRouter, OpenAI o LemonData sin tocar archivos de configuración.
+- **API Keys cifradas:** Las claves de API se registran desde la UI y se almacenan cifradas en PostgreSQL mediante `CREDENTIALS_ENCRYPTION_KEY`. *Nunca dejes API keys en archivos `.env`.*
+- **Modelos independientes:** Configura qué modelo procesa el chat (`LLM_CHAT_MODEL`), cuál realiza el análisis de ingesta (`LLM_MODEL_INGEST`) y cuál genera embeddings (`LLM_EMBEDDING_MODEL` y dimensiones).
+- **Parámetros:** Control de temperatura e hiperparámetros de inferencia.
 
-### 🔷 Orchestrator (NestJS + LangGraph — puerto 3001)
+#### ⚙️ Ajustes del Sistema (`/settings/system`)
+- **Auth y Correo (`/settings/system` ➔ Auth y correo):**
+  - Configuración SMTP completa (Host, Puerto, Usuario, Contraseña cifrada y Remitente).
+  - Whitelist de correos autorizados para solicitud de OTP (`emailOtp`).
+  - Origen permitido para CORS (`corsOrigin`) y URL de SSO (`ssoUrl`).
+- **Red y FalkorDB (`/settings/system` ➔ Red y Falkor):**
+  - Sharding por proyecto (`shardByProject`) y sharding por dominio (`shardByDomain`) para monorepos gigantes.
+  - Auto-overflow con límite suave de nodos (`graphNodeSoftLimit`).
+  - Activación de Cypher Debug para explorador de grafos.
+- **Arquitectura C4 (`/settings/system` ➔ C4 / Diagramas):**
+  - Generación automática de diagramas C4 (Contexto, Contenedores, Componentes).
+  - Ejecución automática tras sincronización completa (`autoOnFullSync`).
+- **Observabilidad (`/settings/system` ➔ Observabilidad):**
+  - Habilitación de métricas Prometheus (`/metrics`).
+  - Logs estructurados de telemetría de chat y límites de archivos para planes de modificación.
 
-| Variable | Default | Qué hace |
-|---|---|---|
-| `PORT` | `3001` | Puerto HTTP |
-| `ARIADNESPEC_API_URL` | `http://api:3000/api` | URL de la API REST para consultas de grafo |
-| `ORCHESTRATOR_LLM_MODEL` | — | Modelo específico para el orquestador. Ver tabla Core arriba. |
-
----
-
-### 🔷 MCP Ariadne (Streamable HTTP — puerto 8080)
-
-| Variable | Default | Qué hace |
-|---|---|---|
-| `PORT` | `8080` | Puerto HTTP del servidor MCP |
-| `ARIADNE_API_URL` | `http://api:3000` (Compose) | Base URL Nest para `fetch` interno `/api/graph/*` (solo proceso MCP). **Bearer**: mismo que el cliente envía en cada `POST /mcp` (no `ARIADNE_*` en `.env` para tokens). |
-| `INGEST_URL` | `http://ingest:3002` | Validación Bearer / Secret MCP contra ingest (`validate-mcp-token`) |
-| `MCP_HTTP_ALLOW_UNAUTHENTICATED` | — | **`1`/`true`:** omite Bearer en `/mcp` (**solo desarrollo local**); no usar en prod expuesta |
-| `MCP_ASK_CODEBASE_TIMEOUT_MS` | `300000` (300s) | Timeout del fetch hacia ingest en `ask_codebase`. Con `raw_evidence`: 900s |
-| `MCP_ASK_CODEBASE_PROGRESS_LOG_MS` | `60000` | Intervalo en ms entre logs de progreso de `ask_codebase` (0 = desactivado) |
-| `MCP_TOOL_LOG` | `1` (activo) | **`0`:** desactiva logs detallados de invocación de herramientas |
-| `MCP_TOOL_LOG_ARG_MAX` | `12000` | Tamaño máximo de línea en log de herramientas |
-| `MCP_TOOL_LOG_RESPONSE_BLOCK_MAX` | — | Tope por bloque de contenido en log de respuesta |
-| `MCP_TOOL_LOG_RESPONSE_TOTAL_MAX` | — | Tope total de respuesta en log |
-| `MCP_SEMANTIC_SEARCH_DEFAULT` | — | Límite default para semantic_search |
-| `MCP_SEMANTIC_SEARCH_MAX` | — | Límite máximo para semantic_search |
-| `MCP_SEMANTIC_SEARCH_VECTOR_K_MAX` | — | Máximo de vecinos vectoriales en semantic_search |
-| `MCP_FILE_CONTEXT_MAX_CHARS` | — | Tope de caracteres en `get_file_context` |
-| `MCP_AFFECTED_NODES_MAX` / `MCP_AFFECTED_FILES_MAX` | — | Topes para `get_affected_scopes` |
-| `MCP_UNUSED_EXPORTS_MAX` | — | Tope para `check_export_usage` |
-| `MCP_TRACE_*` | — | Varias: topes para `trace_reachability` |
-| `MCP_FIND_SIMILAR_*` | — | Varias: topes para `find_similar_implementations` |
-| `MCP_SYNC_STATUS_RECENT_JOBS_MAX` | — | Jobs recientes en `get_sync_status` |
-
-> 💡 Todos los límites MCP tienen defaults altos para información completa. Puedes **bajarlos** si saturan el contexto del LLM o el tiempo de respuesta de Falkor.
+#### 🔑 Credenciales de Repositorios (`/credentials`)
+- Registra tus Personal Access Tokens (PAT) de GitHub, Bitbucket o GitLab. Quedan cifrados en base de datos y asociados a tus repositorios.
 
 ---
 
-### 🔷 Frontend (React + Vite)
+### 3. Conexiones Internas de Docker (No requieren configuración)
 
-| Variable | Default | Qué hace |
-|---|---|---|
-| `VITE_API_URL` | `http://localhost:3000` (dev) / `https://ariadne.kreoint.mx` (prod) | URL base del backend (API/Ingest). Sin trailing slash. |
-| `VITE_SSO_BASE_URL` | — | URL base del SSO (opcional; si no se define, la app funciona sin auth) |
-| `VITE_SSO_APPLICATION_ID` | — | UUID de la aplicación en SSO (opcional) |
-| `VITE_SSO_FRONTEND_URL` | — | URL del frontend SSO para redirección (opcional) |
+Los siguientes parámetros ya están resueltos automáticamente en el archivo `docker-compose.yml` a través de la red privada `falkor-net`. **No necesitas añadirlos a tu `.env` ni sobrescribirlos en Dokploy:**
 
-> `VITE_*` se pasan como **build args** en el Dockerfile, no como env runtime. Se inyectan al construir la imagen. Si cambias estos valores, rebuild de la imagen.
-
----
-
-### Resumen rápido para producción (Dokploy)
-
-Las únicas **obligatorias** en Dokploy son:
-
-| Servicio | Variables requeridas |
-|---|---|
-| **ingest** | `LLM_PROVIDER`, `CREDENTIALS_ENCRYPTION_KEY` (+ API key en Ajustes UI) |
-| **api** | `JWT_SECRET` |
-| **mcp-ariadne** | Valores por defecto en Compose (`ARIADNE_API_URL`, etc.); **Bearer**: cada desarrollador en `~/.cursor/mcp.json` |
-| **orchestrator** | `INGEST_URL`, `LLM_PROVIDER` (+ API key vía ingest/Ajustes) |
-| **frontend** | `VITE_API_URL` (build arg) |
-
-> 💡 **Modelos LLM por componente:** `LLM_MODEL_INGEST` para ingest y `ORCHESTRATOR_LLM_MODEL` para el orquestador. Si no se definen, usan `LLM_CHAT_MODEL` → default (`google/gemini-2.0-flash-001`).
-> **API key:** solo en **Ajustes → Proveedores IA** (admin). Orchestrator la lee vía `GET ingest/internal/llm-runtime`. No uses `LLM_API_KEY`, `OPENROUTER_API_KEY`, `AI_API_KEY` ni `OPENAI_API_KEY` en env.
-
-Todo lo demás tiene defaults funcionales en `docker-compose.yml`.
+- **Bases de datos:** `FALKORDB_HOST=falkordb`, `FALKORDB_PORT=6379`, `REDIS_URL=redis://redis:6379`, `PGHOST=postgres`, `PGPORT=5432`, `PGUSER=falkorspecs`, `PGDATABASE=falkorspecs`.
+- **Servicios internos:** `INGEST_URL=http://ingest:3002`, `ORCHESTRATOR_URL=http://orchestrator:3001`, `ARIADNESPEC_API_URL=http://api:3000/api`, `ARIADNE_API_URL=http://api:3000`.
+- **Límites internos:** Todos los límites de procesamiento, truncado de archivos y buffers de herramientas MCP cuentan con valores seguros y calibrados en el código fuente.
 
 ---
 
