@@ -131,6 +131,54 @@ function jsxComponentTags(source: string): string[] {
   return [...names];
 }
 
+/** Encabezados markdown que coinciden con nombres en PascalCase (# UserProfile, ## AuthService). */
+function markdownHeadingTargets(source: string): string[] {
+  const targets: string[] = [];
+  const re = /^#{1,4}\s+([A-Z][A-Za-z0-9_]+)(?:\s|$|:|\()/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    targets.push(m[1]!);
+  }
+  return targets;
+}
+
+/** Menciones inline de código en PascalCase (`UserProfile`, `Button`). */
+function markdownInlineCodeTargets(source: string): string[] {
+  const targets = new Set<string>();
+  const re = /`([A-Z][A-Za-z0-9]{2,40})`/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    const name = m[1]!;
+    if (
+      ![
+        'README',
+        'API',
+        'HTTP',
+        'REST',
+        'JSON',
+        'HTML',
+        'CSS',
+        'TODO',
+        'NOTE',
+        'TIP',
+        'WARN',
+        'ERROR',
+        'URL',
+        'URI',
+        'UUID',
+        'POST',
+        'GET',
+        'PUT',
+        'DELETE',
+        'PATCH',
+      ].includes(name)
+    ) {
+      targets.add(name);
+    }
+  }
+  return [...targets];
+}
+
 function parseDocumentationExtract(
   path: string,
   source: string,
@@ -159,6 +207,12 @@ function parseDocumentationExtract(
   }
   for (const t of storyMetaTargets) {
     linked.add(t);
+  }
+  for (const h of markdownHeadingTargets(withoutFm)) {
+    linked.add(h);
+  }
+  for (const c of markdownInlineCodeTargets(withoutFm)) {
+    linked.add(c);
   }
 
   let body = withoutFm.replace(/\n{3,}/g, '\n\n').trim();

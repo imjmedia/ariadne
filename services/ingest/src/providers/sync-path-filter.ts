@@ -167,7 +167,7 @@ export function shouldSyncIndexPath(path: string, opts?: { indexTests?: boolean 
   if (ext === '.mdx' && isStorybookDocumentationPath(norm)) return true;
   if (ext === '.json' && isStrapiIndexableJsonPath(norm)) return true;
   if (ext === '.json' && isManifestOrOpenApiSyncPath(norm)) return true;
-  if (ext === '.graphql' && isStrapiGraphqlSchemaPath(norm)) return true;
+  if ((ext === '.graphql' || ext === '.gql') && !ignoreRe.test(norm)) return true;
   if ((ext === '.yaml' || ext === '.yml') && isManifestOrOpenApiSyncPath(norm)) return true;
   if ((ext === '.mjs' || ext === '.cjs') && !ignoreRe.test(norm)) return true;
   if (ext === '.prisma') return true;

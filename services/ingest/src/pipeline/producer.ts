@@ -569,6 +569,9 @@ export function buildCypherForFile(
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gcr:GraphQlClientReference {operationName: ${cypherSafe(gcr.operationName)}, rootField: ${cypherSafe(gcr.rootField)}, filePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:REFERENCES_GRAPHQL]->(gcr)`,
     );
+    statements.push(
+      `MATCH (gcr:GraphQlClientReference {operationName: ${cypherSafe(gcr.operationName)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gq:GraphQlQuery {name: ${cypherSafe(gcr.operationName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (gcr)-[:RESOLVES_OPERATION]->(gq)`,
+    );
   }
 
   for (const gq of parsed.graphQlQueries ?? []) {
@@ -580,6 +583,17 @@ export function buildCypherForFile(
     );
     statements.push(
       `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gq:GraphQlQuery {path: ${cypherSafe(path)}, name: ${cypherSafe(gq.name)}, operationKind: ${cypherSafe(gq.operationKind)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(gq)`,
+    );
+  }
+
+  for (const gt of parsed.graphQlTypes ?? []) {
+    const desc = gt.description != null ? cypherSafe(gt.description) : 'null';
+    const fieldsJson = cypherSafe(JSON.stringify(gt.fields));
+    statements.push(
+      `MERGE (gt:GraphQlType {path: ${cypherSafe(path)}, name: ${cypherSafe(gt.name)}, projectId: ${pid}, repoId: ${rid}}) ON CREATE SET gt.kind = ${cypherSafe(gt.kind)}, gt.fields = ${fieldsJson}, gt.description = ${desc} ON MATCH SET gt.kind = ${cypherSafe(gt.kind)}, gt.fields = ${fieldsJson}, gt.description = ${desc}`,
+    );
+    statements.push(
+      `MATCH (f:File {path: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (gt:GraphQlType {path: ${cypherSafe(path)}, name: ${cypherSafe(gt.name)}, projectId: ${pid}, repoId: ${rid}}) MERGE (f)-[:CONTAINS]->(gt)`,
     );
   }
 
@@ -671,6 +685,12 @@ export function buildCypherForFile(
       statements.push(
         `MATCH (md:MarkdownDoc {sourcePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (c:Component {name: ${cypherSafe(compName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (md)-[:MARKDOWN_DESCRIBES]->(c)`,
       );
+      statements.push(
+        `MATCH (md:MarkdownDoc {sourcePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (s:NestService {name: ${cypherSafe(compName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (md)-[:MARKDOWN_DESCRIBES]->(s)`,
+      );
+      statements.push(
+        `MATCH (md:MarkdownDoc {sourcePath: ${cypherSafe(path)}, projectId: ${pid}, repoId: ${rid}}) MATCH (m:NestModule {name: ${cypherSafe(compName)}, projectId: ${pid}, repoId: ${rid}}) MERGE (md)-[:MARKDOWN_DESCRIBES]->(m)`,
+      );
     }
     for (const { localName, targetPath } of resolvedTargets) {
       statements.push(
@@ -747,6 +767,8 @@ const FALKOR_INDEXES = [
   'CREATE INDEX FOR (sa:StaticAsset) ON (sa.projectId)',
   'CREATE INDEX FOR (sa:StaticAsset) ON (sa.projectId, sa.repoId)',
   'CREATE INDEX FOR (sa:StaticAsset) ON (sa.path)',
+  'CREATE INDEX FOR (gt:GraphQlType) ON (gt.projectId)',
+  'CREATE INDEX FOR (gt:GraphQlType) ON (gt.name)',
 ];
 
 /**
@@ -789,6 +811,7 @@ const REPOID_BACKFILL_LABELS = [
   'ExternalApiReference',
   'GraphQlClientReference',
   'GraphQlQuery',
+  'GraphQlType',
   'OpenApiOperation',
   'DomainConcept',
   'Prop',

@@ -44,6 +44,7 @@ import {
 import { isPublicEntryRoute } from './react-route-public-entry';
 import { extractPendingRouteDefs, type PendingRouteDef } from './router-routes-extract';
 import { extractFlowsFromSource, type ParsedFlowDef } from './flow-extract';
+import { parseGenericGraphQl, type GraphQlTypeInfo } from './graphql-schema-extract';
 import { parseStrapiGraphqlSchema, type GraphQlQueryInfo } from './strapi-graphql-extract';
 import {
   isStrapiConfigJsPath,
@@ -360,8 +361,10 @@ export interface ParsedFile {
   apiClientReferences: ApiClientReferenceInfo[];
   /** URLs externas SSO/tasks detectadas en frontend. */
   externalApiReferences: ExternalApiReferenceInfo[];
-  /** Queries/mutations GraphQL custom Strapi (`schema.graphql`). */
+  /** Queries/mutations GraphQL custom Strapi o genéricas (`schema.graphql`, `.graphql`, `.gql`). */
   graphQlQueries: GraphQlQueryInfo[];
+  /** Tipos de datos definidos en esquemas GraphQL (type, input, interface, enum, union). */
+  graphQlTypes?: GraphQlTypeInfo[];
   /** UIDs `api::…` en lifecycles/cron (strapi.service/controller/db.query). */
   strapiUidReferences: string[];
   /** Operaciones GraphQL en front (`gql`/`graphql` templates). */
@@ -791,14 +794,33 @@ export function parseSource(
     }
     return result;
   }
-  if (isStrapiGraphqlSchemaPath(normPathEarly)) {
-    result.graphQlQueries = parseStrapiGraphqlSchema(path, source);
+  if (normPathEarly.endsWith('.graphql') || normPathEarly.endsWith('.gql')) {
+    if (isStrapiGraphqlSchemaPath(normPathEarly)) {
+      result.graphQlQueries = parseStrapiGraphqlSchema(path, source);
+    }
+    const generic = parseGenericGraphQl(path, source);
+    if (generic.types.length > 0) {
+      result.graphQlTypes = generic.types;
+    }
+    if (generic.operations.length > 0) {
+      const existingNames = new Set(result.graphQlQueries.map((q) => q.name));
+      for (const op of generic.operations) {
+        if (!existingNames.has(op.name)) {
+          result.graphQlQueries.push({
+            name: op.name,
+            apiName: 'graphql',
+            operationKind: op.operationKind,
+            description: op.description,
+          });
+        }
+      }
+    }
     if (options.returnAst) {
       const stubParser = new Parser();
       stubParser.setLanguage(LANG_TS as Parameters<Parser['setLanguage']>[0]);
       return { parsed: result, root: stubParser.parse('').rootNode, source };
     }
-    return result.graphQlQueries.length > 0 ? result : null;
+    return result.graphQlQueries.length > 0 || (result.graphQlTypes?.length ?? 0) > 0 ? result : null;
   }
   if (
     /(^|\/)tsconfig(\.[^/]+)?\.json$/.test(lowerEarly) ||

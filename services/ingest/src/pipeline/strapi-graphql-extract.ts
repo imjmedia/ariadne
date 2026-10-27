@@ -2,7 +2,7 @@
  * Extrae queries/mutations custom de `schema.graphql` Strapi v4 (module.exports con bloques query/mutation/resolver).
  */
 
-export type GraphQlOperationKind = 'query' | 'mutation';
+export type GraphQlOperationKind = 'query' | 'mutation' | 'subscription';
 
 export interface GraphQlQueryInfo {
   name: string;
