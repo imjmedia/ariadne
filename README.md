@@ -26,9 +26,9 @@ Arquitectura: **Ingest** (repos remotos + sync) + **PostgreSQL** (metadatos: rep
 
 ---
 
-## ⚡ Conectar un proyecto a Cursor (Zero-Config)
+## ⚡ Conectar un proyecto en 1 paso (Zero-Config Multi-Agente)
 
-Para conectar cualquier proyecto a Ariadne en un solo paso:
+Conecta cualquier proyecto a Ariadne en segundos sin compilar nada ni abrir puertos:
 
 ```bash
 # Caso 1: En tu máquina local (asume http://localhost:3002 por defecto):
@@ -37,17 +37,62 @@ ariadne link
 # Caso 2: Conectar a servidor en producción (Dokploy) con tu Secret MCP:
 ariadne link --server https://ariadne.kreoint.mx --token ari_...
 
-# Caso 3: Para desarrolladores sin Ariadne clonado (directo desde GitHub):
+# Caso 3: Para cualquier desarrollador sin Ariadne clonado (directo desde GitHub):
 npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token ari_...
 ```
 
-> 🔑 **Token de acceso:** Tu token se obtiene en el panel web (`https://ariadne.kreoint.mx`) ➔ clic en **Perfil** ➔ **Secret MCP** (`ari_...`).
-> 💡 En Dokploy la URL base es `https://ariadne.kreoint.mx`. La ruta `/mcp` solo se usa si configuras Cursor directamente por URL HTTP.
+> 🔑 **Token de acceso:** Obtenlo en el panel web (`https://ariadne.kreoint.mx`) ➔ clic en tu **Perfil** (arriba a la derecha) ➔ **Secret MCP** (`ari_...`).  
+> 🔒 **Seguridad y red:** En producción (Dokploy), la base de datos FalkorDB permanece aislada en la red interna de Docker (`falkor-net`). El cliente se conecta de forma segura a `https://ariadne.kreoint.mx/mcp` vía **HTTP Streamable / Server-Sent Events (SSE)** con autenticación Bearer Token, sin requerir túneles SSH ni exponer puertos de base de datos a internet.
 
-Este comando:
-1. Auto-detecta tu repositorio Git y genera `.cursor/mcp.json` en transporte nativo **STDIO**.
-2. Crea el archivo de reglas [AGENTS.md](AGENTS.md) canónico para que la IA consulte el grafo antes de editar código.
-3. Activa automáticamente el **Live Watcher en segundo plano** dentro del MCP, sincronizando tus deltas locales en `<50ms` con Write-Ahead Log (WAL) tolerante a fallas.
+**¿Qué configura automáticamente este comando?**
+1. **Transporte inteligente en `.cursor/mcp.json`:** Detecta si el servidor es remoto (HTTP SSE + Bearer) o local (STDIO nativo).
+2. **Cursor Rules Nativas (`.cursor/rules/ariadne-governance.mdc`):** Inyecta la regla con `alwaysApply: true` en el System Prompt de Cursor para forzar la observancia estricta del flujo Two-Gate.
+3. **Cursor Skills (`.cursor/skills/ariadnespecs-mcp/SKILL.md`):** Cheatsheet y catálogo de herramientas disponible en la UI de Cursor.
+4. **Claude Code (`CLAUDE.md`):** Gobierno canónico en la raíz del proyecto para Claude CLI y Claude Desktop.
+5. **Google Antigravity (`.agents/skills/ariadne/SKILL.md`):** Skill empaquetado con frontmatter YAML compatible con Antigravity.
+6. **Universal (`AGENTS.md`):** Reglas canónicas para Windsurf, Aider y cualquier otro cliente MCP.
+7. **Live Watcher en segundo plano:** Sincronización continua de deltas locales en tiempo real con Write-Ahead Log (WAL) tolerante a fallas.
+
+---
+
+## 🏆 Ventajas sobre otros enfoques (¿Por qué Ariadne?)
+
+La gran mayoría de asistentes de programación basados en IA operan en **"modo adivinación"**: leen fragmentos aislados de código, inventan nombres de propiedades o endpoints y asumen que los cambios no romperán el resto de la aplicación.
+
+Ariadne introduce una capa de **Gobernanza Arquitectónica Activa (Active Architecture Governance)** basada en un grafo de conocimiento vivo en FalkorDB:
+
+### Matriz comparativa
+
+| Capacidad | Asistente IA Estándar (Copilot / Cursor sin Grafo) | RAG Vectorial Simple (Embeddings / Chunking tradicional) | Ariadne Codebase Intelligence (Grafo + Two-Gate) |
+|---|:---:|:---:|:---:|
+| **Conocimiento de relaciones** | ❌ Ciego a dependientes lejanos | ⚠️ Solo similitud de texto/conceptos | ✅ **Grafo estático real (`CALLS`, `IMPORTS`, `RENDERS`, `USES_HOOK`)** |
+| **Detección de radio de impacto** | ❌ No calcula blast radius | ❌ Imposible predecir quién llama a quién | ✅ **Blast radius pre-calculado a 1 y 2 saltos antes de editar** |
+| **Prevención de alucinaciones de tipos** | ❌ Inventa nombres de props y APIs | ⚠️ Fragmentos truncados de texto | ✅ **Ego-Graphs con contratos TypeScript exactos extraídos del AST** |
+| **Disciplina y compuertas de cambio** | ❌ Genera diffs directos sin auditar | ❌ Sin validación de consistencia | ✅ **Two-Gate Workflow: Gate 1 (Plan) + Gate 2 (Auditoría Bloqueante)** |
+| **Sincronización en tiempo real** | ❌ Depende de guardar o git commit | ❌ Requiere re-indexación batch pesada | ✅ **Live Local Watcher (<50ms) + Write-Ahead Log (WAL) offline** |
+| **Compatibilidad Multi-Agente** | ⚠️ Configuración manual por IDE | ⚠️ Herramientas propietarias cerradas | ✅ **Setup en 1 paso para Cursor, Claude Code, Antigravity y universal** |
+| **Seguridad de infraestructura** | ⚠️ Requiere exponer puertos o túneles | ⚠️ Credenciales dispersas | ✅ **Docker isolated network + Streamable HTTP MCP con Bearer Token** |
+
+---
+
+### Los 5 Pilares Diferenciales de Ariadne
+
+#### 1. Determinismo Estructural vs. Adivinación Heurística
+En lugar de saturar la ventana de contexto del LLM con miles de líneas de código irrelevantes, Ariadne recupera **Ego-Graphs**: sub-grafos inmediatos que contienen los contratos de TypeScript, firmas de funciones y endpoints exactos del símbolo a modificar, eliminando alucinaciones de raíz.
+
+#### 2. Arquitectura de Dos Compuertas (Two-Gate Workflow)
+- **Gate 1 (`get_modification_plan`):** Ante un requerimiento, Ariadne analiza el grafo y entrega la lista exhaustiva de archivos a modificar (`filesToModify`), el árbol de dependientes y preguntas de negocio de precisión (`questionsToRefine`).
+- **Gate 2 (`validate_change_plan`):** Audita el plan estructurado propuesto por la IA antes de permitirle escribir código. Si el agente omitió actualizar un consumidor crítico, el plan se marca como **`BLOCKED`**, evitando regresiones en producción.
+
+#### 3. Auditoría de Símbolo y Pre-Commit
+- **`validate_before_edit(nodeName)`:** Obligatorio antes de tocar cualquier componente o función individual. Devuelve su contrato y la lista de todos sus llamadores.
+- **`detect_changes()`:** Inspecciona el diff local previo al commit para certificar que ningún archivo externo haya quedado huérfano o roto.
+
+#### 4. Sincronización Local Live con Tolerancia a Fallas (WAL)
+No necesitas hacer `git commit` ni `git push` para que Ariadne conozca tu código. El **Live Daemon** integrado observa los cambios de tu buffer/disco y sincroniza deltas en memoria en `<50ms`. Si pierdes conexión a internet o viajas en modo avión, el **Write-Ahead Log (WAL)** en disco encola los cambios y los sincroniza automáticamente al reconectar.
+
+#### 5. Ecosistema Multi-Agente en 1 Solo Comando
+Ariadne no te ata a un único editor. Al ejecutar `npx github:kreodevs/ariadne link`, tu repositorio queda instantáneamente protegido con las directivas nativas de **Cursor** (`.cursor/rules/*.mdc`), **Claude Code** (`CLAUDE.md`) y **Google Antigravity** (`.agents/skills/ariadne/SKILL.md`).
 
 ---
 
