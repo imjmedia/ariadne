@@ -83,11 +83,9 @@ Tras cada sync (normal o resync), se ejecuta automáticamente `embed-index` si h
 - `CREDENTIALS_ENCRYPTION_KEY` — Clave para cifrar credenciales en BD (32 bytes base64). Requerida si se usan credenciales en BD.
 - `BITBUCKET_TOKEN` / `BITBUCKET_APP_PASSWORD` — Bitbucket (fallback si no hay credentialsRef). Permisos requeridos: Account: Read, Workspace membership: Read, Repositories: Read (ver [docs/manual/CONFIGURACION_Y_USO.md](../../docs/manual/CONFIGURACION_Y_USO.md))
 - `GITHUB_TOKEN` — GitHub (fallback)
-- `EMBEDDING_PROVIDER` — `openrouter` (default) o `openai` (alias al mismo API en OpenRouter)
-- **`LLM_MODEL`**, **`LLM_TEMPERATURE`** — Defaults de modelo si no hay fila en Ajustes; ver `src/llm/llm-config.ts`. **API key solo en Ajustes UI.**
-- `OPENROUTER_API_KEY` — Clave principal; alias: `AI_API_KEY`, `OPENAI_API_KEY`.
-- `OPENROUTER_CHAT_MODEL` — Default en código: `nousresearch/hermes-3-llama-3.1-405b` (alineado con The Forge).
-- `OPENROUTER_EMBEDDING_MODEL` — Default `openai/text-embedding-3-small`; `LLM_EMBEDDING_DIM` default 1536.
+- `EMBEDDING_PROVIDER` — `openrouter` (default), `openai` o `lemondata` (gestionable en `/settings/llm`)
+- **`LLM_CHAT_MODEL`**, **`LLM_TEMPERATURE`** — Defaults si no hay fila en Ajustes; ver `src/llm/llm-config.ts` (default: `google/gemini-2.0-flash-001`, temp `0.1`). **API keys se gestionan cifradas exclusivamente desde la UI en `/settings/llm`.**
+- `LLM_EMBEDDING_MODEL` — Default `openai/text-embedding-3-small`; `LLM_EMBEDDING_DIM` default 1536.
 - `CHAT_TELEMETRY_LOG` — `1` o `true`: log JSON por request del pipeline unificado (tamaños, citas de paths, `pathGroundingRatio` vs retrieval).
 - `METRICS_ENABLED` — `0` o `false`: desactiva Prometheus (`GET /metrics` responde 503). Por defecto las métricas están activas (Fase 0 — ver [docs/notebooklm/OBSERVABILIDAD_FASE0.md](../../docs/notebooklm/OBSERVABILIDAD_FASE0.md)).
 - `CHAT_TWO_PHASE` — `0` / `false` / `off`: desactiva el bloque JSON de retrieval antes del contexto bruto en el sintetizador (default: activo).
