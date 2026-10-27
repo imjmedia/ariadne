@@ -52,6 +52,71 @@ This gives you project IDs, repo names, and branches. Use the \`roots[].id\` (re
 4. **Live Local Sync** — The Ariadne daemon watches your local file changes automatically in real time without requiring commit/push.
 `;
 
+const CANONICAL_CURSOR_RULE_MDC = `---
+description: Ariadne Codebase Intelligence governance & 2-gate workflow
+globs: *
+alwaysApply: true
+---
+
+# Ariadne Codebase Intelligence Governance
+
+You are paired with **Ariadne MCP** (backed by FalkorDB). You MUST consult the codebase knowledge graph before creating, modifying, or refactoring code.
+
+## Mandatory 2-Gate Workflow
+
+1. **Verify Freshness**:
+   - Call \`get_sync_status(projectId)\` before planning any multi-file change. If stale, resync.
+2. **Gate 1 (Modification Plan)**:
+   - Call \`get_modification_plan(userDescription)\`.
+   - Never guess files; only modify \`filesToModify\` returned by the graph.
+   - Address the business/technical questions returned in \`questionsToRefine\`.
+3. **Gate 2 (ChangePlan Audit)**:
+   - Formulate the structured \`ChangePlan\` JSON using \`changePlanTemplate\`.
+   - Call \`validate_change_plan(changePlan)\`. If the verdict is \`BLOCKED\`, STOP immediately.
+4. **Before Editing Any Symbol**:
+   - ALWAYS call \`validate_before_edit(nodeName)\` to verify the prop contract and dependents.
+5. **Pre-Commit Blast Radius**:
+   - Call \`detect_changes()\` before committing to ensure no unintended dependents are broken.
+`;
+
+const CANONICAL_CLAUDE_MD = `# CLAUDE.md — Ariadne Codebase Intelligence
+
+You are paired with **Ariadne MCP** — a FalkorDB-backed knowledge graph of this codebase tracking components, functions, routes, models, imports, and TypeScript prop contracts.
+
+## First Step Every Session
+\`\`\`
+list_known_projects()
+\`\`\`
+Use the \`roots[].id\` as \`projectId\` in multi-root monorepos, or pass \`currentFilePath\` to let the server infer it.
+
+## Core 2-Gate Workflow
+1. \`get_sync_status(projectId)\` → Check if the graph is up-to-date.
+2. **Gate 1**: \`get_modification_plan(userDescription)\` → Yields exact \`filesToModify\` and \`questionsToRefine\`.
+3. **Code Inspection**: Read the relevant local files from \`filesToModify\`.
+4. **Gate 2**: \`validate_change_plan(changePlanJson)\` → Mandatory before editing code. STOP if \`BLOCKED\`.
+5. **Per Symbol**: \`validate_before_edit(nodeName)\` → Check impact and prop contracts before touching any function/component.
+6. **Pre-Commit**: \`detect_changes()\` → Verify blast radius before committing.
+`;
+
+const CANONICAL_SKILL_MD = `---
+name: ariadne
+description: Ariadne FalkorDB knowledge graph governance, 2-gate refactor workflow, impact analysis, and TypeScript prop contracts. Use before writing, modifying, or refactoring code.
+---
+
+# Ariadne Codebase Intelligence
+
+Use this skill whenever you explore architecture, plan changes, or modify code in this codebase.
+
+## Quick Reference Tools
+- \`list_known_projects()\`: Discover indexed projects and repository IDs.
+- \`semantic_search(query)\`: Vector + lexical search with 1-hop Ego-Graphs.
+- \`get_file_context(filePath)\`: File content + imports + exports.
+- \`get_modification_plan(userDescription)\`: Gate 1 planning (files to modify + business questions).
+- \`validate_change_plan(plan)\`: Gate 2 audit before multi-file edits.
+- \`validate_before_edit(nodeName)\`: Mandatory contract check before editing any symbol.
+- \`detect_changes()\`: Pre-commit blast radius inspection.
+`;
+
 function getGitRemoteOrigin() {
   try {
     const out = execSync("git remote get-url origin", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] });
@@ -159,16 +224,56 @@ export function runLink() {
 
   writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2) + "\n", "utf-8");
 
-  // 2. Colocar AGENTS.md si no existe
+  // 2. Colocar AGENTS.md si no existe (Universal)
   const agentsMdPath = join(cwd, "AGENTS.md");
   if (!existsSync(agentsMdPath)) {
     writeFileSync(agentsMdPath, CANONICAL_AGENTS_MD, "utf-8");
-    console.log(`✅ \x1b[32mCreado AGENTS.md\x1b[0m (instrucciones canónicas para Cursor)`);
+    console.log(`✅ \x1b[32mCreado AGENTS.md\x1b[0m (instrucciones canónicas universales)`);
   } else {
     console.log(`ℹ️  AGENTS.md ya existe en el proyecto (no se sobreescribió).`);
   }
 
-  // 3. Crear .ariadne/config.json
+  // 3. Colocar CLAUDE.md si no existe (Claude Code / Anthropic)
+  const claudeMdPath = join(cwd, "CLAUDE.md");
+  if (!existsSync(claudeMdPath)) {
+    writeFileSync(claudeMdPath, CANONICAL_CLAUDE_MD, "utf-8");
+    console.log(`✅ \x1b[32mCreado CLAUDE.md\x1b[0m (directivas para Claude Code)`);
+  }
+
+  // 4. Regla nativa de Cursor (.cursor/rules/ariadne-governance.mdc)
+  const cursorRulesDir = join(cursorDir, "rules");
+  if (!existsSync(cursorRulesDir)) {
+    mkdirSync(cursorRulesDir, { recursive: true });
+  }
+  const cursorRulePath = join(cursorRulesDir, "ariadne-governance.mdc");
+  if (!existsSync(cursorRulePath)) {
+    writeFileSync(cursorRulePath, CANONICAL_CURSOR_RULE_MDC, "utf-8");
+    console.log(`✅ \x1b[32mCreada regla Cursor (.cursor/rules/ariadne-governance.mdc)\x1b[0m (prioridad de sistema)`);
+  }
+
+  // 5. Skill nativo para Google Antigravity (.agents/skills/ariadne/SKILL.md)
+  const antigravitySkillDir = join(cwd, ".agents", "skills", "ariadne");
+  if (!existsSync(antigravitySkillDir)) {
+    mkdirSync(antigravitySkillDir, { recursive: true });
+  }
+  const antigravitySkillPath = join(antigravitySkillDir, "SKILL.md");
+  if (!existsSync(antigravitySkillPath)) {
+    writeFileSync(antigravitySkillPath, CANONICAL_SKILL_MD, "utf-8");
+    console.log(`✅ \x1b[32mCreado Skill Antigravity (.agents/skills/ariadne/SKILL.md)\x1b[0m`);
+  }
+
+  // 6. Skill para Cursor (.cursor/skills/ariadnespecs-mcp/SKILL.md)
+  const cursorSkillDir = join(cursorDir, "skills", "ariadnespecs-mcp");
+  if (!existsSync(cursorSkillDir)) {
+    mkdirSync(cursorSkillDir, { recursive: true });
+  }
+  const cursorSkillPath = join(cursorSkillDir, "SKILL.md");
+  if (!existsSync(cursorSkillPath)) {
+    writeFileSync(cursorSkillPath, CANONICAL_SKILL_MD, "utf-8");
+    console.log(`✅ \x1b[32mCreado Skill Cursor (.cursor/skills/ariadnespecs-mcp/SKILL.md)\x1b[0m`);
+  }
+
+  // 7. Crear .ariadne/config.json
   const ariadneDir = join(cwd, ".ariadne");
   if (!existsSync(ariadneDir)) {
     mkdirSync(ariadneDir, { recursive: true });

@@ -41,7 +41,12 @@ Este comando:
 1. **Configura `.cursor/mcp.json` automáticamente según el destino:**
    - **Remoto (`https://...`):** Configura Cursor con `url: "https://ariadne.kreoint.mx/mcp"` y `headers: { "Authorization": "Bearer ari_..." }`.
    - **Local (`http://localhost...`):** Configura Cursor en modo STDIO conectando a tu instancia local de FalkorDB.
-2. Crea el archivo de reglas `AGENTS.md` canónico para que la IA consulte el grafo antes de editar código.
+2. **Instala las reglas y skills multi-agente:**
+   - **Cursor Rules Nativas (`.cursor/rules/ariadne-governance.mdc`):** Fuerza la ejecución estricta del flujo Two-Gate desde el system prompt de Cursor.
+   - **Cursor Skills (`.cursor/skills/ariadnespecs-mcp/SKILL.md`):** Hoja de ruta para la UI de skills de Cursor.
+   - **Claude Code (`CLAUDE.md`):** Gobierno en la raíz del proyecto para Claude CLI y Claude Desktop.
+   - **Google Antigravity (`.agents/skills/ariadne/SKILL.md`):** Skill nativo con frontmatter YAML.
+   - **Universal (`AGENTS.md`):** Instrucciones canónicas universales para cualquier otro agente.
 3. Activa automáticamente el **Live Watcher en segundo plano** dentro del MCP, con Write-Ahead Log (WAL) para trabajar sin conexión en modo avión o tolerar reinicios del servidor.
 
 ---

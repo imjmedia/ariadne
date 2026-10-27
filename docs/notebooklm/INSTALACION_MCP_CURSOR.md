@@ -63,10 +63,15 @@ npx -y github:kreodevs/ariadne link --server https://ariadne.kreoint.mx --token 
 > El contenedor de **`mcp-ariadne`** es el único que se comunica de forma interna y privada con FalkorDB en el puerto 6379. Cursor se conecta a `mcp-ariadne` a través de HTTPS en `/mcp` mediante transporte **HTTP Streamable / Server-Sent Events (SSE)** autenticado con Bearer Token (`ari_...`).
 
 **¿Qué hace automáticamente el comando `link`?**
-1. **Configuración inteligente según el entorno en `.cursor/mcp.json`:**
-   - **Si el servidor es remoto (`https://...` como en Dokploy):** Configura la conexión directa por **HTTP Streamable / SSE** (`url: "https://.../mcp"`) con la cabecera `Authorization: Bearer <token>`. **No necesitas túneles SSH ni exponer puertos de base de datos.**
-   - **Si el servidor es local (`localhost`):** Configura el proceso local por **STDIO** (`command: "ariadne-mcp"`) conectándose al FalkorDB local (`FALKORDB_HOST: "localhost"`).
-2. Crea el archivo de reglas [AGENTS.md](../AGENTS.md) canónico para que Cursor consulte el grafo antes de editar.
+1. **Configuración inteligente de transporte en `.cursor/mcp.json`:**
+   - **Remoto (`https://...` como en Dokploy):** Conexión directa por **HTTP Streamable / SSE** (`url: "https://.../mcp"`) con `Authorization: Bearer <token>`. Sin túneles SSH ni puertos de base de datos expuestos.
+   - **Local (`localhost`):** Proceso nativo por **STDIO** (`command: "ariadne-mcp"`) conectándose al FalkorDB local (`FALKORDB_HOST: "localhost"`).
+2. **Blindaje Multi-Agente (Cursor, Claude Code y Google Antigravity):**
+   - **Cursor Rules Nativas (`.cursor/rules/ariadne-governance.mdc`):** Inyecta la regla con `alwaysApply: true` a nivel de System Prompt para garantizar el flujo Two-Gate de forma obligatoria.
+   - **Cursor Skills (`.cursor/skills/ariadnespecs-mcp/SKILL.md`):** Hoja de referencia y herramientas accesible desde la UI de Cursor.
+   - **Claude Code (`CLAUDE.md`):** Archivo de gobierno oficial en la raíz del proyecto para Claude CLI y Claude Desktop.
+   - **Google Antigravity (`.agents/skills/ariadne/SKILL.md`):** Skill nativo con frontmatter YAML compatible con Antigravity.
+   - **Universal (`AGENTS.md`):** Instrucciones canónicas para cualquier otro asistente (Windsurf, Aider, etc.).
 3. Registra `.ariadne/config.json` con los metadatos de sincronización del proyecto.
 4. Activa el **Live Watcher en segundo plano**: para sincronización continua de archivos locales en tiempo real con Write-Ahead Log (WAL).
 
